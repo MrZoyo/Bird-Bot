@@ -1,5 +1,15 @@
 # DiscordGameServerHelper
 ---
+## V0.1.0 - 2024-02-20
+### Update the bot to support the following features:
+#### New log system
+- Add a new log system to record the user's operation and the robot's response. The log will be saved in the `bot.log` file.
+- Delete the old log system with timestamp. So the bug of the old timestamp system will be fixed.
+#### New version control system
+- The first number of the version number will be updated when the bot is almost completely rewritten.
+- The second number of the version number will be updated when the bot is updated with large new features.
+- The third number of the version number will be updated when the bot is updated with small new features or bug fixes.
+---
 ## V0.0.2 - 2024-02-19
 ### Update the bot to support the following features:
 #### Create channels for players

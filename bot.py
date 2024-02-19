@@ -2,8 +2,7 @@ import discord
 from discord.ext import commands
 from collections import defaultdict
 import re
-from datetime import datetime
-import pytz
+import logging
 
 PUBLIC_CHANNEL_ID = 1145141919810
 PRIVATE_CHANNEL_ID = 8101919114514
@@ -20,17 +19,15 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # Store information about temporary channels
 temp_channels = defaultdict(dict)
 
-# set the timezone to Germany
-germany_tz = pytz.timezone('Europe/Berlin')
-
-# get the current time in Germany
-now_germany = datetime.now(germany_tz)
+# Configure the logging system
+logging.basicConfig(level=logging.INFO, filename='bot.log', filemode='a',
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 @bot.event
 async def on_ready():
-    print(f'Logged in as {bot.user.name}')
+    logging.info(f'Logged in as {bot.user.name}')
     for guild in bot.guilds:
-        print(f"\nBot connected to server {guild.name}\n")
+        logging.info(f"\nBot connected to server {guild.name}\n")
         await bot.change_presence(activity=discord.Game(name=f"Working in {guild.name}"))
 
 @bot.event
@@ -130,8 +127,7 @@ async def on_message(message):
             valid_matches.append(match)
 
     if valid_matches:
-        time_now = now_germany.strftime('%Y-%m-%d %H:%M:%S')
-        print(f'{time_now} Detected content from {message.author}: {message.content}, Matches: {valid_matches}!')
+        logging.info(f'Detected content from {message.author}: {message.content}, Matches: {valid_matches}!')
 
         # Check if the user is in a voice channel
         if message.author.voice and message.author.voice.channel:
