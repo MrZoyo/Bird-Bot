@@ -2,9 +2,12 @@ import discord
 from discord.ext import commands
 from collections import defaultdict
 import re
+from datetime import datetime
+import pytz
 
 PUBLIC_CHANNEL_ID = 1145141919810
 PRIVATE_CHANNEL_ID = 8101919114514
+RELAX_CHANNEL_ID = 1141919810514
 TOKEN = 'Your_Token_Here'
 
 intents = discord.Intents.all()
@@ -17,6 +20,12 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # Store information about temporary channels
 temp_channels = defaultdict(dict)
 
+# set the timezone to Germany
+germany_tz = pytz.timezone('Europe/Berlin')
+
+# get the current time in Germany
+now_germany = datetime.now(germany_tz)
+
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user.name}')
@@ -28,6 +37,7 @@ async def on_ready():
 async def on_voice_state_update(member, before, after):
     channel1_id = PUBLIC_CHANNEL_ID  # Public channel
     channel2_id = PRIVATE_CHANNEL_ID  # Private channel
+    channel3_id = RELAX_CHANNEL_ID  # Relax channel
 
     # Check if the user has joined the public channel
     if after.channel and after.channel.id == channel1_id:
@@ -36,6 +46,10 @@ async def on_voice_state_update(member, before, after):
     # Check if the user has joined the private channel
     elif after.channel and after.channel.id == channel2_id:
         await handle_channel2(member, after)
+
+    # Check if the user has joined the relax channel
+    elif after.channel and after.channel.id == channel3_id:
+        await handle_channel3(member, after)
 
     # Check if a user has left a temporary channel
     if before.channel and before.channel.id in temp_channels:
@@ -79,6 +93,19 @@ async def handle_channel2(member, after):
     temp_channels[temp_channel.id] = member.id
     await member.move_to(temp_channel)
 
+async def handle_channel3(member, after):
+    category = after.channel.category
+    temp_channel_name = f"Relax Room-{member.display_name}"
+    overwrites = {
+        after.channel.guild.default_role: discord.PermissionOverwrite(view_channel=True),
+        member: discord.PermissionOverwrite(manage_channels=True, view_channel=True, connect=True, speak=True)
+    }
+    temp_channel = await after.channel.guild.create_voice_channel(name=temp_channel_name, category=category,
+                                                                  overwrites=overwrites)
+
+    temp_channels[temp_channel.id] = member.id
+    await member.move_to(temp_channel)
+
 @bot.listen('on_message')
 async def on_message(message):
     # Avoid the bot responding to its own messages
@@ -90,7 +117,7 @@ async def on_message(message):
         return  # Ignore this message
 
     # Regex pattern without negative lookbehind assertion
-    pattern = r"(缺\d|等\d|[=＝]\d|[Qq]\d|缺[一二三四五]|等[一二三四五]|缺[nN]|等[nN]|[=＝]N|[=＝]n)"
+    pattern = r"(缺\d|等\d|[=＝]\d|[Qq]\d|缺[一二三四五]|等[一二三四五]|缺[nN]|等[nN]|[=＝]N|[=＝]n)(?!(分|分钟|min|个钟|小时))"
 
     # Find all matches in the content
     matches = re.findall(pattern, message.content, re.IGNORECASE)
@@ -103,7 +130,8 @@ async def on_message(message):
             valid_matches.append(match)
 
     if valid_matches:
-        print(f'Detected content from {message.author}: {message.content}, Matches: {valid_matches}!')
+        time_now = now_germany.strftime('%Y-%m-%d %H:%M:%S')
+        print(f'{time_now} Detected content from {message.author}: {message.content}, Matches: {valid_matches}!')
 
         # Check if the user is in a voice channel
         if message.author.voice and message.author.voice.channel:
