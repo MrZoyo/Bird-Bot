@@ -2,10 +2,11 @@
 ---
 ## V0.1.1 - 2024-02-29
 ### Update the bot to support the following features:
-#### Added a blacklist system that allows bot to not reply to users in the blacklist.
+#### New blacklist system
+- Added a blacklist system that allows bot to not reply to users in the blacklist.
 ### Bug fixes
-#### Fixed a bug that had caused the bot to reply to the same message multiple times when the user sent a message with multiple matches.
-#### Fixed a bug that caused some special URLs to be replied to incorrectly.
+- Fixed a bug that had caused the bot to reply to the same message multiple times when the user sent a message with multiple matches.
+- Fixed a bug that caused some special URLs to be replied to incorrectly.
 ---
 ## V0.1.0 - 2024-02-20
 ### Update the bot to support the following features:
