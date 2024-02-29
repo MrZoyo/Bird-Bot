@@ -9,6 +9,9 @@ PRIVATE_CHANNEL_ID = 8101919114514
 RELAX_CHANNEL_ID = 1141919810514
 TOKEN = 'Your_Token_Here'
 
+# List of user IDs that the bot will ignore
+IGNORE_USER_IDS = [1234567899786574, 1145141919810]
+
 intents = discord.Intents.all()
 intents.members = True
 intents.guilds = True
@@ -113,6 +116,14 @@ async def on_message(message):
     if len(message.content) == 6 and not re.search(r"[=＝一二三四五\s]", message.content):
         return  # Ignore this message
 
+    # Check if the message contains a URL
+    if re.search(r"https?:\/\/", message.content):
+        return
+
+    # Ignore messages from specific users
+    if message.author.id in IGNORE_USER_IDS:
+        return
+
     # Regex pattern without negative lookbehind assertion
     pattern = r"(缺\d|等\d|[=＝]\d|[Qq]\d|缺[一二三四五]|等[一二三四五]|缺[nN]|等[nN]|[=＝]N|[=＝]n)(?!(分|分钟|min|个钟|小时))"
 
@@ -122,8 +133,7 @@ async def on_message(message):
     # Filter valid matches
     valid_matches = []
     for match in matches:
-        if not re.search(r"https?:\/\/", message.content) and \
-                not re.search(r'\d[A-Z]$', message.content, re.IGNORECASE):
+        if not re.search(r'\d[A-Z]$', message.content, re.IGNORECASE):
             valid_matches.append(match)
 
     if valid_matches:
