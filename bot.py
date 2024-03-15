@@ -4,9 +4,8 @@ from collections import defaultdict
 import re
 import logging
 
-PUBLIC_CHANNEL_ID = 1145141919810
-PRIVATE_CHANNEL_ID = 8101919114514
-RELAX_CHANNEL_ID = 1141919810514
+PUBLIC_CHANNEL_ID_LIST = [11451419198101, 11451419198102]
+PRIVATE_CHANNEL_ID_LIST = [81019191145141, 81019191145142]
 TOKEN = 'Your_Token_Here'
 
 # List of user IDs that the bot will ignore
@@ -35,21 +34,16 @@ async def on_ready():
 
 @bot.event
 async def on_voice_state_update(member, before, after):
-    channel1_id = PUBLIC_CHANNEL_ID  # Public channel
-    channel2_id = PRIVATE_CHANNEL_ID  # Private channel
-    channel3_id = RELAX_CHANNEL_ID  # Relax channel
+    # PUBLIC_CHANNEL_ID_LIST Public channel
+    # PRIVATE_CHANNEL_ID_LIST Private channel
 
     # Check if the user has joined the public channel
-    if after.channel and after.channel.id == channel1_id:
+    if after.channel and after.channel.id in PUBLIC_CHANNEL_ID_LIST:
         await handle_channel1(member, after)
 
     # Check if the user has joined the private channel
-    elif after.channel and after.channel.id == channel2_id:
+    elif after.channel and after.channel.id == PRIVATE_CHANNEL_ID_LIST:
         await handle_channel2(member, after)
-
-    # Check if the user has joined the relax channel
-    elif after.channel and after.channel.id == channel3_id:
-        await handle_channel3(member, after)
 
     # Check if a user has left a temporary channel
     if before.channel and before.channel.id in temp_channels:
@@ -93,18 +87,6 @@ async def handle_channel2(member, after):
     temp_channels[temp_channel.id] = member.id
     await member.move_to(temp_channel)
 
-async def handle_channel3(member, after):
-    category = after.channel.category
-    temp_channel_name = f"Relax Room-{member.display_name}"
-    overwrites = {
-        after.channel.guild.default_role: discord.PermissionOverwrite(view_channel=True),
-        member: discord.PermissionOverwrite(manage_channels=True, view_channel=True, connect=True, speak=True)
-    }
-    temp_channel = await after.channel.guild.create_voice_channel(name=temp_channel_name, category=category,
-                                                                  overwrites=overwrites)
-
-    temp_channels[temp_channel.id] = member.id
-    await member.move_to(temp_channel)
 
 @bot.listen('on_message')
 async def on_message(message):

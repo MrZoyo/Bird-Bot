@@ -1,5 +1,10 @@
 # DiscordGameServerHelper
 ---
+## V0.1.2 - 2024-03-14
+### Update the bot to support the following features:
+#### Support for multiple public and private channels
+- Just add the channel ID to the `PUBLIC_CHANNEL_ID_LIST` and `PRIVATE_CHANNEL_ID_LIST` arrays, and the bot will support multiple public and private channels.
+---
 ## V0.1.1 - 2024-02-29
 ### Update the bot to support the following features:
 #### New blacklist system
