@@ -1,5 +1,10 @@
 # DiscordGameServerHelper
 ---
+## V0.1.3 - 2024-03-20
+### Update the bot to support the following features:
+#### New Channel Dictionary System
+- Add a channel dictionary to store the channel ID which the bot will support multiple public and private channels. You can define the channel ID, the channel type and the channel name prefix in the `CHANNEL_CONFIGS` dictionary.
+---
 ## V0.1.2 - 2024-03-14
 ### Update the bot to support the following features:
 #### Support for multiple public and private channels

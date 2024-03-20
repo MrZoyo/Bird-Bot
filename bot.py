@@ -4,8 +4,15 @@ from collections import defaultdict
 import re
 import logging
 
-PUBLIC_CHANNEL_ID_LIST = [11451419198101, 11451419198102]
-PRIVATE_CHANNEL_ID_LIST = [81019191145141, 81019191145142]
+# Use a dictionary to manage all configurations. The channel ID corresponds to the channel type name and type
+CHANNEL_CONFIGS = {
+    11451419198101: {"name_prefix": "GameRoom", "type": "public"},
+    11451419198102: {"name_prefix": "RelaxRoom", "type": "public"},
+    81019191145141: {"name_prefix": "PrivateRoom", "type": "private"},
+    81019191145142: {"name_prefix": "PVP Room", "type": "public"}
+}
+
+# Your bot token
 TOKEN = 'Your_Token_Here'
 
 # List of user IDs that the bot will ignore
@@ -25,6 +32,7 @@ temp_channels = defaultdict(dict)
 logging.basicConfig(level=logging.INFO, filename='bot.log', filemode='a',
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
+
 @bot.event
 async def on_ready():
     logging.info(f'Logged in as {bot.user.name}')
@@ -32,18 +40,19 @@ async def on_ready():
         logging.info(f"\nBot connected to server {guild.name}\n")
         await bot.change_presence(activity=discord.Game(name=f"Working in {guild.name}"))
 
+
 @bot.event
 async def on_voice_state_update(member, before, after):
     # PUBLIC_CHANNEL_ID_LIST Public channel
     # PRIVATE_CHANNEL_ID_LIST Private channel
 
-    # Check if the user has joined the public channel
-    if after.channel and after.channel.id in PUBLIC_CHANNEL_ID_LIST:
-        await handle_channel1(member, after)
-
-    # Check if the user has joined the private channel
-    elif after.channel and after.channel.id == PRIVATE_CHANNEL_ID_LIST:
-        await handle_channel2(member, after)
+    # Check if the user has joined a specific channel
+    if after.channel and after.channel.id in CHANNEL_CONFIGS:
+        config = CHANNEL_CONFIGS[after.channel.id]
+        if config["type"] == "public":
+            await handle_channel(member, after, config, public=True)
+        elif config["type"] == "private":
+            await handle_channel(member, after, config, public=False)
 
     # Check if a user has left a temporary channel
     if before.channel and before.channel.id in temp_channels:
@@ -54,37 +63,30 @@ async def on_voice_state_update(member, before, after):
             # Remove the channel from the dictionary
             del temp_channels[before.channel.id]
 
-async def handle_channel1(member, after):
+
+async def handle_channel(member, after, config, public=True):
     category = after.channel.category
-    temp_channel_name = f"Public Room-{member.display_name}"
+    temp_channel_name = f"{config['name_prefix']}-{member.display_name}"
 
-    # Set channel permissions
-    overwrites = {
-        after.channel.guild.default_role: discord.PermissionOverwrite(view_channel=True),
-        member: discord.PermissionOverwrite(manage_channels=True, view_channel=True, connect=True, speak=True)
-    }
+    if public:  # public channel
+        overwrites = {
+            after.channel.guild.default_role: discord.PermissionOverwrite(view_channel=True),
+            member: discord.PermissionOverwrite(manage_channels=True, view_channel=True, connect=True, speak=True)
+        }
+    else:  # private channel
+        overwrites = {
+            after.channel.guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            member: discord.PermissionOverwrite(view_channel=True, manage_channels=True)
+        }
 
-    # Create a new temporary voice channel
-    temp_channel = await after.channel.guild.create_voice_channel(name=temp_channel_name, category=category,
-                                                                  overwrites=overwrites)
+    # Create a new voice channel
+    temp_channel = await after.channel.guild.create_voice_channel(
+        name=temp_channel_name, category=category, overwrites=overwrites)
 
-    # Store the channel ID and creator
+    # Store the channel ID and the user ID in the dictionary
     temp_channels[temp_channel.id] = member.id
 
-    # Move the user to the newly created temporary channel
-    await member.move_to(temp_channel)
-
-async def handle_channel2(member, after):
-    category = after.channel.category
-    temp_channel_name = f"Private Room-{member.display_name}"
-    overwrites = {
-        after.channel.guild.default_role: discord.PermissionOverwrite(view_channel=False),
-        member: discord.PermissionOverwrite(view_channel=True, manage_channels=True, manage_permissions=False,
-                                            manage_webhooks=False)
-    }
-    temp_channel = await after.channel.guild.create_voice_channel(name=temp_channel_name, category=category,
-                                                                  overwrites=overwrites)
-    temp_channels[temp_channel.id] = member.id
+    # Move the user to the new channel
     await member.move_to(temp_channel)
 
 
