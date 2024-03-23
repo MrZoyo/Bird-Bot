@@ -2,6 +2,9 @@ import discord
 from discord.ext import commands
 from collections import defaultdict
 import re
+import io
+from PIL import Image, ImageDraw, ImageFont
+import aiohttp
 import logging
 
 # Use a dictionary to manage all configurations. The channel ID corresponds to the channel type name and type
@@ -11,6 +14,12 @@ CHANNEL_CONFIGS = {
     81019191145141: {"name_prefix": "PrivateRoom", "type": "private"},
     81019191145142: {"name_prefix": "PVP Room", "type": "public"}
 }
+
+# The bot will send a welcome message to this channel
+WELCOME_CHANNEL_ID = 114514114514114514
+
+# Background image for the welcome message
+BACKGROUND_IMAGE = "background.png"
 
 # Your bot token
 TOKEN = 'Your_Token_Here'
@@ -137,5 +146,108 @@ async def on_message(message):
 
     # Process commands
     await bot.process_commands(message)
+
+
+# Download the user's avatar
+async def download_avatar(url):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            avatar_bytes = await response.read()
+    return avatar_bytes
+
+
+# Create a welcome image
+def create_welcome_image(user_name, member_number, avatar_bytes):
+    with Image.open(BACKGROUND_IMAGE) as background:
+        draw = ImageDraw.Draw(background)
+        font_path = "simhei.ttf"
+        font_size = 30
+        font = ImageFont.truetype(font_path, font_size)
+
+        # First line of text
+        text1 = f"Welcome {user_name} to this server！"
+        text1_width = draw.textlength(text1, font=font)
+        text1_height = font_size  # Assuming single line
+
+        # Second line of text
+        text2 = f"You are the No.{member_number} member!"
+        text2_width = draw.textlength(text2, font=font)
+        text2_height = font_size  # Assuming single line
+
+        # Position for the first line of text
+        text1_x = (background.width - text1_width) // 2
+        # Adjust the position based on your avatar position and size
+        text1_y = 300  # Example y position, adjust based on your needs
+
+        # Position for the second line of text, placed below the first line
+        text2_x = (background.width - text2_width) // 2
+        text2_y = text1_y + text1_height + 5  # 5 pixels space between lines
+
+        # Drawing the text
+        draw.text((text1_x, text1_y), text1, fill=(0, 0, 0), font=font)
+        draw.text((text2_x, text2_y), text2, fill=(0, 0, 0), font=font)
+
+        # Convert byte data to image
+        avatar_image = Image.open(io.BytesIO(avatar_bytes))
+
+        # Assume the background image size is 800x600 for this example
+        bg_width, bg_height = background.size
+
+        # Create avatar mask
+        size = (100, 100)  # Size of the circle
+        mask = Image.new('L', size, 0)
+        draw = ImageDraw.Draw(mask)
+        draw.ellipse((0, 0) + size, fill=255)
+
+        # Resize avatar and apply mask
+        avatar_image = avatar_image.resize(size)
+        avatar_image.putalpha(mask)
+
+        # Calculate position for the avatar (middle, a bit towards the top)
+        avatar_position = ((bg_width - size[0]) // 2, (bg_height - size[1]) // 3)
+        background.paste(avatar_image, avatar_position, avatar_image)
+
+        # Convert to bytes
+        final_buffer = io.BytesIO()
+        background.save(final_buffer, "PNG")
+        final_buffer.seek(0)
+
+    return final_buffer
+
+
+# Event to handle new members joining the server
+@bot.event
+async def on_member_join(member):
+    channel = bot.get_channel(WELCOME_CHANNEL_ID)
+    if channel:
+        # Get the member count for the welcome message
+        member_count = member.guild.member_count
+        avatar_bytes = await download_avatar(member.avatar.url)
+        welcome_image = create_welcome_image(member.name, member_count, avatar_bytes)
+        discord_file = discord.File(fp=welcome_image, filename='welcome_image.png')
+        # Send the welcome message with text and the welcome image
+        welcome_message = f"Welcome to the server, {member.mention}! Have a great time here."
+        await channel.send(welcome_message, file=discord_file)
+        logging.info(f"Welcome message sent for {member.id}")
+
+
+# Test command to simulate the welcome message
+@bot.command(name='testwelcome')
+async def test_welcome(ctx):
+    member = ctx.author
+    if ctx.channel.id == WELCOME_CHANNEL_ID:
+        # Get the member count for the welcome message
+        member_count = member.guild.member_count
+        avatar_bytes = await download_avatar(member.avatar.url)
+        welcome_image = create_welcome_image(member.name, member_count, avatar_bytes)
+        discord_file = discord.File(fp=welcome_image, filename='welcome_image.png')
+        # Send the welcome message with text and the welcome image
+        welcome_message = f"Welcome to the server, {member.mention}! Have a great time here."
+        await ctx.send(content=welcome_message, file=discord_file)
+        logging.info("test welcome command executed.")
+    else:
+        await ctx.send("Please use this command in the 'welcome' channel.")
+        logging.info("welcome command executed in the wrong channel.")
+
 
 bot.run(TOKEN)

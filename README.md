@@ -1,5 +1,14 @@
 # DiscordGameServerHelper
 ---
+## V0.2.0 - 2024-03-23
+### Update the bot to support the following features:
+#### New Welcome message System
+- Add a welcome message system to send a welcome message when they join the server.
+- You can define the welcome channel ID by setting the `WELCOME_CHANNEL_ID` variable.
+- You can edit the background of the welcome pictures by setting the `BACKGROUND_IMAGE` variable.
+- You can adjust the welcome content and specific styles in the code if needed.
+  - ![image](https://github.com/MrZoyo/DiscordGameServerHelper/blob/main/welcome.png)
+---
 ## V0.1.3 - 2024-03-20
 ### Update the bot to support the following features:
 #### New Channel Dictionary System
@@ -16,7 +25,7 @@
 - Added a blacklist system that allows bot to not reply to users in the blacklist.
 ### Bug fixes
 - Fixed a bug that had caused the bot to reply to the same message multiple times when the user sent a message with multiple matches.
-- Fixed a bug that caused some special URLs to be replied to incorrectly.
+- Fixed a bug that caused some special URLs to be replied incorrectly.
 ---
 ## V0.1.0 - 2024-02-20
 ### Update the bot to support the following features:
