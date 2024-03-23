@@ -18,8 +18,21 @@ CHANNEL_CONFIGS = {
 # The bot will send a welcome message to this channel
 WELCOME_CHANNEL_ID = 114514114514114514
 
-# Background image for the welcome message
+# Background image for the welcome picture
 BACKGROUND_IMAGE = "background.png"
+# Text color for the welcome picture
+TEXT_COLOR = (255, 255, 255)
+# Font path for the welcome picture
+FONT_PATH = "simhei.ttf"
+# Font size for the welcome picture
+FONT_SIZE = 60
+# Avatar size for the welcome picture
+AVATAR_SIZE = (250, 250)
+# Text for the welcome message
+WELCOME_TEXT = "Welcome to the server, {member.mention}! Have a great time here."
+# Text for the welcome picture
+WELCOME_TEXT_PICTURE_1 = "Welcome {user_name} to this server！"
+WELCOME_TEXT_PICTURE_2 = "You are the No.{member_number} member!"
 
 # Your bot token
 TOKEN = 'Your_Token_Here'
@@ -47,6 +60,7 @@ async def on_ready():
     logging.info(f'Logged in as {bot.user.name}')
     for guild in bot.guilds:
         logging.info(f"\nBot connected to server {guild.name}\n")
+        print(f"\nBot connected to server {guild.name}\n")
         await bot.change_presence(activity=discord.Game(name=f"Working in {guild.name}"))
 
 
@@ -158,54 +172,46 @@ async def download_avatar(url):
 
 # Create a welcome image
 def create_welcome_image(user_name, member_number, avatar_bytes):
-    with Image.open(BACKGROUND_IMAGE) as background:
+    with Image.open("background.png") as background:
+        # Convert byte data to image
+        avatar_image = Image.open(io.BytesIO(avatar_bytes))
+        avatar_image = avatar_image.resize(AVATAR_SIZE)
+
+        # Create avatar mask for circular avatar
+        mask = Image.new('L', AVATAR_SIZE, 0)
+        draw = ImageDraw.Draw(mask)
+        draw.ellipse((0, 0) + AVATAR_SIZE, fill=255)
+        avatar_image.putalpha(mask)
+
+        # Calculate position for the avatar (middle, a bit towards the top)
+        bg_width, bg_height = background.size
+        avatar_position = ((bg_width - AVATAR_SIZE[0]) // 2, (bg_height - AVATAR_SIZE[1]) // 3)
+        background.paste(avatar_image, avatar_position, avatar_image)
+
+        # Creating a draw object to draw text on a background image
         draw = ImageDraw.Draw(background)
-        font_path = "simhei.ttf"
-        font_size = 30
-        font = ImageFont.truetype(font_path, font_size)
+        font = ImageFont.truetype(FONT_PATH, FONT_SIZE)
 
         # First line of text
-        text1 = f"Welcome {user_name} to this server！"
+        text1 = WELCOME_TEXT_PICTURE_1.format(user_name=user_name)
         text1_width = draw.textlength(text1, font=font)
-        text1_height = font_size  # Assuming single line
+        text1_height = FONT_SIZE  # Assuming single line, this might need adjustment
 
         # Second line of text
-        text2 = f"You are the No.{member_number} member!"
+        text2 = WELCOME_TEXT_PICTURE_2.format(member_number=member_number)
         text2_width = draw.textlength(text2, font=font)
-        text2_height = font_size  # Assuming single line
 
-        # Position for the first line of text
+        # Position for the first line of text, placed below the avatar with some space
         text1_x = (background.width - text1_width) // 2
-        # Adjust the position based on your avatar position and size
-        text1_y = 300  # Example y position, adjust based on your needs
+        text1_y = avatar_position[1] + AVATAR_SIZE[1] + 20  # 20 pixels below the avatar
 
         # Position for the second line of text, placed below the first line
         text2_x = (background.width - text2_width) // 2
         text2_y = text1_y + text1_height + 5  # 5 pixels space between lines
 
         # Drawing the text
-        draw.text((text1_x, text1_y), text1, fill=(0, 0, 0), font=font)
-        draw.text((text2_x, text2_y), text2, fill=(0, 0, 0), font=font)
-
-        # Convert byte data to image
-        avatar_image = Image.open(io.BytesIO(avatar_bytes))
-
-        # Assume the background image size is 800x600 for this example
-        bg_width, bg_height = background.size
-
-        # Create avatar mask
-        size = (100, 100)  # Size of the circle
-        mask = Image.new('L', size, 0)
-        draw = ImageDraw.Draw(mask)
-        draw.ellipse((0, 0) + size, fill=255)
-
-        # Resize avatar and apply mask
-        avatar_image = avatar_image.resize(size)
-        avatar_image.putalpha(mask)
-
-        # Calculate position for the avatar (middle, a bit towards the top)
-        avatar_position = ((bg_width - size[0]) // 2, (bg_height - size[1]) // 3)
-        background.paste(avatar_image, avatar_position, avatar_image)
+        draw.text((text1_x, text1_y), text1, fill=TEXT_COLOR, font=font)
+        draw.text((text2_x, text2_y), text2, fill=TEXT_COLOR, font=font)
 
         # Convert to bytes
         final_buffer = io.BytesIO()
@@ -226,7 +232,7 @@ async def on_member_join(member):
         welcome_image = create_welcome_image(member.name, member_count, avatar_bytes)
         discord_file = discord.File(fp=welcome_image, filename='welcome_image.png')
         # Send the welcome message with text and the welcome image
-        welcome_message = f"Welcome to the server, {member.mention}! Have a great time here."
+        welcome_message = WELCOME_TEXT.format(member=member)
         await channel.send(welcome_message, file=discord_file)
         logging.info(f"Welcome message sent for {member.id}")
 
@@ -242,7 +248,7 @@ async def test_welcome(ctx):
         welcome_image = create_welcome_image(member.name, member_count, avatar_bytes)
         discord_file = discord.File(fp=welcome_image, filename='welcome_image.png')
         # Send the welcome message with text and the welcome image
-        welcome_message = f"Welcome to the server, {member.mention}! Have a great time here."
+        welcome_message = WELCOME_TEXT.format(member=member)
         await ctx.send(content=welcome_message, file=discord_file)
         logging.info("test welcome command executed.")
     else:

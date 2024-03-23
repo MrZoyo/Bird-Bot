@@ -1,13 +1,27 @@
 # DiscordGameServerHelper
 ---
-## V0.2.0 - 2024-03-23
+## V0.2.1 - 2024-03-23
+### Update the bot to support the following features:
+- Add a new command `!testwelcome` to test the welcome message.
+- Optimised the code by placing the welcome message setting parameter at the top of the code. You can now easily customise your welcome message by customising the following parameters:
+  - `BACKGROUND_IMAGE` - The background image of the welcome picture. Note that if your background image size changes. You will also need to adjust the other parameters in turn.
+  - `TEXT_COLOR` - The text color of the welcome picture.
+  - `FONT_SIZE` - The text size of the welcome picture.
+  - `FONT_PATH` - The font path of the welcome picture.
+  - `AVATAR_SIZE` - The size of the avatar in the welcome picture.
+  - `WELCOME_TEXT` - The welcome message text.
+  - `WELCOME_TEXT_PICTURE_1` - The first welcome text in picture.
+  - `WELCOME_TEXT_PICTURE_2` - The second welcome text in picture.
+- ![image](https://github.com/MrZoyo/DiscordGameServerHelper/blob/main/pics/testwelcome.png)
+---
+## V0.2.0 - 2024-03-22
 ### Update the bot to support the following features:
 #### New Welcome message System
 - Add a welcome message system to send a welcome message when they join the server.
 - You can define the welcome channel ID by setting the `WELCOME_CHANNEL_ID` variable.
 - You can edit the background of the welcome pictures by setting the `BACKGROUND_IMAGE` variable.
 - You can adjust the welcome content and specific styles in the code if needed.
-  - ![image](https://github.com/MrZoyo/DiscordGameServerHelper/blob/main/welcome.png)
+  - ![image](https://github.com/MrZoyo/DiscordGameServerHelper/blob/main/pics/welcome.png)
 ---
 ## V0.1.3 - 2024-03-20
 ### Update the bot to support the following features:
@@ -52,18 +66,18 @@
  - Remember to replace `TOKEN` with your own token.
 #### Create channels for players
  - Replace `PUBLIC_CHANNEL_ID` with the ID of the channel you want to use as the public channel creator. When a user joins this channel, a new voice channel will be created for them. And they be moved to the new channel. Only this user has the ability to edit the channel name. 
-   - ![image](https://github.com/MrZoyo/DiscordGameServerHelper/blob/main/public01.png) ![image](https://github.com/MrZoyo/DiscordGameServerHelper/blob/main/public02.png)
+   - ![image](https://github.com/MrZoyo/DiscordGameServerHelper/blob/main/pics/public01.png) ![image](https://github.com/MrZoyo/DiscordGameServerHelper/blob/main/pics/public02.png)
  - Replace `PRIVATE_CHANNEL_ID` with the ID of the channel you want to use as the private channel creator. When a user joins this channel, a new voice channel will be created for them. And they be moved to the new channel. 
-   - ![image](https://github.com/MrZoyo/DiscordGameServerHelper/blob/main/private01.png) ![image](https://github.com/MrZoyo/DiscordGameServerHelper/blob/main/private02.png)
+   - ![image](https://github.com/MrZoyo/DiscordGameServerHelper/blob/main/pics/private01.png) ![image](https://github.com/MrZoyo/DiscordGameServerHelper/blob/main/pics/private02.png)
  - When the last user leaves the channel, the empty channel will be deleted.
-   - ![image](https://github.com/MrZoyo/DiscordGameServerHelper/blob/main/afterwork.png)
+   - ![image](https://github.com/MrZoyo/DiscordGameServerHelper/blob/pics/main/afterwork.png)
 
 --- 
 #### Create room invitation(more for Chinese User)
  - When a user sends a group message in a text channel(for example: flex 4=1/aram 2q3), the bot will automatically create a room invitation link for the user.
-   - ![image](https://github.com/MrZoyo/DiscordGameServerHelper/blob/main/normal.png)
+   - ![image](https://github.com/MrZoyo/DiscordGameServerHelper/blob/main/pics/normal.png)
    - If the user is not in a voice channel, the bot will send a message to remind the user to join a voice channel.
-   - ![image](https://github.com/MrZoyo/DiscordGameServerHelper/blob/main/notinchannel.png)
+   - ![image](https://github.com/MrZoyo/DiscordGameServerHelper/blob/main/pics/notinchannel.png)
  - Valorant Invitation Code (6 bytes long) will not be detected.
  - Some Chinese features:
    - "4缺1","2等3","二等一"等使用“等”、“缺”以及“一二三四五”中文小写数字的组合也可以被识别。
