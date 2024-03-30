@@ -1,5 +1,13 @@
 # DiscordGameServerHelper
 ---
+## V0.2.2 - 2024-03-31
+### Update the bot to support the following features:
+- Add two new parameters at the top of the code to customise the welcome message:
+  - `WELCOME_TEXT_1_DISTANCE` - The distance between the first welcome text and the top of the picture.
+  - `WELCOME_TEXT_2_DISTANCE` - The distance between the second welcome text and the top of the picture.
+### Bug fixes
+- Fixed a bug that in some environments the background image is not converted to the correct format.
+---
 ## V0.2.1 - 2024-03-23
 ### Update the bot to support the following features:
 - Add a new command `!testwelcome` to test the welcome message.

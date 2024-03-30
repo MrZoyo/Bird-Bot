@@ -21,13 +21,17 @@ WELCOME_CHANNEL_ID = 114514114514114514
 # Background image for the welcome picture
 BACKGROUND_IMAGE = "background.png"
 # Text color for the welcome picture
-TEXT_COLOR = (255, 255, 255)
+TEXT_COLOR = (255, 255, 255)  # RGB
 # Font path for the welcome picture
 FONT_PATH = "simhei.ttf"
 # Font size for the welcome picture
 FONT_SIZE = 60
 # Avatar size for the welcome picture
 AVATAR_SIZE = (250, 250)
+# Distance between the first line of text and the avatar
+WELCOME_TEXT_1_DISTANCE = 20
+# Distance between the second line of text and the first line of text
+WELCOME_TEXT_2_DISTANCE = 5
 # Text for the welcome message
 WELCOME_TEXT = "Welcome to the server, {member.mention}! Have a great time here."
 # Text for the welcome picture
@@ -173,6 +177,7 @@ async def download_avatar(url):
 # Create a welcome image
 def create_welcome_image(user_name, member_number, avatar_bytes):
     with Image.open("background.png") as background:
+        background = background.convert("RGBA")
         # Convert byte data to image
         avatar_image = Image.open(io.BytesIO(avatar_bytes))
         avatar_image = avatar_image.resize(AVATAR_SIZE)
@@ -203,11 +208,11 @@ def create_welcome_image(user_name, member_number, avatar_bytes):
 
         # Position for the first line of text, placed below the avatar with some space
         text1_x = (background.width - text1_width) // 2
-        text1_y = avatar_position[1] + AVATAR_SIZE[1] + 20  # 20 pixels below the avatar
+        text1_y = avatar_position[1] + AVATAR_SIZE[1] + WELCOME_TEXT_1_DISTANCE  # pixels below the avatar
 
         # Position for the second line of text, placed below the first line
         text2_x = (background.width - text2_width) // 2
-        text2_y = text1_y + text1_height + 5  # 5 pixels space between lines
+        text2_y = text1_y + text1_height + WELCOME_TEXT_2_DISTANCE  # pixels space between lines
 
         # Drawing the text
         draw.text((text1_x, text1_y), text1, fill=TEXT_COLOR, font=font)
