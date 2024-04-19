@@ -1,5 +1,12 @@
 # DiscordGameServerHelper
 ---
+## V0.2.4 - 2024-04-19
+Skipped a version number to align with the version number of the main bot.
+### Update the bot to support the following features:
+- Add a new slash command `/testwelcome` to test the welcome message. 
+- Reorganised the structure of regular expressions into three matching parts.
+- Added matching words for the new regular expression.
+---
 ## V0.2.2 - 2024-03-31
 ### Update the bot to support the following features:
 - Add two new parameters at the top of the code to customise the welcome message:

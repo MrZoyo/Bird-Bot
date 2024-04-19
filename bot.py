@@ -59,6 +59,31 @@ logging.basicConfig(level=logging.INFO, filename='bot.log', filemode='a',
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
 
+class MyBot(commands.Bot):
+    def __init__(self):
+        super().__init__(command_prefix="!", intents=intents)
+
+    async def setup_hook(self):
+        self.tree.add_cog(WelcomeCog(self))
+        await self.tree.sync()  # Sync the commands
+
+
+class WelcomeCog(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+
+    @discord.app_commands.command(name='testwelcome')
+    async def test_welcome(self, interaction: discord.Interaction):
+        member = interaction.user
+        member_count = member.guild.member_count
+        avatar_bytes = await download_avatar(member.display_avatar.url)
+        welcome_image = create_welcome_image(member.name, member_count, avatar_bytes)
+        discord_file = discord.File(fp=welcome_image, filename='welcome_image.png')
+        welcome_message = WELCOME_TEXT.format(member=member.name, count=member_count)
+        await interaction.response.send_message(content=welcome_message, file=discord_file)
+        logging.info("test welcome command executed.")
+
+
 @bot.event
 async def on_ready():
     logging.info(f'Logged in as {bot.user.name}')
@@ -135,8 +160,10 @@ async def on_message(message):
     if message.author.id in IGNORE_USER_IDS:
         return
 
-    # Regex pattern without negative lookbehind assertion
-    pattern = r"(缺\d|等\d|[=＝]\d|[Qq]\d|缺[一二三四五]|等[一二三四五]|缺[nN]|等[nN]|[=＝]N|[=＝]n)(?!(分|分钟|min|个钟|小时))"
+    # Prefix:  match "缺"|"等"|"="|"＝"|"q"|"Q"
+    # Subject: match numbers|"一" to "五" Chinese characters|"n""N"|"全世界"|"Wworld"
+    # Exclude: not followed by"分"|"分钟"|"min"|"个钟"|"小时"
+    pattern = r"(?:(缺|等|[=＝]|[Qq]))(?:(\d|[一二三四五]|[nN]|全世界|world|World))(?!(分|分钟|min|个钟|小时))"
 
     # Find all matches in the content
     matches = re.findall(pattern, message.content, re.IGNORECASE)
@@ -242,7 +269,6 @@ async def on_member_join(member):
         logging.info(f"Welcome message sent for {member.id}")
 
 
-# Test command to simulate the welcome message
 @bot.command(name='testwelcome')
 async def test_welcome(ctx):
     member = ctx.author
@@ -259,6 +285,5 @@ async def test_welcome(ctx):
     else:
         await ctx.send("Please use this command in the 'welcome' channel.")
         logging.info("welcome command executed in the wrong channel.")
-
 
 bot.run(TOKEN)
