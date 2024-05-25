@@ -1,5 +1,19 @@
 # DiscordGameServerHelper
 ---
+## V0.3.3 - 2024-05-25
+### Update the bot to support the following features:
+- Added slash command to all commands.
+- Note, please tick the application command permission for your bot and re-invite to the server to update the display and description of the slash command.
+---
+## V0.3.2 - 2024-05-25
+### Update the bot to support the following features:
+- The structure of the code has been refactored to package each part of the function into separate cogs for tweaking and calling. Now please adjust the parameters of the response function in the corresponding cog.
+- The usage is exactly the same as before, you just need to run `bot.py`.
+---
+## V0.3.1 - 2024-05-25
+### Update the bot to support the following features:
+- Add `CHECK_ILLEGAL_TEAMING_CHANNEL_ID` to customise the channel ID for the `!check_illegal_teaming` and `!check_user_records` commands.
+---
 ## V0.3.0 - 2024-05-25
 ### Update the bot to support the following features:
 - Bots will now log users' illegal teaming behaviour in the `bot.db` file. The record can be erased by a normal teaming within 5 minutes.
