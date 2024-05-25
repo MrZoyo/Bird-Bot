@@ -3,9 +3,11 @@ from discord.ext import commands
 from collections import defaultdict
 import re
 import io
+from datetime import datetime, timedelta
 from PIL import Image, ImageDraw, ImageFont
 import aiohttp
 import logging
+import sqlite3
 
 # Use a dictionary to manage all configurations. The channel ID corresponds to the channel type name and type
 CHANNEL_CONFIGS = {
@@ -149,8 +151,12 @@ async def on_message(message):
         return
 
     # Check for a message that only has 6 characters and does not contain certain patterns
-    if len(message.content) == 6 and not re.search(r"[=＝一二三四五\s]", message.content):
-        return  # Ignore this message
+    # However, if it contains "flex" or "rank" (in either case), it is not ignored.
+    if (len(message.content) == 6 and
+            not re.search(r"[=＝一二三四五\s]", message.content) and
+            not re.search(r"(?i)(flex|rank)", message.content)):
+        # print(f"Ignore message: {message.content}")
+        return  # Ignore the message
 
     # Check if the message contains a URL
     if re.search(r"https?:\/\/", message.content):
@@ -179,15 +185,21 @@ async def on_message(message):
 
         # Check if the user is in a voice channel
         if message.author.voice and message.author.voice.channel:
+            # Remove illegal teaming behaviour by users
+            remove_illegal_activity(str(message.author.id))
             try:
                 vc_url = await message.author.voice.channel.create_invite(max_age=600)  # Link valid for 10 minutes
                 reply_message = f"{vc_url}"
             except Exception as e:
                 reply_message = "Error creating invite link, please check my permissions."
         else:
+            # Recording of illegal teaming behaviour by users
+            log_illegal_activity(str(message.author.id), message.content)
             reply_message = f'{message.author.mention}, it is forbidden to pull privately, please start a voice channel!'
 
         await message.reply(reply_message)
+        # Ends after the first match is replied to, ensuring that the same message is not replied to repeatedly
+        return
 
     # Process commands
     await bot.process_commands(message)
@@ -285,5 +297,114 @@ async def test_welcome(ctx):
     else:
         await ctx.send("Please use this command in the 'welcome' channel.")
         logging.info("welcome command executed in the wrong channel.")
+
+
+def log_illegal_activity(user_id, message):
+    conn = sqlite3.connect('bot.db')
+    c = conn.cursor()
+    now = datetime.now()
+    formatted_now = now.strftime('%Y-%m-%d %H:%M:%S')  # 将 datetime 转换为字符串
+    c.execute('INSERT INTO illegal_teaming (user_id, timestamp, message) VALUES (?, ?, ?)',
+              (user_id, formatted_now, message))
+    conn.commit()
+    conn.close()
+
+
+def remove_illegal_activity(user_id):
+    conn = sqlite3.connect('bot.db')
+    c = conn.cursor()
+    threshold = datetime.now() - timedelta(minutes=5)
+    formatted_threshold = threshold.strftime('%Y-%m-%d %H:%M:%S')  # 格式化时间为字符串
+    c.execute('DELETE FROM illegal_teaming WHERE user_id = ? AND timestamp > ?', (user_id, formatted_threshold))
+    conn.commit()
+    conn.close()
+
+
+def get_illegal_teaming_stats():
+    conn = sqlite3.connect('bot.db')
+    c = conn.cursor()
+    c.execute('''
+        SELECT user_id, COUNT(*) as count FROM illegal_teaming
+        GROUP BY user_id
+        ORDER BY count DESC
+        LIMIT 20
+    ''')
+    results = c.fetchall()
+    conn.close()
+    return results
+
+
+def get_users_with_min_records(min_records):
+    conn = sqlite3.connect('bot.db')
+    c = conn.cursor()
+    c.execute('''
+        SELECT user_id, COUNT(*) as count FROM illegal_teaming
+        GROUP BY user_id
+        HAVING COUNT(*) > ?
+        ORDER BY count DESC
+    ''', (min_records,))
+    results = c.fetchall()
+    conn.close()
+    return results
+
+
+@bot.command(name='check_illegal_teaming')
+async def check_illegal_teaming(ctx):
+    # Define the channel ID where the command can be executed
+    allowed_channel_id = WELCOME_CHANNEL_ID
+
+    # Check if the current command is executed in the allowed channel
+    if ctx.channel.id != allowed_channel_id:
+        await ctx.send("This command can only be used in specific channels.")
+        return
+
+    top_users = get_illegal_teaming_stats()
+    if not top_users:
+        await ctx.send("No illegal teaming records found.")
+        return
+
+    message = "Top 20 illegal teaming users:\n"
+    for user_id, count in top_users:
+        user = bot.get_user(int(user_id))
+        if user:  # Check if the user is still in the server
+            message += f"{user.mention} with {count} records.\n"
+        else:
+            message += f"User ID {user_id} with {count} records is not in the server anymore.\n"
+    await ctx.send(message)
+
+
+@bot.command(name='check_user_records')
+async def check_user_records(ctx, x: int):
+    # Define the channel ID where the command can be executed
+    allowed_channel_id = WELCOME_CHANNEL_ID
+
+    # Check if the current command is executed in the allowed channel
+    if ctx.channel.id != allowed_channel_id:
+        await ctx.send("This command can only be used in specific channels.")
+        return
+
+    top_users = get_users_with_min_records(x)
+    if not top_users:
+        await ctx.send(f"No users with more than {x} records found.")
+        return
+
+    message = f"Users with more than {x} records: \n"
+    for user_id, count in top_users:
+        user = bot.get_user(int(user_id))
+        if user:
+            message += f"{user.mention} with {count} records.\n"
+        else:
+            message += f"User ID {user_id} with {count} records is not in the server anymore.\n"
+    await ctx.send(message)
+
+
+@check_user_records.error
+async def check_user_records_error(ctx, error):
+    if isinstance(error, commands.MissingRequiredArgument):
+        if error.param.name == 'x':
+            await ctx.send("You need to specify a number. Usage: `!check_user_records <number>`")
+    else:
+        await ctx.send("An unexpected error occurred. Please try again.")
+
 
 bot.run(TOKEN)

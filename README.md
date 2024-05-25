@@ -1,5 +1,16 @@
 # DiscordGameServerHelper
 ---
+## V0.3.0 - 2024-05-25
+### Update the bot to support the following features:
+- Bots will now log users' illegal teaming behaviour in the `bot.db` file. The record can be erased by a normal teaming within 5 minutes.
+- Use the command `!check_illegal_teaming` in a specific channel to query the 20 users with the most records of illegal teaming behaviour.
+- Use the command `!check_user_records <number>` in a specific channel to query all users whose number of illegal teaming behaviours is greater than `<number>`.
+---
+## V0.2.5 - 2024-05-24
+### Bug fixes
+- Fixed a bug that caused the bot to reply to the same message multiple times when the user sent a message with multiple matches.
+- Fixed a bug that caused a user's teaming information containing `flex` or `rank` to be incorrectly ignored.
+---
 ## V0.2.4 - 2024-04-19
 Skipped a version number to align with the version number of the main bot.
 ### Update the bot to support the following features:
