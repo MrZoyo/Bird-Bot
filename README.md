@@ -1,5 +1,9 @@
 # DiscordGameServerHelper
 ---
+## V0.3.4 - 2024-05-25
+### Bug fixes
+- Fixed a bug that caused the bot to reply to the same message twice when the user sent specific command.
+---
 ## V0.3.3 - 2024-05-25
 ### Update the bot to support the following features:
 - Added slash command to all commands.

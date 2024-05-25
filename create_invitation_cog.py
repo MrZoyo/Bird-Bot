@@ -67,6 +67,3 @@ class CreateInvitationCog(commands.Cog):
             await message.reply(reply_message)
             # Ends after the first match is replied to, ensuring that the same message is not replied to repeatedly
             return
-
-        # Process commands
-        await self.bot.process_commands(message)
