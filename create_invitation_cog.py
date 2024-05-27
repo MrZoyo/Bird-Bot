@@ -51,7 +51,7 @@ class CreateInvitationCog(commands.Cog):
             # Check if the user is in a voice channel
             if message.author.voice and message.author.voice.channel:
                 # Remove illegal teaming behaviour by users
-                self.illegal_act_cog.remove_illegal_activity(str(message.author.id))
+                await self.illegal_act_cog.remove_illegal_activity(str(message.author.id))
                 try:
                     vc_url = await message.author.voice.channel.create_invite(max_age=600)
                     reply_message = f"{vc_url}"
@@ -60,7 +60,7 @@ class CreateInvitationCog(commands.Cog):
 
             else:
                 # Recording of illegal teaming behaviour by users
-                self.illegal_act_cog.log_illegal_activity(str(message.author.id), message.content)
+                await self.illegal_act_cog.log_illegal_activity(str(message.author.id), message.content)
                 reply_message = f'{message.author.mention}, it is forbidden to teaming privately, please request a ' \
                                 f'voice channel! '
 

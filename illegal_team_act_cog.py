@@ -1,61 +1,129 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
+from discord.ui import Button, View
 import sqlite3
 from datetime import datetime, timedelta
+import aiosqlite
 
 # Checks for illegal teaming are only allowed in certain channels.
 CHECK_ILLEGAL_TEAMING_CHANNEL_ID = 114514114514114514
+
+
+class PaginationView(View):
+    def __init__(self, bot, records, user_id):
+        super().__init__(timeout=180.0)  # Specify the timeout directly here if needed
+        self.bot = bot
+        self.records = records
+        self.user_id = user_id
+        self.page = 0
+        self.total_pages = (len(records) - 1) // 20 + 1
+        self.total_records = len(records)
+        self.message = None  # This will hold the reference to the message
+
+        self.previous_button = Button(label="Previous", style=discord.ButtonStyle.blurple, disabled=True)
+        self.next_button = Button(label="Next", style=discord.ButtonStyle.green, disabled=len(records) <= 20)
+        self.previous_button.callback = self.previous_button_callback
+        self.next_button.callback = self.next_button_callback
+        self.add_item(self.previous_button)
+        self.add_item(self.next_button)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return interaction.user.id == self.user_id
+
+    async def update_buttons(self):
+        self.previous_button.disabled = self.page == 0
+        self.next_button.disabled = (self.page + 1) * 20 >= len(self.records)
+        if self.message:
+            await self.message.edit(view=self)
+
+    async def previous_button_callback(self, interaction: discord.Interaction):
+        self.page -= 1
+        await self.update_buttons()
+        await interaction.response.edit_message(embed=self.format_page(), view=self)
+
+    async def next_button_callback(self, interaction: discord.Interaction):
+        self.page += 1
+        await self.update_buttons()
+        await interaction.response.edit_message(embed=self.format_page(), view=self)
+
+    def safe_strptime(self, date_str, formats):
+        for fmt in formats:
+            try:
+                return datetime.strptime(date_str, fmt)
+            except ValueError:
+                continue
+        raise ValueError(f"time data {date_str} does not match any format")
+
+    def format_page(self):
+        start = self.page * 20
+        end = min(start + 20, self.total_records)
+        page_entries = self.records[start:end]
+        formats = ['%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S']  # With and without milliseconds
+        description = "\n".join([
+            f"**Time:** {self.safe_strptime(record[1], formats).strftime('%Y-%m-%d %H:%M:%S')} **Message:** {record[2]}"
+            for record in page_entries
+        ])
+        embed = discord.Embed(description=description, color=discord.Color.blue())
+        embed.set_footer(text=f"Page {self.page + 1}/{self.total_pages} - Total records: {self.total_records}")
+        return embed
 
 
 class IllegalTeamActCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    def log_illegal_activity(self, user_id, message):
-        conn = sqlite3.connect('bot.db')
-        c = conn.cursor()
-        now = datetime.now()
-        formatted_now = now.strftime('%Y-%m-%d %H:%M:%S')
-        c.execute('INSERT INTO illegal_teaming (user_id, timestamp, message) VALUES (?, ?, ?)',
-                  (user_id, formatted_now, message))
-        conn.commit()
-        conn.close()
+    async def log_illegal_activity(self, user_id, message):
+        async with aiosqlite.connect('bot.db') as db:
+            cursor = await db.cursor()
+            now = datetime.now()
+            formatted_now = now.strftime('%Y-%m-%d %H:%M:%S.%f')  # Using microseconds
+            try:
+                await cursor.execute('INSERT INTO illegal_teaming (user_id, timestamp, message) VALUES (?, ?, ?)',
+                                     (user_id, formatted_now, message))
+                await db.commit()
+            except sqlite3.IntegrityError:
+                print("Duplicate entry. Skipping.")
+            await cursor.close()
 
-    def remove_illegal_activity(self, user_id):
-        conn = sqlite3.connect('bot.db')
-        c = conn.cursor()
-        threshold = datetime.now() - timedelta(minutes=5)
-        formatted_threshold = threshold.strftime('%Y-%m-%d %H:%M:%S')
-        c.execute('DELETE FROM illegal_teaming WHERE user_id = ? AND timestamp > ?', (user_id, formatted_threshold))
-        conn.commit()
-        conn.close()
+    async def remove_illegal_activity(self, user_id):
+        async with aiosqlite.connect('bot.db') as db:
+            cursor = await db.cursor()
+            threshold = datetime.now() - timedelta(minutes=5)
+            formatted_threshold = threshold.strftime('%Y-%m-%d %H:%M:%S')
+            try:
+                await cursor.execute('DELETE FROM illegal_teaming WHERE user_id = ? AND timestamp > ?',
+                                     (user_id, formatted_threshold))
+                await db.commit()
+            except sqlite3.Error as e:
+                print(f"An error occurred: {e}")
+            await cursor.close()
 
-    def get_illegal_teaming_stats(self):
-        conn = sqlite3.connect('bot.db')
-        c = conn.cursor()
-        c.execute('''
-            SELECT user_id, COUNT(*) as count FROM illegal_teaming
-            GROUP BY user_id
-            ORDER BY count DESC
-            LIMIT 20
-        ''')
-        results = c.fetchall()
-        conn.close()
-        return results
+    async def get_illegal_teaming_stats(self):
+        async with aiosqlite.connect('bot.db') as db:
+            cursor = await db.cursor()
+            await cursor.execute('''
+                SELECT user_id, COUNT(*) as count FROM illegal_teaming
+                GROUP BY user_id
+                ORDER BY count DESC
+                LIMIT 20
+            ''')
+            results = await cursor.fetchall()
+            await cursor.close()
+            return results
 
-    def get_users_with_min_records(self, min_records):
-        conn = sqlite3.connect('bot.db')
-        c = conn.cursor()
-        c.execute('''
-            SELECT user_id, COUNT(*) as count FROM illegal_teaming
-            GROUP BY user_id
-            HAVING COUNT(*) > ?
-            ORDER BY count DESC
-        ''', (min_records,))
-        results = c.fetchall()
-        conn.close()
-        return results
+    async def get_users_with_min_records(self, min_records):
+        async with aiosqlite.connect('bot.db') as db:
+            cursor = await db.cursor()
+            await cursor.execute('''
+                SELECT user_id, COUNT(*) as count FROM illegal_teaming
+                GROUP BY user_id
+                HAVING COUNT(*) > ?
+                ORDER BY count DESC
+            ''', (min_records,))
+            results = await cursor.fetchall()
+            await cursor.close()
+            return results
 
     async def check_channel_validity(self, ctx_or_interaction):
         """Helper function to check if the command is used in the correct channel."""
@@ -85,7 +153,7 @@ class IllegalTeamActCog(commands.Cog):
         await self.send_illegal_teaming_stats(interaction)
 
     async def send_illegal_teaming_stats(self, ctx_or_interaction):
-        top_users = self.get_illegal_teaming_stats()
+        top_users = await self.get_illegal_teaming_stats()
         if not top_users:
             message = "No illegal teaming records found."
         else:
@@ -114,7 +182,7 @@ class IllegalTeamActCog(commands.Cog):
         await self.send_user_records_stats(interaction, x)
 
     async def send_user_records_stats(self, ctx_or_interaction, x):
-        top_users = self.get_users_with_min_records(x)
+        top_users = await self.get_users_with_min_records(x)
         if not top_users:
             message = f"No users with more than {x} records found."
         else:
@@ -135,3 +203,27 @@ class IllegalTeamActCog(commands.Cog):
                 await ctx.send("You need to specify a number. Usage: `!check_user_records <number>`")
         else:
             await ctx.send("An unexpected error occurred. Please try again.")
+
+    @app_commands.command(name="check_member")
+    @app_commands.describe(member="The member to fetch illegal team records for")
+    async def check_member(self, interaction: discord.Interaction, member: discord.Member):
+        """Lists all illegal teaming records for the specified member."""
+        if not await self.check_channel_validity(interaction):
+            return
+        records = await self.fetch_records_for_user(member.id)
+        if not records:
+            await interaction.response.send_message("No records found for this user.", ephemeral=True)
+            return
+        view = PaginationView(self.bot, records, member.id)
+        message = await interaction.response.send_message(content=f"Records for <@{member.id}>", embed=view.format_page(),
+                                                view=view)
+        view.message = message
+
+    async def fetch_records_for_user(self, user_id):
+        async with aiosqlite.connect('bot.db') as db:
+            cursor = await db.cursor()
+            await cursor.execute('SELECT user_id, timestamp, message FROM illegal_teaming WHERE user_id = ?',
+                                 (user_id,))
+            records = await cursor.fetchall()
+            await cursor.close()
+            return records

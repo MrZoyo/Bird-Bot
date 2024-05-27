@@ -35,8 +35,9 @@ class VoiceStateCog(commands.Cog):
         temp_channel_name = f"{config['name_prefix']}-{member.display_name}"
 
         overwrites = {
-            member.guild.default_role: discord.PermissionOverwrite(view_channel=public),
-            member: discord.PermissionOverwrite(manage_channels=True, view_channel=True)
+            member.guild.default_role: discord.PermissionOverwrite(view_channel=True, connect=public),
+            member: discord.PermissionOverwrite(manage_channels=True, view_channel=True, connect=True, speak=True,
+                                                mute_members=True, move_members=True)
         }
 
         temp_channel = await after.channel.guild.create_voice_channel(

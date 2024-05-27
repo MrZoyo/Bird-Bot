@@ -56,12 +56,11 @@ class WelcomeCog(commands.Cog):
             mask = Image.new('L', AVATAR_SIZE, 0)
             draw = ImageDraw.Draw(mask)
             draw.ellipse((0, 0) + AVATAR_SIZE, fill=255)
-            avatar_image.putalpha(mask)
 
             # Calculate position for the avatar (middle, a bit towards the top)
             bg_width, bg_height = background.size
             avatar_position = ((bg_width - AVATAR_SIZE[0]) // 2, (bg_height - AVATAR_SIZE[1]) // 3)
-            background.paste(avatar_image, avatar_position, avatar_image)
+            background.paste(avatar_image, avatar_position, mask)  # Use the mask here
 
             # Creating a draw object to draw text on a background image
             draw = ImageDraw.Draw(background)
@@ -110,30 +109,33 @@ class WelcomeCog(commands.Cog):
 
     @commands.command(name='testwelcome')
     async def test_welcome_command(self, ctx):
-        """Traditional command to test welcome messages in the welcome channel."""
+        """Send a test welcome message using the command interface."""
         if ctx.channel.id == WELCOME_CHANNEL_ID:
-            await self.send_welcome_message(ctx, ctx.author)
+            await self.send_welcome(ctx.author, ctx.channel)
+            logging.info(f"Test welcome message sent to {ctx.author}")
         else:
             await ctx.send("Please use this command in the 'welcome' channel.")
 
     @app_commands.command(name="testwelcome")
     @app_commands.describe(member="Select a member to test the welcome message.")
     async def test_welcome(self, interaction: discord.Interaction, member: discord.Member = None):
-        """Slash command to test welcome messages in the welcome channel."""
+        """Send a test welcome message using the slash command interface."""
         if interaction.channel_id != WELCOME_CHANNEL_ID:
             await interaction.response.send_message("This command can only be used in the welcome channel.",
                                                     ephemeral=True)
             return
         member = member or interaction.user
-        await self.send_welcome_message(interaction, member)
+        await self.send_welcome(member, interaction.channel)
+        logging.info(f"Test welcome message sent to {member}")
 
-    async def send_welcome_message(self, ctx_or_interaction, member):
+    async def send_welcome(self, member, channel):
+        """A unified method to send a welcome message to a member."""
+        if not isinstance(channel, discord.TextChannel):
+            # Ensures we're sending in a text channel
+            return
         member_count = member.guild.member_count
         avatar_bytes = await self.download_avatar(member.display_avatar.url)
         welcome_image = self.create_welcome_image(member.display_name, member_count, avatar_bytes)
         discord_file = discord.File(fp=welcome_image, filename='welcome_image.png')
         welcome_message = WELCOME_TEXT.format(member=member)
-        if isinstance(ctx_or_interaction, commands.Context):
-            await ctx_or_interaction.send(content=welcome_message, file=discord_file)
-        else:
-            await ctx_or_interaction.response.send_message(content=welcome_message, file=discord_file)
+        await channel.send(content=welcome_message, file=discord_file)
