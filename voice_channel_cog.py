@@ -54,14 +54,14 @@ class VoiceStateCog(commands.Cog):
             await db.commit()
 
     async def cleanup_channel(self, channel_id):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.execute('SELECT channel_id FROM temp_channels WHERE channel_id = ?', (channel_id,))
-            result = await cursor.fetchone()
-            if result:
-                await db.execute('DELETE FROM temp_channels WHERE channel_id = ?', (channel_id,))
-                await db.commit()
-                channel = self.bot.get_channel(channel_id)
-                if channel and not channel.members:
+        channel = self.bot.get_channel(channel_id)
+        if channel and not channel.members:
+            async with aiosqlite.connect(self.db_path) as db:
+                cursor = await db.execute('SELECT channel_id FROM temp_channels WHERE channel_id = ?', (channel_id,))
+                result = await cursor.fetchone()
+                if result:
+                    await db.execute('DELETE FROM temp_channels WHERE channel_id = ?', (channel_id,))
+                    await db.commit()
                     await channel.delete(reason="Temporary channel cleanup")
 
     @commands.Cog.listener()

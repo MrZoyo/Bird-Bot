@@ -32,6 +32,9 @@ Provides commands to search for records:
 
 ---
 ## Update Log
+### V0.3.8 - 2024-05-28
+#### Bug fixes
+- Fixed a bug that would cause empty rooms to not be deleted correctly in some cases.
 ### V0.3.7 - 2024-05-27
 #### Update the bot to support the following features:
 - Refactored the method of creating and deleting temporary channels, which will now use a database to store information about temporary channels so that they can continue to be managed after the bot is restarted. 
