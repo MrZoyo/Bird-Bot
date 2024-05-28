@@ -20,6 +20,7 @@ class PaginationView(View):
         self.total_pages = (len(records) - 1) // 20 + 1
         self.total_records = len(records)
         self.message = None  # This will hold the reference to the message
+        self.db_path = 'bot.db'  # Path to SQLite database
 
         self.previous_button = Button(label="Previous", style=discord.ButtonStyle.blurple, disabled=True)
         self.next_button = Button(label="Next", style=discord.ButtonStyle.green, disabled=len(records) <= 20)
@@ -72,9 +73,10 @@ class PaginationView(View):
 class IllegalTeamActCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.db_path = 'bot.db'  # Path to SQLite database
 
     async def log_illegal_activity(self, user_id, message):
-        async with aiosqlite.connect('bot.db') as db:
+        async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.cursor()
             now = datetime.now()
             formatted_now = now.strftime('%Y-%m-%d %H:%M:%S.%f')  # Using microseconds
@@ -87,7 +89,7 @@ class IllegalTeamActCog(commands.Cog):
             await cursor.close()
 
     async def remove_illegal_activity(self, user_id):
-        async with aiosqlite.connect('bot.db') as db:
+        async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.cursor()
             threshold = datetime.now() - timedelta(minutes=5)
             formatted_threshold = threshold.strftime('%Y-%m-%d %H:%M:%S')
@@ -100,7 +102,7 @@ class IllegalTeamActCog(commands.Cog):
             await cursor.close()
 
     async def get_illegal_teaming_stats(self):
-        async with aiosqlite.connect('bot.db') as db:
+        async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.cursor()
             await cursor.execute('''
                 SELECT user_id, COUNT(*) as count FROM illegal_teaming
@@ -113,7 +115,7 @@ class IllegalTeamActCog(commands.Cog):
             return results
 
     async def get_users_with_min_records(self, min_records):
-        async with aiosqlite.connect('bot.db') as db:
+        async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.cursor()
             await cursor.execute('''
                 SELECT user_id, COUNT(*) as count FROM illegal_teaming
@@ -220,10 +222,23 @@ class IllegalTeamActCog(commands.Cog):
         view.message = message
 
     async def fetch_records_for_user(self, user_id):
-        async with aiosqlite.connect('bot.db') as db:
+        async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.cursor()
             await cursor.execute('SELECT user_id, timestamp, message FROM illegal_teaming WHERE user_id = ?',
                                  (user_id,))
             records = await cursor.fetchall()
             await cursor.close()
             return records
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        # Ensure the table exists
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS illegal_teaming (
+                    user_id TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    message TEXT NOT NULL
+                )
+            ''')
+            await db.commit()

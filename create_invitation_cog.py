@@ -35,7 +35,7 @@ class CreateInvitationCog(commands.Cog):
             return
 
         # Prefix:  match "缺"|"等"|"="|"＝"|"q"|"Q"
-        # Subject: match numbers|"一" to "五" Chinese characters|"n""N"|"全世界"|"Wworld"
+        # Subject: match numbers|"一" to "五" Chinese characters|"n""N"|"全世界"|"W/world"
         # Exclude: not followed by"分"|"分钟"|"min"|"个钟"|"小时"
         pattern = r"(?:(缺|等|[=＝]|[Qq]))(?:(\d|[一二三四五]|[nN]|全世界|world|World))(?!(分|分钟|min|个钟|小时))"
 

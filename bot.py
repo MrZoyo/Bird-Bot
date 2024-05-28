@@ -56,24 +56,9 @@ async def setup():
     await bot.add_cog(CreateInvitationCog(bot, bot.get_cog("IllegalTeamActCog")))
 
 
-def initialize_database():
-    conn = sqlite3.connect('bot.db')  # Ensure this matches your database file
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS illegal_teaming (
-            user_id TEXT NOT NULL,
-            timestamp TEXT NOT NULL,
-            message TEXT NOT NULL
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-
 @bot.event
 async def setup_hook():
     await setup()
 
 
-initialize_database()
 bot.run(TOKEN)

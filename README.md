@@ -32,6 +32,11 @@ Provides commands to search for records:
 
 ---
 ## Update Log
+### V0.3.7 - 2024-05-27
+#### Update the bot to support the following features:
+- Refactored the method of creating and deleting temporary channels, which will now use a database to store information about temporary channels so that they can continue to be managed after the bot is restarted. 
+- Optimised some code to improve readability and maintainability.
+
 ### V0.3.6 - 2024-05-27
 #### Update the bot to support the following features:
 - Add a new slash command `check_member` to list all illegal teaming records for the specified `member`.
