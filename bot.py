@@ -2,11 +2,11 @@ import discord
 from discord.ext import commands
 from collections import defaultdict
 import logging
-import sqlite3
 from voice_channel_cog import VoiceStateCog
 from welcome_cog import WelcomeCog
 from illegal_team_act_cog import IllegalTeamActCog
 from create_invitation_cog import CreateInvitationCog
+from dnd_cog import DnDCog
 
 # Your bot token
 TOKEN = 'Your_Token_Here'
@@ -54,6 +54,7 @@ async def setup():
     await bot.add_cog(WelcomeCog(bot))
     await bot.add_cog(IllegalTeamActCog(bot))
     await bot.add_cog(CreateInvitationCog(bot, bot.get_cog("IllegalTeamActCog")))
+    await bot.add_cog(DnDCog(bot))
 
 
 @bot.event
