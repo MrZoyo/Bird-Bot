@@ -3,7 +3,14 @@
 ---
 ## Package Usage
 
-discord.py, sqlite3, PIL, logging, aiohttp, collections, aiosqlite
+discord.py, sqlite3, PIL, logging, aiohttp, aiosqlite
+
+---
+## Setup
+1. Install the required packages.
+2. Replace __all the placeholders__ in the code with your own values.
+3. Run the `bot.py` file. If you are using a Linux server, you can use `nohup python3 bot.py &` to run the bot in the background.
+4. Invite the bot to your server and give it the necessary permissions.(Required permissions: bot, application command, administrator)
 
 ---
 ## Function Introduction
@@ -32,9 +39,10 @@ Provides commands to search for records:
 
 ### DnD_Cog
 Provides Dungeons & Dragons (DnD) players with a convenient way to generate random roll dice points.
--  `/dnd_roll` - The command takes an expression as an argument, which represents the dice roll in DnD notation. 
+-  `/dnd_roll <expression> <x>` - The command takes an expression as an argument, which represents the dice roll in DnD notation. 
 For example, an expression like `3+4d6` would represent rolling four 6-sided dice and adding 3 to the result. The command parses the expression, performs the dice roll, and sends a message back to the user with the result and the details of the roll.
-
+Command `/dnd_roll` has an optional parameter `x` to specify the number of times to repeat the roll. 
+- Expression `5#3+4d6` can repeat a roll of `3+4d6` for 5 times quickly. Use the expression to specify that the number before the `#` has a higher priority than the parameter `x`.
 ### Logfile_Cog
 Provides the ability to quickly query log files from the robot side.
 - `/check_log <number=x>` - Returns the last `x` lines of the log file.
