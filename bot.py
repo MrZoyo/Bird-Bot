@@ -1,7 +1,8 @@
 import discord
 from discord.ext import commands
-from collections import defaultdict
 import logging
+
+from logfile_cog import LogFileCog
 from voice_channel_cog import VoiceStateCog
 from welcome_cog import WelcomeCog
 from illegal_team_act_cog import IllegalTeamActCog
@@ -18,11 +19,10 @@ intents.voice_states = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Store information about temporary channels
-temp_channels = defaultdict(dict)
+LOGGING_FILE = 'bot.log'
 
 # Configure the logging system
-logging.basicConfig(level=logging.INFO, filename='bot.log', filemode='a',
+logging.basicConfig(level=logging.INFO, filename=LOGGING_FILE, filemode='a',
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
 
@@ -33,6 +33,9 @@ async def on_ready():
         logging.info(f"\nBot connected to server {guild.name}\n")
         print(f"\nBot connected to server {guild.name}\n")
         await bot.change_presence(activity=discord.Game(name=f"Working in {guild.name}"))
+
+    await bot.tree.sync()
+    print("Commands Synced.")
 
 
 @bot.command()
@@ -55,6 +58,7 @@ async def setup():
     await bot.add_cog(IllegalTeamActCog(bot))
     await bot.add_cog(CreateInvitationCog(bot, bot.get_cog("IllegalTeamActCog")))
     await bot.add_cog(DnDCog(bot))
+    await bot.add_cog(LogFileCog(bot))
 
 
 @bot.event

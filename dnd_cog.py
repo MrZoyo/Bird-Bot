@@ -9,14 +9,31 @@ class DnDCog(commands.Cog):
         self.bot = bot
 
     @discord.app_commands.command(name="dnd_roll")
-    @discord.app_commands.describe(expression="Expression to roll, e.g., '3+4d6'.")
-    async def dnd_roll(self, interaction: discord.Interaction, expression: str):
+    @discord.app_commands.describe(expression="Expression to roll, e.g., '3+4d6'.",
+                                   x="Number of times to repeat the roll.")
+    async def dnd_roll(self, interaction: discord.Interaction, expression: str, x: int = 1):
         """Rolls dice based on DnD notation."""
-        result, detailed = self.parse_and_roll(expression)
-        if result is None:
-            await interaction.response.send_message("Invalid dice notation.")
-        else:
-            await interaction.response.send_message(f"**Result**: {result}\n**Details**: \n {detailed}")
+        if '#' in expression:
+            parts = expression.split('#', 1)
+            if parts[0].isdigit():
+                x = int(parts[0])
+                expression = parts[1]
+            else:
+                expression = expression.replace('#', '')
+        results = []
+        for _ in range(x):
+            result, detailed = self.parse_and_roll(expression)
+            if result is None:
+                await interaction.response.send_message("Invalid dice notation.")
+                return
+            results.append((result, detailed))
+
+        # Create a table string
+        table = "Roll | Result | Details\n---- | ------ | -------\n"
+        for i, (result, detailed) in enumerate(results, 1):
+            table += f"{i:4} | {result:6} | {detailed}\n"
+
+        await interaction.response.send_message(f"**Results**:\n```\n{table}\n```")
 
     def parse_and_roll(self, expression):
         pattern = r"([+-]?\d*d\d+)|([+-]?\d+)"
@@ -37,7 +54,7 @@ class DnDCog(commands.Cog):
                     map(str, [x * sign for x in rolls])) + f" = {roll_sum}")
             elif match[1]:  # Modifier found
                 total += int(match[1])
-                details.append(f"Modifier: {match[1]}")
+                details.append(f"{match[1]}, ")
 
-        detailed_result = "\n".join(details)
+        detailed_result = "".join(details)
         return total, detailed_result

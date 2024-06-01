@@ -32,14 +32,31 @@ Provides commands to search for records:
 
 ### DnD_Cog
 Provides Dungeons & Dragons (DnD) players with a convenient way to generate random roll dice points.
--  `/dnd_roll` - The command takes an expression as an argument, which represents the dice roll in DnD notation. For example, an expression like '3+4d6' would represent rolling four 6-sided dice and adding 3 to the result. The command parses the expression, performs the dice roll, and sends a message back to the user with the result and the details of the roll.
+-  `/dnd_roll` - The command takes an expression as an argument, which represents the dice roll in DnD notation. 
+For example, an expression like `3+4d6` would represent rolling four 6-sided dice and adding 3 to the result. The command parses the expression, performs the dice roll, and sends a message back to the user with the result and the details of the roll.
+
+### Logfile_Cog
+Provides the ability to quickly query log files from the robot side.
+- `/check_log <number=x>` - Returns the last `x` lines of the log file.
 
 ---
 ## Update Log
+### V0.4.2 - 2024-06-02
+#### Update the bot to support the following features:
+- Provides the ability to quickly query log files from the robot side. Use the slash command `/check_log x` in the specific channel to query the last `x` lines of the log file.
+---
+### V0.4.1 - 2024-06-01
+#### Update the bot to support the following features:
+- Added the ability to query the illegal teaming records of users who have left the server. Use slash command `/check_member_by_id` in the specific channel to query.
+- Added the ability to repeat roll points multiple times and improved the result display format. 
+Command `/dnd_roll` now has an optional parameter `x` to specify the number of times to repeat the roll.
+- Updated the expression for DnD to quickly repeat roll dice. For example `5#3+4d6` can repeat a roll of `3+4d6` for 5 times quickly. Use the expression to specify that the number before the `#` has a higher priority than the parameter `x`.
+- Improved the error throwing mechanism for some features.
+---
 ### V0.4.0 - 2024-05-31
 #### Update the bot to support the following features:
 - Added new feature `DnD_Cog`. this feature provides Dungeons & Dragons (DnD) players with a convenient way to generate random roll dice points.
-- Use slash command `/dnd_roll`. The command takes an expression as an argument, which represents the dice roll in DnD notation. For example, an expression like '3+4d6' would represent rolling four 6-sided dice and adding 3 to the result. The command parses the expression, performs the dice roll, and sends a message back to the user with the result and the details of the roll.
+- Use slash command `/dnd_roll`. The command takes an expression as an argument, which represents the dice roll in DnD notation. For example, an expression like `3+4d6` would represent rolling four 6-sided dice and adding 3 to the result. The command parses the expression, performs the dice roll, and sends a message back to the user with the result and the details of the roll.
 ---
 ### V0.3.8 - 2024-05-28
 #### Bug fixes

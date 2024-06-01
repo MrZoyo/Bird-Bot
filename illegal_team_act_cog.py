@@ -210,16 +210,23 @@ class IllegalTeamActCog(commands.Cog):
     @app_commands.describe(member="The member to fetch illegal team records for")
     async def check_member(self, interaction: discord.Interaction, member: discord.Member):
         """Lists all illegal teaming records for the specified member."""
-        if not await self.check_channel_validity(interaction):
-            return
-        records = await self.fetch_records_for_user(member.id)
-        if not records:
-            await interaction.response.send_message("No records found for this user.", ephemeral=True)
-            return
-        view = PaginationView(self.bot, records, member.id)
-        message = await interaction.response.send_message(content=f"Records for <@{member.id}>", embed=view.format_page(),
-                                                view=view)
-        view.message = message
+        try:
+            if not await self.check_channel_validity(interaction):
+                return
+            if member is None:
+                await interaction.response.send_message("You must mention a user.", ephemeral=True)
+                return
+            records = await self.fetch_records_for_user(member.id)
+            if not records:
+                await interaction.response.send_message("No records found for this user.", ephemeral=True)
+                return
+            view = PaginationView(self.bot, records, member.id)
+            message = await interaction.response.send_message(content=f"Records for <@{member.id}>",
+                                                              embed=view.format_page(),
+                                                              view=view)
+            view.message = message
+        except Exception as e:
+            await interaction.response.send_message(f"An error occurred: {str(e)}", ephemeral=True)
 
     async def fetch_records_for_user(self, user_id):
         async with aiosqlite.connect(self.db_path) as db:
@@ -229,6 +236,25 @@ class IllegalTeamActCog(commands.Cog):
             records = await cursor.fetchall()
             await cursor.close()
             return records
+
+    @app_commands.command(name="check_member_by_id")
+    @app_commands.describe(user_id="The user ID to fetch illegal team records for")
+    async def check_member_by_id(self, interaction: discord.Interaction, user_id: str):
+        """Lists all illegal teaming records for the specified user ID."""
+        try:
+            if not await self.check_channel_validity(interaction):
+                return
+            records = await self.fetch_records_for_user(user_id)
+            if not records:
+                await interaction.response.send_message("No records found for this user.", ephemeral=True)
+                return
+            view = PaginationView(self.bot, records, int(user_id))  # Convert user_id to int
+            message = await interaction.response.send_message(content=f"Records for user ID {user_id}",
+                                                              embed=view.format_page(),
+                                                              view=view)
+            view.message = message
+        except Exception as e:
+            await interaction.response.send_message(f"An error occurred: {str(e)}", ephemeral=True)
 
     @commands.Cog.listener()
     async def on_ready(self):
