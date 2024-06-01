@@ -29,9 +29,9 @@ class DnDCog(commands.Cog):
             results.append((result, detailed))
 
         # Create a table string
-        table = "Roll | Result | Details\n---- | ------ | -------\n"
+        table = "Roll|Result|Details\n----|------|-------\n"
         for i, (result, detailed) in enumerate(results, 1):
-            table += f"{i:4} | {result:6} | {detailed}\n"
+            table += f"{i:3} |{result:5} |{detailed}\n"
 
         await interaction.response.send_message(f"**Results**:\n```\n{table}\n```")
 
@@ -50,11 +50,11 @@ class DnDCog(commands.Cog):
                 rolls = [random.randint(1, dice_sides) for _ in range(num_dice)]
                 roll_sum = sum(rolls) * sign
                 total += roll_sum
-                details.append(f"{'+' if sign > 0 else '-'}{num_dice}d{dice_sides}: " + "+".join(
-                    map(str, [x * sign for x in rolls])) + f" = {roll_sum}")
+                details.append(f"{'+' if sign > 0 else '-'}{num_dice}d{dice_sides}:" + "+".join(
+                    map(str, [x * sign for x in rolls])) + f"={roll_sum},")
             elif match[1]:  # Modifier found
                 total += int(match[1])
-                details.append(f"{match[1]}, ")
+                details.append(f"{match[1]},")
 
         detailed_result = "".join(details)
         return total, detailed_result
