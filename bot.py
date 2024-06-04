@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 import logging
 
+from achievement_cog import AchievementCog
 from logfile_cog import LogFileCog
 from voice_channel_cog import VoiceStateCog
 from welcome_cog import WelcomeCog
@@ -59,6 +60,7 @@ async def setup():
     await bot.add_cog(CreateInvitationCog(bot, bot.get_cog("IllegalTeamActCog")))
     await bot.add_cog(DnDCog(bot))
     await bot.add_cog(LogFileCog(bot))
+    await bot.add_cog(AchievementCog(bot))
 
 
 @bot.event

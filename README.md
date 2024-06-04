@@ -43,12 +43,43 @@ Provides Dungeons & Dragons (DnD) players with a convenient way to generate rand
 For example, an expression like `3+4d6` would represent rolling four 6-sided dice and adding 3 to the result. The command parses the expression, performs the dice roll, and sends a message back to the user with the result and the details of the roll.
 Command `/dnd_roll` has an optional parameter `x` to specify the number of times to repeat the roll. 
 - Expression `5#3+4d6` can repeat a roll of `3+4d6` for 5 times quickly. Use the expression to specify that the number before the `#` has a higher priority than the parameter `x`.
+
 ### Logfile_Cog
 Provides the ability to quickly query log files from the robot side.
 - `/check_log <number=x>` - Returns the last `x` lines of the log file.
 
+### Achievement_Cog
+
+It is designed to track and display user achievements based on their activity in the server. 
+
+**Features**
+- Message Count: The bot tracks the number of messages a user sends in the server. Achievements are awarded when a user reaches certain message count thresholds.  
+- Reaction Count: The bot also keeps track of the number of reactions a user adds to messages. Achievements are given when a user reaches certain reaction count thresholds.  
+- Time Spent in Voice Channels: The bot monitors the amount of time a user spends in voice channels. Achievements are granted when a user reaches certain time thresholds.  
+
+
+It listens to message, reaction, and voice state update events to track user activity.  
+To view a user's achievements, use the `/achievements` command. 
+If no user is specified, the command will display the achievements of the user who invoked the command.  
+To manually increase or decrease a user's achievement progress, use the `/increase_achievement` and `/decrease_achievement` commands respectively. 
+
+These commands require the following parameters:  
+- `member`: The member whose achievement progress to modify.
+- `reactions:int`: The number of reactions to add or subtract.
+- `messages:int`: The number of messages to add or subtract.
+- `time_spent:int`: The time spent on the server to add or subtract (in seconds).
+
+`member` is a required parameter, while the other parameters are at least 1 optional.
+
 ---
 ## Update Log
+### V0.5.0 - 2024-06-04
+#### Update the bot to support the following features:
+- New Achievement System, which is designed to track and display user achievements based on their activity in the server.
+- To view a user's achievements, use the `/achievements` command. If no user is specified, the command will display the achievements of the user who invoked the command.  
+- To manually increase or decrease a user's achievement progress, use the `/increase_achievement` and `/decrease_achievement` commands respectively. 
+
+---
 ### V0.4.2 - 2024-06-02
 #### Update the bot to support the following features:
 - Provides the ability to quickly query log files from the robot side. Use the slash command `/check_log x` in the specific channel to query the last `x` lines of the log file.
