@@ -71,21 +71,33 @@ These commands require the following parameters:
 
 `member` is a required parameter, while the other parameters are at least 1 optional.
 
+Use `/achievement_ranking` to show the top 10 users with the every highest achievement indicators in the server.
+
 ---
 ## Update Log
+### V0.5.2 - 2024-06-04
+#### Bug fixes
+- Fixed a bug that would cause the Achievement system to timeout on replies in low performance environments. 
+- Optimised the /check_log command's limit on the number of characters, which would send a file when the character limit was exceeded.
+- Optimised response times for low performance servers.
+---
+### V0.5.1 - 2024-06-04
+#### New features:
+- Added a slash command `/achievement_ranking` to show the top 10 users with the every highest achievement indicators in the server.
+---
 ### V0.5.0 - 2024-06-04
-#### Update the bot to support the following features:
+#### New features:
 - New Achievement System, which is designed to track and display user achievements based on their activity in the server.
 - To view a user's achievements, use the `/achievements` command. If no user is specified, the command will display the achievements of the user who invoked the command.  
 - To manually increase or decrease a user's achievement progress, use the `/increase_achievement` and `/decrease_achievement` commands respectively. 
 
 ---
 ### V0.4.2 - 2024-06-02
-#### Update the bot to support the following features:
+#### New features:
 - Provides the ability to quickly query log files from the robot side. Use the slash command `/check_log x` in the specific channel to query the last `x` lines of the log file.
 ---
 ### V0.4.1 - 2024-06-01
-#### Update the bot to support the following features:
+#### New features:
 - Added the ability to query the illegal teaming records of users who have left the server. Use slash command `/check_member_by_id` in the specific channel to query.
 - Added the ability to repeat roll points multiple times and improved the result display format. 
 Command `/dnd_roll` now has an optional parameter `x` to specify the number of times to repeat the roll.
@@ -93,7 +105,7 @@ Command `/dnd_roll` now has an optional parameter `x` to specify the number of t
 - Improved the error throwing mechanism for some features.
 ---
 ### V0.4.0 - 2024-05-31
-#### Update the bot to support the following features:
+#### New features:
 - Added new feature `DnD_Cog`. this feature provides Dungeons & Dragons (DnD) players with a convenient way to generate random roll dice points.
 - Use slash command `/dnd_roll`. The command takes an expression as an argument, which represents the dice roll in DnD notation. For example, an expression like `3+4d6` would represent rolling four 6-sided dice and adding 3 to the result. The command parses the expression, performs the dice roll, and sends a message back to the user with the result and the details of the roll.
 ---
@@ -103,12 +115,12 @@ Command `/dnd_roll` now has an optional parameter `x` to specify the number of t
 
 ---
 ### V0.3.7 - 2024-05-27
-#### Update the bot to support the following features:
+#### New features:
 - Refactored the method of creating and deleting temporary channels, which will now use a database to store information about temporary channels so that they can continue to be managed after the bot is restarted. 
 - Optimised some code to improve readability and maintainability.
 ---
 ### V0.3.6 - 2024-05-27
-#### Update the bot to support the following features:
+#### New features:
 - Add a new slash command `check_member` to list all illegal teaming records for the specified `member`.
 #### Bug fixes
 - Asynchronous database operations were used, thus fixing a bug that would cause high-frequency private pulls from the same user to clog the database.
@@ -124,21 +136,21 @@ Command `/dnd_roll` now has an optional parameter `x` to specify the number of t
 - Fixed a bug that caused the bot to reply to the same message twice when the user sent specific command.
 ---
 ### V0.3.3 - 2024-05-25
-#### Update the bot to support the following features:
+#### New features:
 - Added slash command to all commands.
 - Note, please tick the application command permission for your bot and re-invite to the server to update the display and description of the slash command.
 ---
 ### V0.3.2 - 2024-05-25
-#### Update the bot to support the following features:
+#### New features:
 - The structure of the code has been refactored to package each part of the function into separate cogs for tweaking and calling. Now please adjust the parameters of the response function in the corresponding cog.
 - The usage is exactly the same as before, you just need to run `bot.py`.
 ---
 ### V0.3.1 - 2024-05-25
-#### Update the bot to support the following features:
+#### New features:
 - Add `CHECK_ILLEGAL_TEAMING_CHANNEL_ID` to customise the channel ID for the `!check_illegal_teaming` and `!check_user_records` commands.
 ---
 ### V0.3.0 - 2024-05-25
-#### Update the bot to support the following features:
+#### New features:
 - Bots will now log users' illegal teaming behaviour in the `bot.db` file. The record can be erased by a normal teaming within 5 minutes.
 - Use the command `!check_illegal_teaming` in a specific channel to query the 20 users with the most records of illegal teaming behaviour.
 - Use the command `!check_user_records <number>` in a specific channel to query all users whose number of illegal teaming behaviours is greater than `<number>`.
@@ -150,13 +162,13 @@ Command `/dnd_roll` now has an optional parameter `x` to specify the number of t
 ---
 ### V0.2.4 - 2024-04-19
 Skipped a version number to align with the version number of the main bot.
-#### Update the bot to support the following features:
+#### New features:
 - Add a new slash command `/testwelcome` to test the welcome message. 
 - Reorganised the structure of regular expressions into three matching parts.
 - Added matching words for the new regular expression.
 ---
 ### V0.2.2 - 2024-03-31
-#### Update the bot to support the following features:
+#### New features:
 - Add two new parameters at the top of the code to customise the welcome message:
   - `WELCOME_TEXT_1_DISTANCE` - The distance between the first welcome text and the top of the picture.
   - `WELCOME_TEXT_2_DISTANCE` - The distance between the second welcome text and the top of the picture.
@@ -164,7 +176,7 @@ Skipped a version number to align with the version number of the main bot.
 - Fixed a bug that in some environments the background image is not converted to the correct format.
 ---
 ### V0.2.1 - 2024-03-23
-#### Update the bot to support the following features:
+#### New features:
 - Add a new command `!testwelcome` to test the welcome message.
 - Optimised the code by placing the welcome message setting parameter at the top of the code. You can now easily customise your welcome message by customising the following parameters:
   - `BACKGROUND_IMAGE` - The background image of the welcome picture. Note that if your background image size changes. You will also need to adjust the other parameters in turn.
@@ -178,7 +190,7 @@ Skipped a version number to align with the version number of the main bot.
 - ![image](https://github.com/MrZoyo/DiscordGameServerHelper/blob/main/pics/testwelcome.png)
 ---
 ### V0.2.0 - 2024-03-22
-#### Update the bot to support the following features:
+#### New features:
 ##### New Welcome message System
 - Add a welcome message system to send a welcome message when they join the server.
 - You can define the welcome channel ID by setting the `WELCOME_CHANNEL_ID` variable.
@@ -187,17 +199,17 @@ Skipped a version number to align with the version number of the main bot.
   - ![image](https://github.com/MrZoyo/DiscordGameServerHelper/blob/main/pics/welcome.png)
 ---
 ### V0.1.3 - 2024-03-20
-#### Update the bot to support the following features:
+#### New features:
 ##### New Channel Dictionary System
 - Add a channel dictionary to store the channel ID which the bot will support multiple public and private channels. You can define the channel ID, the channel type and the channel name prefix in the `CHANNEL_CONFIGS` dictionary.
 ---
 ### V0.1.2 - 2024-03-14
-#### Update the bot to support the following features:
+#### New features:
 ##### Support for multiple public and private channels
 - Just add the channel ID to the `PUBLIC_CHANNEL_ID_LIST` and `PRIVATE_CHANNEL_ID_LIST` arrays, and the bot will support multiple public and private channels.
 ---
 ### V0.1.1 - 2024-02-29
-#### Update the bot to support the following features:
+#### New features:
 ##### New blacklist system
 - Added a blacklist system that allows bot to not reply to users in the blacklist.
 #### Bug fixes
@@ -205,7 +217,7 @@ Skipped a version number to align with the version number of the main bot.
 - Fixed a bug that caused some special URLs to be replied incorrectly.
 ---
 ### V0.1.0 - 2024-02-20
-#### Update the bot to support the following features:
+#### New features:
 ##### New log system
 - Add a new log system to record the user's operation and the robot's response. The log will be saved in the `bot.log` file.
 - Delete the old log system with timestamp. So the bug of the old timestamp system will be fixed.
@@ -215,7 +227,7 @@ Skipped a version number to align with the version number of the main bot.
 - The third number of the version number will be updated when the bot is updated with small new features or bug fixes.
 ---
 ### V0.0.2 - 2024-02-19
-#### Update the bot to support the following features:
+#### New features:
 ##### Create channels for players
 - Replace `RELAX_CHANNEL_ID` with the ID of the channel you want to use as the relax channel creator. When a user joins this channel, a new voice channel will be created for them. And they be moved to the new channel. Only this user has the ability to edit the channel name. 
 - Added a timestamp to the detection log output by the robot. (defaults to Berlin time)

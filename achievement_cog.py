@@ -70,7 +70,9 @@ class AchievementRefreshView(View):
 
         # Create an embed with the user's achievements
         embed = discord.Embed(title=f"Achievements of {user_name}",
-                              description=f"{user_mention} completed {completed_achievements}/12 achievements!\n**---------**")
+                              description=f"{user_mention} completed {completed_achievements}/12 achievements!\n**---------**",
+                              color=discord.Color.blue()
+                              )
 
         for achievement in achievements:
             emoji = ":white_check_mark:" if achievement["count"] >= achievement["threshold"] else ":wheelchair:"
@@ -83,7 +85,7 @@ class AchievementRefreshView(View):
 
 class ConfirmationView(View):
     def __init__(self, bot, member_id, reactions, messages, time_spent, operation):
-        super().__init__(timeout=60.0)
+        super().__init__(timeout=120.0)
         self.bot = bot
         self.member_id = member_id
         self.reactions = reactions
@@ -92,41 +94,87 @@ class ConfirmationView(View):
         self.db_path = 'bot.db'
         self.operation = operation  # 'increase' or 'decrease'
 
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+        self.stop()  # Optionally stop further interactions if desired
+        await self.message.edit(content="**Timeout: No longer accepting interactions.**", view=self)
+
     @discord.ui.button(label="Confirm", style=discord.ButtonStyle.green)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Immediate feedback
+        await interaction.response.edit_message(content="**Processing your request...**", view=None)
+
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.cursor()
             await cursor.execute("SELECT * FROM achievements WHERE user_id = ?", (self.member_id,))
             user_record = await cursor.fetchone()
 
             if user_record is None:
-                # This user is not in the database, so create a new record for them
                 await cursor.execute(
                     "INSERT INTO achievements (user_id, message_count, reaction_count, time_spent) VALUES (?, ?, ?, ?)",
                     (self.member_id, 0, 0, 0))
-                user_record = (self.member_id, 0, 0, 0)
-
-            _, message_count, reaction_count, time_spent_db = user_record
-
+            new_values = (self.messages, self.reactions, self.time_spent, self.member_id)
             if self.operation == 'increase':
                 await cursor.execute(
                     "UPDATE achievements SET message_count = message_count + ?, reaction_count = reaction_count + ?, time_spent = time_spent + ? WHERE user_id = ?",
-                    (self.messages, self.reactions, self.time_spent, self.member_id))
+                    new_values)
             elif self.operation == 'decrease':
-                if self.messages > message_count or self.reactions > reaction_count or self.time_spent > time_spent_db:
-                    await interaction.response.edit_message(
-                        content="**Operation cancelled! Achievements cannot go below zero.**", view=None)
-                    return
                 await cursor.execute(
                     "UPDATE achievements SET message_count = message_count - ?, reaction_count = reaction_count - ?, time_spent = time_spent - ? WHERE user_id = ?",
-                    (self.messages, self.reactions, self.time_spent, self.member_id))
+                    new_values)
             await db.commit()
 
-        await interaction.response.edit_message(content=f"**Operation {self.operation} complete!**", view=None)
+        await interaction.edit_original_response(content=f"**Operation {self.operation} complete!**", view=None)
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.red)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="**Operation cancelled!**", view=None)
+        await interaction.response.edit_message(content="**Operation cancelled!**", view=self)
+
+
+class AchievementRankingView(View):
+    def __init__(self, bot):
+        super().__init__(timeout=180.0)
+        self.db_path = 'bot.db'  # Path to SQLite database
+        self.bot = bot
+        self.message = None  # This will hold the reference to the message
+
+    async def format_page(self):
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.cursor()
+
+            # Fetch the top 10 users for each category
+            await cursor.execute("SELECT user_id, reaction_count FROM achievements ORDER BY reaction_count DESC LIMIT 10")
+            top_reactions = await cursor.fetchall()
+            await cursor.execute("SELECT user_id, message_count FROM achievements ORDER BY message_count DESC LIMIT 10")
+            top_messages = await cursor.fetchall()
+            await cursor.execute("SELECT user_id, time_spent FROM achievements ORDER BY time_spent DESC LIMIT 10")
+            top_time_spent = await cursor.fetchall()
+
+        # Define the emojis for the ranks
+        rank_emojis = [":first_place:", ":second_place:", ":third_place:"] + [f":{i}:" for i in ['four', 'five', 'six', 'seven', 'eight', 'nine', 'keycap_ten']]
+
+        # Create an embed with the rankings
+        embed = discord.Embed(title=":crown:Achievement Ranking:crown:", color=discord.Color.blue())
+
+        # Define the achievements and their thresholds
+        achievements = [
+            {"name": ":heart: Add Most Reaction :heart: ", "type": "reactions", "top_users": top_reactions},
+            {"name": ":green_heart: Send Most Message :green_heart: ", "type": "messages", "top_users": top_messages},
+            {"name": ":yellow_heart: Spent Most Time(min) :yellow_heart: ", "type": "time_spent",
+             "top_users": top_time_spent}
+        ]
+
+        for achievement in achievements:
+            ranking = ""
+            for i, (user_id, count) in enumerate(achievement["top_users"]):
+                user = await self.bot.fetch_user(user_id)
+                if achievement["type"] == "time_spent":
+                    count /= 60  # Convert seconds to minutes
+                ranking += f"{rank_emojis[i]} {user.mention} - {int(count)}\n"
+            embed.add_field(name=achievement["name"], value=ranking, inline=False)
+
+        return embed
 
 
 class AchievementCog(commands.Cog):
@@ -220,11 +268,15 @@ class AchievementCog(commands.Cog):
     )
     @app_commands.describe(member="The member to query. Defaults to self if not provided")
     async def achievements(self, interaction: discord.Interaction, member: discord.Member = None):
+        # Defer the interaction
+        await interaction.response.defer()
+
         if member is None:
             member = interaction.user  # Default to the user who invoked the command
 
         view = AchievementRefreshView(self.bot, member.id)
-        message = await interaction.response.send_message(embeds=[await view.format_page()], view=view)
+        embed = await view.format_page()
+        message = await interaction.edit_original_response(embeds=[embed], view=view)
         view.message = message
 
     @app_commands.command(
@@ -242,6 +294,8 @@ class AchievementCog(commands.Cog):
                                             messages: int = 0, time_spent: int = 0):
         if not await self.illegal_act_cog.check_channel_validity(interaction):
             return
+
+        await interaction.response.defer()  # Properly defer to handle possibly lengthy DB operations
 
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.cursor()
@@ -263,8 +317,7 @@ class AchievementCog(commands.Cog):
             embed.add_field(name="Reactions to Add", value=str(reactions), inline=True)
             embed.add_field(name="Messages to Add", value=str(messages), inline=True)
             embed.add_field(name="Time to Add (seconds)", value=str(time_spent), inline=True)
-            message = await interaction.response.send_message(embed=embed, view=view)
-            view.message = message
+            await interaction.edit_original_response(embed=embed, view=view)
 
     @app_commands.command(
         name="decrease_achievement",
@@ -281,6 +334,8 @@ class AchievementCog(commands.Cog):
                                             messages: int = 0, time_spent: int = 0):
         if not await self.illegal_act_cog.check_channel_validity(interaction):
             return
+
+        await interaction.response.defer()  # Defer interaction for database operations
 
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.cursor()
@@ -302,8 +357,20 @@ class AchievementCog(commands.Cog):
             embed.add_field(name="Reactions to Subtract", value=str(reactions), inline=True)
             embed.add_field(name="Messages to Subtract", value=str(messages), inline=True)
             embed.add_field(name="Time to Subtract (seconds)", value=str(time_spent), inline=True)
-            message = await interaction.response.send_message(embed=embed, view=view)
-            view.message = message
+            await interaction.edit_original_response(embed=embed, view=view)
+
+    @app_commands.command(
+        name="achievement_ranking",
+        description="Display the achievement rankings"
+    )
+    async def achievement_ranking(self, interaction: discord.Interaction):
+        # Defer the interaction
+        await interaction.response.defer()
+
+        view = AchievementRankingView(self.bot)
+        embed = await view.format_page()
+        # Correct method to edit the message after deferring
+        await interaction.edit_original_response(embed=embed, view=view)
 
     @commands.Cog.listener()
     async def on_ready(self):
