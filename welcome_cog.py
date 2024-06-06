@@ -111,31 +111,46 @@ class WelcomeCog(commands.Cog):
     async def test_welcome_command(self, ctx):
         """Send a test welcome message using the command interface."""
         if ctx.channel.id == WELCOME_CHANNEL_ID:
-            await self.send_welcome(ctx.author, ctx.channel)
-            logging.info(f"Test welcome message sent to {ctx.author}")
+            member_number = len(ctx.guild.members)  # Get the number of members in the guild
+            await self.send_welcome(ctx.author, ctx.channel, member_number)
         else:
             await ctx.send("Please use this command in the 'welcome' channel.")
 
     @app_commands.command(name="testwelcome")
     @app_commands.describe(member="Select a member to test the welcome message.")
-    async def test_welcome(self, interaction: discord.Interaction, member: discord.Member = None):
+    @app_commands.describe(member_number="Customize the 'xth member of the server' message.")
+    async def test_welcome(self, interaction: discord.Interaction, member: discord.Member = None,
+                           member_number: int = None):
         """Send a test welcome message using the slash command interface."""
         if interaction.channel_id != WELCOME_CHANNEL_ID:
             await interaction.response.send_message("This command can only be used in the welcome channel.",
                                                     ephemeral=True)
             return
+
         member = member or interaction.user
-        await self.send_welcome(member, interaction.channel)
+        member_number = member_number or member.guild.member_count  # Use the provided member number or the actual member count
+
+        # Call send_welcome and edit the original response with the result
+        await self.send_welcome(member, interaction.channel, member_number, interaction)
+
         logging.info(f"Test welcome message sent to {member}")
 
-    async def send_welcome(self, member, channel):
+    async def send_welcome(self, member, channel, member_number, interaction=None):
         """A unified method to send a welcome message to a member."""
         if not isinstance(channel, discord.TextChannel):
             # Ensures we're sending in a text channel
             return
-        member_count = member.guild.member_count
+
         avatar_bytes = await self.download_avatar(member.display_avatar.url)
-        welcome_image = self.create_welcome_image(member.display_name, member_count, avatar_bytes)
+        welcome_image = self.create_welcome_image(member.display_name, member_number, avatar_bytes)
         discord_file = discord.File(fp=welcome_image, filename='welcome_image.png')
         welcome_message = WELCOME_TEXT.format(member=member)
-        await channel.send(content=welcome_message, file=discord_file)
+
+        if interaction:
+            # First, defer the response without any content
+            await interaction.response.defer(ephemeral=True)
+            # Then send a followup message with the content and the file
+            await interaction.followup.send(content=welcome_message, files=[discord_file])
+        else:
+            # Regular send for non-slash command contexts
+            await channel.send(content=welcome_message, file=discord_file)

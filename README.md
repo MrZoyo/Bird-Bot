@@ -27,7 +27,9 @@ This includes a more complex feature: creating a unique welcome image with the c
 
 This feature contains command functions that allow the welcome message to be summoned manually by the user.
 - `!testwelcome` - Send the welcome message for who use this command.
-- `/testwelcome <member>` - Send the welcome message for specific member.
+- `/testwelcome <member> <member_number>` - Send the welcome message for specific member with specific number.
+- For default `<member>` is the user who uses the command, `<member_number>` is the total number of people in the server.
+
 ### Illegal_Team_Act_Cog
 For users who are not in the server's channel but sent a teaming message, the bot will record their id, what they sent and when they sent it.
 If the user resends a normal teaming message, the bot deletes their illegal teaming record for 5 minutes.
@@ -75,10 +77,18 @@ Use `/achievement_ranking` to show the top 10 users with the every highest achie
 
 ---
 ## Update Log
+### V0.5.3 - 2024-06-06
+#### Bug fixes
+- Fixed an issue that had caused Bot to not be able to create new rooms when the number of channels reached the limit (50) for the same category in discord.
+Now the bot will create a new category with the same name below the current category and create a new channel there. It will delete these categories when they are empty.
+#### New features:
+- Added a new parameter `<member_number>` to the `/testwelcome` command to specify the number of the welcome image. 
+`/testwelcome <member> <member_number
+---
 ### V0.5.2 - 2024-06-04
 #### Bug fixes
 - Fixed a bug that would cause the Achievement system to timeout on replies in low performance environments. 
-- Optimised the /check_log command's limit on the number of characters, which would send a file when the character limit was exceeded.
+- Optimised the `/check_log` command's limit on the number of characters, which would send a file when the character limit was exceeded.
 - Optimised response times for low performance servers.
 ---
 ### V0.5.1 - 2024-06-04

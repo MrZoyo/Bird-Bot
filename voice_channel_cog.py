@@ -27,15 +27,41 @@ class VoiceStateCog(commands.Cog):
             await self.cleanup_channel(before.channel.id)
 
     async def handle_channel(self, member, after, config, public=True):
-        category = after.channel.category
+        guild = after.channel.guild
         temp_channel_name = f"{config['name_prefix']}-{member.display_name}"
         overwrites = {
             member.guild.default_role: discord.PermissionOverwrite(view_channel=True, connect=public),
             member: discord.PermissionOverwrite(manage_channels=True, view_channel=True, connect=True, speak=True,
                                                 mute_members=True, move_members=True)
         }
-        temp_channel = await after.channel.guild.create_voice_channel(name=temp_channel_name, category=category,
-                                                                      overwrites=overwrites)
+
+        # Get all categories with the same name as the current one
+        categories = [category for category in guild.categories if category.name == after.channel.category.name]
+
+        # Sort the categories by position
+        categories.sort(key=lambda category: category.position)
+
+        for category in categories:
+            try:
+                temp_channel = await guild.create_voice_channel(name=temp_channel_name, category=category,
+                                                                overwrites=overwrites)
+                break  # If the channel creation is successful, break the loop
+            except discord.errors.HTTPException as e:
+                if e.code == 50035:  # Maximum number of channels in category reached
+                    continue  # If the category is full, continue to the next one
+                else:
+                    raise e  # If it's another error, raise it
+        else:  # If all categories are full
+            # Before creating a new category, increment the position of all categories with a position
+            # greater than or equal to the new category's position
+            new_category_position = categories[-1].position
+            print(f"Creating new category at position {new_category_position}")
+
+            new_category = await guild.create_category(name=after.channel.category.name,
+                                                       position=new_category_position)
+            temp_channel = await guild.create_voice_channel(name=temp_channel_name, category=new_category,
+                                                            overwrites=overwrites)
+
         # Move the member and handle exceptions if the member is no longer connected
         try:
             if member.voice:
@@ -63,6 +89,8 @@ class VoiceStateCog(commands.Cog):
                     await db.execute('DELETE FROM temp_channels WHERE channel_id = ?', (channel_id,))
                     await db.commit()
                     await channel.delete(reason="Temporary channel cleanup")
+                    if not channel.category.channels:  # If the category is empty, delete it
+                        await channel.category.delete(reason="Temporary category cleanup")
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -89,3 +117,12 @@ class VoiceStateCog(commands.Cog):
                 elif not channel.members:
                     # If the channel exists and is empty, delete it
                     await self.cleanup_channel(channel_id)
+
+            # Check for empty categories on startup
+            for guild in self.bot.guilds:
+                # Get the category names from CHANNEL_CONFIGS
+                category_names = [self.bot.get_channel(channel_id).category.name for channel_id in
+                                  CHANNEL_CONFIGS.keys()]
+                for category in guild.categories:
+                    if not category.channels and category.name in category_names:
+                        await category.delete(reason="Temporary category cleanup")
