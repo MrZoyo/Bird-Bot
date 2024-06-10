@@ -89,7 +89,7 @@ class PaginationView(View):
         end = min(start + 20, self.total_records)
         page_entries = self.records[start:end]
         description = "\n".join([
-            f"**User:** {self.bot.get_user(int(record[0])).mention} **Logs:** {record[1]}"
+            f"**User:** {self.bot.get_user(int(record[0])).mention if self.bot.get_user(int(record[0])) else 'Unknown User'} **Logs:** {record[1]}"
             for record in page_entries
         ])
         embed = discord.Embed(description=description, color=discord.Color.blue())
