@@ -12,7 +12,7 @@ import aiosqlite
 
 
 class PaginationView(View):
-    def __init__(self, bot, records, user_id):
+    def __init__(self, bot, records, user_id, format_type):
         super().__init__(timeout=180.0)  # Specify the timeout directly here if needed
         self.bot = bot
         self.records = records
@@ -21,6 +21,7 @@ class PaginationView(View):
         self.total_pages = (len(records) - 1) // 20 + 1
         self.total_records = len(records)
         self.message = None  # This will hold the reference to the message
+        self.format_type = format_type  # 'user_records' or 'illegal_teaming'
 
         config = self.bot.get_cog('ConfigCog').config
         self.db_path = config['db_path']
@@ -44,19 +45,29 @@ class PaginationView(View):
     async def previous_button_callback(self, interaction: discord.Interaction):
         self.page -= 1
         await self.update_buttons()
-        await interaction.response.edit_message(embed=self.format_page(), view=self)
+        if self.format_type == 'user_records':
+            await interaction.response.edit_message(embed=self.format_page_for_check_user_records(), view=self)
+        else:
+            await interaction.response.edit_message(embed=self.format_page(), view=self)
 
     async def next_button_callback(self, interaction: discord.Interaction):
         self.page += 1
         await self.update_buttons()
-        await interaction.response.edit_message(embed=self.format_page(), view=self)
+        if self.format_type == 'user_records':
+            await interaction.response.edit_message(embed=self.format_page_for_check_user_records(), view=self)
+        else:
+            await interaction.response.edit_message(embed=self.format_page(), view=self)
 
     def safe_strptime(self, date_str, formats):
+        if not isinstance(date_str, str):
+            date_str = str(date_str)  # Convert to string if not already
+
         for fmt in formats:
             try:
                 return datetime.strptime(date_str, fmt)
             except ValueError:
-                continue
+                continue  # Skip to the next format if the current one fails
+
         raise ValueError(f"time data {date_str} does not match any format")
 
     def format_page(self):
@@ -76,10 +87,12 @@ class PaginationView(View):
         start = self.page * 20
         end = min(start + 20, self.total_records)
         page_entries = self.records[start:end]
+
         description = "\n".join([
-            f"**User:** {self.bot.get_user(int(record[0])).mention if self.bot.get_user(int(record[0])) else 'Unknown User'} **Count:** {record[1]}"
+            f"**User:** {self.bot.get_user(int(record[0])).mention if self.bot.get_user(int(record[0])) else 'Unknown User'} **Records:** {record[1]}"
             for record in page_entries
         ])
+
         embed = discord.Embed(description=description, color=discord.Color.blue())
         embed.set_footer(text=f"Page {self.page + 1}/{self.total_pages} - Total records: {self.total_records}")
         return embed
@@ -121,7 +134,8 @@ class ConfirmationView(View):
     async def confirm(self, interaction: discord.Interaction):
         cog = self.bot.get_cog('IllegalTeamActCog')
         content_with_member = f"{self.content} - Logged by {interaction.user.name}"
-        await cog.add_illegal_record_to_db(self.member.id, content_with_member, self.time)
+        formatted_time = datetime.strptime(self.time, '%Y-%m-%d %H:%M:%S').strftime('%Y-%m-%d %H:%M:%S.%f')
+        await cog.add_illegal_record_to_db(self.member.id, content_with_member, formatted_time)
         self.remove_item(self.confirm_button)
         self.remove_item(self.cancel_button)
         await interaction.message.edit(content="Illegal teaming record added.", view=self)
@@ -227,7 +241,7 @@ class IllegalTeamActCog(commands.Cog):
         else:
             user_id = ctx_or_interaction.author.id if isinstance(ctx_or_interaction,
                                                                  commands.Context) else ctx_or_interaction.user.id
-            view = PaginationView(self.bot, top_users, user_id)
+            view = PaginationView(self.bot, top_users, user_id, 'illegal_teaming')
             embed = view.format_page_for_check_illegal_teaming()
             if isinstance(ctx_or_interaction, commands.Context):
                 message = await ctx_or_interaction.send(content="Top 20 illegal teaming users:",
@@ -261,7 +275,7 @@ class IllegalTeamActCog(commands.Cog):
         else:
             user_id = ctx_or_interaction.author.id if isinstance(ctx_or_interaction,
                                                                  commands.Context) else ctx_or_interaction.user.id
-            view = PaginationView(self.bot, top_users, user_id)
+            view = PaginationView(self.bot, top_users, user_id, 'user_records')
             embed = view.format_page_for_check_user_records()
             if isinstance(ctx_or_interaction, commands.Context):
                 message = await ctx_or_interaction.send(content=f"Users with more than {x} records:",
@@ -297,7 +311,7 @@ class IllegalTeamActCog(commands.Cog):
             if not records:
                 await interaction.followup.send("No records found for this user.", ephemeral=True)
                 return
-            view = PaginationView(self.bot, records, member.id)
+            view = PaginationView(self.bot, records, member.id, 'check_member')
             message = await interaction.followup.send(content=f"Records for <@{member.id}>",
                                                       embed=view.format_page(),
                                                       view=view)
@@ -326,7 +340,7 @@ class IllegalTeamActCog(commands.Cog):
             if not records:
                 await interaction.followup.send("No records found for this user.", ephemeral=True)
                 return
-            view = PaginationView(self.bot, records, int(user_id))  # Convert user_id to int
+            view = PaginationView(self.bot, records, int(user_id), 'check_member')  # Convert user_id to int
             message = await interaction.followup.send(content=f"Records for user ID {user_id}",
                                                       embed=view.format_page(),
                                                       view=view)
@@ -338,7 +352,7 @@ class IllegalTeamActCog(commands.Cog):
     @app_commands.describe(
         member="The member to add the illegal teaming record for",
         content="The content of the illegal teaming record",
-        time="The time of the illegal teaming record (optional)"
+        time="The time of the illegal teaming record (optional). Format: 'YYYY-MM-DD HH:MM:SS"
     )
     async def add_illegal_record(self, interaction: discord.Interaction, member: discord.Member, content: str,
                                  time: str = None):
