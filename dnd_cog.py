@@ -1,3 +1,7 @@
+# Author: MrZoyo
+# Version: 0.4.2
+# Date: 2024-06-02
+# ========================================
 import discord
 from discord.ext import commands
 import random

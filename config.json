@@ -1,0 +1,134 @@
+{
+	"_comment": "====Config File for Zoyo's Discord Bot===============================",
+	"_comment": "=====================================================================",
+	"_comment": "====FOR main program bot.py or all cog===============================",
+	"token": "YOUR_BOT_TOKEN",
+    "logging_file": "bot.log",
+	"db_path": "bot.db",
+	"_comment": "=====================================================================",
+	"_comment": "====FOR Create_Invitation_Cog========================================",
+    "ignore_user_ids": [1020063451613241534, 1145141919810],
+    "illegal_team_response": "{mention}, it is forbidden to teaming privately, please request a voice channel!",
+    "failed_invite_responses": "Error creating invite link, please check my permissions.",
+	"_comment": "=====================================================================",
+	"_comment": "====FOR Welcome_Cog==================================================",
+	"welcome_channel_id": 114514114514114514,
+    "text_color": [255, 255, 255],
+    "font_path": "simhei.ttf",
+    "font_size": 60,
+    "avatar_size": [400, 400],
+    "welcome_text_1_distance": 30,
+    "welcome_text_2_distance": 30,
+    "welcome_text_picture_1": "Welcome {user_name} to this server！",
+    "welcome_text_picture_2": "You are the No.{member_number} member!",
+    "welcome_text": "Welcome to the server, {member.mention}! Have a great time here.",
+    "background_image": "background.png",
+	"_comment": "=====================================================================",
+	"_comment": "====FOR Voice_Channel_Cog============================================",
+	"channel_configs": {
+        "11451419198101": {"name_prefix": "GameRoom", "type": "public"},
+        "11451419198102": {"name_prefix": "RelaxRoom", "type": "public"},
+        "11451419198102": {"name_prefix": "PrivateRoom", "type": "private"},
+        "81019191145142": {"name_prefix": "PVP Room", "type": "public"}
+    },
+	"_comment": "=====================================================================",
+	"_comment": "====FOR Illegal_Team_Act_Cog=========================================",
+	"check_illegal_teaming_channel_id": 114514114514114514,
+	"_comment": "=====================================================================",
+	"_comment": "====FOR Achievements_Cog=============================================",
+	"achievements": [
+        {
+            "name": "Express Emotion",
+            "description": "Add reactions to 10 messages",
+            "threshold": 10,
+            "type": "reaction"
+        },
+        {
+            "name": "Tagging Master",
+            "description": "Add reactions to 100 messages",
+            "threshold": 100,
+            "type": "reaction"
+        },
+        {
+            "name": "How to Comment...",
+            "description": "Add reactions to 1000 messages",
+            "threshold": 1000,
+            "type": "reaction"
+        },
+        {
+            "name": "Hello！",
+            "description": "Speak 10 times",
+            "threshold": 10,
+            "type": "message"
+        },
+        {
+            "name": "Is Anyone There?",
+            "description": "Speak 100 times",
+            "threshold": 100,
+            "type": "message"
+        },
+        {
+            "name": "Super Speaker",
+            "description": "Speak 1000 times",
+            "threshold": 1000,
+            "type": "message"
+        },
+        {
+            "name": "I'm Always Speaking:whale:",
+            "description": "Speak 10000 times",
+            "threshold": 10000,
+            "type": "message"
+        },
+        {
+            "name": "First Time Chatting:bird:",
+            "description": "Stay in voice channel for 60 minutes",
+            "threshold": 60,
+            "type": "time_spent"
+        },
+        {
+            "name": "First Day Chatting:bird:",
+            "description": "Stay in voice channel for 24 hours",
+            "threshold": 1440,
+            "type": "time_spent"
+        },
+        {
+            "name": "Been Chatting for a Month:bird:",
+            "description": "Stay in voice channel for 1 month",
+            "threshold": 43200,
+            "type": "time_spent"
+        },
+        {
+            "name": "999 Hours of Company",
+            "description": "Stay in voice channel for 999 hours",
+            "threshold": 59940,
+            "type": "time_spent"
+        },
+        {
+            "name": "More Time Than Home",
+            "description": "Stay in voice channel for 1 year",
+            "threshold": 525600,
+            "type": "time_spent"
+        }
+    ],
+	"achievements_page_title": "Achievements of {user_name}",
+    "achievements_page_description": "{user_mention} completed {completed_achievements}/{total_achievements} achievements!\n**---------**",
+	"achievements_finish_emoji": ":white_check_mark:",
+	"achievements_incomplete_emoji": ":wheelchair:",
+	"achievements_ranking_emoji": [":first_place:", ":second_place:", ":third_place:", ":four:", ":five:", ":six:", ":seven:", ":eight:", ":nine:", ":keycap_ten:"],
+	"achievements_ranking_title": ":crown:Achievement Ranking:crown:",
+	"achievements_ranking": [
+        {
+            "name": ":heart: Add Most Reaction :heart: ",
+            "type": "reactions"
+        },
+        {
+            "name": ":green_heart: Send Most Message :green_heart: ",
+            "type": "messages"
+        },
+        {
+            "name": ":yellow_heart: Spent Most Time(min) :yellow_heart: ",
+            "type": "time_spent"
+        }
+    ],
+	"_comment": "====================================================================="
+}

@@ -1,17 +1,19 @@
+# Author: MrZoyo
+# Version: 0.6.0
+# Date: 2024-06-10
+# ========================================
 import discord
 from discord.ext import commands
 import logging
 
-from achievement_cog import AchievementCog
-from logfile_cog import LogFileCog
+from config_cog import ConfigCog
+from check_status_cog import CheckStatusCog
 from voice_channel_cog import VoiceStateCog
 from welcome_cog import WelcomeCog
 from illegal_team_act_cog import IllegalTeamActCog
 from create_invitation_cog import CreateInvitationCog
 from dnd_cog import DnDCog
-
-# Your bot token
-TOKEN = 'Your_Token_Here'
+from achievement_cog import AchievementCog
 
 intents = discord.Intents.all()
 intents.members = True
@@ -20,7 +22,13 @@ intents.voice_states = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-LOGGING_FILE = 'bot.log'
+# Call the function to get the configuration
+config_cog = ConfigCog(bot)
+config = config_cog.read_config('config.json')
+
+# Then replace the hardcoded values with the values from the configuration
+TOKEN = config['token']
+LOGGING_FILE = config['logging_file']
 
 # Configure the logging system
 logging.basicConfig(level=logging.INFO, filename=LOGGING_FILE, filemode='a',
@@ -54,12 +62,13 @@ async def synccommands(ctx):
 
 # add cogs
 async def setup():
+    await bot.add_cog(ConfigCog(bot))
     await bot.add_cog(VoiceStateCog(bot))
     await bot.add_cog(WelcomeCog(bot))
     await bot.add_cog(IllegalTeamActCog(bot))
     await bot.add_cog(CreateInvitationCog(bot, bot.get_cog("IllegalTeamActCog")))
     await bot.add_cog(DnDCog(bot))
-    await bot.add_cog(LogFileCog(bot))
+    await bot.add_cog(CheckStatusCog(bot))
     await bot.add_cog(AchievementCog(bot))
 
 

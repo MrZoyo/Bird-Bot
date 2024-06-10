@@ -1,25 +1,24 @@
-import aiosqlite
+# Author: MrZoyo
+# Version: 0.6.0
+# Date: 2024-06-10
+# ========================================
 import discord
 from discord.ext import commands
-
-# Use a dictionary to manage all configurations. The channel ID corresponds to the channel type name and type
-CHANNEL_CONFIGS = {
-    11451419198101: {"name_prefix": "GameRoom", "type": "public"},
-    11451419198102: {"name_prefix": "RelaxRoom", "type": "public"},
-    81019191145141: {"name_prefix": "PrivateRoom", "type": "private"},
-    81019191145142: {"name_prefix": "PVP Room", "type": "public"}
-}
+import aiosqlite
 
 
 class VoiceStateCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.db_path = 'bot.db'  # Path to SQLite database
+
+        config = self.bot.get_cog('ConfigCog').config
+        self.channel_configs = {int(channel_id): config for channel_id, config in config['channel_configs'].items()}
+        self.db_path = config['db_path']
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
-        if after.channel and after.channel.id in CHANNEL_CONFIGS:
-            config = CHANNEL_CONFIGS[after.channel.id]
+        if after.channel and after.channel.id in self.channel_configs:
+            config = self.channel_configs[after.channel.id]
             if config["type"] == "public" or config["type"] == "private":
                 await self.handle_channel(member, after, config, public=config["type"] == "public")
 
@@ -32,7 +31,7 @@ class VoiceStateCog(commands.Cog):
         overwrites = {
             member.guild.default_role: discord.PermissionOverwrite(view_channel=True, connect=public),
             member: discord.PermissionOverwrite(manage_channels=True, view_channel=True, connect=True, speak=True,
-                                                mute_members=True, move_members=True)
+                                                move_members=True)
         }
 
         # Get all categories with the same name as the current one
@@ -55,7 +54,7 @@ class VoiceStateCog(commands.Cog):
             # Before creating a new category, increment the position of all categories with a position
             # greater than or equal to the new category's position
             new_category_position = categories[-1].position
-            print(f"Creating new category at position {new_category_position}")
+            # print(f"Creating new category at position {new_category_position}")
 
             new_category = await guild.create_category(name=after.channel.category.name,
                                                        position=new_category_position)
@@ -121,8 +120,10 @@ class VoiceStateCog(commands.Cog):
             # Check for empty categories on startup
             for guild in self.bot.guilds:
                 # Get the category names from CHANNEL_CONFIGS
-                category_names = [self.bot.get_channel(channel_id).category.name for channel_id in
-                                  CHANNEL_CONFIGS.keys()]
+                category_names = [self.bot.get_channel(channel_id).category.name
+                                  for channel_id in self.channel_configs.keys()
+                                  if self.bot.get_channel(channel_id) is not None]
                 for category in guild.categories:
                     if not category.channels and category.name in category_names:
                         await category.delete(reason="Temporary category cleanup")
+

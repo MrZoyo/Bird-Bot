@@ -3,12 +3,12 @@
 ---
 ## Package Usage
 
-discord.py, sqlite3, PIL, logging, aiohttp, aiosqlite
+discord.py, sqlite3, PIL, logging, aiohttp, aiosqlite, os, tempfile, re, random, 
 
 ---
 ## Setup
 1. Install the required packages.
-2. Replace __all the placeholders__ in the code with your own values.
+2. Replace __all the parameters__ in the `config.json` with your own values.
 3. Run the `bot.py` file. If you are using a Linux server, you can use `nohup python3 bot.py &` to run the bot in the background.
 4. Invite the bot to your server and give it the necessary permissions.(Required permissions: bot, application command, administrator)
 
@@ -38,6 +38,8 @@ Provides commands to search for records:
 - `!check_illegal_teaming` or `/check_illegal_teaming`- Query the 20 users with the most records of illegal teaming behaviour.
 - `!check_user_records <number>` or `/check_user_records <number>` - Query all users whose number of illegal teaming behaviours is greater than `<number>`.
 - `/check_member <member>` - Query all illegal teaming records for the specified `member`.
+- `/check_member_by_id <member_id>` - Query all illegal teaming records for the specified `member_id`.
+- `/add_illegal_record <member> <content> <time>` - Manually add a record for a specified member.
 
 ### DnD_Cog
 Provides Dungeons & Dragons (DnD) players with a convenient way to generate random roll dice points.
@@ -46,9 +48,12 @@ For example, an expression like `3+4d6` would represent rolling four 6-sided dic
 Command `/dnd_roll` has an optional parameter `x` to specify the number of times to repeat the roll. 
 - Expression `5#3+4d6` can repeat a roll of `3+4d6` for 5 times quickly. Use the expression to specify that the number before the `#` has a higher priority than the parameter `x`.
 
-### Logfile_Cog
+### CheckStatusCog
 Provides the ability to quickly query log files from the robot side.
-- `/check_log <number=x>` - Returns the last `x` lines of the log file.
+- `/check_log <number=x>` - Returns the last `x` lines of the log file. If the number of lines exceeds the limit, the bot will send a file with the log content.
+Provides commands to query the number of active rooms and the number of in-voice users within the current server.
+- `/check_people_number` - Returns the number of people in the server. 
+- `/check_channel_number` - Returns the number of active channels in the server.
 
 ### Achievement_Cog
 
@@ -77,6 +82,19 @@ Use `/achievement_ranking` to show the top 10 users with the every highest achie
 
 ---
 ## Update Log
+### V0.6.0 - 2024-06-10
+#### New features:
+- Added new `config_cog` for sharing configuration information across all cogs. Configuration information in all cogs will now be read from `config.json`.
+- Optimised the interface returned when querying an illegal group. Optimised performance when querying illegal groups on low performance platforms.
+- Added a command to manually record illegal team behaviours. Illegal team behaviours can now be recorded via `/add_illegal_record`.
+- Optimised logging of achievement progress before and after bot restarts, now the bot will log a portion of the achievement progress after restarting that could not be logged otherwise.
+- Renamed `LogFileCog` to `CheckStatusCog`, added two new commands `/check_people_number` and `/check_channel_number` to check the number of people and channels on the server.
+---
+### V0.5.4 - 2024-06-08
+#### Bug fixes
+- Optimised regular expression matching for items, now it won't ignore messages containing "aram" or messages of length 6 containing Chinese characters.
+- Fixed wrong permission override for room creation.
+---
 ### V0.5.3 - 2024-06-06
 #### Bug fixes
 - Fixed an issue that had caused Bot to not be able to create new rooms when the number of channels reached the limit (50) for the same category in discord.

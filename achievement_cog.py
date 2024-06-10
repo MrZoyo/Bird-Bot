@@ -1,3 +1,7 @@
+# Author: MrZoyo
+# Version: 0.6.0
+# Date: 2024-06-10
+# ========================================
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -10,10 +14,12 @@ from illegal_team_act_cog import IllegalTeamActCog
 class AchievementRefreshView(View):
     def __init__(self, bot, user_id):
         super().__init__(timeout=180.0)  # Specify the timeout directly here if needed
-        self.db_path = 'bot.db'  # Path to SQLite database
         self.bot = bot
         self.user_id = user_id
         self.message = None  # This will hold the reference to the message
+
+        config = self.bot.get_cog('ConfigCog').config
+        self.db_path = config['db_path']
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         return interaction.user.id == self.user_id
@@ -35,30 +41,17 @@ class AchievementRefreshView(View):
 
             await db.commit()
 
-        # Define the achievements and their thresholds
-        achievements = [
-            {"name": "Express Emotion", "description": "Add reactions to 10 messages", "threshold": 10,
-             "count": reaction_count},
-            {"name": "Tagging Master", "description": "Add reactions to 100 messages", "threshold": 100,
-             "count": reaction_count},
-            {"name": "How to Comment...", "description": "Add reactions to 1000 messages", "threshold": 1000,
-             "count": reaction_count},
-            {"name": "Hello!", "description": "Speak 10 times", "threshold": 10, "count": message_count},
-            {"name": "Is Anyone There?", "description": "Speak 100 times", "threshold": 100, "count": message_count},
-            {"name": "Super Speaker", "description": "Speak 1000 times", "threshold": 1000, "count": message_count},
-            {"name": "I'm Always Speaking", "description": "Speak 10000 times", "threshold": 10000,
-             "count": message_count},
-            {"name": "First Time Chatting", "description": "Stay in voice channel for 60 minutes", "threshold": 60,
-             "count": time_spent / 60},
-            {"name": "First Day Chatting", "description": "Stay in voice channel for 24 hours", "threshold": 1440,
-             "count": time_spent / 60},
-            {"name": "Been Chatting for a Month", "description": "Stay in voice channel for 1 month",
-             "threshold": 43200, "count": time_spent / 60},
-            {"name": "999 Hours of Company", "description": "Stay in voice channel for 999 hours", "threshold": 59940,
-             "count": time_spent / 60},
-            {"name": "More Time Than Home", "description": "Stay in voice channel for 1 year",
-             "threshold": 525600, "count": time_spent / 60},
-        ]
+        # Load the achievements from the config.json file
+        achievements = self.bot.get_cog('AchievementCog').achievements
+
+        # Add the count for each achievement
+        for achievement in achievements:
+            if achievement['type'] == 'reaction':
+                achievement['count'] = reaction_count
+            elif achievement['type'] == 'message':
+                achievement['count'] = message_count
+            else:  # 'time_spent'
+                achievement['count'] = time_spent / 60  # Convert seconds to minutes
 
         # Count the number of completed achievements
         completed_achievements = sum(1 for a in achievements if a["count"] >= a["threshold"])
@@ -69,13 +62,19 @@ class AchievementRefreshView(View):
         user_name = user.name
 
         # Create an embed with the user's achievements
-        embed = discord.Embed(title=f"Achievements of {user_name}",
-                              description=f"{user_mention} completed {completed_achievements}/12 achievements!\n**---------**",
-                              color=discord.Color.blue()
-                              )
+        config = self.bot.get_cog('ConfigCog').config
+        title = config['achievements_page_title'].format(user_name=user_name)
+        description = config['achievements_page_description'].format(user_mention=user_mention,
+                                                                     completed_achievements=completed_achievements,
+                                                                     total_achievements=len(achievements))
+        achievements_finish_emoji = config['achievements_finish_emoji']
+        achievements_incomplete_emoji = config['achievements_incomplete_emoji']
+
+        embed = discord.Embed(title=title, description=description, color=discord.Color.blue())
 
         for achievement in achievements:
-            emoji = ":white_check_mark:" if achievement["count"] >= achievement["threshold"] else ":wheelchair:"
+            emoji = achievements_finish_emoji if achievement["count"] >= achievement[
+                "threshold"] else achievements_incomplete_emoji
             progress = min(1, achievement["count"] / achievement["threshold"])
             progress_bar = f"{emoji} **{achievement['description']}** → `{int(achievement['count'])}/{int(achievement['threshold'])}`\n`{'█' * int(progress * 20)}{' ' * (20 - int(progress * 20))}` `{progress * 100:.2f}%`"
             embed.add_field(name=achievement["name"], value=progress_bar, inline=False)
@@ -91,8 +90,10 @@ class ConfirmationView(View):
         self.reactions = reactions
         self.messages = messages
         self.time_spent = time_spent
-        self.db_path = 'bot.db'
         self.operation = operation  # 'increase' or 'decrease'
+
+        config = self.bot.get_cog('ConfigCog').config
+        self.db_path = config['db_path']
 
     async def on_timeout(self):
         for item in self.children:
@@ -135,9 +136,11 @@ class ConfirmationView(View):
 class AchievementRankingView(View):
     def __init__(self, bot):
         super().__init__(timeout=180.0)
-        self.db_path = 'bot.db'  # Path to SQLite database
         self.bot = bot
         self.message = None  # This will hold the reference to the message
+
+        config = self.bot.get_cog('ConfigCog').config
+        self.db_path = config['db_path']
 
     async def format_page(self):
         async with aiosqlite.connect(self.db_path) as db:
@@ -151,23 +154,27 @@ class AchievementRankingView(View):
             await cursor.execute("SELECT user_id, time_spent FROM achievements ORDER BY time_spent DESC LIMIT 10")
             top_time_spent = await cursor.fetchall()
 
+        # Map the types to the corresponding SQL query results
+        top_users = {
+            "reactions": top_reactions,
+            "messages": top_messages,
+            "time_spent": top_time_spent
+        }
+
         # Define the emojis for the ranks
-        rank_emojis = [":first_place:", ":second_place:", ":third_place:"] + [f":{i}:" for i in ['four', 'five', 'six', 'seven', 'eight', 'nine', 'keycap_ten']]
+        config = self.bot.get_cog('ConfigCog').config
+        rank_emojis = config['achievements_ranking_emoji']
+
+        # Load the achievement_ranking
+        achievements_ranking = config['achievements_ranking']
 
         # Create an embed with the rankings
-        embed = discord.Embed(title=":crown:Achievement Ranking:crown:", color=discord.Color.blue())
+        title = config['achievements_ranking_title']
+        embed = discord.Embed(title=title, color=discord.Color.blue())
 
-        # Define the achievements and their thresholds
-        achievements = [
-            {"name": ":heart: Add Most Reaction :heart: ", "type": "reactions", "top_users": top_reactions},
-            {"name": ":green_heart: Send Most Message :green_heart: ", "type": "messages", "top_users": top_messages},
-            {"name": ":yellow_heart: Spent Most Time(min) :yellow_heart: ", "type": "time_spent",
-             "top_users": top_time_spent}
-        ]
-
-        for achievement in achievements:
+        for achievement in achievements_ranking:
             ranking = ""
-            for i, (user_id, count) in enumerate(achievement["top_users"]):
+            for i, (user_id, count) in enumerate(top_users[achievement["type"]]):
                 user = await self.bot.fetch_user(user_id)
                 if achievement["type"] == "time_spent":
                     count /= 60  # Convert seconds to minutes
@@ -180,9 +187,12 @@ class AchievementRankingView(View):
 class AchievementCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.db_path = 'bot.db'  # Path to SQLite database
         self.voice_state = {}  # To track the time users join a voice channel
         self.illegal_act_cog = IllegalTeamActCog(bot)
+
+        config = self.bot.get_cog('ConfigCog').config
+        self.db_path = config['db_path']
+        self.achievements = config['achievements']
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -235,32 +245,46 @@ class AchievementCog(commands.Cog):
 
         current_time = datetime.now(timezone.utc)
 
-        # If the user was in a voice channel before the update
+        # When the member leaves a channel
         if before.channel is not None:
-            start_time = self.voice_state.pop(member.id, None)
-            if start_time is not None:
-                time_spent = (current_time - start_time).total_seconds()
+            async with aiosqlite.connect(self.db_path) as db:
+                cursor = await db.cursor()
+                # Retrieve the start time and channel ID from the database for the user
+                await cursor.execute("SELECT start_time, channel_id FROM voice_channel_entries WHERE user_id = ?",
+                                     (member.id,))
+                entry = await cursor.fetchone()
 
-                async with aiosqlite.connect(self.db_path) as db:
-                    cursor = await db.cursor()
-                    await cursor.execute("SELECT * FROM achievements WHERE user_id = ?", (member.id,))
+                # Process time spent only if the user left the same channel they entered
+                if entry and entry[1] == before.channel.id:
+                    start_time = datetime.fromisoformat(entry[0])
+                    time_spent = (current_time - start_time).total_seconds()
+
+                    # Update or insert time spent in achievements
+                    await cursor.execute("SELECT time_spent FROM achievements WHERE user_id = ?",
+                                         (member.id,))
                     user_record = await cursor.fetchone()
-
-                    if user_record is None:
-                        # This user is not in the database, so create a new record for them
-                        await cursor.execute(
-                            "INSERT INTO achievements (user_id, message_count, reaction_count, time_spent) VALUES (?, ?, ?, ?)",
-                            (member.id, 0, 0, time_spent))
-                    else:
-                        # This user is in the database, so increment their time spent
+                    if user_record:
                         await cursor.execute("UPDATE achievements SET time_spent = time_spent + ? WHERE user_id = ?",
                                              (time_spent, member.id))
+                    else:
+                        await cursor.execute("INSERT INTO achievements (user_id, time_spent) VALUES (?, ?)",
+                                             (member.id, time_spent))
 
-                    await db.commit()
+                    # Delete the entry from voice_channel_entries since the session is complete
+                    await cursor.execute("DELETE FROM voice_channel_entries WHERE user_id = ? AND channel_id = ?",
+                                         (member.id, before.channel.id))
 
-        # If the user is in a voice channel after the update
+                await db.commit()
+
+        # Handle joining a new channel
         if after.channel is not None:
-            self.voice_state[member.id] = current_time
+            async with aiosqlite.connect(self.db_path) as db:
+                cursor = await db.cursor()
+                # Record the new channel entry
+                await cursor.execute(
+                    "REPLACE INTO voice_channel_entries (user_id, channel_id, start_time) VALUES (?, ?, ?)",
+                    (member.id, after.channel.id, current_time.isoformat()))
+                await db.commit()
 
     @app_commands.command(
         name="achievements",
@@ -384,4 +408,27 @@ class AchievementCog(commands.Cog):
                     time_spent INTEGER DEFAULT 0
                 )
             """)
+            await cursor.execute("""
+                CREATE TABLE IF NOT EXISTS voice_channel_entries (
+                    user_id INTEGER NOT NULL,
+                    channel_id INTEGER NOT NULL,
+                    start_time TIMESTAMP NOT NULL,
+                    PRIMARY KEY (user_id, channel_id)
+                )
+            """)
+
+            # Fetch all the users that have been logged in voice_channel_entries
+            await cursor.execute("SELECT user_id, channel_id FROM voice_channel_entries")
+            entries = await cursor.fetchall()
+
+            for user_id, channel_id in entries:
+                member = None
+                for guild in self.bot.guilds:
+                    member = guild.get_member(user_id)
+                    if member is not None:
+                        break
+                if member is None or member.voice is None or member.voice.channel.id != channel_id:
+                    # The member is no longer on the server or is currently in a different room
+                    await cursor.execute("DELETE FROM voice_channel_entries WHERE user_id = ? AND channel_id = ?",
+                                         (user_id, channel_id))
             await db.commit()
