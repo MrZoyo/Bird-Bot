@@ -80,8 +80,53 @@ These commands require the following parameters:
 
 Use `/achievement_ranking` to show the top 10 users with the every highest achievement indicators in the server.
 
+### Notebook_Cog
+The Notebook_Cog is a feature in the bot that allows administrators to manually log user events. This can be useful for tracking user behavior, recording important events, or keeping a record of specific interactions.
+
+#### `/log_event <member> <event>`
+This command allows to manually log a user event. 
+This command can only be used on specific channels. Users who have used this command become **administrators**.
+
+The command takes the following parameters:  
+
+- `member`: The member whose event you want to log.
+- `event`: The event that you want to log for the member.
+
+#### `/check_member_event <member>`
+This command allows **administrators** to check the event log for a specific member. 
+
+The command takes the following parameter:
+- `member`: The member whose event log you want to check.
+
+#### `/check_all_event`
+This command allows **administrators** to check the event log for all members in the server.
+
+#### `/delete_event <member> <event_serial_number>`
+This command allows to delete a specific event from a member's event log. This command can only be used on specific channels. 
+
+The command takes the following parameters:
+- `member`: The member whose event log you want to delete an event from.
+- `event_serial_number`: The serial number of the event you want to delete.
+
 ---
 ## Update Log
+### V0.6.2 - 2024-06-13
+#### New features:
+- Added a new `notebook_cog` for administrators to manually log user events. User events can now be logged via the `/log_event` command.
+- Details can be viewed in the [Notebook_Cog](###Notebook_Cog) section of the Function Introduction.
+#### Bug fixes
+- Optimised matching for builds, now ignores messages from other bots.
+- Fixed an issue where an empty url error would occur if a user without an avatar used `/invitation` command.
+---
+### V0.6.1 - 2024-06-12
+#### New features:
+- Optimised the display of invitation links, now creates a nice looking embed message to display the invitation link.
+- Added a new command `/invitation` for creating an invitation link without sending a message using the command.
+#### Bug fixes
+-  Optimised what is returned when querying an illegal group, for users who have already left their user id will be returned.
+-  Fixed an issue that would cause error text to appear in rooms after using the room_full button.
+
+---
 ### V0.6.0 - 2024-06-10
 #### New features:
 - Added new `config_cog` for sharing configuration information across all cogs. Configuration information in all cogs will now be read from `config.json`.

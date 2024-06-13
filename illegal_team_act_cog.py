@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.6.0
-# Date: 2024-06-10
+# Version: 0.6.1
+# Date: 2024-06-12
 # ========================================
 import discord
 from discord.ext import commands
@@ -89,7 +89,7 @@ class PaginationView(View):
         page_entries = self.records[start:end]
 
         description = "\n".join([
-            f"**User:** {self.bot.get_user(int(record[0])).mention if self.bot.get_user(int(record[0])) else 'Unknown User'} **Records:** {record[1]}"
+            f"**User:** {self.bot.get_user(int(record[0])).mention if self.bot.get_user(int(record[0])) else f'User ID: {record[0]}'} **Records:** {record[1]}"
             for record in page_entries
         ])
 
@@ -102,7 +102,7 @@ class PaginationView(View):
         end = min(start + 20, self.total_records)
         page_entries = self.records[start:end]
         description = "\n".join([
-            f"**User:** {self.bot.get_user(int(record[0])).mention if self.bot.get_user(int(record[0])) else 'Unknown User'} **Logs:** {record[1]}"
+            f"**User:** {self.bot.get_user(int(record[0])).mention if self.bot.get_user(int(record[0])) else f'User ID: {record[0]}'} **Logs:** {record[1]}"
             for record in page_entries
         ])
         embed = discord.Embed(description=description, color=discord.Color.blue())
