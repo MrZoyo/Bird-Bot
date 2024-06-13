@@ -111,6 +111,7 @@ class TeamInvitationView(discord.ui.View):
                                                                     mention=self.user.mention,
                                                                     time=embed.description.split('\n\n')[-1]
                                                                     )
+        embed.color = discord.Color.red()
 
         # Disable the "Join Room" button
         self.children[0].disabled = True  # Assuming the first button is the join button

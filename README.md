@@ -17,9 +17,12 @@ discord.py, sqlite3, PIL, logging, aiohttp, aiosqlite, os, tempfile, re, random,
 ### Voice_Channel_Cog
 When a user enters a specific channel, the bot creates a new channel of the corresponding type and moves the user to the new channel.
 Similarly, if the channel was created by the bot, the bot will delete the channel when the last user leaves the channel.
+
 ### Create_Invitation_Cog
 A user sends a teaming message and bot replies with an invitation link to that user's channel to make it easy for other users to quickly join the user's room.
 If the user is not currently on a channel, bot will prompt the user to create a new channel using `Voice_Channel_Cog` first.
+- `/invitation <title>`: Create an invitation with a specified title(optional).
+
 ### Welcome_Cog
 When a new user joins the server, the bot sends a welcome message to the user in the welcome channel. 
 
@@ -110,6 +113,10 @@ The command takes the following parameters:
 
 ---
 ## Update Log
+### V0.6.3 - 2024-06-13
+#### Bug fixes
+- The colour of the embed of the closed room(red) will now be displayed correctly.
+---
 ### V0.6.2 - 2024-06-13
 #### New features:
 - Added a new `notebook_cog` for administrators to manually log user events. User events can now be logged via the `/log_event` command.
