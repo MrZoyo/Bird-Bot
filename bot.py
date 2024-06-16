@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.6.2
-# Date: 2024-06-13
+# Version: 0.6.6
+# Date: 2024-06-16
 # ========================================
 
 import discord
@@ -9,12 +9,13 @@ import logging
 
 from config_cog import ConfigCog
 from check_status_cog import CheckStatusCog
+from game_spymode_cog import SpyModeCog
 from notebook_cog import NotebookCog
 from voice_channel_cog import VoiceStateCog
 from welcome_cog import WelcomeCog
 from illegal_team_act_cog import IllegalTeamActCog
 from create_invitation_cog import CreateInvitationCog
-from dnd_cog import DnDCog
+from game_dnd_cog import DnDCog
 from achievement_cog import AchievementCog
 
 intents = discord.Intents.all()
@@ -41,9 +42,9 @@ logging.basicConfig(level=logging.INFO, filename=LOGGING_FILE, filemode='a',
 async def on_ready():
     logging.info(f'Logged in as {bot.user.name}')
     for guild in bot.guilds:
-        logging.info(f"\n机器人已连接到服务器 {guild.name}\n")
-        print(f"\n机器人已连接到服务器 {guild.name}\n")
-        await bot.change_presence(activity=discord.Game(name=f"在 {guild.name} 上搬砖"))
+        logging.info(f"\nBot has connected to {guild.name}\n")
+        print(f"\nBot has connected to {guild.name}\n")
+        await bot.change_presence(activity=discord.Game(name=f"Working on {guild.name}"))
 
     await bot.tree.sync()
     print("Commands Synced.")
@@ -73,6 +74,7 @@ async def setup():
         await bot.add_cog(CheckStatusCog(bot))
         await bot.add_cog(AchievementCog(bot))
         await bot.add_cog(NotebookCog(bot))
+        await bot.add_cog(SpyModeCog(bot))
 
 
 @bot.event

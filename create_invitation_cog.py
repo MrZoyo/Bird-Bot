@@ -1,5 +1,5 @@
 # Author: MrZoyo
-# Version: 0.6.2
+# Version: 0.6.3
 # Date: 2024-06-13
 # ========================================
 import discord

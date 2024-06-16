@@ -1,10 +1,12 @@
 # Author: MrZoyo
-# Version: 0.6.0
-# Date: 2024-06-10
+# Version: 0.6.5
+# Date: 2024-06-14
 # ========================================
+
 import discord
 from discord.ext import commands
 import aiosqlite
+import asyncio
 
 
 class VoiceStateCog(commands.Cog):
@@ -66,11 +68,14 @@ class VoiceStateCog(commands.Cog):
             if member.voice:
                 await member.move_to(temp_channel)
             else:
-                raise discord.errors.HTTPException("Member not connected to voice")
-        except (discord.HTTPException, discord.NotFound):
+                raise RuntimeError("Member not connected to voice")
+        except (discord.HTTPException, discord.NotFound, RuntimeError) as e:
             # Handle exceptions by cleaning up the newly created channel if the move fails
-            await temp_channel.delete(reason="Cleanup unused channel due to user disconnect")
-            return  # Exit function to avoid further operations
+            if isinstance(e, RuntimeError) or "Target user is not connected to voice" in str(e):
+                await temp_channel.delete(reason="Cleanup unused channel due to user disconnect")
+                if not temp_channel.category.channels:
+                    await temp_channel.category.delete(reason="Cleanup unused category")
+                return
 
         # Record the temporary channel in the database
         async with aiosqlite.connect(self.db_path) as db:
@@ -126,4 +131,3 @@ class VoiceStateCog(commands.Cog):
                 for category in guild.categories:
                     if not category.channels and category.name in category_names:
                         await category.delete(reason="Temporary category cleanup")
-

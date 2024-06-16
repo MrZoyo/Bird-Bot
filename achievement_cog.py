@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.6.0
-# Date: 2024-06-10
+# Version: 0.6.6
+# Date: 2024-06-16
 # ========================================
 import discord
 from discord.ext import commands
@@ -50,7 +50,7 @@ class AchievementRefreshView(View):
                 achievement['count'] = reaction_count
             elif achievement['type'] == 'message':
                 achievement['count'] = message_count
-            else:  # 'time_spent'
+            elif achievement['type'] == 'time_spent':
                 achievement['count'] = time_spent / 60  # Convert seconds to minutes
 
         # Count the number of completed achievements
@@ -120,10 +120,22 @@ class ConfirmationView(View):
                 await cursor.execute(
                     "UPDATE achievements SET message_count = message_count + ?, reaction_count = reaction_count + ?, time_spent = time_spent + ? WHERE user_id = ?",
                     new_values)
+
+                # Record the operation in the achievement_operation table
+                await cursor.execute(
+                    "INSERT INTO achievement_operation (user_id, target_user_id, operation, message_count, reaction_count, time_spent) VALUES (?, ?, ?, ?, ?, ?)",
+                    (interaction.user.id, self.member_id, 'increase', self.messages, self.reactions, self.time_spent))
+
             elif self.operation == 'decrease':
                 await cursor.execute(
                     "UPDATE achievements SET message_count = message_count - ?, reaction_count = reaction_count - ?, time_spent = time_spent - ? WHERE user_id = ?",
                     new_values)
+
+                # Record the operation in the achievement_operation table
+                await cursor.execute(
+                    "INSERT INTO achievement_operation (user_id, target_user_id, operation, message_count, reaction_count, time_spent) VALUES (?, ?, ?, ?, ?, ?)",
+                    (interaction.user.id, self.member_id, 'decrease', self.messages, self.reactions, self.time_spent))
+
             await db.commit()
 
         await interaction.edit_original_response(content=f"**Operation {self.operation} complete!**", view=None)
@@ -147,7 +159,8 @@ class AchievementRankingView(View):
             cursor = await db.cursor()
 
             # Fetch the top 10 users for each category
-            await cursor.execute("SELECT user_id, reaction_count FROM achievements ORDER BY reaction_count DESC LIMIT 10")
+            await cursor.execute(
+                "SELECT user_id, reaction_count FROM achievements ORDER BY reaction_count DESC LIMIT 10")
             top_reactions = await cursor.fetchall()
             await cursor.execute("SELECT user_id, message_count FROM achievements ORDER BY message_count DESC LIMIT 10")
             top_messages = await cursor.fetchall()
@@ -182,6 +195,76 @@ class AchievementRankingView(View):
             embed.add_field(name=achievement["name"], value=ranking, inline=False)
 
         return embed
+
+
+class AchievementOperationView(discord.ui.View):
+    def __init__(self, bot, user_id, operations, page=1):
+        super().__init__(timeout=180.0)
+        self.bot = bot
+        self.user_id = user_id
+        self.operations = operations
+        self.page = page
+        self.message = None  # This will hold the reference to the message
+
+        config = self.bot.get_cog('ConfigCog').config
+        self.db_path = config['db_path']
+
+        # Define the buttons
+        self.previous_button = Button(label="Previous", style=discord.ButtonStyle.primary, disabled=True)
+        self.next_button = Button(label="Next", style=discord.ButtonStyle.green, disabled=True)
+
+        self.previous_button.callback = self.previous_page
+        self.next_button.callback = self.next_page
+
+        # Add the buttons to the view
+        self.add_item(self.previous_button)
+        self.add_item(self.next_button)
+
+        self.item_each_page = 5
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return interaction.user.id == self.user_id
+
+    async def format_page(self):
+        # Fetch the records for the current page from memory
+        records = self.operations[(self.page - 1) * self.item_each_page: self.page * self.item_each_page]
+
+        # Enable or disable the buttons based on the existence of more records
+        self.children[0].disabled = (self.page == 1)
+        self.children[1].disabled = ((self.page * self.item_each_page) >= len(self.operations))
+
+        # Create an embed with the records
+        embed = discord.Embed(title="Achievement Operations Log", color=discord.Color.blue())
+
+        for record in records:
+            user = await self.bot.fetch_user(record[0])
+            target_user = await self.bot.fetch_user(record[1])
+            operation = record[2]
+            message_count = record[3]
+            reaction_count = record[4]
+            time_spent = record[5]
+            timestamp = record[6]
+
+            embed.add_field(name=f"{timestamp} - {user.name} -> {target_user.name}",
+                            value=f"Operation: {operation}\n"
+                                  f"Reactions: {reaction_count}\n"
+                                  f"Messages: {message_count}\n"
+                                  f"Time Spent: {time_spent}",
+                            inline=False)
+
+        return embed
+
+    async def previous_page(self, interaction: discord.Interaction):
+        print("Previous page")
+        self.page -= 1
+        embed = await self.format_page()
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    async def next_page(self, interaction: discord.Interaction):
+        print("Next page")
+        self.page += 1
+        embed = await self.format_page()
+        await interaction.response.edit_message(embed=embed, view=self)
 
 
 class AchievementCog(commands.Cog):
@@ -396,6 +479,32 @@ class AchievementCog(commands.Cog):
         # Correct method to edit the message after deferring
         await interaction.edit_original_response(embed=embed, view=view)
 
+    @app_commands.command(
+        name="check_achi_op",
+        description="Check the records of manual operations on achievements"
+    )
+    async def check_achi_op(self, interaction: discord.Interaction):
+        if not await self.illegal_act_cog.check_channel_validity(interaction):
+            return
+
+        await interaction.response.defer()
+
+        try:
+            async with aiosqlite.connect(self.db_path) as db:
+                cursor = await db.cursor()
+                await cursor.execute("SELECT * FROM achievement_operation ORDER BY timestamp DESC")
+                operations = await cursor.fetchall()
+
+        except Exception as e:
+            await interaction.edit_original_response(
+                content=f"An error occurred while fetching the records. Error: {e}")
+            return
+
+        view = AchievementOperationView(self.bot, interaction.user.id, operations)
+        embed = await view.format_page()
+        message = await interaction.edit_original_response(embeds=[embed], view=view)
+        view.message = message
+
     @commands.Cog.listener()
     async def on_ready(self):
         async with aiosqlite.connect(self.db_path) as db:
@@ -415,6 +524,19 @@ class AchievementCog(commands.Cog):
                     start_time TIMESTAMP NOT NULL,
                     PRIMARY KEY (user_id, channel_id)
                 )
+            """)
+
+            # Create the new table
+            await cursor.execute("""
+                CREATE TABLE IF NOT EXISTS achievement_operation (
+                    user_id INTEGER NOT NULL,
+                    target_user_id INTEGER NOT NULL,
+                    operation TEXT NOT NULL,
+                    message_count INTEGER DEFAULT 0,
+                    reaction_count INTEGER DEFAULT 0,
+                    time_spent INTEGER DEFAULT 0,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                 )
             """)
 
             # Fetch all the users that have been logged in voice_channel_entries

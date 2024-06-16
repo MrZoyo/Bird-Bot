@@ -44,22 +44,15 @@ Provides commands to search for records:
 - `/check_member_by_id <member_id>` - Query all illegal teaming records for the specified `member_id`.
 - `/add_illegal_record <member> <content> <time>` - Manually add a record for a specified member.
 
-### DnD_Cog
-Provides Dungeons & Dragons (DnD) players with a convenient way to generate random roll dice points.
--  `/dnd_roll <expression> <x>` - The command takes an expression as an argument, which represents the dice roll in DnD notation. 
-For example, an expression like `3+4d6` would represent rolling four 6-sided dice and adding 3 to the result. The command parses the expression, performs the dice roll, and sends a message back to the user with the result and the details of the roll.
-Command `/dnd_roll` has an optional parameter `x` to specify the number of times to repeat the roll. 
-- Expression `5#3+4d6` can repeat a roll of `3+4d6` for 5 times quickly. Use the expression to specify that the number before the `#` has a higher priority than the parameter `x`.
-
 ### CheckStatusCog
-Provides the ability to quickly query log files from the robot side.
+Provide some convenient functions for querying related data.
 - `/check_log <number=x>` - Returns the last `x` lines of the log file. If the number of lines exceeds the limit, the bot will send a file with the log content.
 Provides commands to query the number of active rooms and the number of in-voice users within the current server.
 - `/check_people_number` - Returns the number of people in the server. 
 - `/check_channel_number` - Returns the number of active channels in the server.
+- `/where_is <member>` - Returns the position of the selected member within the channel. Only visible to user.
 
 ### Achievement_Cog
-
 It is designed to track and display user achievements based on their activity in the server. 
 
 **Features**
@@ -82,6 +75,8 @@ These commands require the following parameters:
 `member` is a required parameter, while the other parameters are at least 1 optional.
 
 Use `/achievement_ranking` to show the top 10 users with the every highest achievement indicators in the server.
+
+Use `/check_achi_op` to check the history of manual operation logging for the Achievement System.
 
 ### Notebook_Cog
 The Notebook_Cog is a feature in the bot that allows administrators to manually log user events. This can be useful for tracking user behavior, recording important events, or keeping a record of specific interactions.
@@ -111,8 +106,37 @@ The command takes the following parameters:
 - `member`: The member whose event log you want to delete an event from.
 - `event_serial_number`: The serial number of the event you want to delete.
 
+### Game_DnD_Cog
+Provides Dungeons & Dragons (DnD) players with a convenient way to generate random roll dice points.
+-  `/dnd_roll <expression> <x>` - The command takes an expression as an argument, which represents the dice roll in DnD notation. 
+For example, an expression like `3+4d6` would represent rolling four 6-sided dice and adding 3 to the result. The command parses the expression, performs the dice roll, and sends a message back to the user with the result and the details of the roll.
+Command `/dnd_roll` has an optional parameter `x` to specify the number of times to repeat the roll. 
+- Expression `5#3+4d6` can repeat a roll of `3+4d6` for 5 times quickly. Use the expression to specify that the number before the `#` has a higher priority than the parameter `x`.
+
+### Game_Spymode_Cog
+Provides a simple way to play the game in "Spy Mode" in the server.
+For example, a 5v5 League of Legends custom duel has a spy on each side who aims to make their opponent win without being detected.
+- `/spy_mode <team_size> <spy>`: Set the number of players and spies on each team. Then sign up the teams, start the game and reveal the identity of the spies at the end of the game.
+
+
 ---
 ## Update Log
+### V0.6.6 - 2024-06-16
+#### New features:
+- Added a history of manual operation logging for the Achievement System. 
+The history of manual operations on the achievement system can now be viewed with the `/check_achi_op`.
+- Added a new command `/where_is` to query the user's voice channel in the server.
+---
+### V0.6.5 - 2024-06-15
+#### Bug fixes
+- Fixed an issue that would correctly throw an error and delete unused channels when a player quickly cancels the creation of a voice channel. 
+- Empty channel categories are now correctly deleted when deleting channels.
+---
+### V0.6.4 - 2024-06-14
+#### New features:
+- New `Game_Spymode_Cog` feature, which provides a simple way to play the game in "Spy Mode" in the server.
+- Details can be viewed in the [Game_Spymode_Cog](###Game_Spymode_Cog) section of the Function Introduction.
+---
 ### V0.6.3 - 2024-06-13
 #### Bug fixes
 - The colour of the embed of the closed room(red) will now be displayed correctly.
