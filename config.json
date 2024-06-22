@@ -5,9 +5,10 @@
 	"token": "YOUR_BOT_TOKEN",
     "logging_file": "bot.log",
 	"db_path": "bot.db",
+    "guild_id": 1145141919810,
 	"_comment": "=====================================================================",
 	"_comment": "====FOR Create_Invitation_Cog========================================",
-    "ignore_user_ids": [1020063451613241534, 1145141919810],
+    "ignore_user_ids": [11451419198101, 11451419198102],
     "illegal_team_response": "{mention}, it is forbidden to teaming privately, please request a voice channel!",
     "failed_invite_responses": "Error creating invite link, please check my permissions.",
     "invite_button_label": "\uD83D\uDCE3 Tap to the room!",
@@ -52,73 +53,106 @@
             "name": "Express Emotion",
             "description": "Add reactions to 10 messages",
             "threshold": 10,
-            "type": "reaction"
+            "type": "reaction",
+            "milestone": "reaction1"
         },
         {
             "name": "Tagging Master",
             "description": "Add reactions to 100 messages",
             "threshold": 100,
-            "type": "reaction"
+            "type": "reaction",
+            "milestone": "reaction2"
         },
         {
             "name": "How to Comment...",
             "description": "Add reactions to 1000 messages",
             "threshold": 1000,
-            "type": "reaction"
+            "type": "reaction",
+            "milestone": "reaction3"
         },
         {
             "name": "Hello！",
             "description": "Speak 10 times",
             "threshold": 10,
-            "type": "message"
+            "type": "message",
+            "milestone": "message1"
         },
         {
             "name": "Is Anyone There?",
             "description": "Speak 100 times",
             "threshold": 100,
-            "type": "message"
+            "type": "message",
+            "milestone": "message2"
         },
         {
             "name": "Super Speaker",
             "description": "Speak 1000 times",
             "threshold": 1000,
-            "type": "message"
+            "type": "message",
+            "milestone": "message3"
         },
         {
             "name": "I'm Always Speaking:whale:",
             "description": "Speak 10000 times",
             "threshold": 10000,
-            "type": "message"
+            "type": "message",
+            "milestone": "message4"
         },
         {
             "name": "First Time Chatting:bird:",
             "description": "Stay in voice channel for 60 minutes",
             "threshold": 60,
-            "type": "time_spent"
+            "type": "time_spent",
+            "milestone": "timespent1"
         },
         {
             "name": "First Day Chatting:bird:",
             "description": "Stay in voice channel for 24 hours",
             "threshold": 1440,
-            "type": "time_spent"
+            "type": "time_spent",
+            "milestone": "timespent2"
         },
         {
             "name": "Been Chatting for a Month:bird:",
             "description": "Stay in voice channel for 1 month",
             "threshold": 43200,
-            "type": "time_spent"
+            "type": "time_spent",
+            "milestone": "timespent3"
         },
         {
             "name": "999 Hours of Company",
             "description": "Stay in voice channel for 999 hours",
             "threshold": 59940,
-            "type": "time_spent"
+            "type": "time_spent",
+            "milestone": "timespent4"
         },
         {
             "name": "More Time Than Home",
             "description": "Stay in voice channel for 1 year",
             "threshold": 525600,
-            "type": "time_spent"
+            "type": "time_spent",
+            "milestone": "timespent5"
+        },
+                {
+            "name": "Lucky Strike",
+            "description": "Participate in a Giveaway",
+            "threshold": 1,
+            "type": "giveaway",
+            "milestone": "giveaway1"
+        },
+        {
+            "name": "Long-term lottery buyers",
+            "description": "Participate in 10 Giveaways",
+            "threshold": 10,
+            "type": "giveaway",
+            "milestone": "giveaway2"
+        },
+        {
+            "name": "Luck is a part of life.",
+            "description": "Participate in 100 Giveaways",
+            "threshold": 100,
+            "type": "giveaway",
+            "milestone": "giveaway3"
         }
     ],
 	"achievements_page_title": "Achievements of {user_name}",
@@ -139,6 +173,10 @@
         {
             "name": ":yellow_heart: Spent Most Time(min) :yellow_heart: ",
             "type": "time_spent"
+        },
+        {
+            "name": ":blue_heart: Participate Most Giveaways :blue_heart: ",
+            "type": "giveaways"
         }
     ],
 	"_comment": "=====================================================================",
@@ -153,8 +191,8 @@
     "spymode_embed_saved_title":  "[GameSnapshot] SPYMODE {game_id}",
     "spymode_embed_footer": "-------Click the button below to join the team, click again to leave.-------",
     "spymode_gameinfo": "- Initiating User: {name}\n- Player Per Team：{team_size}\n- Spy per Team：{spy}\n",
-    "blue_team_name": ":blue_circle:Blue Team({team_size}人)",
-    "red_team_name": ":red_circle:Red Team({team_size}人)",
+    "blue_team_name": ":blue_circle:Blue Team({team_size})",
+    "red_team_name": ":red_circle:Red Team({team_size})",
     "blue_team_result": ":blue_circle:Blue Team:spy:",
     "red_team_result": ":red_circle:Red Team:spy:",
     "you_are_spy": "**You are :spy:__SPY__:spy:！Hide yourself！**",
@@ -173,5 +211,35 @@
     "current_channel_name_message": "Current Channel",
     "current_channel_members_message": "Channel members",
     "where_is_join_button_label": "\uD83D\uDC46Click to join in the fun!",
+    "_comment": "=====================================================================",
+    "_comment": "====FOR Giveaway_Cog=================================================",
+    "giveaway_channel_id": 1145141919810,
+    "giveaway_default_provider": "Management Group",
+    "giveaway_join_button_label": "\uD83C\uDF89Click to Join",
+    "giveaway_exit_button_label": "\uD83D\uDEABClick to Exit",
+    "giveaway_embed_title_open": "\uD83C\uDF89Giveaway: {prizes}",
+    "giveaway_embed_title_closed": "\uD83C\uDF89Giveaway",
+    "giveaway_embed_title_closed_deleted": "[END]Giveaway ID：{giveaway_id}",
+    "giveaway_embed_provider_title": "Provider",
+    "giveaway_embed_timeend_title": "End Time",
+    "giveaway_embed_winner_number_title": "Number of Winners",
+    "giveaway_embed_participants_title": "Participants",
+    "giveaway_embed_participants_text": ":fire::fire::fire:",
+    "giveaway_embed_description_title": "Description",
+    "giveaway_embed_description_closed_deleted": "The original information has been removed.",
+    "giveaway_embed_end_label": "[END] ",
+    "giveaway_embed_cancel_label": "[CANCEL] ",
+    "giveaway_embed_earlyend_label": "[EARLY END] ",
+    "giveaway_embed_time_extend_label": " [TIME EXTENDED]",
+    "giveaway_embed_winner_title": "Winners List",
+    "giveaway_embed_no_winner": "No Winners",
+    "giveaway_embed_footer": "------Giveaway ID: {giveaway_id}------",
+    "giveaway_already_joined_message": "You've already joined this Giveaway.",
+    "giveaway_joined_message": "Congratulations, you have been joined the Giveaway.",
+    "giveaway_leave_message": "You have withdrawn from this Giveaway.",
+    "giveaway_not_access_message": "Unfortunately, you do not meet the requirements to enter this Giveaway:smiling_face_with_tear:",
+    "giveaway_win_public_message": "Bravo! Congrats {winner_mentions} won {prizes}!",
+    "giveaway_win_private_message": "Congratulations, you've won {prizes} in the Giveaway! Don't forget to claim!",
+    "giveaway_fail_message": "Ao, no one can take away {prizes} from this Giveaway ~~",
     "_comment": "====================================================================="
 }
