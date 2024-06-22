@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.6.6
-# Date: 2024-06-16
+# Version: 0.7.0
+# Date: 2024-06-20
 # ========================================
 import discord
 from discord.ext import commands
@@ -33,11 +33,11 @@ class AchievementRefreshView(View):
             if user_record is None:
                 # This user is not in the database, so create a new record for them
                 await cursor.execute(
-                    "INSERT INTO achievements (user_id, message_count, reaction_count, time_spent) VALUES (?, ?, ?, ?)",
-                    (self.user_id, 0, 0, 0))
-                message_count, reaction_count, time_spent = 0, 0, 0
+                    "INSERT INTO achievements (user_id) VALUES (?)",
+                    (self.user_id,))
+                message_count, reaction_count, time_spent, giveaway_count = 0, 0, 0, 0
             else:
-                _, message_count, reaction_count, time_spent = user_record
+                _, message_count, reaction_count, time_spent, giveaway_count = user_record
 
             await db.commit()
 
@@ -52,6 +52,9 @@ class AchievementRefreshView(View):
                 achievement['count'] = message_count
             elif achievement['type'] == 'time_spent':
                 achievement['count'] = time_spent / 60  # Convert seconds to minutes
+            elif achievement['type'] == 'giveaway':
+                achievement['count'] = giveaway_count
+
 
         # Count the number of completed achievements
         completed_achievements = sum(1 for a in achievements if a["count"] >= a["threshold"])
@@ -83,13 +86,14 @@ class AchievementRefreshView(View):
 
 
 class ConfirmationView(View):
-    def __init__(self, bot, member_id, reactions, messages, time_spent, operation):
+    def __init__(self, bot, member_id, reactions, messages, time_spent, giveaways, operation):
         super().__init__(timeout=120.0)
         self.bot = bot
         self.member_id = member_id
         self.reactions = reactions
         self.messages = messages
         self.time_spent = time_spent
+        self.giveaways = giveaways
         self.operation = operation  # 'increase' or 'decrease'
 
         config = self.bot.get_cog('ConfigCog').config
@@ -113,28 +117,28 @@ class ConfirmationView(View):
 
             if user_record is None:
                 await cursor.execute(
-                    "INSERT INTO achievements (user_id, message_count, reaction_count, time_spent) VALUES (?, ?, ?, ?)",
-                    (self.member_id, 0, 0, 0))
-            new_values = (self.messages, self.reactions, self.time_spent, self.member_id)
+                    "INSERT INTO achievements (user_id) VALUES (?)",
+                    (self.member_id,))
+            new_values = (self.messages, self.reactions, self.time_spent, self.giveaways, self.member_id)
             if self.operation == 'increase':
                 await cursor.execute(
-                    "UPDATE achievements SET message_count = message_count + ?, reaction_count = reaction_count + ?, time_spent = time_spent + ? WHERE user_id = ?",
+                    "UPDATE achievements SET message_count = message_count + ?, reaction_count = reaction_count + ?, time_spent = time_spent + ?, giveaway_count = giveaway_count + ? WHERE user_id = ?",
                     new_values)
 
                 # Record the operation in the achievement_operation table
                 await cursor.execute(
-                    "INSERT INTO achievement_operation (user_id, target_user_id, operation, message_count, reaction_count, time_spent) VALUES (?, ?, ?, ?, ?, ?)",
-                    (interaction.user.id, self.member_id, 'increase', self.messages, self.reactions, self.time_spent))
+                    "INSERT INTO achievement_operation (user_id, target_user_id, operation, message_count, reaction_count, time_spent, giveaway_count) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (interaction.user.id, self.member_id, 'increase', self.messages, self.reactions, self.time_spent, self.giveaways))
 
             elif self.operation == 'decrease':
                 await cursor.execute(
-                    "UPDATE achievements SET message_count = message_count - ?, reaction_count = reaction_count - ?, time_spent = time_spent - ? WHERE user_id = ?",
+                    "UPDATE achievements SET message_count = message_count - ?, reaction_count = reaction_count - ?, time_spent = time_spent - ?, giveaway_count = giveaway_count - ? WHERE user_id = ?",
                     new_values)
 
                 # Record the operation in the achievement_operation table
                 await cursor.execute(
-                    "INSERT INTO achievement_operation (user_id, target_user_id, operation, message_count, reaction_count, time_spent) VALUES (?, ?, ?, ?, ?, ?)",
-                    (interaction.user.id, self.member_id, 'decrease', self.messages, self.reactions, self.time_spent))
+                    "INSERT INTO achievement_operation (user_id, target_user_id, operation, message_count, reaction_count, time_spent, giveaway_count) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (interaction.user.id, self.member_id, 'decrease', self.messages, self.reactions, self.time_spent, self.giveaways))
 
             await db.commit()
 
@@ -166,12 +170,15 @@ class AchievementRankingView(View):
             top_messages = await cursor.fetchall()
             await cursor.execute("SELECT user_id, time_spent FROM achievements ORDER BY time_spent DESC LIMIT 10")
             top_time_spent = await cursor.fetchall()
+            await cursor.execute("SELECT user_id, giveaway_count FROM achievements ORDER BY giveaway_count DESC LIMIT 10")
+            top_giveaways = await cursor.fetchall()
 
         # Map the types to the corresponding SQL query results
         top_users = {
             "reactions": top_reactions,
             "messages": top_messages,
-            "time_spent": top_time_spent
+            "time_spent": top_time_spent,
+            "giveaways": top_giveaways
         }
 
         # Define the emojis for the ranks
@@ -221,6 +228,8 @@ class AchievementOperationView(discord.ui.View):
         self.add_item(self.next_button)
 
         self.item_each_page = 5
+        self.total_pages = (len(operations) - 1) // self.item_each_page + 1
+        self.total_records = len(operations)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         return interaction.user.id == self.user_id
@@ -244,24 +253,27 @@ class AchievementOperationView(discord.ui.View):
             reaction_count = record[4]
             time_spent = record[5]
             timestamp = record[6]
+            giveaway_count = record[7]
 
             embed.add_field(name=f"{timestamp} - {user.name} -> {target_user.name}",
                             value=f"Operation: {operation}\n"
                                   f"Reactions: {reaction_count}\n"
                                   f"Messages: {message_count}\n"
-                                  f"Time Spent: {time_spent}",
+                                  f"Time Spent: {time_spent}\n"
+                                  f"Giveaways: {giveaway_count}",
                             inline=False)
+
+        # Add the page information to the embed
+        embed.set_footer(text=f"Page {self.page}/{self.total_pages} ({self.total_records} records)")
 
         return embed
 
     async def previous_page(self, interaction: discord.Interaction):
-        print("Previous page")
         self.page -= 1
         embed = await self.format_page()
         await interaction.response.edit_message(embed=embed, view=self)
 
     async def next_page(self, interaction: discord.Interaction):
-        print("Next page")
         self.page += 1
         embed = await self.format_page()
         await interaction.response.edit_message(embed=embed, view=self)
@@ -290,8 +302,8 @@ class AchievementCog(commands.Cog):
             if user is None:
                 # This user is not in the database, so create a new record for them
                 await cursor.execute(
-                    "INSERT INTO achievements (user_id, message_count, reaction_count, time_spent) VALUES (?, ?, ?, ?)",
-                    (message.author.id, 1, 0, 0))
+                    "INSERT INTO achievements (user_id, message_count) VALUES (?, ?)",
+                    (message.author.id, 1))
             else:
                 # This user is in the database, so increment their message count
                 await cursor.execute("UPDATE achievements SET message_count = message_count + 1 WHERE user_id = ?",
@@ -312,8 +324,8 @@ class AchievementCog(commands.Cog):
             if user_record is None:
                 # This user is not in the database, so create a new record for them
                 await cursor.execute(
-                    "INSERT INTO achievements (user_id, message_count, reaction_count, time_spent) VALUES (?, ?, ?, ?)",
-                    (user.id, 0, 1, 0))
+                    "INSERT INTO achievements (user_id, reaction_count) VALUES (?, ?)",
+                    (user.id, 1))
             else:
                 # This user is in the database, so increment their reaction count
                 await cursor.execute("UPDATE achievements SET reaction_count = reaction_count + 1 WHERE user_id = ?",
@@ -394,11 +406,14 @@ class AchievementCog(commands.Cog):
         member="The member whose achievement progress to increase",
         reactions="The number of reactions to increase",
         messages="The number of messages to increase",
-        time_spent="The time spent on the server to increase (in seconds)"
+        time_spent="The time spent on the server to increase (in seconds)",
+        giveaways="The number of giveaways to increase"
     )
     async def increase_achievement_progress(self, interaction: discord.Interaction, member: discord.Member,
                                             reactions: int = 0,
-                                            messages: int = 0, time_spent: int = 0):
+                                            messages: int = 0,
+                                            time_spent: int = 0,
+                                            giveaways: int = 0):
         if not await self.illegal_act_cog.check_channel_validity(interaction):
             return
 
@@ -412,18 +427,20 @@ class AchievementCog(commands.Cog):
             if user_record is None:
                 # This user is not in the database, so create a new empty record for them
                 await cursor.execute(
-                    "INSERT INTO achievements (user_id, message_count, reaction_count, time_spent) VALUES (?, ?, ?, ?)",
-                    (member.id, 0, 0, 0))
+                    "INSERT INTO achievements (user_id) VALUES (?)",
+                    (member.id,))
             await db.commit()
 
             # Create a confirmation view and send it with an embed
-            view = ConfirmationView(self.bot, member.id, reactions, messages, time_spent, 'increase')
+            view = ConfirmationView(self.bot, member.id, reactions, messages, time_spent, giveaways, 'increase')
             embed = discord.Embed(title="Increase Achievement Progress",
                                   description=f"You will increase the achievement progress of {member.mention}.",
                                   color=discord.Color.blue())
             embed.add_field(name="Reactions to Add", value=str(reactions), inline=True)
             embed.add_field(name="Messages to Add", value=str(messages), inline=True)
+            embed.add_field(name="", value="\u200b", inline=False)
             embed.add_field(name="Time to Add (seconds)", value=str(time_spent), inline=True)
+            embed.add_field(name="Giveaways to Add", value=str(giveaways), inline=True)
             await interaction.edit_original_response(embed=embed, view=view)
 
     @app_commands.command(
@@ -434,11 +451,14 @@ class AchievementCog(commands.Cog):
         member="The member whose achievement progress to decrease",
         reactions="The number of reactions to decrease",
         messages="The number of messages to decrease",
-        time_spent="The time spent on the server to decrease (in seconds)"
+        time_spent="The time spent on the server to decrease (in seconds)",
+        giveaways="The number of giveaways to decrease"
     )
     async def decrease_achievement_progress(self, interaction: discord.Interaction, member: discord.Member,
                                             reactions: int = 0,
-                                            messages: int = 0, time_spent: int = 0):
+                                            messages: int = 0,
+                                            time_spent: int = 0,
+                                            giveaways: int = 0):
         if not await self.illegal_act_cog.check_channel_validity(interaction):
             return
 
@@ -452,18 +472,20 @@ class AchievementCog(commands.Cog):
             if user_record is None:
                 # This user is not in the database, so create a new empty record for them
                 await cursor.execute(
-                    "INSERT INTO achievements (user_id, message_count, reaction_count, time_spent) VALUES (?, ?, ?, ?)",
-                    (member.id, 0, 0, 0))
+                    "INSERT INTO achievements (user_id) VALUES (?)",
+                    (member.id,))
             await db.commit()
 
             # Create a confirmation view and send it with an embed
-            view = ConfirmationView(self.bot, member.id, reactions, messages, time_spent, 'decrease')
+            view = ConfirmationView(self.bot, member.id, reactions, messages, time_spent, giveaways, 'decrease')
             embed = discord.Embed(title="Decrease Achievement Progress",
                                   description=f"You will decrease the achievement progress of {member.mention}.",
                                   color=discord.Color.blue())
             embed.add_field(name="Reactions to Subtract", value=str(reactions), inline=True)
             embed.add_field(name="Messages to Subtract", value=str(messages), inline=True)
+            embed.add_field(name="", value="\u200b", inline=False)
             embed.add_field(name="Time to Subtract (seconds)", value=str(time_spent), inline=True)
+            embed.add_field(name="Giveaways to Subtract", value=str(giveaways), inline=True)
             await interaction.edit_original_response(embed=embed, view=view)
 
     @app_commands.command(
@@ -480,10 +502,10 @@ class AchievementCog(commands.Cog):
         await interaction.edit_original_response(embed=embed, view=view)
 
     @app_commands.command(
-        name="check_achi_op",
+        name="check_ach_ops",
         description="Check the records of manual operations on achievements"
     )
-    async def check_achi_op(self, interaction: discord.Interaction):
+    async def check_ach_ops(self, interaction: discord.Interaction):
         if not await self.illegal_act_cog.check_channel_validity(interaction):
             return
 
@@ -505,8 +527,44 @@ class AchievementCog(commands.Cog):
         message = await interaction.edit_original_response(embeds=[embed], view=view)
         view.message = message
 
+    async def check_table_exists(self, table_name='achievements'):
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.cursor()
+
+            # Check if the achievements table exists
+            await cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'")
+            table_exists = await cursor.fetchone() is not None
+
+            await cursor.close()
+
+        return table_exists
+
+    async def add_giveaway_count_column(self, table_name):
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.cursor()
+
+            # Fetch the information of all columns in the specified table
+            await cursor.execute(f"PRAGMA table_info({table_name})")
+            columns = await cursor.fetchall()
+
+            # Check if the giveaway_count column exists
+            if not any(column[1] == 'giveaway_count' for column in columns):
+                # The giveaway_count column does not exist, so add it
+                await cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN giveaway_count INTEGER DEFAULT 0")
+
+            await db.commit()
+            await cursor.close()
+
     @commands.Cog.listener()
     async def on_ready(self):
+        # if the achievements table exists, add the giveaway_count column
+        if await self.check_table_exists(table_name='achievements'):
+            await self.add_giveaway_count_column(table_name='achievements')
+
+        # if the achievement_operation table exists, add the giveaway_count column
+        if await self.check_table_exists(table_name='achievement_operation'):
+            await self.add_giveaway_count_column(table_name='achievement_operation')
+
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.cursor()
             await cursor.execute("""

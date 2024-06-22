@@ -1,21 +1,99 @@
 # Author: MrZoyo
-# Version: 0.6.5
-# Date: 2024-06-14
+# Version: 0.6.8
+# Date: 2024-06-17
 # ========================================
 
-import discord
-from discord.ext import commands
 import aiosqlite
 import asyncio
+import logging
+import discord
+from discord.ui import Button, View
+from discord.ext import commands, tasks
+from discord import app_commands
+
+from illegal_team_act_cog import IllegalTeamActCog
+
+
+class CheckTempChannelView(discord.ui.View):
+    def __init__(self, bot, user_id, records, page=1):
+        super().__init__(timeout=180.0)
+        self.bot = bot
+        self.user_id = user_id
+        self.records = records
+        self.page = page
+        self.message = None  # This will hold the reference to the message
+
+        config = self.bot.get_cog('ConfigCog').config
+        self.db_path = config['db_path']
+
+        # Define the buttons
+        self.previous_button = Button(label="Previous", style=discord.ButtonStyle.primary, disabled=True)
+        self.next_button = Button(label="Next", style=discord.ButtonStyle.green, disabled=True)
+
+        self.previous_button.callback = self.previous_page
+        self.next_button.callback = self.next_page
+
+        # Add the buttons to the view
+        self.add_item(self.previous_button)
+        self.add_item(self.next_button)
+
+        self.item_each_page = 5
+        self.total_pages = (len(records) - 1) // self.item_each_page + 1
+        self.total_records = len(records)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return interaction.user.id == self.user_id
+
+    async def format_page(self):
+        # Fetch the records for the current page from memory
+        records = self.records[(self.page - 1) * self.item_each_page: self.page * self.item_each_page]
+
+        # Enable or disable the buttons based on the existence of more records
+        self.children[0].disabled = (self.page == 1)
+        self.children[1].disabled = ((self.page * self.item_each_page) >= len(self.records))
+
+        # Create an embed with the records
+        embed = discord.Embed(title="Temp Channel Records", color=discord.Color.blue())
+
+        records_str = ""
+        for record in records:
+            channel_id = record[0]
+            creator_id = record[1]
+            created_at = record[2]
+            records_str += (f"Time: {created_at}\n"
+                            f"Channel: <#{channel_id}>\n"
+                            f"Channel ID: {channel_id}\n"
+                            f"Creator: <@{creator_id}>\n\n")
+
+        embed.add_field(name="Records", value=records_str, inline=False)
+
+        # Add footer
+        embed.set_footer(text=f"Page {self.page}/{self.total_pages} - Total channels: {self.total_records}")
+
+        return embed
+
+    async def previous_page(self, interaction: discord.Interaction):
+        self.page -= 1
+        embed = await self.format_page()
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    async def next_page(self, interaction: discord.Interaction):
+        self.page += 1
+        embed = await self.format_page()
+        await interaction.response.edit_message(embed=embed, view=self)
 
 
 class VoiceStateCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.illegal_act_cog = IllegalTeamActCog(bot)
 
         config = self.bot.get_cog('ConfigCog').config
         self.channel_configs = {int(channel_id): config for channel_id, config in config['channel_configs'].items()}
         self.db_path = config['db_path']
+
+        # Start the cleanup task
+        self.cleanup_task.start()
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
@@ -75,7 +153,7 @@ class VoiceStateCog(commands.Cog):
                 await temp_channel.delete(reason="Cleanup unused channel due to user disconnect")
                 if not temp_channel.category.channels:
                     await temp_channel.category.delete(reason="Cleanup unused category")
-                return
+                # return
 
         # Record the temporary channel in the database
         async with aiosqlite.connect(self.db_path) as db:
@@ -90,11 +168,52 @@ class VoiceStateCog(commands.Cog):
                 cursor = await db.execute('SELECT channel_id FROM temp_channels WHERE channel_id = ?', (channel_id,))
                 result = await cursor.fetchone()
                 if result:
-                    await db.execute('DELETE FROM temp_channels WHERE channel_id = ?', (channel_id,))
-                    await db.commit()
+                    # await db.execute('DELETE FROM temp_channels WHERE channel_id = ?', (channel_id,))
+                    # await db.commit()
                     await channel.delete(reason="Temporary channel cleanup")
                     if not channel.category.channels:  # If the category is empty, delete it
                         await channel.category.delete(reason="Temporary category cleanup")
+
+    @tasks.loop(hours=1)
+    async def cleanup_task(self):
+        logging.info("Running cleanup task")
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('SELECT channel_id FROM temp_channels')
+            channels = await cursor.fetchall()
+            for (channel_id,) in channels:
+                channel = self.bot.get_channel(channel_id)
+                if channel is None:
+                    # The channel no longer exists, so clean up the database entry
+                    await db.execute('DELETE FROM temp_channels WHERE channel_id = ?', (channel_id,))
+                    await db.commit()
+
+    @cleanup_task.before_loop
+    async def before_cleanup(self):
+        await self.bot.wait_until_ready()
+
+    @app_commands.command(
+        name="check_temp_channel_records",
+        description="Check the records of temporary channels"
+    )
+    async def check_temp_channel_records(self, interaction: discord.Interaction):
+        if not await self.illegal_act_cog.check_channel_validity(interaction):
+            return
+
+        await interaction.response.defer()
+
+        # Fetch the records from the database
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('SELECT * FROM temp_channels ORDER BY created_at DESC')
+            records = await cursor.fetchall()
+
+        if not records:
+            await interaction.edit_original_response(content="No records found.")
+            return
+
+        view = CheckTempChannelView(self.bot, interaction.user.id, records)
+        embed = await view.format_page()
+        message = await interaction.edit_original_response(embeds=[embed], view=view)
+        view.message = message
 
     @commands.Cog.listener()
     async def on_ready(self):

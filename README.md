@@ -1,5 +1,8 @@
 # DiscordGameServerHelper
 ---
+
+As I am a student, I am not able to devote my full attention to the development of the robot. Therefore it is expected that the code architecture will be refactored in version 1.0, until then all feature updates will use the existing architecture.
+
 ---
 ## Package Usage
 
@@ -7,7 +10,7 @@ discord.py, sqlite3, PIL, logging, aiohttp, aiosqlite, os, tempfile, re, random,
 
 ---
 ## Setup
-1. Install the required packages.
+1. Make sure you have all the necessary packages.
 2. Replace __all the parameters__ in the `config.json` with your own values.
 3. Run the `bot.py` file. If you are using a Linux server, you can use `nohup python3 bot.py &` to run the bot in the background.
 4. Invite the bot to your server and give it the necessary permissions.(Required permissions: bot, application command, administrator)
@@ -17,6 +20,8 @@ discord.py, sqlite3, PIL, logging, aiohttp, aiosqlite, os, tempfile, re, random,
 ### Voice_Channel_Cog
 When a user enters a specific channel, the bot creates a new channel of the corresponding type and moves the user to the new channel.
 Similarly, if the channel was created by the bot, the bot will delete the channel when the last user leaves the channel.
+- `/check_temp_channel_records`: Query the temporary voice channel records of the current server. This command is mainly used to check that the robot's mechanism of automatically deleting rooms that no longer exist every hour is working properly.
+
 
 ### Create_Invitation_Cog
 A user sends a teaming message and bot replies with an invitation link to that user's channel to make it easy for other users to quickly join the user's room.
@@ -106,6 +111,44 @@ The command takes the following parameters:
 - `member`: The member whose event log you want to delete an event from.
 - `event_serial_number`: The serial number of the event you want to delete.
 
+### Config_Cog
+Config_Cog is used as a bridge to help other Cogs read settings from `config.json`.
+
+### Giveaway_Cog
+
+Giveaway_Cog creates the Giveaway mechanism. All giveaways will be posted in the Giveaway channel.
+#### `/ga_create <reaction_req> <message_req> <timespent_req>` 
+- This command allows users to create Giveaway with restrictions.
+- The command parameters are as follows:
+  - `reaction_req` Limits the achievement progress of added reactions for users participating in Giveaway. Not recommended.
+  - `message_req` Limits the progress of the Send Message achievement for users participating in Giveaway. Not recommended.
+  - `timespent_req` Limits the progress of the in-channel voice time (in minutes) achievement for users participating in Giveaway. Recommended].
+
+- An interactive form will pop up after using the command, containing the following parameters:
+  - `duration` Giveaway duration, support mainstream time abbreviation, recommended format is abbreviation. For example: 1d/24h/60m. winners The number of prizes.
+  - `winners` The number of prizes, BOT will draw the corresponding number of winners, default value is 1.
+  - `prizes` The name of the prizes. Note that the number of prizes should not be included here.
+  - `description` Giveaway description. Please include the Giveaway limitations and description of the prize here. Note that if you use a non-discord default emoticon here, please use the full emoticon code. For example, for the in-server custom emoji :064:, use <a:064:1174704124768550963> instead of :064:.
+  - `providers` Prize provider. If left blank, the default value is a custom parameter.
+- Giveaway will be displayed in the Giveaway channel after submission. A copy of the original version is generated as an arch. in the channel where the command was sent. Any subsequent changes will not affect the archived version.
+  The published Giveaway will be assigned a unique random ID, which will be used to identify the Giveaway.
+
+#### `ga_cancel <giveaway_id>` 
+- This command allows the user to cancel the giveaway.
+- Cancelling a giveaway immediately ends the giveaway and marks it as a giveaway, no winner will be selected if the giveaway is cancelled.
+  - `<giveaway_id>` giveaway identification ID.
+  
+#### `ga_end <giveaway_id>` 
+- This command allows user to end the giveaway early.
+- Ending a giveaway early will immediately end the raffle and mark it as a giveaway, ending a giveaway early will result in winners being selected.
+  - `<giveaway_id>` giveaway identification ID.
+  
+#### `ga_time_extend <giveaway_id> <time>` 
+- This command allows user to extend the giveaway time.
+- The command parameters are as follows:
+  - `<giveaway_id>` giveaway identification ID.
+  - `<time>` The time is numeric only and is expressed in minutes.
+
 ### Game_DnD_Cog
 Provides Dungeons & Dragons (DnD) players with a convenient way to generate random roll dice points.
 -  `/dnd_roll <expression> <x>` - The command takes an expression as an argument, which represents the dice roll in DnD notation. 
@@ -121,6 +164,22 @@ For example, a 5v5 League of Legends custom duel has a spy on each side who aims
 
 ---
 ## Update Log
+### V0.7.0 - 2024-06-20
+#### New features:
+- Added a new `giveaway_cog` for server-wide participable giveaways. A giveaway can now be created via the `/ga_create` command. For more details, check out the [Giveaway_Cog](###Giveaway_Cog) section of the Function Introduction.
+- Added a new giveaway achievement `giveaway_count` to the achievement system, which now controls the conditions under which users can participate in giveaways.
+- Modified the `check_channel_validity` method, which can now be used to target other channels for validity checks.
+---
+### V0.6.7 and V0.6.8 - 2024-06-17
+#### New features:
+- Added a new command `/check_temp_channel_records`, which is used to query the temporary voice channel records of current server.
+- Added logging for the behaviour of the query `/where_is`.
+#### Bug fixes
+- Fixed an issue that would cause a page number error in the `/check_temp_channel_records` query result.
+- Modify the logic of room building, now the room will be recorded first as long as the user applies to build a room. At the same time delete room no longer delete room record instantly after deleting the room, but delete all the room records that have expired every hour.
+- Fixed an issue that would cause records in `notebook_cog` and `illegal_team_act_cog` to exceed the field length limit of the discord embed.
+
+---
 ### V0.6.6 - 2024-06-16
 #### New features:
 - Added a history of manual operation logging for the Achievement System. 

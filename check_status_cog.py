@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.6.6
-# Date: 2024-06-16
+# Version: 0.6.7
+# Date: 2024-06-17
 # ========================================
 
 import discord
@@ -8,6 +8,7 @@ from discord.ext import commands
 from illegal_team_act_cog import IllegalTeamActCog
 import os
 import tempfile
+import logging
 
 
 class EmbedGenerator:
@@ -126,6 +127,8 @@ class CheckStatusCog(commands.Cog):
             if member.voice is None or member.voice.channel is None:
                 await interaction.followup.send(self.where_is_not_found_message.format(name=member.display_name), ephemeral=True)
                 return
+
+            logging.info(f"Checking position for {member.display_name} by {interaction.user.display_name}")
 
             channel = member.voice.channel
             members_in_channel = [m.display_name for m in channel.members]

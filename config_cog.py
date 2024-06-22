@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.6.0
-# Date: 2024-06-10
+# Version: 0.7.0
+# Date: 2024-06-20
 # ========================================
 import json
 import discord
@@ -24,7 +24,7 @@ class ConfigCog(commands.Cog):
             config = {}
 
         # Check for required keys
-        required_keys = ['token', 'logging_file', 'db_path']
+        required_keys = ['token', 'logging_file', 'db_path', 'guild_id']
         for key in required_keys:
             if key not in config:
                 print(f"Missing key {key} in configuration file {file_path}. Please add it.")

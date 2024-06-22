@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.6.1
-# Date: 2024-06-12
+# Version: 0.7.0
+# Date: 2024-06-20
 # ========================================
 import discord
 from discord.ext import commands
@@ -18,7 +18,8 @@ class PaginationView(View):
         self.records = records
         self.user_id = user_id
         self.page = 0
-        self.total_pages = (len(records) - 1) // 20 + 1
+        self.item_each_page = 20
+        self.total_pages = (len(records) - 1) // self.item_each_page + 1
         self.total_records = len(records)
         self.message = None  # This will hold the reference to the message
         self.format_type = format_type  # 'user_records' or 'illegal_teaming'
@@ -38,7 +39,7 @@ class PaginationView(View):
 
     async def update_buttons(self):
         self.previous_button.disabled = self.page == 0
-        self.next_button.disabled = (self.page + 1) * 20 >= len(self.records)
+        self.next_button.disabled = (self.page + 1) * self.item_each_page >= len(self.records)
         if self.message:
             await self.message.edit(view=self)
 
@@ -71,25 +72,41 @@ class PaginationView(View):
         raise ValueError(f"time data {date_str} does not match any format")
 
     def format_page(self):
-        start = self.page * 20
-        end = min(start + 20, self.total_records)
+        start = self.page * self.item_each_page
+        end = min(start + self.item_each_page, self.total_records)
         page_entries = self.records[start:end]
+
+        embed = discord.Embed(color=discord.Color.blue())
+
         formats = ['%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S']  # With and without milliseconds
-        description = "\n".join([
-            f"**Time:** {self.safe_strptime(record[1], formats).strftime('%Y-%m-%d %H:%M:%S')} **Message:** {record[2]}"
-            for record in page_entries
-        ])
-        embed = discord.Embed(description=description, color=discord.Color.blue())
+
+        records_str = ""
+        for record in page_entries:
+            record_str = (f"**Time:** {self.safe_strptime(record[1], formats).strftime('%Y-%m-%d %H:%M:%S')} "
+                          f"**Message:** {record[2]}\n")
+
+            # If adding the next record will exceed the limit, add the current records_str as a field and start a new
+            # one
+            if len(records_str) + len(record_str) > 1024:
+                embed.add_field(name="Records", value=records_str, inline=False)
+                records_str = record_str
+            else:
+                records_str += record_str
+
+        # Add any remaining records
+        if records_str:
+            embed.add_field(name="Records", value=records_str, inline=False)
+
         embed.set_footer(text=f"Page {self.page + 1}/{self.total_pages} - Total records: {self.total_records}")
         return embed
 
     def format_page_for_check_user_records(self):
-        start = self.page * 20
-        end = min(start + 20, self.total_records)
+        start = self.page * self.item_each_page
+        end = min(start + self.item_each_page, self.total_records)
         page_entries = self.records[start:end]
 
         description = "\n".join([
-            f"**User:** {self.bot.get_user(int(record[0])).mention if self.bot.get_user(int(record[0])) else f'User ID: {record[0]}'} **Records:** {record[1]}"
+            f"**User:** {self.bot.get_user(int(record[0])).mention if self.bot.get_user(int(record[0])) else f'User ID: {record[0]}'} **Record Times:** {record[1]}"
             for record in page_entries
         ])
 
@@ -98,11 +115,11 @@ class PaginationView(View):
         return embed
 
     def format_page_for_check_illegal_teaming(self):
-        start = self.page * 20
-        end = min(start + 20, self.total_records)
+        start = self.page * self.item_each_page
+        end = min(start + self.item_each_page, self.total_records)
         page_entries = self.records[start:end]
         description = "\n".join([
-            f"**User:** {self.bot.get_user(int(record[0])).mention if self.bot.get_user(int(record[0])) else f'User ID: {record[0]}'} **Logs:** {record[1]}"
+            f"**User:** {self.bot.get_user(int(record[0])).mention if self.bot.get_user(int(record[0])) else f'User ID: {record[0]}'} **Record Times** {record[1]}"
             for record in page_entries
         ])
         embed = discord.Embed(description=description, color=discord.Color.blue())
@@ -206,11 +223,14 @@ class IllegalTeamActCog(commands.Cog):
             await cursor.close()
             return results
 
-    async def check_channel_validity(self, ctx_or_interaction):
+    async def check_channel_validity(self, ctx_or_interaction, allowed_channel_id=None):
         """Helper function to check if the command is used in the correct channel."""
         channel_id = ctx_or_interaction.channel.id if isinstance(ctx_or_interaction,
                                                                  commands.Context) else ctx_or_interaction.channel_id
-        allowed_channel_id = self.check_illegal_teaming_channel_id
+        if allowed_channel_id is None:
+            allowed_channel_id = self.check_illegal_teaming_channel_id
+        else:
+            allowed_channel_id = int(allowed_channel_id)
         if channel_id != allowed_channel_id:
             message = "This command can only be used in specific channels."
             if isinstance(ctx_or_interaction, commands.Context):

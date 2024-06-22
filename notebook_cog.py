@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.6.2
-# Date: 2024-06-13
+# Version: 0.6.7
+# Date: 2024-06-17
 # ========================================
 import discord
 from discord.ext import commands
@@ -70,13 +70,14 @@ class EventPaginationView(View):
         self.next_button.callback = self.next_button_callback
         self.add_item(self.previous_button)
         self.add_item(self.next_button)
+        self.item_each_page = 5
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         return interaction.user.id == self.user_id
 
     async def update_buttons(self):
         self.previous_button.disabled = self.page == 0
-        self.next_button.disabled = (self.page + 1) * 5 >= len(self.records)
+        self.next_button.disabled = (self.page + 1) * self.item_each_page >= len(self.records)
         if self.message:
             await self.message.edit(view=self)
 
@@ -91,29 +92,40 @@ class EventPaginationView(View):
         await interaction.response.edit_message(embed=self.format_page_method(self), view=self)
 
     def format_page_check_member_event(self):
-        start = self.page * 5
-        end = min(start + 5, self.total_records)
+        start = self.page * self.item_each_page
+        end = min(start + self.item_each_page, self.total_records)
         page_entries = self.records[start:end]
-
-        description = "\n".join([
-            f"**Log Number:** {record[4]} \n"
-            f"**Add Time:** {record[0]} \n"
-            f"**Operator:** {self.bot.get_user(int(record[1])).mention if self.bot.get_user(int(record[1])) else f'User ID: {record[1]}'}\n"
-            f"**Event Description:** \n {record[3]}\n"
-            f"{'-' * 20}"
-            for record in page_entries
-        ])
 
         embed = discord.Embed(
             title=f"Logs for {self.bot.get_user(int(page_entries[0][2])).display_name if self.bot.get_user(int(page_entries[0][2])) else f'User ID: {page_entries[0][2]}'}",
-            description=description,
             color=discord.Color.blue())
+
+        records_str = ""
+        for record in page_entries:
+            record_str = (f"**Log Number:** {record[4]} \n"
+                          f"**Add Time:** {record[0]} \n"
+                          f"**Operator:** {self.bot.get_user(int(record[1])).mention if self.bot.get_user(int(record[1])) else f'User ID: {record[1]}'}\n"
+                          f"**Event Description:** \n {record[3]}\n"
+                          f"{'-' * 20}\n")
+
+            # If adding the next record will exceed the limit,
+            # add the current records_str as a field and start a new one
+            if len(records_str) + len(record_str) > 1024:
+                embed.add_field(name="Records", value=records_str, inline=False)
+                records_str = record_str
+            else:
+                records_str += record_str
+
+        # Add any remaining records
+        if records_str:
+            embed.add_field(name="Records", value=records_str, inline=False)
+
         embed.set_footer(text=f"Page {self.page + 1}/{self.total_pages} - Total Logs: {self.total_records}")
         return embed
 
     def format_page_check_all_event(self):
-        start = self.page * 5
-        end = min(start + 5, self.total_records)
+        start = self.page * self.item_each_page
+        end = min(start + self.item_each_page, self.total_records)
         page_entries = self.records[start:end]
 
         description = "\n".join([
