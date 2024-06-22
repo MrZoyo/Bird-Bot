@@ -241,5 +241,6 @@
     "giveaway_win_public_message": "Bravo! Congrats {winner_mentions} won {prizes}!",
     "giveaway_win_private_message": "Congratulations, you've won {prizes} in the Giveaway! Don't forget to claim!",
     "giveaway_fail_message": "Ao, no one can take away {prizes} from this Giveaway ~~",
+    "giveaway_end_message": "This Giveaway has ended ~~",
     "_comment": "====================================================================="
 }

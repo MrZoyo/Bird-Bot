@@ -173,6 +173,10 @@ For example, a 5v5 League of Legends custom duel has a spy on each side who aims
 
 ---
 ## Update Log
+### V0.7.1 - 2024-06-22
+#### Bug fixes
+- Fixed an issue that would cause users to be able to exit the giveaways after it had ended.
+---
 ### V0.7.0 - 2024-06-20
 #### New features:
 - Added a new `giveaway_cog` for server-wide participable giveaways. A giveaway can now be created via the `/ga_create` command. For more details, check out the [Giveaway_Cog](###Giveaway_Cog) section of the Function Introduction.

@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.7.0
-# Date: 2024-06-20
+# Version: 0.7.1
+# Date: 2024-06-22
 # ========================================
 import discord
 from discord.ext import commands

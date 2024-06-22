@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.7.0
-# Date: 2024-06-20
+# Version: 0.7.1
+# Date: 2024-06-22
 # ========================================
 import discord
 from discord import app_commands, ui, components
@@ -37,6 +37,7 @@ class GiveawayParticipationView(ui.View):
         self.giveaway_leave_message = config['giveaway_leave_message']
         self.giveaway_not_access_message = config['giveaway_not_access_message']
         self.giveaway_embed_participants_title = config['giveaway_embed_participants_title']
+        self.giveaway_end_message = config['giveaway_end_message']
 
         # buttons definition
         self.participate_button = Button(label=self.giveaway_join_button_label,
@@ -112,6 +113,12 @@ class GiveawayParticipationView(ui.View):
 
     async def exit(self, interaction: discord.Interaction):
         giveaway_cog = self.bot.get_cog('GiveawayCog')
+        giveaway_details = await giveaway_cog.fetch_giveaway(self.giveaway_id)
+
+        if giveaway_details['is_end']:
+            # The giveaway has already ended
+            await interaction.response.send_message(self.giveaway_end_message, ephemeral=True)
+            return
         if await giveaway_cog.is_participant(self.giveaway_id, interaction.user.id):
             # The user is currently participating and wants to exit
 
