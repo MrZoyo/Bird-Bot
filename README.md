@@ -1,4 +1,13 @@
-# DiscordGameServerHelper
+# Zoyo's Discord Bot
+
+The purpose of developing this bot is to avoid the use of various current e.g. MEE6, ProBot and other existing server managed robots. This allows for maximum personalisation and control of features and interfaces and avoids the introduction of too many public bots.
+
+The bot incorporates the functionality used in several bots and has been developed with additional fun features. Therefore, the bot is currently only intended for use with a single server and there are no plans to support multiple servers at this time. Anyone can download the bot and run it on their own server. All data processing and storage is done locally.
+
+The bot's code is deeply optimised for low-performance devices, using asynchronous handling of API responses and database operations. Therefore, for this bot working on a 10k members and 500 online voice users server, a 1 vCPU + 1GB RAM cloud server for about $5 a month is perfectly adequate for performance.
+
+
+
 ---
 
 As I am a student, I am not able to devote my full attention to the development of the robot. Therefore it is expected that the code architecture will be refactored in version 1.0, until then all feature updates will use the existing architecture.
