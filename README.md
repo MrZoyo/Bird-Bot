@@ -92,6 +92,12 @@ Use `/achievement_ranking` to show the top 10 users with the every highest achie
 
 Use `/check_achi_op` to check the history of manual operation logging for the Achievement System.
 
+### Role_Cog
+The Role_Cog is a feature in the bot that allows users to assign roles to users who complete achievements.
+
+#### `/create_create_role_pickup <channel_id>`
+This command causes the bot to send a message listing all achievements with the four achievement type buttons on the specified channel. The user can click on the buttons to update the corresponding type of achievement role.
+
 ### Notebook_Cog
 The Notebook_Cog is a feature in the bot that allows administrators to manually log user events. This can be useful for tracking user behavior, recording important events, or keeping a record of specific interactions.
 
@@ -173,6 +179,11 @@ For example, a 5v5 League of Legends custom duel has a spy on each side who aims
 
 ---
 ## Update Log
+### V0.7.2 - 2024-06-24
+#### New features:
+- Added a new `Role_Cog` for the achievement system. The role_cog is used to assign roles to users who complete achievements. 
+- More details can be found in the [Role_Cog](###Role_Cog) section of the Function Introduction.
+---
 ### V0.7.1 - 2024-06-22
 #### Bug fixes
 - Fixed an issue that would cause users to be able to exit the giveaways after it had ended.

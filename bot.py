@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.7.1
-# Date: 2024-06-22
+# Version: 0.7.2
+# Date: 2024-06-24
 # ========================================
 import discord
 from discord.ext import commands
@@ -15,6 +15,7 @@ from game_spymode_cog import SpyModeCog
 from giveaway_cog import GiveawayCog
 from illegal_team_act_cog import IllegalTeamActCog
 from notebook_cog import NotebookCog
+from role_cog import RoleCog
 from voice_channel_cog import VoiceStateCog
 from welcome_cog import WelcomeCog
 
@@ -81,6 +82,7 @@ async def setup():
     await bot.add_cog(NotebookCog(bot))
     await bot.add_cog(SpyModeCog(bot))
     await bot.add_cog(GiveawayCog(bot))
+    await bot.add_cog(RoleCog(bot))
 
 
 @bot.event

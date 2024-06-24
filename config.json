@@ -54,105 +54,120 @@
             "description": "Add reactions to 10 messages",
             "threshold": 10,
             "type": "reaction",
-            "milestone": "reaction1"
+            "milestone": "reaction1",
+            "role_id": 1145141919810
         },
         {
             "name": "Tagging Master",
             "description": "Add reactions to 100 messages",
             "threshold": 100,
             "type": "reaction",
-            "milestone": "reaction2"
+            "milestone": "reaction2",
+            "role_id": 1145141919810
         },
         {
             "name": "How to Comment...",
             "description": "Add reactions to 1000 messages",
             "threshold": 1000,
             "type": "reaction",
-            "milestone": "reaction3"
+            "milestone": "reaction3",
+            "role_id": 1145141919810
         },
         {
             "name": "Hello！",
             "description": "Speak 10 times",
             "threshold": 10,
             "type": "message",
-            "milestone": "message1"
+            "milestone": "message1",
+            "role_id": 1145141919810
         },
         {
             "name": "Is Anyone There?",
             "description": "Speak 100 times",
             "threshold": 100,
             "type": "message",
-            "milestone": "message2"
+            "milestone": "message2",
+            "role_id": 1145141919810
         },
         {
             "name": "Super Speaker",
             "description": "Speak 1000 times",
             "threshold": 1000,
             "type": "message",
-            "milestone": "message3"
+            "milestone": "message3",
+            "role_id": 1145141919810
         },
         {
             "name": "I'm Always Speaking:whale:",
             "description": "Speak 10000 times",
             "threshold": 10000,
             "type": "message",
-            "milestone": "message4"
+            "milestone": "message4",
+            "role_id": 1145141919810
         },
         {
             "name": "First Time Chatting:bird:",
             "description": "Stay in voice channel for 60 minutes",
             "threshold": 60,
             "type": "time_spent",
-            "milestone": "timespent1"
+            "milestone": "timespent1",
+            "role_id": 1145141919810
         },
         {
             "name": "First Day Chatting:bird:",
             "description": "Stay in voice channel for 24 hours",
             "threshold": 1440,
             "type": "time_spent",
-            "milestone": "timespent2"
+            "milestone": "timespent2",
+            "role_id": 1145141919810
         },
         {
             "name": "Been Chatting for a Month:bird:",
             "description": "Stay in voice channel for 1 month",
             "threshold": 43200,
             "type": "time_spent",
-            "milestone": "timespent3"
+            "milestone": "timespent3",
+            "role_id": 1145141919810
         },
         {
             "name": "999 Hours of Company",
             "description": "Stay in voice channel for 999 hours",
             "threshold": 59940,
             "type": "time_spent",
-            "milestone": "timespent4"
+            "milestone": "timespent4",
+            "role_id": 1145141919810
         },
         {
             "name": "More Time Than Home",
             "description": "Stay in voice channel for 1 year",
             "threshold": 525600,
             "type": "time_spent",
-            "milestone": "timespent5"
+            "milestone": "timespent5",
+            "role_id": 1145141919810
         },
                 {
             "name": "Lucky Strike",
             "description": "Participate in a Giveaway",
             "threshold": 1,
             "type": "giveaway",
-            "milestone": "giveaway1"
+            "milestone": "giveaway1",
+                    "role_id": 1145141919810
         },
         {
             "name": "Long-term lottery buyers",
             "description": "Participate in 10 Giveaways",
             "threshold": 10,
             "type": "giveaway",
-            "milestone": "giveaway2"
+            "milestone": "giveaway2",
+            "role_id": 1145141919810
         },
         {
             "name": "Luck is a part of life.",
             "description": "Participate in 100 Giveaways",
             "threshold": 100,
             "type": "giveaway",
-            "milestone": "giveaway3"
+            "milestone": "giveaway3",
+            "role_id": 1145141919810
         }
     ],
 	"achievements_page_title": "Achievements of {user_name}",
@@ -164,11 +179,11 @@
 	"achievements_ranking": [
         {
             "name": ":heart: Add Most Reaction :heart: ",
-            "type": "reactions"
+            "type": "reaction"
         },
         {
             "name": ":green_heart: Send Most Message :green_heart: ",
-            "type": "messages"
+            "type": "message"
         },
         {
             "name": ":yellow_heart: Spent Most Time(min) :yellow_heart: ",
@@ -176,7 +191,7 @@
         },
         {
             "name": ":blue_heart: Participate Most Giveaways :blue_heart: ",
-            "type": "giveaways"
+            "type": "giveaway"
         }
     ],
 	"_comment": "=====================================================================",
@@ -242,5 +257,36 @@
     "giveaway_win_private_message": "Congratulations, you've won {prizes} in the Giveaway! Don't forget to claim!",
     "giveaway_fail_message": "Ao, no one can take away {prizes} from this Giveaway ~~",
     "giveaway_end_message": "This Giveaway has ended ~~",
+    "_comment": "=====================================================================",
+    "_comment": "====FOR Role_Cog=====================================================",
+    "achievement_start_role_id": 114514123456789,
+    "role_type_name": [
+        {
+            "name": "\uD83D\uDD34 Reaction",
+            "type": "reaction",
+            "data": "reaction_count"
+        },
+        {
+            "name": "\uD83D\uDFE1 Message",
+            "type": "message",
+            "data": "message_count"
+        },
+        {
+            "name": "\uD83D\uDD35 VC Time",
+            "type": "time_spent",
+            "data": "time_spent"
+        },
+        {
+            "name": "\uD83D\uDFE2 Giveaway",
+            "type": "giveaway",
+            "data": "giveaway_count"
+        }
+    ],
+    "role_no_column_name_message": "Error: unknown achievement type. Please contact the administrator.",
+    "role_no_progress_message": "You haven't started accumulating achievement progress yet.",
+    "role_no_achievement_message": "Aaah, you haven't finished this type of achievement yet~",
+    "role_success_message": "Congratulations on the achievement: {name} ",
+    "role_pickup_title": "\uD83D\uDCCD Please select the type of achievement you wish to receive",
+    "role_pickup_footer": "------The current type of achievement will be replaced with the highest level------",
     "_comment": "====================================================================="
 }

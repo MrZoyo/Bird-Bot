@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.7.0
-# Date: 2024-06-20
+# Version: 0.7.2
+# Date: 2024-06-24
 # ========================================
 import discord
 from discord.ext import commands
@@ -54,7 +54,6 @@ class AchievementRefreshView(View):
                 achievement['count'] = time_spent / 60  # Convert seconds to minutes
             elif achievement['type'] == 'giveaway':
                 achievement['count'] = giveaway_count
-
 
         # Count the number of completed achievements
         completed_achievements = sum(1 for a in achievements if a["count"] >= a["threshold"])
@@ -128,7 +127,8 @@ class ConfirmationView(View):
                 # Record the operation in the achievement_operation table
                 await cursor.execute(
                     "INSERT INTO achievement_operation (user_id, target_user_id, operation, message_count, reaction_count, time_spent, giveaway_count) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (interaction.user.id, self.member_id, 'increase', self.messages, self.reactions, self.time_spent, self.giveaways))
+                    (interaction.user.id, self.member_id, 'increase', self.messages, self.reactions, self.time_spent,
+                     self.giveaways))
 
             elif self.operation == 'decrease':
                 await cursor.execute(
@@ -138,7 +138,8 @@ class ConfirmationView(View):
                 # Record the operation in the achievement_operation table
                 await cursor.execute(
                     "INSERT INTO achievement_operation (user_id, target_user_id, operation, message_count, reaction_count, time_spent, giveaway_count) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (interaction.user.id, self.member_id, 'decrease', self.messages, self.reactions, self.time_spent, self.giveaways))
+                    (interaction.user.id, self.member_id, 'decrease', self.messages, self.reactions, self.time_spent,
+                     self.giveaways))
 
             await db.commit()
 
@@ -170,15 +171,16 @@ class AchievementRankingView(View):
             top_messages = await cursor.fetchall()
             await cursor.execute("SELECT user_id, time_spent FROM achievements ORDER BY time_spent DESC LIMIT 10")
             top_time_spent = await cursor.fetchall()
-            await cursor.execute("SELECT user_id, giveaway_count FROM achievements ORDER BY giveaway_count DESC LIMIT 10")
+            await cursor.execute(
+                "SELECT user_id, giveaway_count FROM achievements ORDER BY giveaway_count DESC LIMIT 10")
             top_giveaways = await cursor.fetchall()
 
         # Map the types to the corresponding SQL query results
         top_users = {
-            "reactions": top_reactions,
-            "messages": top_messages,
+            "reaction": top_reactions,
+            "message": top_messages,
             "time_spent": top_time_spent,
-            "giveaways": top_giveaways
+            "giveaway": top_giveaways
         }
 
         # Define the emojis for the ranks
@@ -555,8 +557,11 @@ class AchievementCog(commands.Cog):
             await db.commit()
             await cursor.close()
 
-    @commands.Cog.listener()
-    async def on_ready(self):
+    @app_commands.command(
+        name="fix_achievements",
+        description="If you have run this bot before version 0.7.0, use this command to repair the database."
+    )
+    async def fix_achievements(self, interaction: discord.Interaction):
         # if the achievements table exists, add the giveaway_count column
         if await self.check_table_exists(table_name='achievements'):
             await self.add_giveaway_count_column(table_name='achievements')
@@ -565,6 +570,11 @@ class AchievementCog(commands.Cog):
         if await self.check_table_exists(table_name='achievement_operation'):
             await self.add_giveaway_count_column(table_name='achievement_operation')
 
+        await interaction.response.send_message("The database has been repaired.")
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.cursor()
             await cursor.execute("""
@@ -572,7 +582,8 @@ class AchievementCog(commands.Cog):
                     user_id INTEGER PRIMARY KEY,
                     message_count INTEGER DEFAULT 0,
                     reaction_count INTEGER DEFAULT 0,
-                    time_spent INTEGER DEFAULT 0
+                    time_spent INTEGER DEFAULT 0,
+                    giveaway_count INTEGER DEFAULT 0
                 )
             """)
             await cursor.execute("""
@@ -593,6 +604,7 @@ class AchievementCog(commands.Cog):
                     message_count INTEGER DEFAULT 0,
                     reaction_count INTEGER DEFAULT 0,
                     time_spent INTEGER DEFAULT 0,
+                    giveaway_count INTEGER DEFAULT 0,
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                  )
             """)
