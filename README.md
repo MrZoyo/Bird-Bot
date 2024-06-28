@@ -35,7 +35,7 @@ Similarly, if the channel was created by the bot, the bot will delete the channe
 ### Create_Invitation_Cog
 A user sends a teaming message and bot replies with an invitation link to that user's channel to make it easy for other users to quickly join the user's room.
 If the user is not currently on a channel, bot will prompt the user to create a new channel using `Voice_Channel_Cog` first.
-- `/invitation <title>`: Create an invitation with a specified title(optional).
+- `/invt <title>`: Create an invitation with a specified title(optional).
 
 ### Welcome_Cog
 When a new user joins the server, the bot sends a welcome message to the user in the welcome channel. 
@@ -94,9 +94,15 @@ Use `/check_achi_op` to check the history of manual operation logging for the Ac
 
 ### Role_Cog
 The Role_Cog is a feature in the bot that allows users to assign roles to users who complete achievements.
+Note that in order to use this feature properly, you need to create the role manually and add the role's id to config.
 
-#### `/create_create_role_pickup <channel_id>`
-This command causes the bot to send a message listing all achievements with the four achievement type buttons on the specified channel. The user can click on the buttons to update the corresponding type of achievement role.
+#### `/create_role_pickup <channel_id>`
+This command causes the bot to send a message listing all achievements with the 4 achievement type buttons on the specified channel. The user can click on the buttons to update the corresponding type of achievement role.
+#### `/create_starsign_pickup <channel_id>`
+This command causes the bot to send a message listing all star signs with the 12 star sign buttons on the specified channel. The user can click on the buttons to update the corresponding star sign role.
+#### `/create_mbti_pickup <channel_id>`
+This command causes the bot to send a message listing all MBTI identities with the 16 MBTI identity buttons on the specified channel. The user can click on the buttons to update the corresponding MBTI identity role.
+
 
 ### Notebook_Cog
 The Notebook_Cog is a feature in the bot that allows administrators to manually log user events. This can be useful for tracking user behavior, recording important events, or keeping a record of specific interactions.
@@ -125,6 +131,13 @@ This command allows to delete a specific event from a member's event log. This c
 The command takes the following parameters:
 - `member`: The member whose event log you want to delete an event from.
 - `event_serial_number`: The serial number of the event you want to delete.
+
+### Backup_Cog
+Backup_Cog is used to create automatic backups of the server's databases for data security.
+Backup_Cog creates backups at 0:00, 6:00, 12:00 and 18:00 every day. The current limit is 20 backups, and the oldest backups will be deleted if there are more than 20.
+#### `/backup_now`
+This command will manually create a backup file. Manually created backup files do not affect automatically saved backups. However, it still follows the 20 backup limit.
+
 
 ### Config_Cog
 Config_Cog is used as a bridge to help other Cogs read settings from `config.json`.
@@ -164,6 +177,19 @@ Giveaway_Cog creates the Giveaway mechanism. All giveaways will be posted in the
   - `<giveaway_id>` giveaway identification ID.
   - `<time>` The time is numeric only and is expressed in minutes.
 
+#### `ga_participant <giveaway_id>`
+- This command allows user to list all participants in the giveaway.
+  - `<giveaway_id>` giveaway identification ID.
+
+#### `ga_description <giveaway_id> <description>`
+- This command allows user to change the description of the giveaway.
+  - `<giveaway_id>` giveaway identification ID.
+  - `<description>` The new description of the giveaway.
+
+#### `ga_sendtowinner <giveaway_id>`
+- This command allows user to send message to the winner.
+  - `<giveaway_id>` giveaway identification ID.
+
 ### Game_DnD_Cog
 Provides Dungeons & Dragons (DnD) players with a convenient way to generate random roll dice points.
 -  `/dnd_roll <expression> <x>` - The command takes an expression as an argument, which represents the dice roll in DnD notation. 
@@ -179,6 +205,26 @@ For example, a 5v5 League of Legends custom duel has a spy on each side who aims
 
 ---
 ## Update Log
+### V0.7.4 - 2024-06-26
+#### New features and improvements
+- Add 3 new commands to Giveaway_Cog:
+  - `/ga_participant`: List all participants in the giveaway.
+  - `/ga_description`: Change the description of the giveaway.
+  - `/ga_sendtowinner`: Send message to the winner.
+- Changed some giveaway command permissions to now restrict to the correct channel.
+- Changed the command for creating invitations to `/invt` for ease of use.
+- Optimised code in Notebook_Cog, paging is now better defined.
+- Add a new [Backup_Cog](###Backup_Cog) to backup the database.
+#### Bug fixes
+- Fixed page numbering in illegal_team_act_cog, although this was only a problem after changing the code settings.
+---
+### V0.7.3 - 2024-06-25
+#### New features and improvements
+- Change Spymode_Cog to infinite time interaction.
+- Added new identity pickup for Role_Cog for MBTI identity and Star sign identity.
+#### Bug fixes
+- Fixed an issue where Giveaway snapshot times are now displayed correctly.
+---
 ### V0.7.2 - 2024-06-24
 #### New features:
 - Added a new `Role_Cog` for the achievement system. The role_cog is used to assign roles to users who complete achievements. 

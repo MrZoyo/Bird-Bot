@@ -1,13 +1,13 @@
 {
-	"_comment": "====Config File for Zoyo's Discord Bot===============================",
-	"_comment": "=====================================================================",
-	"_comment": "====FOR main program bot.py or all cog===============================",
-	"token": "YOUR_BOT_TOKEN",
+    "_comment": "====Config File for Zoyo's Discord Bot===============================",
+    "_comment": "=====================================================================",
+    "_comment": "====FOR main program bot.py or all cog===============================",
+    "token": "YOUR_BOT_TOKEN",
     "logging_file": "bot.log",
-	"db_path": "bot.db",
+    "db_path": "bot.db",
     "guild_id": 1145141919810,
-	"_comment": "=====================================================================",
-	"_comment": "====FOR Create_Invitation_Cog========================================",
+    "_comment": "=====================================================================",
+    "_comment": "====FOR Create_Invitation_Cog========================================",
     "ignore_user_ids": [11451419198101, 11451419198102],
     "illegal_team_response": "{mention}, it is forbidden to teaming privately, please request a voice channel!",
     "failed_invite_responses": "Error creating invite link, please check my permissions.",
@@ -22,9 +22,9 @@
     "not_in_vc_message": "You have left the room and can no longer use this button.",
     "extract_channel_id_error": "Failed to extract room link, please contact admin.",
     "default_invite_embed_title": "Looking for teammates!",
-	"_comment": "=====================================================================",
-	"_comment": "====FOR Welcome_Cog==================================================",
-	"welcome_channel_id": 114514114514114514,
+    "_comment": "=====================================================================",
+    "_comment": "====FOR Welcome_Cog==================================================",
+    "welcome_channel_id": 114514114514114514,
     "text_color": [255, 255, 255],
     "font_path": "simhei.ttf",
     "font_size": 60,
@@ -35,20 +35,20 @@
     "welcome_text_picture_2": "You are the No.{member_number} member!",
     "welcome_text": "Welcome to the server, {member.mention}! Have a great time here.",
     "background_image": "background.png",
-	"_comment": "=====================================================================",
-	"_comment": "====FOR Voice_Channel_Cog============================================",
-	"channel_configs": {
+    "_comment": "=====================================================================",
+    "_comment": "====FOR Voice_Channel_Cog============================================",
+    "channel_configs": {
         "11451419198101": {"name_prefix": "GameRoom", "type": "public"},
         "11451419198102": {"name_prefix": "RelaxRoom", "type": "public"},
         "11451419198102": {"name_prefix": "PrivateRoom", "type": "private"},
         "81019191145142": {"name_prefix": "PVP Room", "type": "public"}
     },
-	"_comment": "=====================================================================",
-	"_comment": "====FOR Illegal_Team_Act_Cog=========================================",
-	"check_illegal_teaming_channel_id": 114514114514114514,
-	"_comment": "=====================================================================",
-	"_comment": "====FOR Achievements_Cog=============================================",
-	"achievements": [
+    "_comment": "=====================================================================",
+    "_comment": "====FOR Illegal_Team_Act_Cog=========================================",
+    "check_illegal_teaming_channel_id": 114514114514114514,
+    "_comment": "=====================================================================",
+    "_comment": "====FOR Achievements_Cog=============================================",
+    "achievements": [
         {
             "name": "Express Emotion",
             "description": "Add reactions to 10 messages",
@@ -170,13 +170,13 @@
             "role_id": 1145141919810
         }
     ],
-	"achievements_page_title": "Achievements of {user_name}",
+    "achievements_page_title": "Achievements of {user_name}",
     "achievements_page_description": "{user_mention} completed {completed_achievements}/{total_achievements} achievements!\n**---------**",
-	"achievements_finish_emoji": ":white_check_mark:",
-	"achievements_incomplete_emoji": ":wheelchair:",
-	"achievements_ranking_emoji": [":first_place:", ":second_place:", ":third_place:", ":four:", ":five:", ":six:", ":seven:", ":eight:", ":nine:", ":keycap_ten:"],
-	"achievements_ranking_title": ":crown:Achievement Ranking:crown:",
-	"achievements_ranking": [
+    "achievements_finish_emoji": ":white_check_mark:",
+    "achievements_incomplete_emoji": ":wheelchair:",
+    "achievements_ranking_emoji": [":first_place:", ":second_place:", ":third_place:", ":four:", ":five:", ":six:", ":seven:", ":eight:", ":nine:", ":keycap_ten:"],
+    "achievements_ranking_title": ":crown:Achievement Ranking:crown:",
+    "achievements_ranking": [
         {
             "name": ":heart: Add Most Reaction :heart: ",
             "type": "reaction"
@@ -194,7 +194,7 @@
             "type": "giveaway"
         }
     ],
-	"_comment": "=====================================================================",
+    "_comment": "=====================================================================",
     "_comment": "====FOR Game_Spymode_Cog=============================================",
     "blue_team_button_label": "\uD83D\uDD35Click to join Blue",
     "red_team_button_label": "\uD83D\uDD34Click to join Red",
@@ -288,5 +288,175 @@
     "role_success_message": "Congratulations on the achievement: {name} ",
     "role_pickup_title": "\uD83D\uDCCD Please select the type of achievement you wish to receive",
     "role_pickup_footer": "------The current type of achievement will be replaced with the highest level------",
+    "social_start_role_id": 1255152432481173554,
+    "starsign_name": [
+        {
+            "name": "Aries",
+            "emoji": "♈",
+            "role_id": 1255138637717442580
+        },
+        {
+            "name": "Taurus",
+            "emoji": "♉",
+            "role_id": 1255138758043369517
+        },
+        {
+            "name": "Gemini",
+            "emoji": "♊",
+            "role_id": 1255138856122974282
+        },
+        {
+            "name": "Cancer",
+            "emoji": "♋",
+            "role_id": 1255138920254148629
+        },
+        {
+            "name": "Leo",
+            "emoji": "♌",
+            "role_id": 1255139048364965938
+        },
+        {
+            "name": "Virgo",
+            "emoji": "♍",
+            "role_id": 1255139152488304641
+        },
+        {
+            "name": "Libra",
+            "emoji": "♎",
+            "role_id": 1255139511021735968
+        },
+        {
+            "name": "Scorpio",
+            "emoji": "♏",
+            "role_id": 1255139634409902131
+        },
+        {
+            "name": "Sagittarius",
+            "emoji": "♐",
+            "role_id": 1255139766098460783
+        },
+        {
+            "name": "Capricorn",
+            "emoji": "♑",
+            "role_id": 1255139917592526939
+        },
+        {
+            "name": "Aquarius",
+            "emoji": "♒",
+            "role_id": 1255140170085437471
+        },
+        {
+            "name": "Pisces",
+            "emoji": "♓",
+            "role_id": 1255140315552026706
+        }
+
+    ],
+    "starsign_fire_title": "Fire Signs",
+    "starsign_fire_description": "- ♈ Aries March 21 - April 19\n- ♌ Leo July 23 - August 22\n- ♐ Sagittarius November 23 - December 21",
+    "starsign_earth_title": "Earth Signs",
+    "starsign_earth_description": "- ♉ Taurus April 20 - May 20\n- ♍ Virgo August 23 - September 22\n- ♑ Capricorn December 22 - January 19",
+    "starsign_air_title": "Air Signs",
+    "starsign_air_description": "- ♊ Gemini May 21 - June 21\n- ♎ Libra September 23 - October 23\n- ♒ Aquarius January 20 - February 18",
+    "starsign_water_title": "Water Signs",
+    "starsign_water_description": "- ♋ Cancer June 22 - July 22\n- ♏ Scorpio October 24 - November 22\n- ♓ Pisces February 19 - March 20",
+    "starsign_pickup_title": "Please Select Your Star Sign",
+    "starsign_pickup_footer": "------Click the button to select your star sign, your current sign will be replaced with a new one------",
+    "starsign_success_message": "Your star sign has been added: {name} ",
+    "mbti_name": [
+        {
+            "name": "INTJ",
+            "emoji": "🧑\u200D🔬",
+            "role_id": 1255136859697188987
+        },
+        {
+            "name": "INTP",
+            "emoji": "🧑\u200D🔬",
+            "role_id": 1255136966115070043
+        },
+        {
+            "name": "ENTJ",
+            "emoji": "🧑\u200D🔬",
+            "role_id": 1255137019869528204
+        },
+        {
+            "name": "ENTP",
+            "emoji": "🧑\u200D🔬",
+            "role_id": 1255137158759710721
+        },
+        {
+            "name": "INFJ",
+            "emoji": "🧑\u200D🔬",
+            "role_id": 1255137219002237030
+        },
+        {
+            "name": "INFP",
+            "emoji": "🧑\u200D🔬",
+            "role_id": 1255137287684227142
+        },
+        {
+            "name": "ENFJ",
+            "emoji": "🧑\u200D🔬",
+            "role_id": 1255137370131660941
+        },
+        {
+            "name": "ENFP",
+            "emoji": "🧑\u200D🔬",
+            "role_id": 1255137405476798465
+        },
+        {
+            "name": "ISTJ",
+            "emoji": "🧑\u200D🔬",
+            "role_id": 1255137502197452844
+        },
+        {
+            "name": "ISFJ",
+            "emoji": "🧑\u200D🔬",
+            "role_id": 1255137570350956566
+        },
+        {
+            "name": "ESTJ",
+            "emoji": "🧑\u200D🔬",
+            "role_id": 1255137617020977272
+        },
+        {
+            "name": "ESFJ",
+            "emoji": "🧑\u200D🔬",
+            "role_id": 1255137662097166466
+        },
+        {
+            "name": "ISTP",
+            "emoji": "🧑\u200D🔬",
+            "role_id": 1255137710503366718
+        },
+        {
+            "name": "ISFP",
+            "emoji": "🧑\u200D🔬",
+            "role_id": 1255137779927613491
+        },
+        {
+            "name": "ESTP",
+            "emoji": "🧑\u200D🔬",
+            "role_id": 1255137829890166856
+        },
+        {
+            "name": "ESFP",
+            "emoji": "🧑\u200D🔬",
+            "role_id": 1255137934622068778
+        }
+    ],
+    "mbti_pickup_title": "Please Select Your MBTI Type",
+    "mbti_pickup_footer": "------Click the button to select your MBTI type, your current MBTI type will be replaced with a new MBTI type------",
+    "mbti_success_message": "Your MBTI type has been added: {name} ",
+    "mbti_first_field_title": "MBTI Classification Basis",
+    "mbti_first_field_description": "**Attitude of Energy**: Introversion (I) / Extraversion (E)\n**Perceiving Functions**: Sensing (S) / Intuition (N)\n**Decision-Making Functions**: Thinking (T) / Feeling (F)\n**Lifestyle**: Judging (J) / Perceiving (P)",
+    "mbti_SP_title": "SP Group (Artisans)",
+    "mbti_SP_description": "\n- ESTP: Promoter\n- ISTP: Crafter \n- ISFP: Composer\n- ESFP: Performer",
+    "mbti_SJ_title": "SJ Group (Guardians)",
+    "mbti_SJ_description": "\n- ESTJ: Supervisor\n- ISTJ: Inspector\n- ISFJ: Protector\n- ESFJ: Provider",
+    "mbti_NF_title": "NF Group (Idealists)",
+    "mbti_NF_description": "\n- ENFJ: Teacher\n- INFJ: Counselor\n- INFP: Healer\n- ENFP: Champion",
+    "mbti_NT_title": "NT Group (Rationals)",
+    "mbti_NT_description": "\n- ENTJ: Fieldmarshal\n- INTJ: Mastermind\n- INTP: Architect\n- ENTP: Inventor",
     "_comment": "====================================================================="
 }

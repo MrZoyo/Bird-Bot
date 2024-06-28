@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.7.0
-# Date: 2024-06-20
+# Version: 0.7.4
+# Date: 2024-06-26
 # ========================================
 import discord
 from discord.ext import commands
@@ -28,7 +28,9 @@ class PaginationView(View):
         self.db_path = config['db_path']
 
         self.previous_button = Button(label="Previous", style=discord.ButtonStyle.blurple, disabled=True)
-        self.next_button = Button(label="Next", style=discord.ButtonStyle.green, disabled=len(records) <= 20)
+        self.next_button = Button(label="Next",
+                                  style=discord.ButtonStyle.green,
+                                  disabled=len(records) <= self.item_each_page)
         self.previous_button.callback = self.previous_button_callback
         self.next_button.callback = self.next_button_callback
         self.add_item(self.previous_button)

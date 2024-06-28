@@ -1,12 +1,13 @@
 # Author: MrZoyo
-# Version: 0.7.2
-# Date: 2024-06-24
+# Version: 0.7.4
+# Date: 2024-06-26
 # ========================================
 import discord
 from discord.ext import commands
 import logging
 
 from achievement_cog import AchievementCog
+from backup_cog import BackupCog
 from config_cog import ConfigCog
 from check_status_cog import CheckStatusCog
 from create_invitation_cog import CreateInvitationCog
@@ -83,6 +84,7 @@ async def setup():
     await bot.add_cog(SpyModeCog(bot))
     await bot.add_cog(GiveawayCog(bot))
     await bot.add_cog(RoleCog(bot))
+    await bot.add_cog(BackupCog(bot))
 
 
 @bot.event

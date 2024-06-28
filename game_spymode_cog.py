@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.6.4
-# Date: 2024-06-14
+# Version: 0.7.3
+# Date: 2024-06-25
 # ========================================
 import discord
 from discord.ext import commands
@@ -45,7 +45,7 @@ class RandomSpyButton(discord.ui.Button):
 class SpyModeView(discord.ui.View):
     def __init__(self, bot, team_size: int, spy: int, command_user: discord.Member, voice_channel: discord.VoiceChannel,
                  game_id: int):
-        super().__init__(timeout=3600.0)
+        super().__init__(timeout=None)
         self.bot = bot
         self.blue_team = []
         self.red_team = []

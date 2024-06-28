@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.6.3
-# Date: 2024-06-13
+# Version: 0.7.4
+# Date: 2024-06-26
 # ========================================
 import discord
 from discord.ext import commands
@@ -142,7 +142,7 @@ class CreateInvitationCog(commands.Cog):
         IGNORE_USER_IDS = self.config['ignore_user_ids']
         FAILED_INVITE_RESPONSES = self.config['failed_invite_responses']
 
-        # If the message author is the bot itself, return immediately
+        # 避免机器人回复自己的消息
         if message.author == self.bot.user:
             return
 
@@ -150,42 +150,42 @@ class CreateInvitationCog(commands.Cog):
         if message.author.bot:
             return
 
-        # check if the message meets the ignore conditions: only 6 characters and does not contain an equal sign,
-        # Chinese characters, or spaces,
-        # but if it contains "flex" or "rank" or "aram" (regardless of case), it should not be ignored.
+        # 检查是否满足忽略条件：仅有6个字符且不包含等号、中文字、空格，
+        # 但如果包含 "flex" 或 "rank" 或 "aram"（无论大小写），则不忽略。
         if (len(message.content) == 6 and
                 not re.search(r"[=＝\s]", message.content) and  # Check for any equal sign or space
                 not re.search(r"(?i)(flex|rank|aram)", message.content) and
                 not re.search(r"[\u4e00-\u9FFF]", message.content)):  # Check for any Chinese character
-            return  # Ignore this message
+            # print(f"忽略的消息: {message.content}")
+            return  # 忽略这条消息
 
-        # If the message contains a link, do not reply
+        # 如果消息中包含链接，则不回复
         if re.search(r"https?:\/\/", message.content):
             return
 
-        # Check if the message sender is in the list of users who should not be replied to
+        # 检查消息发送者是否在不回复的用户列表中
         if message.author.id in IGNORE_USER_IDS:
-            return  # If in the list, do not process this message
+            return  # 如果在列表中，则不处理这条消息
 
         # 前缀：匹配"缺"、"等"、"="、"＝"、"q"、"Q"。
         # 主体：匹配数字、"一"到"五"的汉字、"n"、"N"、"全世界"、"W/world"。
         # 排除：不应该后跟"分"、"分钟"、"min"、"个钟"、"小时"。
         pattern = r"(?:(缺|等|[=＝]|[Qq]))(?:(\d|[一二三四五]|[nN]|全世界|world|World))(?!(分|分钟|min|个钟|小时))"
 
-        # find all matching content
+        # 查找所有匹配的内容
         matches = re.findall(pattern, message.content, re.IGNORECASE)
-        # filter out valid matches, excluding cases where a number is followed by a letter
+        # 筛选出有效的匹配项, 排除数字后紧跟字母的情况
         valid_matches = [match for match in matches if not re.search(r'\d[A-Z]$', message.content, re.IGNORECASE)]
 
         # Define a default value for reply_message
         reply_message = ""
 
         if valid_matches:
-            logging.info(f'Detected content from {message.author}: {message.content}, match items: {valid_matches}!')
+            logging.info(f'检测到 {message.author} 的内容: {message.content}, 匹配项: {valid_matches}!')
 
-            # check if the user is in a voice channel
+            # 检查用户是否在语音频道
             if message.author.voice and message.author.voice.channel:
-                # remove the user's illegal team behavior within 5 minutes
+                # 移除用户5分钟内的非法组队行为
                 await self.illegal_act_cog.remove_illegal_activity(str(message.author.id))
                 try:
                     invite = await message.author.voice.channel.create_invite(max_age=600)
@@ -197,18 +197,17 @@ class CreateInvitationCog(commands.Cog):
                     reply_message = FAILED_INVITE_RESPONSES + str(e)
 
             else:
-                # log the illegal behavior
+                # 记录用户的非法组队行为
                 await self.illegal_act_cog.log_illegal_activity(str(message.author.id), message.content)
                 reply_message = self.illegal_team_response.format(mention=message.author.mention)
 
             # Only reply if reply_message is not empty
             if reply_message:
                 await message.reply(reply_message)
-            # Ends after replying to the first match, ensuring that don't repeatedly
-            # reply to the same message with multiple matches
+            # 在回复完第一个匹配项后结束，确保不会重复回复有多个匹配项的同一条消息
             return
 
-    @app_commands.command(name="invitation")
+    @app_commands.command(name="invt")
     @app_commands.describe(title="Optional title for the invitation.")
     async def invitation(self, interaction: discord.Interaction, title: str = None):
         """Create an invitation to the voice channel the user is currently in."""

@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.7.1
-# Date: 2024-06-22
+# Version: 0.7.4
+# Date: 2024-06-26
 # ========================================
 import discord
 from discord import app_commands, ui, components
@@ -12,9 +12,7 @@ import string
 import aiosqlite
 import re
 import datetime
-import asyncio
 import tempfile
-import os
 import logging
 
 from illegal_team_act_cog import IllegalTeamActCog
@@ -281,7 +279,7 @@ class GiveawayForm(ui.Modal, title='Create Giveaway'):
         message = f"Limitations:\n" \
                   f"Reaction: {self.reaction_limit}\n" \
                   f"Message: {self.message_limit}\n" \
-                  f"Time Spent(min): {self.timespent_limit}"
+                  f"Time Spent(min): {self.timespent_limit / 60}"
 
         await interaction.response.send_message(content=message, embed=embed, ephemeral=False)
 
@@ -363,6 +361,76 @@ class GiveawayForm(ui.Modal, title='Create Giveaway'):
             return record
 
 
+class GiveawayCheckParticipantView(ui.View):
+    def __init__(self, giveaway_id, participant_ids):
+        super().__init__()
+        self.giveaway_id = giveaway_id
+        self.participant_ids = participant_ids
+        self.current_page = 0
+        self.items_per_page = 50
+        self.message = None
+
+        self.previous_button = ui.Button(style=discord.ButtonStyle.blurple, label="Previous", disabled=True)
+        self.next_button = ui.Button(style=discord.ButtonStyle.green,
+                                     label="Next",
+                                     disabled=len(participant_ids) <= self.items_per_page)
+
+        self.previous_button.callback = self.previous_page
+        self.next_button.callback = self.next_page
+
+        self.add_item(self.previous_button)
+        self.add_item(self.next_button)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return True
+
+    async def previous_page(self, interaction: discord.Interaction):
+        self.current_page -= 1
+        await self.update_buttons()
+        await interaction.response.edit_message(embed=self.format_page(), view=self)
+
+    async def next_page(self, interaction: discord.Interaction):
+        self.current_page += 1
+        await self.update_buttons()
+        await interaction.response.edit_message(embed=self.format_page(), view=self)
+
+    async def update_buttons(self):
+        max_pages = self.get_max_pages()  # Ensure you calculate it fresh
+        self.previous_button.disabled = self.current_page == 0
+        self.next_button.disabled = self.current_page >= max_pages - 1
+        if self.message:
+            await self.message.edit(view=self)
+
+    def get_max_pages(self):
+        return (len(self.participant_ids) - 1) // self.items_per_page + 1
+
+    def format_page(self):
+        # Create an Embed object
+        embed_title = f"Participants for Giveaway ID: {self.giveaway_id}"
+        embed = discord.Embed(title=embed_title, color=discord.Color.blue())
+
+        # Calculate the range of participants for the current page
+        start_index = self.current_page * self.items_per_page
+        end_index = start_index + self.items_per_page
+
+        # Get the participants for the current page
+        current_page_participants = self.participant_ids[start_index:end_index]
+
+        message = ""
+
+        # Add the participants to the Embed object
+        for i, participant_id in enumerate(current_page_participants, start=start_index + 1):
+            message += f"{i}. <@{participant_id}>\n"
+
+        embed.description = message
+
+        # Add the page number to the footer
+        embed.set_footer(
+            text=f"Page {self.current_page + 1}/{self.get_max_pages()} | Total Participants: {len(self.participant_ids)}")
+
+        return embed
+
+
 class GiveawayCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -376,6 +444,7 @@ class GiveawayCog(commands.Cog):
         self.giveaway_embed_title_closed = config['giveaway_embed_title_closed']
         self.giveaway_embed_title_closed_deleted = config['giveaway_embed_title_closed_deleted']
         self.giveaway_embed_description_closed_deleted = config['giveaway_embed_description_closed_deleted']
+        self.giveaway_embed_description_title = config['giveaway_embed_description_title']
         self.giveaway_embed_end_label = config['giveaway_embed_end_label']
         self.giveaway_embed_winner_title = config['giveaway_embed_winner_title']
         self.giveaway_embed_no_winner = config['giveaway_embed_no_winner']
@@ -689,6 +758,23 @@ class GiveawayCog(commands.Cog):
             else:
                 return []
 
+    async def fetch_winner_ids(self, giveaway_id):
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.cursor()
+
+            # Fetch the winner_ids from the giveaway
+            await cursor.execute('SELECT winner_ids FROM giveaway WHERE giveaway_id = ?', (giveaway_id,))
+            record = await cursor.fetchone()
+            await cursor.close()
+
+            if record[0] is not None:
+                # Extract the user IDs from the Discord mentions, convert them into integers, and ignore empty strings
+                winner_ids = [int(mention.strip('<@>')) for mention in record[0].split(',') if mention]
+            else:
+                winner_ids = []
+
+        return winner_ids
+
     async def is_participant(self, giveaway_id, participant_id):
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.cursor()
@@ -783,6 +869,8 @@ class GiveawayCog(commands.Cog):
                           description="End a giveaway early and select the winner")
     @app_commands.describe(giveaway_id="Enter the giveaway ID to end")
     async def end_giveaway(self, interaction: discord.Interaction, giveaway_id: str):
+        if not await self.illegal_act_cog.check_channel_validity(interaction):
+            return
         # Fetch the giveaway details from the database
         giveaway_details = await self.fetch_giveaway(giveaway_id)
 
@@ -832,6 +920,8 @@ class GiveawayCog(commands.Cog):
     @app_commands.describe(giveaway_id="Enter the giveaway ID to extend",
                            time="Enter the time to extend the giveaway by (in minutes)")
     async def extend_giveaway(self, interaction: discord.Interaction, giveaway_id: str, time: int):
+        if not await self.illegal_act_cog.check_channel_validity(interaction):
+            return
         # Fetch the giveaway details from the database
         giveaway_details = await self.fetch_giveaway(giveaway_id)
 
@@ -865,6 +955,111 @@ class GiveawayCog(commands.Cog):
 
             await interaction.response.send_message(f"Giveaway {giveaway_id} time has been extended by {time} minutes.",
                                                     ephemeral=True)
+
+    @app_commands.command(name="ga_participant",
+                          description="Fetch all participants for a giveaway")
+    @app_commands.describe(giveaway_id="Enter the giveaway ID to fetch participants for")
+    async def ga_participant(self, interaction: discord.Interaction, giveaway_id: str):
+        if not await self.illegal_act_cog.check_channel_validity(interaction):
+            return
+
+        # Fetch the giveaway details from the database
+        giveaway_details = await self.fetch_giveaway(giveaway_id)
+
+        if giveaway_details is None:
+            # The giveaway does not exist
+            await interaction.response.send_message(f"Giveaway {giveaway_id} does not exist.", ephemeral=True)
+
+            return
+
+        else:
+            # Fetch all participant IDs for the giveaway
+            participant_ids = await self.fetch_participant_ids(giveaway_id)
+
+            if not participant_ids:
+                await interaction.response.send_message(f"No participants found for giveaway {giveaway_id}.",
+                                                        ephemeral=True)
+                return
+
+            # Create an instance of GiveawayCheckParticipantView
+            participant_view = GiveawayCheckParticipantView(giveaway_id, participant_ids)
+
+            # Send a message with the GiveawayCheckParticipantView instance as the view
+            message = await interaction.response.send_message(content=f"Participants for giveaway {giveaway_id}:",
+                                                              embed=participant_view.format_page(),
+                                                              view=participant_view)
+            participant_view.message = message
+
+    @app_commands.command(name="ga_description",
+                          description="Modify the description of a giveaway that is not yet finished")
+    @app_commands.describe(giveaway_id="Enter the giveaway ID to modify",
+                           description="Enter the new description for the giveaway")
+    async def ga_description(self, interaction: discord.Interaction, giveaway_id: str, description: str):
+        if not await self.illegal_act_cog.check_channel_validity(interaction):
+            return
+
+        # Fetch the giveaway details from the database
+        giveaway_details = await self.fetch_giveaway(giveaway_id)
+
+        if giveaway_details is None:
+            # The giveaway does not exist
+            await interaction.response.send_message(f"Giveaway {giveaway_id} does not exist.", ephemeral=True)
+        elif giveaway_details['is_end']:
+            # The giveaway has already ended
+            await interaction.response.send_message(f"Giveaway {giveaway_id} has already ended.", ephemeral=True)
+        else:
+            # The giveaway is not ended, so update its description
+            await self.update_giveaway_description(giveaway_id, description)
+
+            # Fetch the giveaway message
+            channel = self.bot.get_channel(self.giveaway_channel_id)
+            message = await channel.fetch_message(giveaway_details['message_id'])
+
+            # Update the embed to reflect the new description
+            embed = message.embeds[0]
+            # Find the index of the "Description" field
+            index = next((i for i, field in enumerate(message.embeds[0].fields) if
+                          field.name == self.giveaway_embed_description_title), None)
+
+            # Update the "Description" field if it exists
+            if index is not None:
+                embed.set_field_at(index, name=self.giveaway_embed_description_title, value=description,
+                                   inline=False)
+
+            # Edit the message with the updated embed
+            await message.edit(embed=embed)
+
+            await interaction.response.send_message(f"Giveaway {giveaway_id} description has been updated.",
+                                                    ephemeral=True)
+
+    @app_commands.command(name="ga_sendtowinner")
+    @app_commands.describe(giveaway_id="Enter the giveaway ID to fetch winners for",
+                           message="Enter the message to send to winners")
+    async def ga_sendtowinner(self, interaction: discord.Interaction, giveaway_id: str, message: str):
+        if not await self.illegal_act_cog.check_channel_validity(interaction):
+            return
+        # Fetch all winner IDs for the giveaway
+        winner_ids = await self.fetch_winner_ids(giveaway_id)
+
+        if not winner_ids:
+            await interaction.response.send_message(f"No winners found for giveaway {giveaway_id}.", ephemeral=True)
+            return
+        else:
+            # Iterate over the winners
+            for winner_id in winner_ids:
+                # Fetch the winner's user object
+                winner = self.bot.get_user(winner_id)
+
+                # Send the message to the winner
+                await winner.send(content=message)
+
+            await interaction.response.send_message(f"Message sent to all winners of giveaway {giveaway_id}.")
+
+    async def update_giveaway_description(self, giveaway_id, new_description):
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.cursor()
+            await cursor.execute('UPDATE giveaway SET description = ? WHERE giveaway_id = ?',
+                                 (new_description, giveaway_id))
 
     async def update_giveaway_duration(self, giveaway_id, new_duration):
         async with aiosqlite.connect(self.db_path) as db:
@@ -934,8 +1129,19 @@ class GiveawayCog(commands.Cog):
 
         if winners:
             # Send a message in the giveaway channel congratulating all winners
-            await giveaway_channel.send(self.giveaway_win_public_message.format(winner_mentions=', '.join(winner_mentions),
-                                                                                prizes=prizes))
+            await giveaway_channel.send(
+                self.giveaway_win_public_message.format(winner_mentions=', '.join(winner_mentions),
+                                                        prizes=prizes))
+
+            # Fetch the giveaway details from the database
+            giveaway_details = await self.fetch_giveaway(giveaway_id)
+            # Fetch the giveaway message
+            channel = self.bot.get_channel(self.giveaway_channel_id)
+            message = await channel.fetch_message(giveaway_details['message_id'])
+
+            # Get the final version of the embed from the message
+            embed = message.embeds[0]
+            embed.color = discord.Color.green()
 
             # Send a private message to each winner
             for winner_id in winners:
@@ -945,7 +1151,7 @@ class GiveawayCog(commands.Cog):
                     continue
 
                 try:
-                    await winner.send(self.giveaway_win_private_message.format(prizes=prizes))
+                    await winner.send(self.giveaway_win_private_message.format(prizes=prizes), embed=embed)
                 except discord.Forbidden:
                     print(
                         f"Could not send a private message to {winner.name}. They might have private messages disabled.")

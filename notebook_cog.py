@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.6.7
-# Date: 2024-06-17
+# Version: 0.7.4
+# Date: 2024-06-26
 # ========================================
 import discord
 from discord.ext import commands
@@ -59,18 +59,18 @@ class EventPaginationView(View):
         self.records = records
         self.user_id = user_id
         self.page = 0
-        self.total_pages = (len(records) - 1) // 5 + 1
+        self.item_each_page = 5
+        self.total_pages = (len(records) - 1) // self.item_each_page + 1
         self.total_records = len(records)
         self.message = None
         self.format_page_method = format_page_method
 
         self.previous_button = Button(label="Previous", style=discord.ButtonStyle.blurple, disabled=True)
-        self.next_button = Button(label="Next", style=discord.ButtonStyle.green, disabled=len(records) <= 5)
+        self.next_button = Button(label="Next", style=discord.ButtonStyle.green, disabled=len(records) <= self.item_each_page)
         self.previous_button.callback = self.previous_button_callback
         self.next_button.callback = self.next_button_callback
         self.add_item(self.previous_button)
         self.add_item(self.next_button)
-        self.item_each_page = 5
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         return interaction.user.id == self.user_id
