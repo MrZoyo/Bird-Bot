@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.7.4
-# Date: 2024-06-26
+# Version: 0.7.6
+# Date: 2024-07-02
 # ========================================
 import discord
 from discord.ext import commands
@@ -38,7 +38,7 @@ GUILD_ID = config['guild_id']
 
 # 配置日志系统
 logging.basicConfig(level=logging.INFO, filename=LOGGING_FILE, filemode='a',
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+                    format='%(asctime)s - %(levelname)s - %(message)s', encoding='utf-8')
 
 
 @bot.event

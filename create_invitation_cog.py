@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.7.4
-# Date: 2024-06-26
+# Version: 0.7.6
+# Date: 2024-07-02
 # ========================================
 import discord
 from discord.ext import commands
@@ -60,6 +60,9 @@ class TeamInvitationView(discord.ui.View):
         channel_id = author.voice.channel.id
         vc_url_direct = f"https://discord.com/channels/{guild_id}/{channel_id}"
 
+        # Truncate the content to 240 characters if longer
+        if len(content) > 256:
+            content = content[:253] + "..."
         embed = discord.Embed(
             title=content,
             description=self.invite_embed_content.format(vc_url=vc_url_direct, mention=author.mention,
@@ -181,7 +184,7 @@ class CreateInvitationCog(commands.Cog):
         reply_message = ""
 
         if valid_matches:
-            logging.info(f'检测到 {message.author} 的内容: {message.content}, 匹配项: {valid_matches}!')
+            logging.info(f'Content of {message.author} detected: {message.content}, matches: {valid_matches}!')
 
             # 检查用户是否在语音频道
             if message.author.voice and message.author.voice.channel:
@@ -204,7 +207,7 @@ class CreateInvitationCog(commands.Cog):
             # Only reply if reply_message is not empty
             if reply_message:
                 await message.reply(reply_message)
-            # 在回复完第一个匹配项后结束，确保不会重复回复有多个匹配项的同一条消息
+            # Ends after replying to the first match, ensuring that don't repeatedly reply to multiple matches
             return
 
     @app_commands.command(name="invt")
@@ -221,6 +224,9 @@ class CreateInvitationCog(commands.Cog):
                 view = TeamInvitationView(self.bot, vc_url, interaction.user)
                 embed = view.create_embed(interaction)
                 embed.title = title or self.default_invite_embed_title
+                # Truncate the content to 256 characters if longer
+                if len(embed.title) > 256:
+                    embed.title = embed.title[:253] + "..."
                 await interaction.followup.send(embed=embed, view=view)
             except Exception as e:
                 await interaction.followup.send(f"Failed to create an invitation: {str(e)}", ephemeral=True)

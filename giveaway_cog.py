@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.7.4
-# Date: 2024-06-26
+# Version: 0.7.5
+# Date: 2024-06-29
 # ========================================
 import discord
 from discord import app_commands, ui, components
@@ -316,11 +316,14 @@ class GiveawayForm(ui.Modal, title='Create Giveaway'):
         await self.bot.get_cog('GiveawayCog').save_giveaways(giveaway_id, giveaway_view)
 
     async def generate_giveaway_id(self):
+        # Fetch all existing giveaway IDs
+        existing_ids = await self.fetch_all_giveaway_ids()
+
         # Generate a unique giveaway id
         while True:
             giveaway_id = ''.join(random.choices(string.digits, k=10))
-            # Check if the giveaway_id already exists in the database
-            if await self.fetch_giveaway(giveaway_id) is None:
+            # Check if the giveaway_id already exists in the fetched list
+            if giveaway_id not in existing_ids:
                 return giveaway_id
 
     def validate(self):
@@ -359,6 +362,12 @@ class GiveawayForm(ui.Modal, title='Create Giveaway'):
             record = await cursor.fetchone()
             await cursor.close()
             return record
+
+    async def fetch_all_giveaway_ids(self):
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute("SELECT giveaway_id FROM giveaway")
+            rows = await cursor.fetchall()
+            return [row[0] for row in rows]
 
 
 class GiveawayCheckParticipantView(ui.View):

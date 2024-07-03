@@ -1,4 +1,9 @@
-# Zoyo's Discord Bot
+# Bird Bot
+
+---
+version: 0.7.6
+
+---
 
 The purpose of developing this bot is to avoid the use of various current e.g. MEE6, ProBot and other existing server managed robots. This allows for maximum personalisation and control of features and interfaces and avoids the introduction of too many public bots.
 
@@ -10,7 +15,28 @@ The bot's code is deeply optimised for low-performance devices, using asynchrono
 
 ---
 
-As I am a student, I am not able to devote my full attention to the development of the robot. Therefore it is expected that the code architecture will be refactored in version 1.0, until then all feature updates will use the existing architecture.
+`As I am a student, I am not able to devote my full attention to the development of the robot. Therefore it is expected that the code architecture will be refactored in version 1.0, until then all feature updates will use the existing architecture.`
+
+---
+
+## Table of Contents
+- [Package Usage](#package-usage)
+- [Setup](#setup)
+- [Function Introduction](#function-introduction)
+  - [Voice_Channel_Cog](#voice_channel_cog)
+  - [Create_Invitation_Cog](#create_invitation_cog)
+  - [Welcome_Cog](#welcome_cog)
+  - [Illegal_Team_Act_Cog](#illegal_team_act_cog)
+  - [CheckStatusCog](#checkstatuscog)
+  - [Achievement_Cog](#achievement_cog)
+  - [Role_Cog](#role_cog)
+  - [Notebook_Cog](#notebook_cog)
+  - [Backup_Cog](#backup_cog)
+  - [Config_Cog](#config_cog)
+  - [Giveaway_Cog](#giveaway_cog)
+  - [Game_DnD_Cog](#game_dnd_cog)
+  - [Game_Spymode_Cog](#game_spymode_cog)
+- [Update Log](#update-log)
 
 ---
 ## Package Usage
@@ -76,7 +102,8 @@ It is designed to track and display user achievements based on their activity in
 
 
 It listens to message, reaction, and voice state update events to track user activity.  
-To view a user's achievements, use the `/achievements` command. 
+To view a user's achievements, use the `/achievements` command. Use `<member>` to view the achievements of a specific user.
+Use `<date>` to view the achievements of a specific month(eg. 2024-07).
 If no user is specified, the command will display the achievements of the user who invoked the command.  
 To manually increase or decrease a user's achievement progress, use the `/increase_achievement` and `/decrease_achievement` commands respectively. 
 
@@ -88,7 +115,8 @@ These commands require the following parameters:
 
 `member` is a required parameter, while the other parameters are at least 1 optional.
 
-Use `/achievement_ranking` to show the top 10 users with the every highest achievement indicators in the server.
+Use `/achievement_ranking` to show the top 10 users with the every highest achievement indicators in the server. 
+Use `<date>` to view the achievements ranking of a specific month(eg. 2024-07).
 
 Use `/check_achi_op` to check the history of manual operation logging for the Achievement System.
 
@@ -205,6 +233,18 @@ For example, a 5v5 League of Legends custom duel has a spy on each side who aims
 
 ---
 ## Update Log
+### V0.7.6 - 2024-07-02
+#### New features and improvements
+- Added achievement statistics by month to Achievement_Cog.
+- Force log files to use utf-8 encoding.
+### Bug fixes
+- Fixed an issue where for invitation messages with more than 256 characters, only the first 256 characters will now be sent.
+
+---
+### V0.7.5 - 2024-06-29
+#### New features and improvements
+- Improved performance in generating a new `giveaway_id` after a long period of use.
+---
 ### V0.7.4 - 2024-06-26
 #### New features and improvements
 - Add 3 new commands to Giveaway_Cog:
@@ -214,7 +254,7 @@ For example, a 5v5 League of Legends custom duel has a spy on each side who aims
 - Changed some giveaway command permissions to now restrict to the correct channel.
 - Changed the command for creating invitations to `/invt` for ease of use.
 - Optimised code in Notebook_Cog, paging is now better defined.
-- Add a new [Backup_Cog](###Backup_Cog) to backup the database.
+- Add a new [Backup_Cog](#backup_cog) to backup the database.
 #### Bug fixes
 - Fixed page numbering in illegal_team_act_cog, although this was only a problem after changing the code settings.
 ---
@@ -228,7 +268,7 @@ For example, a 5v5 League of Legends custom duel has a spy on each side who aims
 ### V0.7.2 - 2024-06-24
 #### New features:
 - Added a new `Role_Cog` for the achievement system. The role_cog is used to assign roles to users who complete achievements. 
-- More details can be found in the [Role_Cog](###Role_Cog) section of the Function Introduction.
+- More details can be found in the [Role_Cog](#role_cog) section of the Function Introduction.
 ---
 ### V0.7.1 - 2024-06-22
 #### Bug fixes
@@ -264,7 +304,7 @@ The history of manual operations on the achievement system can now be viewed wit
 ### V0.6.4 - 2024-06-14
 #### New features:
 - New `Game_Spymode_Cog` feature, which provides a simple way to play the game in "Spy Mode" in the server.
-- Details can be viewed in the [Game_Spymode_Cog](###Game_Spymode_Cog) section of the Function Introduction.
+- Details can be viewed in the [Game_Spymode_Cog](#game_spymode_cog) section of the Function Introduction.
 ---
 ### V0.6.3 - 2024-06-13
 #### Bug fixes
@@ -273,7 +313,7 @@ The history of manual operations on the achievement system can now be viewed wit
 ### V0.6.2 - 2024-06-13
 #### New features:
 - Added a new `notebook_cog` for administrators to manually log user events. User events can now be logged via the `/log_event` command.
-- Details can be viewed in the [Notebook_Cog](###Notebook_Cog) section of the Function Introduction.
+- Details can be viewed in the [Notebook_Cog](#notebook_cog) section of the Function Introduction.
 #### Bug fixes
 - Optimised matching for builds, now ignores messages from other bots.
 - Fixed an issue where an empty url error would occur if a user without an avatar used `/invitation` command.

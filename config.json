@@ -194,6 +194,13 @@
             "type": "giveaway"
         }
     ],
+        "achievements_type_name": {
+        "reaction":"\uD83D\uDD34 Add reactions",
+        "message":"\uD83D\uDFE1 Send messages",
+        "time_spent":"\uD83D\uDD35 VC time spent (min)",
+        "giveaway":"\uD83D\uDFE2 Giveaway"
+    },
+    "achievements_progress_title": "{date} Achievement progress ",
     "_comment": "=====================================================================",
     "_comment": "====FOR Game_Spymode_Cog=============================================",
     "blue_team_button_label": "\uD83D\uDD35Click to join Blue",
