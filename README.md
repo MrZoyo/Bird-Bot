@@ -8,8 +8,6 @@ Here are the maximum uses and testbeds for Bird Bot. Note that this is a server 
 
 [![Discord Banner 2](https://discord.com/api/guilds/1146359014968537089/widget.png?style=banner2)](https://discord.gg/birdgaming)<br>
 
-[![Discord](https://discordapp.com/api/guilds/1146359014968537089/widget.png)](https://discord.gg/birdgaming)<br>
-
 ---
 
 The purpose of developing this bot is to avoid the use of various current e.g. MEE6, ProBot and other existing server managed robots. This allows for maximum personalisation and control of features and interfaces and avoids the introduction of too many public bots.
