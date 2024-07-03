@@ -6,9 +6,9 @@
 
 Here are the maximum uses and testbeds for Bird Bot. Note that this is a server mainly for Chinese speakers in mainland Europe, anyone is welcome to join, but please respect the culture of the server and follow the server rules.
 
-![Discord Banner 2](https://discord.com/api/guilds/1146359014968537089/widget.png?style=banner2)
+[![Discord Banner 2](https://discord.com/api/guilds/1146359014968537089/widget.png?style=banner2)](https://discord.gg/birdgaming)<br>
 
-[![Discord](https://discordapp.com/api/guilds/1146359014968537089/widget.png)](https://discord.gg/0p9LSGoRLu6Pet0k)<br>
+[![Discord](https://discordapp.com/api/guilds/1146359014968537089/widget.png)](https://discord.gg/birdgaming)<br>
 
 ---
 
