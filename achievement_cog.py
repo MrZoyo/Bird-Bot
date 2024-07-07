@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.7.6
-# Date: 2024-07-02
+# Version: 0.7.7
+# Date: 2024-07-03
 # ========================================
 import re
 import discord
@@ -119,11 +119,10 @@ class AchievementRefreshView(View):
 
         embed.add_field(name=type_names['reaction'], value=reaction_count, inline=False)
         embed.add_field(name=type_names['message'], value=message_count, inline=False)
-        embed.add_field(name=type_names['time_spent'], value=int(time_spent/60), inline=False)
+        embed.add_field(name=type_names['time_spent'], value=int(time_spent / 60), inline=False)
         embed.add_field(name=type_names['giveaway'], value=giveaway_count, inline=False)
 
         return embed
-
 
 
 class ConfirmationView(View):
@@ -212,7 +211,8 @@ class AchievementRankingView(View):
                 await cursor.execute(
                     "SELECT user_id, reaction_count FROM achievements ORDER BY reaction_count DESC LIMIT 10")
                 top_reactions = await cursor.fetchall()
-                await cursor.execute("SELECT user_id, message_count FROM achievements ORDER BY message_count DESC LIMIT 10")
+                await cursor.execute(
+                    "SELECT user_id, message_count FROM achievements ORDER BY message_count DESC LIMIT 10")
                 top_messages = await cursor.fetchall()
                 await cursor.execute("SELECT user_id, time_spent FROM achievements ORDER BY time_spent DESC LIMIT 10")
                 top_time_spent = await cursor.fetchall()
@@ -337,14 +337,16 @@ class AchievementOperationView(discord.ui.View):
         return embed
 
     async def previous_page(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         self.page -= 1
         embed = await self.format_page()
-        await interaction.response.edit_message(embed=embed, view=self)
+        await interaction.edit_original_response(embed=embed, view=self)
 
     async def next_page(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         self.page += 1
         embed = await self.format_page()
-        await interaction.response.edit_message(embed=embed, view=self)
+        await interaction.edit_original_response(embed=embed, view=self)
 
 
 class AchievementCog(commands.Cog):
@@ -379,7 +381,6 @@ class AchievementCog(commands.Cog):
                 # This user is in the database, so increment their message count
                 await cursor.execute("UPDATE achievements SET message_count = message_count + 1 WHERE user_id = ?",
                                      (message.author.id,))
-
 
             # For table monthly_achievements
             await cursor.execute("SELECT * FROM monthly_achievements WHERE user_id = ? AND year = ? AND month = ?",
@@ -471,15 +472,18 @@ class AchievementCog(commands.Cog):
                                              (member.id, time_spent))
 
                     # Update or insert time spent in monthly_achievements
-                    await cursor.execute("SELECT time_spent FROM monthly_achievements WHERE user_id = ? AND year = ? AND month = ?",
-                                         (member.id, start_year, start_month))
+                    await cursor.execute(
+                        "SELECT time_spent FROM monthly_achievements WHERE user_id = ? AND year = ? AND month = ?",
+                        (member.id, start_year, start_month))
                     user_record = await cursor.fetchone()
                     if user_record:
-                        await cursor.execute("UPDATE monthly_achievements SET time_spent = time_spent + ? WHERE user_id = ? AND year = ? AND month = ?",
-                                             (time_spent, member.id, start_year, start_month))
+                        await cursor.execute(
+                            "UPDATE monthly_achievements SET time_spent = time_spent + ? WHERE user_id = ? AND year = ? AND month = ?",
+                            (time_spent, member.id, start_year, start_month))
                     else:
-                        await cursor.execute("INSERT INTO monthly_achievements (user_id, year, month, time_spent) VALUES (?, ?, ?, ?)",
-                                             (member.id, start_year, start_month, time_spent))
+                        await cursor.execute(
+                            "INSERT INTO monthly_achievements (user_id, year, month, time_spent) VALUES (?, ?, ?, ?)",
+                            (member.id, start_year, start_month, time_spent))
 
                     # Delete the entry from voice_channel_entries since the session is complete
                     await cursor.execute("DELETE FROM voice_channel_entries WHERE user_id = ? AND channel_id = ?",

@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.7.4
-# Date: 2024-06-26
+# Version: 0.7.7
+# Date: 2024-07-03
 # ========================================
 import discord
 from discord.ext import commands
@@ -46,20 +46,22 @@ class PaginationView(View):
             await self.message.edit(view=self)
 
     async def previous_button_callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         self.page -= 1
         await self.update_buttons()
         if self.format_type == 'user_records':
-            await interaction.response.edit_message(embed=self.format_page_for_check_user_records(), view=self)
+            await interaction.edit_original_response(embed=self.format_page_for_check_user_records(), view=self)
         else:
-            await interaction.response.edit_message(embed=self.format_page(), view=self)
+            await interaction.edit_original_response(embed=self.format_page(), view=self)
 
     async def next_button_callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         self.page += 1
         await self.update_buttons()
         if self.format_type == 'user_records':
-            await interaction.response.edit_message(embed=self.format_page_for_check_user_records(), view=self)
+            await interaction.edit_original_response(embed=self.format_page_for_check_user_records(), view=self)
         else:
-            await interaction.response.edit_message(embed=self.format_page(), view=self)
+            await interaction.edit_original_response(embed=self.format_page(), view=self)
 
     def safe_strptime(self, date_str, formats):
         if not isinstance(date_str, str):
@@ -242,13 +244,13 @@ class IllegalTeamActCog(commands.Cog):
             return False
         return True
 
-    @commands.command(name='check_illegal_teaming')
+    @commands.command(name='illegal_ranking')
     async def check_illegal_teaming_command(self, ctx):
         if not await self.check_channel_validity(ctx):
             return
         await self.send_illegal_teaming_stats(ctx)
 
-    @app_commands.command(name="check_illegal_teaming")
+    @app_commands.command(name="illegal_ranking")
     async def check_illegal_teaming(self, interaction: discord.Interaction):
         """Slash command to list the 20 most recorded users."""
         await interaction.response.defer()
@@ -275,13 +277,13 @@ class IllegalTeamActCog(commands.Cog):
                                                                           view=view)
         view.message = message
 
-    @commands.command(name='check_user_records')
+    @commands.command(name='illegal_greater_than')
     async def check_user_records_command(self, ctx, x: int):
         if not await self.check_channel_validity(ctx):
             return
         await self.send_user_records_stats(ctx, x)
 
-    @app_commands.command(name="check_user_records")
+    @app_commands.command(name="illegal_greater_than")
     @app_commands.describe(x="The minimum number of records to query for.")
     async def check_user_records(self, interaction: discord.Interaction, x: int):
         """Slash command to list users who have been recorded greater than x times."""
@@ -318,7 +320,7 @@ class IllegalTeamActCog(commands.Cog):
             # print(error)
             await ctx.send("An unexpected error occurred. Please try again.")
 
-    @app_commands.command(name="check_member")
+    @app_commands.command(name="illegal_member")
     @app_commands.describe(member="The member to fetch illegal team records for")
     async def check_member(self, interaction: discord.Interaction, member: discord.Member):
         """Lists all illegal teaming records for the specified member."""
@@ -344,13 +346,14 @@ class IllegalTeamActCog(commands.Cog):
     async def fetch_records_for_user(self, user_id):
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.cursor()
-            await cursor.execute('SELECT user_id, timestamp, message FROM illegal_teaming WHERE user_id = ?',
-                                 (user_id,))
+            await cursor.execute(
+                'SELECT user_id, timestamp, message FROM illegal_teaming WHERE user_id = ? ORDER BY timestamp DESC',
+                (user_id,))
             records = await cursor.fetchall()
             await cursor.close()
             return records
 
-    @app_commands.command(name="check_member_by_id")
+    @app_commands.command(name="illegal_member_by_id")
     @app_commands.describe(user_id="The user ID to fetch illegal team records for")
     async def check_member_by_id(self, interaction: discord.Interaction, user_id: str):
         """Lists all illegal teaming records for the specified user ID."""
@@ -370,7 +373,7 @@ class IllegalTeamActCog(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"An error occurred: {str(e)}", ephemeral=True)
 
-    @app_commands.command(name="add_illegal_record")
+    @app_commands.command(name="illegal_add_record")
     @app_commands.describe(
         member="The member to add the illegal teaming record for",
         content="The content of the illegal teaming record",

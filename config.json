@@ -1,5 +1,5 @@
 {
-    "_comment": "====Config File for Zoyo's Discord Bot===============================",
+    "_comment": "====Config File for Bird Bot=========================================",
     "_comment": "=====================================================================",
     "_comment": "====FOR main program bot.py or all cog===============================",
     "token": "YOUR_BOT_TOKEN",
@@ -465,5 +465,8 @@
     "mbti_NF_description": "\n- ENFJ: Teacher\n- INFJ: Counselor\n- INFP: Healer\n- ENFP: Champion",
     "mbti_NT_title": "NT Group (Rationals)",
     "mbti_NT_description": "\n- ENTJ: Fieldmarshal\n- INTJ: Mastermind\n- INTP: Architect\n- ENTP: Inventor",
+    "_comment": "=====================================================================",
+    "_comment": "====FOR Rating_Cog===================================================",
+    "rating_channel_id": 1145141919810,
     "_comment": "====================================================================="
 }

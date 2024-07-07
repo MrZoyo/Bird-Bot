@@ -39,6 +39,7 @@ The bot's code is deeply optimised for low-performance devices, using asynchrono
   - [Backup_Cog](#backup_cog)
   - [Config_Cog](#config_cog)
   - [Giveaway_Cog](#giveaway_cog)
+  - [Rating_Cog](#rating_cog)
   - [Game_DnD_Cog](#game_dnd_cog)
   - [Game_Spymode_Cog](#game_spymode_cog)
 - [Update Log](#update-log)
@@ -46,7 +47,7 @@ The bot's code is deeply optimised for low-performance devices, using asynchrono
 ---
 ## Package Usage
 
-discord.py, sqlite3, PIL, logging, aiohttp, aiosqlite, os, tempfile, re, random, 
+discord.py, sqlite3, PIL(pillow), logging, aiohttp, aiosqlite, matplotlib
 
 ---
 ## Setup
@@ -83,11 +84,11 @@ For users who are not in the server's channel but sent a teaming message, the bo
 If the user resends a normal teaming message, the bot deletes their illegal teaming record for 5 minutes.
 
 Provides commands to search for records:
-- `!check_illegal_teaming` or `/check_illegal_teaming`- Query the 20 users with the most records of illegal teaming behaviour.
-- `!check_user_records <number>` or `/check_user_records <number>` - Query all users whose number of illegal teaming behaviours is greater than `<number>`.
-- `/check_member <member>` - Query all illegal teaming records for the specified `member`.
-- `/check_member_by_id <member_id>` - Query all illegal teaming records for the specified `member_id`.
-- `/add_illegal_record <member> <content> <time>` - Manually add a record for a specified member.
+- `!illegal_ranking` or `/illegal_ranking`- Query the 20 users with the most records of illegal teaming behaviour.
+- `!illegal_greater_than <number>` or `/illegal_greater_than` - Query all users whose number of illegal teaming behaviours is greater than `<number>`.
+- `/illegal_member <member>` - Query all illegal teaming records for the specified `member`.
+- `/illegal_member_by_id <member_id>` - Query all illegal teaming records for the specified `member_id`.
+- `/illegal_add_record <member> <content> <time>` - Manually add a record for a specified member.
 
 ### CheckStatusCog
 Provide some convenient functions for querying related data.
@@ -140,7 +141,7 @@ This command causes the bot to send a message listing all MBTI identities with t
 ### Notebook_Cog
 The Notebook_Cog is a feature in the bot that allows administrators to manually log user events. This can be useful for tracking user behavior, recording important events, or keeping a record of specific interactions.
 
-#### `/log_event <member> <event>`
+#### `/notebook_log <member> <event>`
 This command allows to manually log a user event. 
 This command can only be used on specific channels. Users who have used this command become **administrators**.
 
@@ -149,16 +150,16 @@ The command takes the following parameters:
 - `member`: The member whose event you want to log.
 - `event`: The event that you want to log for the member.
 
-#### `/check_member_event <member>`
+#### `/notebook_member <member>`
 This command allows **administrators** to check the event log for a specific member. 
 
 The command takes the following parameter:
 - `member`: The member whose event log you want to check.
 
-#### `/check_all_event`
+#### `/notebook_all`
 This command allows **administrators** to check the event log for all members in the server.
 
-#### `/delete_event <member> <event_serial_number>`
+#### `/notebook_delete <member> <event_serial_number>`
 This command allows to delete a specific event from a member's event log. This command can only be used on specific channels. 
 
 The command takes the following parameters:
@@ -223,6 +224,25 @@ Giveaway_Cog creates the Giveaway mechanism. All giveaways will be posted in the
 - This command allows user to send message to the winner.
   - `<giveaway_id>` giveaway identification ID.
 
+### Rating_Cog
+#### `/rt_create`
+- This command allows users to create an event with a rating system. It is set to a 10-point scale, with anonymous scoring, manual start and end of scoring and display of average scores and score distribution statistics when finished.
+- Using the command will call out a form that will appear in the `rating_channel` with the description filled in. Each rating item is assigned a unique `rating_id` that is used to manipulate and identify the rating item.
+
+#### `/rt_end <rating_id>`
+- This command allows the user to end a rating item.
+The ended rating item will no longer allow interaction, and the average score and rating distribution statistics will be displayed when it is ended.
+- For closed ratings use this command to query the ratings.
+
+#### `rt_cancel <rating_id>`
+- This command allows the user to cancel a rating item.
+A cancelled rating item is no longer interactive and no statistics will be displayed.
+
+#### `rt_description <rating_id> <description>`
+- This command allows the user to modify the description of a rating item.
+- Only the description of an open rating item can be modified.
+
+
 ### Game_DnD_Cog
 Provides Dungeons & Dragons (DnD) players with a convenient way to generate random roll dice points.
 -  `/dnd_roll <expression> <x>` - The command takes an expression as an argument, which represents the dice roll in DnD notation. 
@@ -238,13 +258,26 @@ For example, a 5v5 League of Legends custom duel has a spy on each side who aims
 
 ---
 ## Update Log
+### V0.7.8 - 2024-07-06
+#### New features and improvements
+- Add a Rating_Cog for posting events as well as rating them.
+- For more details, check out the [Rating_Cog](#rating_cog) section of the Function Introduction.
+---
+### V0.7.7 - 2024-07-03
+#### New features and improvements
+- Added defer to page flip buttons in illegal_team_act_cog, achievement_cog, giveaway_cog, notebook_cog to avoid button interaction timeout.
+- Changed commands in notebook_cog for clarity.
+- Changed commands in illegal_team_act_cog for clarity.
+- Changed all query results in illegal_team_act_cog and notebook_cog to newest to oldest.
+### Bug fixes
+- Fixed issue where in giveaway_cog if the winning user turned off private messaging, it would result in not being able to send messages to other winning users.
+---
 ### V0.7.6 - 2024-07-02
 #### New features and improvements
 - Added achievement statistics by month to Achievement_Cog.
 - Force log files to use utf-8 encoding.
 ### Bug fixes
 - Fixed an issue where for invitation messages with more than 256 characters, only the first 256 characters will now be sent.
-
 ---
 ### V0.7.5 - 2024-06-29
 #### New features and improvements

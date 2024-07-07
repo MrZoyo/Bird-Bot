@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.7.4
-# Date: 2024-06-26
+# Version: 0.7.7
+# Date: 2024-07-03
 # ========================================
 import discord
 from discord.ext import commands
@@ -82,14 +82,16 @@ class EventPaginationView(View):
             await self.message.edit(view=self)
 
     async def previous_button_callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         self.page -= 1
         await self.update_buttons()
-        await interaction.response.edit_message(embed=self.format_page_method(self), view=self)
+        await interaction.edit_original_response(embed=self.format_page_method(self), view=self)
 
     async def next_button_callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         self.page += 1
         await self.update_buttons()
-        await interaction.response.edit_message(embed=self.format_page_method(self), view=self)
+        await interaction.edit_original_response(embed=self.format_page_method(self), view=self)
 
     def format_page_check_member_event(self):
         start = self.page * self.item_each_page
@@ -151,7 +153,7 @@ class NotebookCog(commands.Cog):
         config = self.bot.get_cog('ConfigCog').config
         self.db_path = config['db_path']
 
-    @app_commands.command(name="log_event")
+    @app_commands.command(name="notebook_log")
     @app_commands.describe(event_object="The member to log",
                            event_description="The description of the event"
                            )
@@ -198,7 +200,7 @@ class NotebookCog(commands.Cog):
             await db.commit()
             await cursor.close()
 
-    @app_commands.command(name="check_member_event")
+    @app_commands.command(name="notebook_member")
     @app_commands.describe(member="The member to fetch event logs for")
     async def check_member_event(self, interaction: discord.Interaction, member: discord.Member):
         """Lists all event logs for the specified member."""
@@ -234,13 +236,13 @@ class NotebookCog(commands.Cog):
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.cursor()
             await cursor.execute(
-                'SELECT add_time, operator, event_member, event_description, count FROM event_logs WHERE event_member = ?',
+                'SELECT add_time, operator, event_member, event_description, count FROM event_logs WHERE event_member = ? ORDER BY add_time DESC',
                 (event_member,))
             records = await cursor.fetchall()
             await cursor.close()
             return records
 
-    @app_commands.command(name="check_all_event")
+    @app_commands.command(name="notebook_all")
     async def check_all_event(self, interaction: discord.Interaction):
         """Lists all event logs."""
         await interaction.response.defer()
@@ -267,12 +269,12 @@ class NotebookCog(commands.Cog):
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.cursor()
             await cursor.execute(
-                'SELECT MAX(add_time), event_member, COUNT(event_member) FROM event_logs GROUP BY event_member')
+                'SELECT MAX(add_time) as latest_time, event_member, COUNT(event_member) FROM event_logs GROUP BY event_member ORDER BY latest_time DESC')
             records = await cursor.fetchall()
             await cursor.close()
             return records
 
-    @app_commands.command(name="delete_event")
+    @app_commands.command(name="notebook_delete")
     @app_commands.describe(member="The member whose event is to be deleted",
                            event_serial_number="The serial number of the event to be deleted"
                            )

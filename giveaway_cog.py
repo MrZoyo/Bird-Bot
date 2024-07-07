@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.7.5
-# Date: 2024-06-29
+# Version: 0.7.7
+# Date: 2024-07-03
 # ========================================
 import discord
 from discord import app_commands, ui, components
@@ -394,14 +394,16 @@ class GiveawayCheckParticipantView(ui.View):
         return True
 
     async def previous_page(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         self.current_page -= 1
         await self.update_buttons()
-        await interaction.response.edit_message(embed=self.format_page(), view=self)
+        await interaction.edit_original_response(embed=self.format_page(), view=self)
 
     async def next_page(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         self.current_page += 1
         await self.update_buttons()
-        await interaction.response.edit_message(embed=self.format_page(), view=self)
+        await interaction.edit_original_response(embed=self.format_page(), view=self)
 
     async def update_buttons(self):
         max_pages = self.get_max_pages()  # Ensure you calculate it fresh
@@ -1054,15 +1056,22 @@ class GiveawayCog(commands.Cog):
             await interaction.response.send_message(f"No winners found for giveaway {giveaway_id}.", ephemeral=True)
             return
         else:
+            failed_to_send = []
             # Iterate over the winners
             for winner_id in winner_ids:
-                # Fetch the winner's user object
-                winner = self.bot.get_user(winner_id)
+                try:
+                    winner = await self.bot.fetch_user(winner_id)
+                    await winner.send(content=message)
+                except discord.errors.Forbidden:
+                    failed_to_send.append(winner_id)
+                    continue
 
-                # Send the message to the winner
-                await winner.send(content=message)
-
-            await interaction.response.send_message(f"Message sent to all winners of giveaway {giveaway_id}.")
+            if failed_to_send:
+                # Handle the case where some messages could not be sent
+                failed_mentions = ', '.join([f'<@{user_id}>' for user_id in failed_to_send])
+                await interaction.response.send_message(f"Failed to send message to the following users: {failed_mentions} in giveaway {giveaway_id}. Message: {message}")
+            else:
+                await interaction.response.send_message(f"Message sent to all winners of giveaway {giveaway_id}. Message: {message}")
 
     async def update_giveaway_description(self, giveaway_id, new_description):
         async with aiosqlite.connect(self.db_path) as db:
