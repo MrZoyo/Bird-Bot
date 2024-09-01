@@ -1,8 +1,7 @@
 # Author: MrZoyo
-# Version: 0.6.8
-# Date: 2024-06-17
+# Version: 0.8.0
+# Date: 2024-09-01
 # ========================================
-
 import aiosqlite
 import asyncio
 import logging
@@ -91,6 +90,11 @@ class VoiceStateCog(commands.Cog):
         config = self.bot.get_cog('ConfigCog').config
         self.channel_configs = {int(channel_id): config for channel_id, config in config['channel_configs'].items()}
         self.db_path = config['db_path']
+
+        self.soundboard_not_in_vc_message = config['soundboard_not_in_vc_message']
+        self.soundboard_no_permission_message = config['soundboard_no_permission_message']
+        self.soundboard_disabled_message = config['soundboard_disabled_message']
+        self.soundboard_enabled_message = config['soundboard_enabled_message']
 
         # Start the cleanup task
         self.cleanup_task.start()
@@ -214,6 +218,42 @@ class VoiceStateCog(commands.Cog):
         embed = await view.format_page()
         message = await interaction.edit_original_response(embeds=[embed], view=view)
         view.message = message
+
+    @app_commands.command(
+        name="set_soundboard",
+        description="Toggle the soundboard functionality for the creator's voice channel"
+    )
+    async def set_soundboard(self, interaction: discord.Interaction):
+        member = interaction.user
+        voice_state = member.voice
+
+        if not voice_state or not voice_state.channel:
+            await interaction.response.send_message(self.soundboard_not_in_vc_message, ephemeral=True)
+            return
+
+        channel = voice_state.channel
+
+        # Check if the user is the creator of the channel
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('SELECT creator_id FROM temp_channels WHERE channel_id = ?', (channel.id,))
+            record = await cursor.fetchone()
+
+        if not record or record[0] != member.id:
+            await interaction.response.send_message(self.soundboard_no_permission_message, ephemeral=True)
+            return
+
+        # Toggle soundboard functionality
+        current_overwrites = channel.overwrites_for(channel.guild.default_role)
+        if current_overwrites.use_soundboard is None or current_overwrites.use_soundboard:
+            current_overwrites.update(use_soundboard=False)
+            await channel.set_permissions(channel.guild.default_role, overwrite=current_overwrites)
+            await interaction.response.send_message(self.soundboard_disabled_message,
+                                                    ephemeral=True)
+        else:
+            current_overwrites.update(use_soundboard=True)
+            await channel.set_permissions(channel.guild.default_role, overwrite=current_overwrites)
+            await interaction.response.send_message(self.soundboard_enabled_message,
+                                                    ephemeral=True)
 
     @commands.Cog.listener()
     async def on_ready(self):

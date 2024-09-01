@@ -1,32 +1,18 @@
 # Author: MrZoyo
-# Version: 0.6.7
-# Date: 2024-06-17
+# Version: 0.8.0
+# Date: 2024-09-01
 # ========================================
-
+import asyncio
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from illegal_team_act_cog import IllegalTeamActCog
 import os
 import tempfile
 import logging
-
-
-class EmbedGenerator:
-    @staticmethod
-    def create_people_embed(total_people, category_counts):
-        embed = discord.Embed(title="Voice Channel Statistics", color=discord.Color.blue())
-        for category, count in category_counts.items():
-            embed.add_field(name=category, value=f"{count} people", inline=False)
-        embed.add_field(name="Total People in Voice Channels", value=f"{total_people} people", inline=False)
-        return embed
-
-    @staticmethod
-    def create_channel_embed(total_channels, category_counts):
-        embed = discord.Embed(title="Active Voice Channel Statistics", color=discord.Color.blue())
-        for category, count in category_counts.items():
-            embed.add_field(name=category, value=f"{count} active channels", inline=False)
-        embed.add_field(name="Total Active Channels", value=f"{total_channels} channels", inline=False)
-        return embed
+import aiosqlite
+from datetime import datetime, timezone, timedelta
+import matplotlib.pyplot as plt
+import io
 
 
 class MemberPositionView(discord.ui.View):
@@ -47,12 +33,133 @@ class CheckStatusCog(commands.Cog):
         self.bot = bot
         self.illegal_act_cog = IllegalTeamActCog(bot)
 
+        self.where_is_menu = discord.app_commands.ContextMenu(
+            name='Where Is',  # set the name of the context menu to "Where Is"
+            callback=self.where_is_context_menu,
+        )
+        self.bot.tree.add_command(self.where_is_menu)
+
         config = self.bot.get_cog('ConfigCog').config
+        self.db_path = config['db_path']
         self.logging_file = config['logging_file']
         self.where_is_not_found_message = config['where_is_not_found_message']
         self.where_is_title_message = config['where_is_title_message']
         self.current_channel_name_message = config['current_channel_name_message']
         self.current_channel_members_message = config['current_channel_members_message']
+
+        self.check_voice_status_task.start()  # Start the background task
+
+    @tasks.loop(minutes=10)
+    async def check_voice_status_task(self):
+        """Checks the number of people and active channels in voice channels and records it in the database."""
+        try:
+            category_counts = {}
+            total_people = 0
+            total_channels = 0
+            for guild in self.bot.guilds:
+                for channel in guild.voice_channels:
+                    if channel.category is not None:
+                        if channel.category.name not in category_counts:
+                            category_counts[channel.category.name] = {'people': 0, 'channels': 0}
+                        category_counts[channel.category.name]['people'] += len(channel.members)
+                        if len(channel.members) > 0:
+                            category_counts[channel.category.name]['channels'] += 1
+                            total_channels += 1
+                        total_people += len(channel.members)
+            # Remove categories with no active players or channels
+            category_counts = {k: v for k, v in category_counts.items() if v['people'] > 0 or v['channels'] > 0}
+
+            # Record the data in the database
+            async with aiosqlite.connect(self.db_path) as db:
+                await db.execute('''
+                    INSERT INTO status (timestamp, people, channels)
+                    VALUES (?, ?, ?)
+                ''', (datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'), total_people, total_channels))
+                await db.commit()
+
+            logging.info(f"Voice status checked at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+        except Exception as e:
+            logging.error(f"An error occurred while checking voice status: {str(e)}")
+
+    @check_voice_status_task.before_loop
+    async def before_check_voice_status_task(self):
+        now = datetime.now()
+        next_run = (now + timedelta(minutes=10 - now.minute % 10)).replace(second=0, microsecond=0)
+        await asyncio.sleep((next_run - now).total_seconds())
+        await self.bot.wait_until_ready()
+
+    @discord.app_commands.command(name="print_voice_status")
+    @discord.app_commands.describe(date="The date in format YYYY-MM-DD, YYYY-MM, or YYYY.")
+    async def print_voice_status(self, interaction: discord.Interaction, date: str):
+        """Generates line graphs for the number of people and channels on a specific date, month, or year."""
+        await interaction.response.defer()
+        try:
+            async with aiosqlite.connect(self.db_path) as db:
+                cursor = await db.execute('''
+                        SELECT timestamp, people, channels FROM status
+                        WHERE timestamp LIKE ?
+                        ORDER BY timestamp
+                    ''', (f'{date}%',))
+                rows = await cursor.fetchall()
+
+            if not rows:
+                await interaction.followup.send(f"No data found for the specified date: {date}", ephemeral=True)
+                return
+
+            timestamps = [datetime.strptime(row[0], '%Y-%m-%d %H:%M:%S') for row in rows]
+            people_counts = [row[1] for row in rows]
+            channel_counts = [row[2] for row in rows]
+
+            max_people = max(people_counts)
+            max_channels = max(channel_counts)
+            max_people_time = timestamps[people_counts.index(max_people)]
+            max_channels_time = timestamps[channel_counts.index(max_channels)]
+
+            # Plot the number of people
+            plt.figure(figsize=(10, 5))
+            plt.plot(timestamps, people_counts, label='Number of People', marker='o')
+            plt.axhline(y=max_people, color='r', linestyle='--', label=f'Max People: {max_people} at {max_people_time}')
+            plt.title(f'Number of People in Voice Channels (Max: {max_people} at {max_people_time})')
+            plt.xlabel('Time')
+            plt.ylabel('Number of People')
+            plt.grid(True)
+            plt.legend()
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+
+            # Save the plot to a BytesIO object
+            people_buf = io.BytesIO()
+            plt.savefig(people_buf, format='png')
+            people_buf.seek(0)
+            plt.close()
+
+            # Plot the number of channels
+            plt.figure(figsize=(10, 5))
+            plt.plot(timestamps, channel_counts, label='Number of Channels', marker='o')
+            plt.axhline(y=max_channels, color='r', linestyle='--',
+                        label=f'Max Channels: {max_channels} at {max_channels_time}')
+            plt.title(f'Number of Channels in Voice Channels (Max: {max_channels} at {max_channels_time})')
+            plt.xlabel('Time')
+            plt.ylabel('Number of Channels')
+            plt.grid(True)
+            plt.legend()
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+
+            # Save the plot to a BytesIO object
+            channels_buf = io.BytesIO()
+            plt.savefig(channels_buf, format='png')
+            channels_buf.seek(0)
+            plt.close()
+
+            # Send the plots as images
+            await interaction.followup.send(files=[
+                discord.File(people_buf, filename='people_stats.png'),
+                discord.File(channels_buf, filename='channels_stats.png')
+            ])
+        except Exception as e:
+            await interaction.followup.send(f"An error occurred: {str(e)}", ephemeral=True)
 
     @discord.app_commands.command(name="check_log")
     @discord.app_commands.describe(x="Number of lines from the end of the log file to return.")
@@ -61,7 +168,7 @@ class CheckStatusCog(commands.Cog):
         if not await self.illegal_act_cog.check_channel_validity(interaction):
             return
         try:
-            with open(self.logging_file, 'r') as f:
+            with open(self.logging_file, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
         except FileNotFoundError:
             await interaction.response.send_message("The log file does not exist.")
@@ -78,42 +185,32 @@ class CheckStatusCog(commands.Cog):
         else:
             await interaction.response.send_message(f"**Last {x} lines of the log file**:\n```{last_x_lines}```")
 
-    @discord.app_commands.command(name="check_people_number")
-    async def check_people_number(self, interaction: discord.Interaction):
-        """Returns the number of people in each category and the total number of people in voice channels."""
+    @discord.app_commands.command(name="check_voice_status")
+    async def check_voice_status(self, interaction: discord.Interaction):
+        """Returns the number of people and active channels in each category and the total numbers."""
         await interaction.response.defer()
         try:
             category_counts = {}
             total_people = 0
+            total_channels = 0
             for guild in self.bot.guilds:
                 for channel in guild.voice_channels:
                     if channel.category is not None:
                         if channel.category.name not in category_counts:
-                            category_counts[channel.category.name] = 0
-                        category_counts[channel.category.name] += len(channel.members)
+                            category_counts[channel.category.name] = {'people': 0, 'channels': 0}
+                        category_counts[channel.category.name]['people'] += len(channel.members)
+                        if len(channel.members) > 0:
+                            category_counts[channel.category.name]['channels'] += 1
+                            total_channels += 1
                         total_people += len(channel.members)
-            # Remove categories with no active players
-            category_counts = {k: v for k, v in category_counts.items() if v > 0}
-            embed = EmbedGenerator.create_people_embed(total_people, category_counts)
-            await interaction.followup.send(embed=embed)
-        except Exception as e:
-            await interaction.followup.send(f"An error occurred: {str(e)}", ephemeral=True)
-
-    @discord.app_commands.command(name="check_channel_number")
-    async def check_channel_number(self, interaction: discord.Interaction):
-        """Returns the number of active channels in each category and the total number of active channels."""
-        await interaction.response.defer()
-        try:
-            category_counts = {}
-            total_channels = 0
-            for guild in self.bot.guilds:
-                for channel in guild.voice_channels:
-                    if channel.category is not None and len(channel.members) > 0:
-                        if channel.category.name not in category_counts:
-                            category_counts[channel.category.name] = 0
-                        category_counts[channel.category.name] += 1
-                        total_channels += 1
-            embed = EmbedGenerator.create_channel_embed(total_channels, category_counts)
+            # Remove categories with no active players or channels
+            category_counts = {k: v for k, v in category_counts.items() if v['people'] > 0 or v['channels'] > 0}
+            embed = discord.Embed(title="Voice Channel Statistics", color=discord.Color.blue())
+            for category, counts in category_counts.items():
+                embed.add_field(name=category, value=f"{counts['people']} people, {counts['channels']} active channels",
+                                inline=False)
+            embed.add_field(name="Total People in Voice Channels", value=f"{total_people} people", inline=False)
+            embed.add_field(name="Total Active Channels", value=f"{total_channels} channels", inline=False)
             await interaction.followup.send(embed=embed)
         except Exception as e:
             await interaction.followup.send(f"An error occurred: {str(e)}", ephemeral=True)
@@ -125,7 +222,8 @@ class CheckStatusCog(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         try:
             if member.voice is None or member.voice.channel is None:
-                await interaction.followup.send(self.where_is_not_found_message.format(name=member.display_name), ephemeral=True)
+                await interaction.followup.send(self.where_is_not_found_message.format(name=member.display_name),
+                                                ephemeral=True)
                 return
 
             logging.info(f"Checking position for {member.display_name} by {interaction.user.display_name}")
@@ -137,11 +235,53 @@ class CheckStatusCog(commands.Cog):
             channel_id = member.voice.channel.id
             vc_url_direct = f"https://discord.com/channels/{guild_id}/{channel_id}"
 
-            embed = discord.Embed(title=self.where_is_title_message.format(name=member.display_name), color=discord.Color.blue())
+            embed = discord.Embed(title=self.where_is_title_message.format(name=member.display_name),
+                                  color=discord.Color.blue())
             embed.add_field(name=self.current_channel_name_message, value="".join(vc_url_direct), inline=False)
-            embed.add_field(name=self.current_channel_members_message, value="\n".join(members_in_channel), inline=False)
+            embed.add_field(name=self.current_channel_members_message, value="\n".join(members_in_channel),
+                            inline=False)
 
             view = MemberPositionView(self.bot, vc_url_direct)
             await interaction.followup.send(embed=embed, view=view, ephemeral=True)
         except Exception as e:
             await interaction.followup.send(f"An error occurred: {str(e)}", ephemeral=True)
+
+    async def where_is_context_menu(self, interaction: discord.Interaction, member: discord.Member):
+        """Find out where the member is in voice channels."""
+        await interaction.response.defer(ephemeral=True)
+        try:
+            if member.voice is None or member.voice.channel is None:
+                await interaction.followup.send(self.where_is_not_found_message.format(name=member.display_name),
+                                                ephemeral=True)
+                return
+
+            logging.info(f"Checking position for {member.display_name} by {interaction.user.display_name}")
+
+            channel = member.voice.channel
+            members_in_channel = [m.display_name for m in channel.members]
+
+            guild_id = member.guild.id
+            channel_id = member.voice.channel.id
+            vc_url_direct = f"https://discord.com/channels/{guild_id}/{channel_id}"
+
+            embed = discord.Embed(title=self.where_is_title_message.format(name=member.display_name),
+                                  color=discord.Color.blue())
+            embed.add_field(name=self.current_channel_name_message, value="".join(vc_url_direct), inline=False)
+            embed.add_field(name=self.current_channel_members_message, value="\n".join(members_in_channel),
+                            inline=False)
+
+            view = MemberPositionView(self.bot, vc_url_direct)
+            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f"An error occurred: {str(e)}", ephemeral=True)
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS status (
+                    timestamp TEXT NOT NULL,
+                    people INTEGER DEFAULT 0,
+                    channels INTEGER DEFAULT 0
+                )
+            ''')

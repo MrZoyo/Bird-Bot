@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.7.6
-# Date: 2024-07-02
+# Version: 0.8.0
+# Date: 2024-09-01
 # ========================================
 import discord
 from discord.ext import commands
@@ -59,6 +59,12 @@ class TeamInvitationView(discord.ui.View):
         guild_id = author.guild.id
         channel_id = author.voice.channel.id
         vc_url_direct = f"https://discord.com/channels/{guild_id}/{channel_id}"
+
+        # Remove parts of the message that match the pattern <@digits> (for member mentions)
+        content = re.sub(r'<@\d+>', '', content)
+
+        # Remove parts of the message that match the pattern <@&digits> (for role mentions)
+        content = re.sub(r'<@&\d+>', '', content)
 
         # Truncate the content to 240 characters if longer
         if len(content) > 256:
@@ -131,6 +137,18 @@ class TeamInvitationView(discord.ui.View):
         return interaction.user == self.user
 
 
+class DefaultRoomView(discord.ui.View):
+    def __init__(self, bot, url):
+        super().__init__(timeout=600)
+        self.bot = bot
+        self.url = url
+        self.config = self.bot.get_cog('ConfigCog').config
+        self.default_create_room_channel_id = self.config['default_create_room_channel_id']
+        self.default_create_room_button = self.config['default_create_room_button']
+
+        self.add_item(discord.ui.Button(style=discord.ButtonStyle.link, label=self.default_create_room_button, url=self.url))
+
+
 class CreateInvitationCog(commands.Cog):
     def __init__(self, bot, illegal_act_cog):
         self.bot = bot
@@ -138,6 +156,7 @@ class CreateInvitationCog(commands.Cog):
         self.config = self.bot.get_cog('ConfigCog').config
         self.illegal_team_response = self.config['illegal_team_response']
         self.default_invite_embed_title = self.config['default_invite_embed_title']
+        self.default_create_room_channel_id = self.config['default_create_room_channel_id']
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -145,7 +164,7 @@ class CreateInvitationCog(commands.Cog):
         IGNORE_USER_IDS = self.config['ignore_user_ids']
         FAILED_INVITE_RESPONSES = self.config['failed_invite_responses']
 
-        # 避免机器人回复自己的消息
+        # If the message author is the bot itself, return immediately
         if message.author == self.bot.user:
             return
 
@@ -162,33 +181,33 @@ class CreateInvitationCog(commands.Cog):
             # print(f"忽略的消息: {message.content}")
             return  # 忽略这条消息
 
-        # 如果消息中包含链接，则不回复
+        # if the message contains a URL, not process it
         if re.search(r"https?:\/\/", message.content):
             return
 
-        # 检查消息发送者是否在不回复的用户列表中
+        # check if the user is in the ignore list
         if message.author.id in IGNORE_USER_IDS:
-            return  # 如果在列表中，则不处理这条消息
+            return  # Ignore the message
 
         # 前缀：匹配"缺"、"等"、"="、"＝"、"q"、"Q"。
         # 主体：匹配数字、"一"到"五"的汉字、"n"、"N"、"全世界"、"W/world"。
         # 排除：不应该后跟"分"、"分钟"、"min"、"个钟"、"小时"。
         pattern = r"(?:(缺|等|[=＝]|[Qq]))(?:(\d|[一二三四五]|[nN]|全世界|world|World))(?!(分|分钟|min|个钟|小时))"
 
-        # 查找所有匹配的内容
+        # Find all matches in the message content
         matches = re.findall(pattern, message.content, re.IGNORECASE)
-        # 筛选出有效的匹配项, 排除数字后紧跟字母的情况
+        # Filter out matches that end with a digit followed by a letter
         valid_matches = [match for match in matches if not re.search(r'\d[A-Z]$', message.content, re.IGNORECASE)]
 
         # Define a default value for reply_message
         reply_message = ""
 
         if valid_matches:
-            logging.info(f'Content of {message.author} detected: {message.content}, matches: {valid_matches}!')
+            logging.info(f'检测到 {message.author} 的内容: {message.content}, 匹配项: {valid_matches}!')
 
-            # 检查用户是否在语音频道
+            # Check if the author is in a voice channel
             if message.author.voice and message.author.voice.channel:
-                # 移除用户5分钟内的非法组队行为
+                # Remove illegal teaming behaviour from users for 5 minutes
                 await self.illegal_act_cog.remove_illegal_activity(str(message.author.id))
                 try:
                     invite = await message.author.voice.channel.create_invite(max_age=600)
@@ -200,14 +219,20 @@ class CreateInvitationCog(commands.Cog):
                     reply_message = FAILED_INVITE_RESPONSES + str(e)
 
             else:
-                # 记录用户的非法组队行为
+                # Log the illegal teaming activity
                 await self.illegal_act_cog.log_illegal_activity(str(message.author.id), message.content)
                 reply_message = self.illegal_team_response.format(mention=message.author.mention)
 
+                # Create the URL for the default room
+                guild_id = message.guild.id
+                default_room_url = f"https://discord.com/channels/{guild_id}/{self.default_create_room_channel_id}"
+                view = DefaultRoomView(self.bot, default_room_url)
+
             # Only reply if reply_message is not empty
             if reply_message:
-                await message.reply(reply_message)
-            # Ends after replying to the first match, ensuring that don't repeatedly reply to multiple matches
+                await message.reply(reply_message, view=view)
+            # Ends after replying to the first match, ensuring that not repeatedly reply to
+            # the same message with multiple matches
             return
 
     @app_commands.command(name="invt")
@@ -231,5 +256,11 @@ class CreateInvitationCog(commands.Cog):
             except Exception as e:
                 await interaction.followup.send(f"Failed to create an invitation: {str(e)}", ephemeral=True)
         else:
-            await interaction.followup.send(self.illegal_team_response.format(mention=interaction.user.mention),
-                                                    ephemeral=True)
+            reply_message = self.illegal_team_response.format(mention=interaction.user.mention)
+
+            # Create the URL for the default room
+            guild_id = interaction.guild.id
+            default_room_url = f"https://discord.com/channels/{guild_id}/{self.default_create_room_channel_id}"
+            view = DefaultRoomView(self.bot, default_room_url)
+
+            await interaction.followup.send(reply_message, view=view, ephemeral=True)

@@ -1,6 +1,6 @@
 # Bird Bot
 
-`Version: 0.7.6`
+`Version: 0.8.0`
 
 ---
 
@@ -32,7 +32,7 @@ The bot's code is deeply optimised for low-performance devices, using asynchrono
   - [Create_Invitation_Cog](#create_invitation_cog)
   - [Welcome_Cog](#welcome_cog)
   - [Illegal_Team_Act_Cog](#illegal_team_act_cog)
-  - [CheckStatusCog](#checkstatuscog)
+  - [Check_Status_Cog](#checkstatuscog)
   - [Achievement_Cog](#achievement_cog)
   - [Role_Cog](#role_cog)
   - [Notebook_Cog](#notebook_cog)
@@ -90,13 +90,13 @@ Provides commands to search for records:
 - `/illegal_member_by_id <member_id>` - Query all illegal teaming records for the specified `member_id`.
 - `/illegal_add_record <member> <content> <time>` - Manually add a record for a specified member.
 
-### CheckStatusCog
+### Check_Status_Cog
 Provide some convenient functions for querying related data.
 - `/check_log <number=x>` - Returns the last `x` lines of the log file. If the number of lines exceeds the limit, the bot will send a file with the log content.
 Provides commands to query the number of active rooms and the number of in-voice users within the current server.
-- `/check_people_number` - Returns the number of people in the server. 
-- `/check_channel_number` - Returns the number of active channels in the server.
+- `/check_voice_status` - Returns the number of active rooms and the number of in-voice users within the current server.
 - `/where_is <member>` - Returns the position of the selected member within the channel. Only visible to user.
+- `/print_voice_status` - Print the longtime server voice channel and number information.
 
 ### Achievement_Cog
 It is designed to track and display user achievements based on their activity in the server. 
@@ -137,7 +137,6 @@ This command causes the bot to send a message listing all star signs with the 12
 #### `/create_mbti_pickup <channel_id>`
 This command causes the bot to send a message listing all MBTI identities with the 16 MBTI identity buttons on the specified channel. The user can click on the buttons to update the corresponding MBTI identity role.
 
-
 ### Notebook_Cog
 The Notebook_Cog is a feature in the bot that allows administrators to manually log user events. This can be useful for tracking user behavior, recording important events, or keeping a record of specific interactions.
 
@@ -171,7 +170,6 @@ Backup_Cog is used to create automatic backups of the server's databases for dat
 Backup_Cog creates backups at 0:00, 6:00, 12:00 and 18:00 every day. The current limit is 20 backups, and the oldest backups will be deleted if there are more than 20.
 #### `/backup_now`
 This command will manually create a backup file. Manually created backup files do not affect automatically saved backups. However, it still follows the 20 backup limit.
-
 
 ### Config_Cog
 Config_Cog is used as a bridge to help other Cogs read settings from `config.json`.
@@ -242,7 +240,6 @@ A cancelled rating item is no longer interactive and no statistics will be displ
 - This command allows the user to modify the description of a rating item.
 - Only the description of an open rating item can be modified.
 
-
 ### Game_DnD_Cog
 Provides Dungeons & Dragons (DnD) players with a convenient way to generate random roll dice points.
 -  `/dnd_roll <expression> <x>` - The command takes an expression as an argument, which represents the dice roll in DnD notation. 
@@ -256,8 +253,26 @@ For example, a 5v5 League of Legends custom duel has a spy on each side who aims
 - `/spy_mode <team_size> <spy>`: Set the number of players and spies on each team. Then sign up the teams, start the game and reveal the identity of the spies at the end of the game.
 
 
----
+---\
+
 ## Update Log
+### V0.8.0 - 2027-09-01
+#### New features and improvements
+- The title of the invitation embed created for [Create_Invitation_Cog](#create_invitation_cog) masks the `@group` information.
+- Merged `/check_channel_number` and `/check_people_number` into `/check_voice_status` for [Check_Status_Cog](#check_status_cog).
+- Added `/print_voice_status` for printing long server voice channel and number information.
+- Added `/set_soundboard` for switching the soundboard on and off for [Voice_Channel_Cog](#voice_channel_cog).
+---
+### V0.7.10 - 2027-07-31
+#### New features and improvements
+- Add a menu version for `\where_is`.
+- Masked the `@member` of the title of the invitation embed created for [Create_Invitation_Cog](#create_invitation_cog).
+- Added a direct room creation button for replies to illegal groups in [Create_Invitation_Cog](#create_invitation_cog).
+---
+### V0.7.9 - 2027-07-10
+#### New features and improvements
+- Added comments to the commands giveaway_cog and illegal_team_act_cog.
+---
 ### V0.7.8 - 2024-07-06
 #### New features and improvements
 - Add a Rating_Cog for posting events as well as rating them.

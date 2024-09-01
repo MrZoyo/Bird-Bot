@@ -1,6 +1,6 @@
 # Author: MrZoyo
-# Version: 0.7.7
-# Date: 2024-07-03
+# Version: 0.7.9
+# Date: 2024-07-10
 # ========================================
 import discord
 from discord.ext import commands
@@ -381,6 +381,7 @@ class IllegalTeamActCog(commands.Cog):
     )
     async def add_illegal_record(self, interaction: discord.Interaction, member: discord.Member, content: str,
                                  time: str = None):
+        """Adds an illegal teaming record manually for the specified member."""
         if not await self.check_channel_validity(interaction):
             return
 
