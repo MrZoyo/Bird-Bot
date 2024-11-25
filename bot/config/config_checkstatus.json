@@ -1,9 +1,0 @@
-{
-    "_comment": "====FOR Check_Status_Cog=============================================",
-    "where_is_not_found_message": "{name} 似乎没有在语音频道里哦！",
-    "where_is_title_message": "为你找到 {name} 啦！",
-    "current_channel_name_message": "当前频道",
-    "current_channel_members_message": "频道成员",
-    "where_is_join_button_label": "\uD83D\uDC46点我加入一起玩",
-    "_comment": "====================================================================="
-}
