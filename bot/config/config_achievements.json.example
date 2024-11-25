@@ -1,0 +1,168 @@
+{
+  "_comment": "====FOR Achievements_Cog=============================================",
+  "achievements": [
+    {
+      "name": "表达情绪",
+      "description": "为10条信息添加反应",
+      "threshold": 10,
+      "type": "reaction",
+      "milestone": "reaction1",
+      "role_id": 1145141919810
+    },
+    {
+      "name": "打标达人",
+      "description": "为100条信息添加反应",
+      "threshold": 100,
+      "type": "reaction",
+      "milestone": "reaction2",
+      "role_id": 1145141919810
+    },
+    {
+      "name": "如何评价···",
+      "description": "为1000条信息添加反应",
+      "threshold": 1000,
+      "type": "reaction",
+      "milestone": "reaction3",
+      "role_id": 1145141919810
+    },
+    {
+      "name": "你好！",
+      "description": "发言10次",
+      "threshold": 10,
+      "type": "message",
+      "milestone": "message1",
+      "role_id": 1145141919810
+    },
+    {
+      "name": "有人来吗？",
+      "description": "发言100次",
+      "threshold": 100,
+      "type": "message",
+      "milestone": "message2",
+      "role_id": 1145141919810
+    },
+    {
+      "name": "超级:regional_indicator_e:人",
+      "description": "发言1000次",
+      "threshold": 1000,
+      "type": "message",
+      "milestone": "message3",
+      "role_id": 1145141919810
+    },
+    {
+      "name": "我一直在喷水:whale:",
+      "description": "发言10000次",
+      "threshold": 10000,
+      "type": "message",
+      "milestone": "message4",
+      "role_id": 1145141919810
+    },
+    {
+      "name": "第一次做:bird:",
+      "description": "在语音频道中待满60分钟",
+      "threshold": 60,
+      "type": "time_spent",
+      "milestone": "timespent1",
+      "role_id": 1145141919810
+    },
+    {
+      "name": "在:bird:的第一天",
+      "description": "在语音频道中待满24小时",
+      "threshold": 1440,
+      "type": "time_spent",
+      "milestone": "timespent2",
+      "role_id": 1145141919810
+    },
+    {
+      "name": "已经做了一个月:bird:了",
+      "description": "在语音频道中待满1个月",
+      "threshold": 43200,
+      "type": "time_spent",
+      "milestone": "timespent3",
+      "role_id": 1145141919810
+    },
+    {
+      "name": "999小时的陪伴",
+      "description": "在语音频道中待满999小时",
+      "threshold": 59940,
+      "type": "time_spent",
+      "milestone": "timespent4",
+      "role_id": 1145141919810
+    },
+    {
+      "name": "我知道:bird:在想什么",
+      "description": "在语音频道中待满1年",
+      "threshold": 525600,
+      "type": "time_spent",
+      "milestone": "timespent5",
+      "role_id": 1145141919810
+    },
+    {
+      "name": ":game_die:赌:dog:来咯",
+      "description": "参加一次抽奖",
+      "threshold": 1,
+      "type": "giveaway",
+      "milestone": "giveaway1",
+      "role_id": 1145141919810
+    },
+    {
+      "name": ":joker:土块！",
+      "description": "参加10次抽奖",
+      "threshold": 10,
+      "type": "giveaway",
+      "milestone": "giveaway2",
+      "role_id": 1145141919810
+    },
+    {
+      "name": ":regional_indicator_q::regional_indicator_q::regional_indicator_q:三个蛋！",
+      "description": "参加100次抽奖",
+      "threshold": 100,
+      "type": "giveaway",
+      "milestone": "giveaway3",
+      "role_id": 1145141919810
+    }
+  ],
+  "achievements_page_title": "{user_name}的成就清单",
+  "achievements_page_description": "{user_mention} 完成了 {completed_achievements}/{total_achievements} 项成就!\n**---------**",
+  "achievements_finish_emoji": ":white_check_mark:",
+  "achievements_incomplete_emoji": "",
+  "achievements_ranking_emoji": [
+    ":first_place:",
+    ":second_place:",
+    ":third_place:",
+    ":four:",
+    ":five:",
+    ":six:",
+    ":seven:",
+    ":eight:",
+    ":nine:",
+    ":keycap_ten:"
+  ],
+  "achievements_ranking_title": ":crown:成就排行榜:crown:",
+  "achievements_ranking": [
+    {
+      "name": ":heart: 添加最多反应 :heart: ",
+      "type": "reaction"
+    },
+    {
+      "name": ":green_heart: 发送最多消息 :green_heart: ",
+      "type": "message"
+    },
+    {
+      "name": ":yellow_heart: 语音时长最久(min) :yellow_heart: ",
+      "type": "time_spent"
+    },
+    {
+      "name": ":blue_heart: 参加最多抽奖 :blue_heart: ",
+      "type": "giveaway"
+    }
+  ],
+  "achievements_type_name": {
+    "reaction": "\uD83D\uDD34 添加反应",
+    "message": "\uD83D\uDFE1 发送消息",
+    "time_spent": "\uD83D\uDD35 语音时长(min)",
+    "giveaway": "\uD83D\uDFE2 参加抽奖"
+  },
+  "achievements_progress_title": "{date} 成就进度 ",
+  "_comment": "====================================================================="
+}

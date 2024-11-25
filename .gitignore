@@ -1,3 +1,96 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.env
+.venv
+bot-env/
+
+# IDE
 .idea/
-/__pycache__
-bot.log
+.vscode/
+*.swp
+*.swo
+.project
+.pydevproject
+.settings/
+
+# Project specific
+data/*.db
+data/*.log
+backup/db_backup/*
+backup/db_backup_manual/*
+!data/.gitkeep
+!backup/db_backup/.gitkeep
+!backup/db_backup_manual/.gitkeep
+old_test/
+
+# Configuration and sensitive data
+bot/config/config_main.json
+bot/config/config_role.json
+bot/config/config_achievements.json
+bot/config/config_spymode.json
+bot/config/config_welcome.json
+*.pem
+*.key
+*.env
+
+# Testing
+.coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Logs
+logs/
+*.log
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Keep directory structure
+!.gitkeep
+
+# Optional: Add if using Jupyter notebooks
+.ipynb_checkpoints
+*.ipynb
