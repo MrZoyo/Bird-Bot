@@ -49,11 +49,7 @@ backup/db_backup_manual/*
 old_test/
 
 # Configuration and sensitive data
-bot/config/config_main.json
-bot/config/config_role.json
-bot/config/config_achievements.json
-bot/config/config_spymode.json
-bot/config/config_welcome.json
+bot/config/*.json
 *.pem
 *.key
 *.env
