@@ -49,6 +49,7 @@ aiosqlite, matplotlib, aiohttp, pillow, discord.py, aiofiles
 
 ---
 ## Setup
+0. Clone the repository and enter the directory.
 1. `pip3 install -r requirements.txt`
 2. Modify __all the config.example files__ in the `.bot\config\` and delete `.example`.
 3. Run `run.py`. If you are using a Linux server, you can use `nohup python3 run.py &` to run the bot in the background.
