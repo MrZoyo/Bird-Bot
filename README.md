@@ -1,6 +1,6 @@
 # Bird Bot
 
-`Version: 1.0.0`
+`Version: 1.0.1`
 
 ---
 
@@ -54,6 +54,7 @@ aiosqlite, matplotlib, aiohttp, pillow, discord.py, aiofiles
 2. Modify __all the config.example files__ in the `.bot\config\` and delete `.example`.
 3. Run `run.py`. If you are using a Linux server, you can use `nohup python3 run.py &` to run the bot in the background.
 4. Invite the bot to your server and give it the necessary permissions.(Required permissions: bot, application command, administrator)
+5. For updating the bot, you can use the `git pull` command to update the bot to the latest version.
 
 ---
 ## Function Introduction
@@ -273,6 +274,13 @@ A bridge to help other Cogs read settings from all config files.
 A tool to check if the channel is valid.
 
 ## Update Log
+### V1.0.1 - 2024-11-27
+#### New features and improvements
+- Added `/vc_list` command to list all voice channels that automatically create new voice channels.
+#### Bug fixes
+- Fixed an issue where bots were not deleting from the ignore channel list correctly.
+
+---
 ### V1.0.0 - 2024-11-25
 #### New features and improvements
 - All code was refactored in its entirety.

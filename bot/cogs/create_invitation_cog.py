@@ -256,7 +256,7 @@ class CreateInvitationCog(commands.Cog):
                     embed.title = embed.title[:253] + "..."
                 await interaction.followup.send(embed=embed, view=view)
             except Exception as e:
-                await interaction.followup.send(f"Failed to create an invitation: {str(e)}", ephemeral=True)
+                await interaction.followup.send(f"Failed to create an invitation: {str(e)}")
         else:
             reply_message = self.illegal_team_response.format(mention=interaction.user.mention)
 
@@ -265,7 +265,7 @@ class CreateInvitationCog(commands.Cog):
             default_room_url = f"https://discord.com/channels/{guild_id}/{self.default_create_room_channel_id}"
             view = DefaultRoomView(self.bot, default_room_url)
 
-            await interaction.followup.send(reply_message, view=view, ephemeral=True)
+            await interaction.followup.send(reply_message, view=view)
 
     async def save_config(self):
         """Save the current configuration back to the JSON file."""
@@ -315,6 +315,30 @@ class CreateInvitationCog(commands.Cog):
 
         await interaction.response.send_message(embed=embed)
 
+    async def format_ignore_list_embed(self, title, description):
+        """Helper method to create an embed showing the current ignore list."""
+        embed = discord.Embed(
+            title=title,
+            description=description,
+            color=discord.Color.blue()
+        )
+
+        ignored_channels = []
+        for channel_id in self.conf['ignore_channel_ids']:
+            channel = self.bot.get_channel(channel_id)
+            if channel:
+                ignored_channels.append(f"• {channel.mention} (ID: {channel_id})")
+            else:
+                ignored_channels.append(f"• Invalid Channel (ID: {channel_id})")
+
+        embed.add_field(
+            name="Ignored Channels",
+            value="\n".join(ignored_channels) if ignored_channels else "No channels are currently being ignored.",
+            inline=False
+        )
+
+        return embed
+
     @app_commands.command(name="invt_addignorelist")
     @app_commands.describe(channel_id="The ID of the channel to add to the ignore list")
     async def add_ignore_list(self, interaction: discord.Interaction, channel_id: str):
@@ -322,26 +346,32 @@ class CreateInvitationCog(commands.Cog):
         if not await check_channel_validity(interaction):
             return
 
+        await interaction.response.defer()
+
         try:
             channel_id = int(channel_id)
             channel = self.bot.get_channel(channel_id)
 
             if not channel:
-                await interaction.response.send_message("Invalid channel ID.", ephemeral=True)
+                await interaction.followup.send("Invalid channel ID.", ephemeral=True)
                 return
 
             if channel_id in self.conf['ignore_channel_ids']:
-                await interaction.response.send_message(f"Channel {channel.mention} is already in the ignore list.",
-                                                        ephemeral=True)
+                await interaction.followup.send(f"Channel {channel.mention} is already in the ignore list.",
+                                                ephemeral=True)
                 return
 
             self.conf['ignore_channel_ids'].append(channel_id)
             await self.save_config()
 
-            await interaction.response.send_message(f"Added {channel.mention} to the ignore list.", ephemeral=True)
+            embed = await self.format_ignore_list_embed(
+                "Channel Added to Ignore List",
+                f"Successfully added {channel.mention} to the ignore list."
+            )
+            await interaction.followup.send(embed=embed)
 
         except ValueError:
-            await interaction.response.send_message("Invalid channel ID format.", ephemeral=True)
+            await interaction.followup.send("Invalid channel ID format.", ephemeral=True)
 
     @app_commands.command(name="invt_removeignorelist")
     @app_commands.describe(channel_id="The ID of the channel to remove from the ignore list")
@@ -350,24 +380,27 @@ class CreateInvitationCog(commands.Cog):
         if not await check_channel_validity(interaction):
             return
 
+        await interaction.response.defer()
+
         try:
             channel_id = int(channel_id)
             channel = self.bot.get_channel(channel_id)
 
-            if channel_id not in self.conf['ignore_user_ids']:
-                await interaction.response.send_message(
-                    f"Channel {channel.mention if channel else channel_id} is not in the ignore list.",
+            if channel_id not in self.conf['ignore_channel_ids']:
+                await interaction.followup.send(
+                    f"Channel {channel.mention if channel else f'ID: {channel_id}'} is not in the ignore list.",
                     ephemeral=True
                 )
                 return
 
-            self.conf['ignore_user_ids'].remove(channel_id)
+            self.conf['ignore_channel_ids'].remove(channel_id)
             await self.save_config()
 
-            await interaction.response.send_message(
-                f"Removed {channel.mention if channel else channel_id} from the ignore list.",
-                ephemeral=True
+            embed = await self.format_ignore_list_embed(
+                "Channel Removed from Ignore List",
+                f"Successfully removed {channel.mention if channel else f'ID: {channel_id}'} from the ignore list."
             )
+            await interaction.followup.send(embed=embed)
 
         except ValueError:
-            await interaction.response.send_message("Invalid channel ID format.", ephemeral=True)
+            await interaction.followup.send("Invalid channel ID format. Please provide a valid number.", ephemeral=True)
