@@ -12,3 +12,4 @@ from .rating_cog import RatingCog
 from .role_cog import RoleCog
 from .voice_channel_cog import VoiceStateCog
 from .welcome_cog import WelcomeCog
+from .tickets_cog import TicketsCog

@@ -32,14 +32,15 @@ The bot's code is deeply optimised for low-performance devices, using asynchrono
   - [Role_Cog](#role_cog)
   - [Notebook_Cog](#notebook_cog)
   - [Backup_Cog](#backup_cog)
-  - [Config_Cog](#config_cog)
   - [Giveaway_Cog](#giveaway_cog)
   - [Rating_Cog](#rating_cog)
+  - [Tickets_Cog](#tickets_cog)
   - [Game_DnD_Cog](#game_dnd_cog)
   - [Game_Spymode_Cog](#game_spymode_cog)
 - [Utilities and Tools](#utilities-and-tools)
   - [config](#config)
   - [channel_validator](#channel_validator)
+  - [tickets_db](#tickets_db)
 - [Update Log](#update-log)
 
 ---
@@ -55,6 +56,7 @@ aiosqlite, matplotlib, aiohttp, pillow, discord.py, aiofiles
 3. Run `run.py`. If you are using a Linux server, you can use `nohup python3 run.py &` to run the bot in the background.
 4. Invite the bot to your server and give it the necessary permissions.(Required permissions: bot, application command, administrator)
 5. For updating the bot, you can use the `git pull` command to update the bot to the latest version.
+6. For some cogs like `tickets_cog`, you need to use command `/tickets_setup` to initialize the ticket system. Please check function introduction for more details.
 
 ---
 ## Function Introduction
@@ -180,7 +182,7 @@ Backup_Cog creates backups at 0:00, 6:00, 12:00 and 18:00 every day. The current
 #### `/backup_now`
 This command will manually create a backup file. Manually created backup files do not affect automatically saved backups. However, it still follows the 20 backup limit.
 
-### ~~Config_Cog~~(deprecated from version 1.0.0)
+
 Config_Cog is used as a bridge to help other Cogs read settings from `config.json`.
 
 ### Giveaway_Cog
@@ -249,6 +251,75 @@ A cancelled rating item is no longer interactive and no statistics will be displ
 - This command allows the user to modify the description of a rating item.
 - Only the description of an open rating item can be modified.
 
+
+### Tickets_Cog
+The Tickets_Cog provides a comprehensive ticket management system that allows users to create, manage, and track support tickets. It includes features for ticket creation, user management, and statistical tracking.
+
+#### `/tickets_setup`
+Initialize the ticket system. This command sets up necessary channels, categories, and messages for the ticket system to function.
+
+#### `/tickets_stats`
+Display comprehensive statistics about the ticket system, including:
+- Total number of tickets
+- Number of active tickets
+- Number of closed tickets
+- Average response time
+- Breakdown by ticket type
+
+#### `/tickets_add_type`
+Add a new ticket type to the system. Opens a modal form to input:
+- Type name
+- Description
+- User guide
+- Button color (R/G/B)
+
+#### `/tickets_edit_type`
+Edit an existing ticket type. Displays a selection menu of existing types and opens a modal form to modify the selected type.
+
+#### `/tickets_delete_type`
+Delete an existing ticket type. Displays a selection menu of existing types for deletion.
+
+#### `/tickets_admin_list`
+Display current admin configuration, including:
+- Admin roles
+- Admin users
+- Discord permissions that grant admin access
+
+#### `/tickets_admin_add_role <role>`
+Add a role to the ticket system's admin roles.
+- `role`: The role to be added as admin
+
+#### `/tickets_admin_remove_role <role>`
+Remove a role from the ticket system's admin roles.
+- `role`: The role to be removed from admin status
+
+#### `/tickets_admin_add_user <user>`
+Add a user to the ticket system's admin users.
+- `user`: The user to be added as admin
+
+#### `/tickets_admin_remove_user <user>`
+Remove a user from the ticket system's admin users.
+- `user`: The user to be removed from admin status
+
+#### `/tickets_add_user <user>`
+Add a user to the current ticket.
+- `user`: The user to be added to the ticket
+
+The system also includes:
+- Customizable ticket types with different colors and descriptions
+- Automatic ticket channel creation and management
+- Ticket status tracking (open, accepted, closed)
+- Admin permission management
+- Comprehensive logging system for all ticket activities
+- DM notifications for ticket updates
+- Interactive buttons for ticket management:
+  - Accept ticket
+  - Add users
+  - Close ticket
+- Separate categories for open and closed tickets
+- Automatic channel cleanup for invalid tickets
+- Detailed logging of all actions in a dedicated info channel
+
 ### Game_DnD_Cog
 Provides Dungeons & Dragons (DnD) players with a convenient way to generate random roll dice points.
 - Supports up to 100 up to 1,000 dice 🎲 Randomized.
@@ -272,8 +343,23 @@ For example, a 5v5 League of Legends custom duel has a spy on each side who aims
 A bridge to help other Cogs read settings from all config files.
 ### channel_validator
 A tool to check if the channel is valid.
+### tickets_db
+A module that integrates tickets_cog's interaction with the database.
 
 ## Update Log
+### V1.1.0 - 2024-12-11
+#### New features and improvements
+- Added new Tickets_Cog for ticket management system with its associated tickets_db.
+- Created separate configuration file for Rating_Cog.
+- Modified welcome image font style and background file paths in Welcome_Cog.
+- Added verification mechanism to Welcome_Cog.
+
+- Dropped config_cog.
+
+#### Bug fixes
+- Adjusted Check_Status_Cog's log file character limit from 2000 to 1900 to prevent Discord message length issues.
+---
+
 ### V1.0.1 - 2024-11-27
 #### New features and improvements
 - Added `/vc_list` command to list all voice channels that automatically create new voice channels.

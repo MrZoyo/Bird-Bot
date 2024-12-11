@@ -2,7 +2,7 @@
   "_comment": "====FOR Welcome_Cog==================================================",
   "welcome_channel_id": 1145141919810,
   "text_color": [107,104,180],
-  "font_path": "./resources/fonts/mengshenshouxieti.ttf",
+  "font_path": "mengshenshouxieti.ttf",
   "font_size": 60,
   "avatar_size": [400,400],
   "welcome_text_1_distance": 30,
@@ -10,6 +10,6 @@
   "welcome_text_picture_1": "漆黑的世界，我寻着光，遇到了你。 {user_name}，祝君开心。",
   "welcome_text_picture_2": "本服务器第 {member_number} 名成员",
   "welcome_text": "欢迎来到本服务器, {member.mention}! 希望你能在这里度过一段美好时光。<:200013:1145141919810> \n 请查看 https://discord.com/channels/1145141919810/1145141919810 了解更多信息。",
-  "background_image": "./resources/images/background.png",
+  "background_image": "background.png",
   "_comment": "====================================================================="
 }

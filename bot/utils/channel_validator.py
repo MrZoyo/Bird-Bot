@@ -20,7 +20,7 @@ async def check_channel_validity(ctx_or_interaction, allowed_channel_id=None):
 
     # If no specific channel ID is provided, use the default from config
     if allowed_channel_id is None:
-        allowed_channel_id = config.get_config()['check_illegal_teaming_channel_id']
+        allowed_channel_id = config.get_config()['admin_channel_id']
     else:
         allowed_channel_id = int(allowed_channel_id)
 

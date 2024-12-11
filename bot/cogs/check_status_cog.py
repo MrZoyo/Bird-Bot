@@ -174,7 +174,7 @@ class CheckStatusCog(commands.Cog):
             await interaction.response.send_message("The log file does not exist.")
             return
         last_x_lines = ''.join(lines[-x:])
-        if len(last_x_lines) > 2000:
+        if len(last_x_lines) > 1900:
             # If the message is too long, write it to a temporary file and send the file
             with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as temp:
                 temp.write(last_x_lines.encode())

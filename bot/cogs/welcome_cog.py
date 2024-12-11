@@ -1,5 +1,6 @@
 # bot/cogs/welcome_cog.py
 import io
+import os
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -24,7 +25,7 @@ class WelcomeCog(commands.Cog):
         # Set the parameters from the config
         self.welcome_channel_id = self.conf['welcome_channel_id']
         self.text_color = tuple(self.conf['text_color'])
-        self.font_path = self.conf['font_path']
+
         self.font_size = self.conf['font_size']
         self.avatar_size = tuple(self.conf['avatar_size'])
         self.welcome_text_1_distance = self.conf['welcome_text_1_distance']
@@ -32,7 +33,21 @@ class WelcomeCog(commands.Cog):
         self.welcome_text_picture_1 = self.conf['welcome_text_picture_1']
         self.welcome_text_picture_2 = self.conf['welcome_text_picture_2']
         self.welcome_text = self.conf['welcome_text']
-        self.background_image = self.conf['background_image']
+
+        self.base_path = Path(__file__).parent.parent.parent
+        self.font_path = str(self.base_path / "resources" / "fonts" / Path(self.conf['font_path']).name)
+        self.background_image = str(self.base_path / "resources" / "images" / Path(self.conf['background_image']).name)
+
+        # Verify resources exist
+        self._verify_resources()
+
+    def _verify_resources(self):
+        """Verify that required resource files exist"""
+        if not os.path.exists(self.font_path):
+            raise FileNotFoundError(f"Font file not found at {self.font_path}")
+        if not os.path.exists(self.background_image):
+            raise FileNotFoundError(f"Background image not found at {self.background_image}")
+        logging.info(f"Resources verified - Font: {self.font_path}, Background: {self.background_image}")
 
     async def cog_unload(self):
         await self.session.close()

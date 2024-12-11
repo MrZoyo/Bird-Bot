@@ -145,8 +145,9 @@ class RatingForm(ui.Modal, title='Create Rating'):
         self.bot = bot
         self.result = None
 
-        self.conf = config.get_config()
-        self.db_path = self.conf['db_path']
+        self.main_conf = config.get_config('main')
+        self.db_path = self.main_conf['db_path']
+        self.conf = config.get_config('rating')
         self.rating_channel_id = self.conf['rating_channel_id']
 
     async def on_submit(self, interaction: discord.Interaction):
@@ -232,8 +233,9 @@ class RatingCog(commands.Cog):
         self.bot = bot
         self.ratings = {}
 
-        self.conf = config.get_config()
-        self.db_path = self.conf['db_path']
+        self.main_conf = config.get_config('main')
+        self.db_path = self.main_conf['db_path']
+        self.conf = config.get_config('rating')
         self.rating_channel_id = self.conf['rating_channel_id']
 
     async def count_participants(self, rating_id):
