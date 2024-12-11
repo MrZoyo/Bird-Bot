@@ -336,7 +336,7 @@ For example, a 5v5 League of Legends custom duel has a spy on each side who aims
 - `/spy_mode <team_size> <spy>`: Set the number of players and spies on each team. Then sign up the teams, start the game and reveal the identity of the spies at the end of the game.
 
 
----\
+---
 
 ## Utilities and Tools
 ### config
