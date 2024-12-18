@@ -10,14 +10,20 @@ from discord.utils import format_dt
 from pathlib import Path
 import aiofiles
 from bot.utils import config, check_channel_validity
+import aiosqlite
 
 
 class TeamInvitationView(discord.ui.View):
-    def __init__(self, bot, url, user):
+    def __init__(self, bot, channel, user):
         super().__init__(timeout=600)
         self.bot = bot
         self.user = user
-        self.url = url
+        self.channel = channel
+        self.url = f"https://discord.com/channels/{channel.guild.id}/{channel.id}"
+
+        # Get main config for db_path
+        self.main_config = config.get_config('main')
+        self.db_path = self.main_config['db_path']
 
         self.conf = config.get_config('invitation')
         self.roomfull_button_label = self.conf['roomfull_button_label']
@@ -40,7 +46,7 @@ class TeamInvitationView(discord.ui.View):
         self.room_full_button.callback = self.room_full_button_callback
         self.add_item(self.room_full_button)
 
-    def create_embed(self, obj):
+    async def create_embed(self, obj):
         # Get the current time
         current_time = discord.utils.utcnow()
         # Format the timestamp for the embed
@@ -57,19 +63,28 @@ class TeamInvitationView(discord.ui.View):
         else:
             raise ValueError("The passed object must be a discord.Message or a discord.Interaction.")
 
+        # Get user's signature if exists
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.cursor()
+            await cursor.execute(
+                'SELECT signature, is_disabled FROM user_signatures WHERE user_id = ?',
+                (author.id,)
+            )
+            result = await cursor.fetchone()
+            signature = result[0] if result and not result[1] else None
+
         guild_id = author.guild.id
         channel_id = author.voice.channel.id
         vc_url_direct = f"https://discord.com/channels/{guild_id}/{channel_id}"
 
-        # Remove parts of the message that match the pattern <@digits> (for member mentions)
+        # Remove mentions from content
         content = re.sub(r'<@\d+>', '', content)
-
-        # Remove parts of the message that match the pattern <@&digits> (for role mentions)
         content = re.sub(r'<@&\d+>', '', content)
 
-        # Truncate the content to 240 characters if longer
+        # Truncate the content
         if len(content) > 256:
             content = content[:253] + "..."
+
         embed = discord.Embed(
             title=content,
             description=self.invite_embed_content.format(vc_url=vc_url_direct, mention=author.mention,
@@ -77,16 +92,18 @@ class TeamInvitationView(discord.ui.View):
             color=discord.Color.blue()
         )
 
-        # Check if the author has an avatar
+        # Add signature field if exists
+        if signature:
+            embed.add_field(name="", value=signature, inline=False)
+
+        # Set thumbnail
         if author.avatar:
             embed.set_thumbnail(url=author.avatar.url)
         # If the author doesn't have an avatar, check if the bot has an avatar
         elif self.bot.user.avatar:
             embed.set_thumbnail(url=self.bot.user.avatar.url)
 
-        embed.timestamp = current_time  # Set the timestamp to the message time
-
-        # Add the original time to the footer
+        embed.timestamp = current_time
         embed.set_footer(text=self.invite_embed_footer)
 
         return embed
@@ -102,36 +119,63 @@ class TeamInvitationView(discord.ui.View):
         # Extract the channel ID from the URL in the embed description
         embed = interaction.message.embeds[0]
         match = re.search(r"https://discord.com/channels/\d+/(\d+)", embed.description)
-        if match:
-            original_channel_id = int(match.group(1))
-        else:
+        if not match:
             await interaction.followup.send(self.extract_channel_id_error, ephemeral=True)
             return
+        
+        original_channel_id = int(match.group(1))
 
-        # Check if the user is still in the original voice channel
+        # 检查用户是否在语音频道
         if not self.user.voice or self.user.voice.channel.id != original_channel_id:
             await interaction.followup.send(self.not_in_vc_message, ephemeral=True)
             return
 
-        # Update the embed title and description to reflect the room is full
-        embed = interaction.message.embeds[0]
-        embed.title = f"{self.roomfull_title} ~~{embed.title}~~"
-        embed.description = self.invite_embed_content_edited.format(name=self.user.voice.channel.name,
-                                                                    url=self.url,
-                                                                    mention=self.user.mention,
-                                                                    time=embed.description.split('\n\n')[-1]
-                                                                    )
-        embed.color = discord.Color.red()
+        # Get user's signature if exists
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.cursor()
+            await cursor.execute(
+                'SELECT signature, is_disabled FROM user_signatures WHERE user_id = ?',
+                (self.user.id,)
+            )
+            result = await cursor.fetchone()
+            signature = result[0] if result and not result[1] else None
 
-        # Disable the "Join Room" button
-        self.children[0].disabled = True  # Assuming the first button is the join button
-        # Disable the "Room Full" button itself
+        # Create new embed
+        new_embed = discord.Embed(
+            title=f"{self.roomfull_title} ~~{embed.title}~~",
+            color=discord.Color.red()
+        )
+
+        # Get original timestamp
+        original_timestamp = embed.timestamp
+
+        # Build new description
+        new_embed.description = self.invite_embed_content_edited.format(
+            name=self.user.voice.channel.name,
+            url=self.url,
+            mention=self.user.mention,
+            time=discord.utils.format_dt(original_timestamp, style='R')
+        )
+
+        # Add signature field if exists
+        if signature:
+            new_embed.add_field(name="", value=signature, inline=False)
+
+        # Keep original thumbnail
+        if embed.thumbnail:
+            new_embed.set_thumbnail(url=embed.thumbnail.url)
+
+        # Keep original footer and timestamp
+        if embed.footer:
+            new_embed.set_footer(text=embed.footer.text)
+        new_embed.timestamp = original_timestamp
+
+        # 禁用所有按钮
+        self.children[0].disabled = True  # Join Room button
         self.room_full_button.disabled = True
 
-        # Update the message with the disabled buttons
-        await interaction.edit_original_response(embed=embed, view=self)
-
-        # Send a follow-up message to confirm the room is now full
+        # 更新消息
+        await interaction.message.edit(embed=new_embed, view=self)
         await interaction.followup.send(self.roomfull_set_message, ephemeral=True)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
@@ -214,10 +258,9 @@ class CreateInvitationCog(commands.Cog):
             # Check if the author is in a voice channel
             if message.author.voice and message.author.voice.channel:
                 try:
-                    invite = await message.author.voice.channel.create_invite(max_age=600)
-                    vc_url = invite.url  # Get the URL from the Invite object
-                    view = TeamInvitationView(self.bot, vc_url, message.author)
-                    embed = view.create_embed(message)
+                    channel = message.author.voice.channel
+                    view = TeamInvitationView(self.bot, channel, message.author)
+                    embed = await view.create_embed(message)
                     await message.reply(embed=embed, view=view)
                 except Exception as e:
                     reply_message = self.failed_invite_responses + str(e)
@@ -246,10 +289,9 @@ class CreateInvitationCog(commands.Cog):
 
         if interaction.user.voice and interaction.user.voice.channel:
             try:
-                invite = await interaction.user.voice.channel.create_invite(max_age=600)
-                vc_url = invite.url  # Get the URL from the Invite object
-                view = TeamInvitationView(self.bot, vc_url, interaction.user)
-                embed = view.create_embed(interaction)
+                channel = interaction.user.voice.channel
+                view = TeamInvitationView(self.bot, channel, interaction.user)
+                embed = await view.create_embed(interaction)
                 embed.title = title or self.default_invite_embed_title
                 # Truncate the content to 256 characters if longer
                 if len(embed.title) > 256:

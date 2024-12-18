@@ -263,3 +263,14 @@ class TicketsDatabaseManager:
                 await db.commit()
             except Exception as e:
                 logging.error(f"Error cleaning invalid tickets: {e}")
+
+    async def get_ticket_number(self, channel_id: int) -> int:
+        """Get ticket number from database based on channel ID."""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('''
+                SELECT COUNT(*) 
+                FROM tickets 
+                WHERE channel_id <= ?
+            ''', (channel_id,))
+            count = await cursor.fetchone()
+            return count[0] if count else 0

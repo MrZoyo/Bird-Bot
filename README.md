@@ -1,6 +1,6 @@
 # Bird Bot
 
-`Version: 1.1.0`
+`Version: 1.2.0`
 
 ---
 
@@ -81,8 +81,9 @@ When a new user joins the server, the bot sends a welcome message to the user in
 
 This includes a more complex feature: creating a unique welcome image with the current server population for a user using a specified background image, specified text content, their id and avatar.
 
+The bot will also send a DM to the user who joins the server.
+
 This feature contains command functions that allow the welcome message to be summoned manually by the user.
-- `!testwelcome` - Send the welcome message for who use this command.
 - `/testwelcome <member> <member_number>` - Send the welcome message for specific member with specific number.
 - For default `<member>` is the user who uses the command, `<member_number>` is the total number of people in the server.
 
@@ -147,6 +148,18 @@ This command causes the bot to send a message listing all star signs with the 12
 This command causes the bot to send a message listing all MBTI identities with the 16 MBTI identity buttons on the specified channel. The user can click on the buttons to update the corresponding MBTI identity role.
 #### `/create_gender_pickup <channel_id>`
 This command causes the bot to send a message listing all genders with 3 gender buttons on the specified channel. The user can click on the buttons to update.
+#### `/create_signature_pickup <channel_id>`
+This command causes the bot to send a message with a signature setup button and check button on the specified channel. The user can click on the buttons to update and check the signature.
+#### `signature_permission_toggle <user_id> <disable>`
+This command allows the user to toggle the permission of a member's signature setup permission. If the member has no permission, he/she can not change or check his signature. And the signature will not be displayed in the invitation message.
+- `<user_id>` The member's id to be toggled.
+- `<disable>` Whether to disable the signature setup button.
+#### `signature_clear <user_id>`
+Clear a user's signature and change history.
+#### `signature_set_requirement <minutes>`
+Set the voice time requirement for signature feature.
+#### `signature_check <user_id>`
+Check a user's signature information.
 
 ### Notebook_Cog
 The Notebook_Cog is a feature in the bot that allows administrators to manually log user events. This can be useful for tracking user behavior, recording important events, or keeping a record of specific interactions.
@@ -285,40 +298,22 @@ Display current admin configuration, including:
 - Admin users
 - Discord permissions that grant admin access
 
-#### `/tickets_admin_add_role <role>`
-Add a role to the ticket system's admin roles.
-- `role`: The role to be added as admin
+#### `/tickets_admin_add_role`
+Add a role to the ticket system's admin roles. There will now be a menu for selecting the corresponding ticket type that needs to be added.
 
-#### `/tickets_admin_remove_role <role>`
-Remove a role from the ticket system's admin roles.
-- `role`: The role to be removed from admin status
+#### `/tickets_admin_remove_role`
+Remove a role from the ticket system's admin roles. There will now be a menu for selecting the corresponding ticket type that needs to be removed.
 
-#### `/tickets_admin_add_user <user>`
-Add a user to the ticket system's admin users.
-- `user`: The user to be added as admin
+#### `/tickets_admin_add_user`
+Add a user to the ticket system's admin users. There will now be a menu for selecting the corresponding ticket type that needs to be added.
 
-#### `/tickets_admin_remove_user <user>`
-Remove a user from the ticket system's admin users.
-- `user`: The user to be removed from admin status
+#### `/tickets_admin_remove_user`
+Remove a user from the ticket system's admin users. There will now be a menu for selecting the corresponding ticket type that needs to be removed.
 
 #### `/tickets_add_user <user>`
 Add a user to the current ticket.
 - `user`: The user to be added to the ticket
 
-The system also includes:
-- Customizable ticket types with different colors and descriptions
-- Automatic ticket channel creation and management
-- Ticket status tracking (open, accepted, closed)
-- Admin permission management
-- Comprehensive logging system for all ticket activities
-- DM notifications for ticket updates
-- Interactive buttons for ticket management:
-  - Accept ticket
-  - Add users
-  - Close ticket
-- Separate categories for open and closed tickets
-- Automatic channel cleanup for invalid tickets
-- Detailed logging of all actions in a dedicated info channel
 
 ### Game_DnD_Cog
 Provides Dungeons & Dragons (DnD) players with a convenient way to generate random roll dice points.
@@ -347,6 +342,21 @@ A tool to check if the channel is valid.
 A module that integrates tickets_cog's interaction with the database.
 
 ## Update Log
+### V1.2.0 - 2024-12-18
+#### New features and improvements
+- Now every type of tickets can be set with separate admin users and roles.
+- When a new ticket is created, the bot will send a DM to the corresponding admin users.
+- Addresses the issue of capping the number of tickets that will occur in the future.
+- Added a signature pickup system for the role_cog.
+- The signature will be displayed in the invitation message.
+- Added a automatic DM message for the welcome_cog. The bot will send a DM message to the user who joins the server.
+
+- Dropped the `!testwelcome` command.
+
+#### Bug fixes
+- Fixed an issue with the ticket component id initialization issues.
+
+---
 ### V1.1.0 - 2024-12-11
 #### New features and improvements
 - Added new Tickets_Cog for ticket management system with its associated tickets_db.

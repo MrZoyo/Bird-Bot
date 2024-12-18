@@ -8,6 +8,7 @@ from pathlib import Path
 import aiofiles
 import aiosqlite
 from typing import Optional
+from datetime import datetime
 
 from bot.utils import config, check_channel_validity, TicketsDatabaseManager
 
@@ -69,18 +70,11 @@ class TicketLogger:
         self.info_channel_id = info_channel_id
         self.messages = messages
         self.colors = EmbedColors
-        self.db_path = config.get_config('main')['db_path']
+        self.db = TicketsDatabaseManager(config.get_config('main')['db_path'])
 
     async def get_ticket_number(self, channel_id: int) -> int:
-        """Get ticket number from database based on channel ID."""
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.execute('''
-                SELECT COUNT(*) 
-                FROM tickets 
-                WHERE channel_id <= ?
-            ''', (channel_id,))
-            count = await cursor.fetchone()
-            return count[0] if count else 0
+        """Get ticket number using database manager."""
+        return await self.db.get_ticket_number(channel_id)
 
     async def format_title(self, base_title: str, ticket_number: int = None) -> str:
         """Format log title with ticket number if provided."""
@@ -89,7 +83,7 @@ class TicketLogger:
         return base_title
 
     async def log_ticket_create(self, ticket_number: int, type_name: str,
-                              creator: discord.Member, channel: discord.TextChannel):
+                                creator: discord.Member, channel: discord.TextChannel):
         """Log ticket creation"""
         title = await self.format_title(self.messages['log_ticket_create_title'], ticket_number)
         embed = await self._create_base_embed(
@@ -105,7 +99,7 @@ class TicketLogger:
         await self._send_log(embed)
 
     async def log_ticket_accept(self, channel: discord.TextChannel,
-                              acceptor: discord.Member):
+                                acceptor: discord.Member):
         """Log ticket acceptance"""
         ticket_number = await self.get_ticket_number(channel.id)
         title = await self.format_title(self.messages['log_ticket_accept_title'], ticket_number)
@@ -120,7 +114,7 @@ class TicketLogger:
         await self._send_log(embed)
 
     async def log_ticket_close(self, channel: discord.TextChannel,
-                             closer: discord.Member, reason: str):
+                               closer: discord.Member, reason: str):
         """Log ticket closure"""
         ticket_number = await self.get_ticket_number(channel.id)
         title = await self.format_title(self.messages['log_ticket_close_title'], ticket_number)
@@ -136,7 +130,7 @@ class TicketLogger:
         await self._send_log(embed)
 
     async def log_user_add(self, channel: discord.TextChannel,
-                          adder: discord.Member, user: discord.Member):
+                           adder: discord.Member, user: discord.Member):
         """Log user addition to ticket"""
         ticket_number = await self.get_ticket_number(channel.id)
         title = await self.format_title(self.messages['log_user_add_title'], ticket_number)
@@ -167,7 +161,7 @@ class TicketLogger:
         await self._send_log(embed)
 
     async def log_type_edit(self, admin: discord.Member,
-                           old_type: str, new_type_data: dict):
+                            old_type: str, new_type_data: dict):
         """Log ticket type edit"""
         title = await self.format_title(self.messages['log_type_edit_title'])
         embed = await self._create_base_embed(
@@ -197,8 +191,8 @@ class TicketLogger:
         await self._send_log(embed)
 
     async def _create_base_embed(self, title: str, description: str,
-                               color: discord.Color,
-                               channel_mentions: Optional[List[tuple]] = None) -> TicketEmbed:
+                                 color: discord.Color,
+                                 channel_mentions: Optional[List[tuple]] = None) -> TicketEmbed:
         """Create a base embed with consistent styling"""
         bot_avatar_url = str(self.bot.user.avatar.url) if self.bot.user.avatar else str(
             self.bot.user.default_avatar.url)
@@ -242,9 +236,9 @@ class TicketTypeModal(discord.ui.Modal):
         self.cog = cog
         self.edit_mode = edit_mode
         self.type_key = type_key
-        self.original_message = original_message  # 保存原始消息引用
+        self.original_message = original_message
 
-        # 创建表单输入框
+        # Create form inputs
         self.type_name = discord.ui.TextInput(
             label=messages['ticket_type_name_label'],
             placeholder=messages['ticket_type_name_placeholder'],
@@ -292,11 +286,15 @@ class TicketTypeModal(discord.ui.Modal):
         type_name = self.type_name.value.strip()
 
         if self.edit_mode and self.type_key:
+            # Keep existing admin settings when editing
             old_type_name = self.type_key
+            old_admin_roles = ticket_types[old_type_name].get('admin_roles', [])
+            old_admin_users = ticket_types[old_type_name].get('admin_users', [])
+
             if old_type_name != type_name:
                 ticket_types.pop(old_type_name, None)
 
-            # 记录编辑操作
+            # Record edit operation
             await self.cog.logger.log_type_edit(
                 admin=interaction.user,
                 old_type=old_type_name,
@@ -307,6 +305,11 @@ class TicketTypeModal(discord.ui.Modal):
                 }
             )
         else:
+            # Initialize empty admin lists for new types
+            old_admin_roles = []
+            old_admin_users = []
+
+            # Record add operation
             await self.cog.logger.log_type_add(
                 admin=interaction.user,
                 type_data={
@@ -316,26 +319,28 @@ class TicketTypeModal(discord.ui.Modal):
                 }
             )
 
-        # 更新或创建工单类型
+        # Update or create ticket type with admin settings
         ticket_types[type_name] = {
             'name': type_name,
             'description': self.type_description.value.strip(),
             'guide': self.user_guide.value.strip(),
-            'button_color': self.button_color.value.strip().lower()
+            'button_color': self.button_color.value.strip().lower(),
+            'admin_roles': old_admin_roles,  # Preserve or initialize admin settings
+            'admin_users': old_admin_users
         }
 
-        # 保存配置并更新主消息
+        # Save config and update main message
         await self.cog.save_ticket_types(ticket_types)
         if self.cog.ticket_system:
             await self.cog.ticket_system.update_main_message()
 
-        # 发送确认消息
+        # Send confirmation message
         await interaction.followup.send(
             f"Tickets type {'updated' if self.edit_mode else 'added'}: {type_name}",
             ephemeral=True
         )
 
-        # 在所有操作完成后删除原始的选择菜单消息
+        # Clean up original message if editing
         if self.original_message:
             try:
                 await self.original_message.delete()
@@ -349,6 +354,7 @@ class TypeSelectMenu(discord.ui.Select):
     def __init__(self, cog, action):
         self.cog = cog
         self.action = action
+        self.messages = cog.conf['messages']
         ticket_types = cog.conf.get('ticket_types', {})
 
         options = [
@@ -360,7 +366,7 @@ class TypeSelectMenu(discord.ui.Select):
         ]
 
         super().__init__(
-            placeholder="选择工单类型...",
+            placeholder=self.messages['ticket_type_select_placeholder'],
             min_values=1,
             max_values=1,
             options=options
@@ -390,7 +396,7 @@ class TypeSelectMenu(discord.ui.Select):
 
                 # 发送确认消息
                 await interaction.followup.send(
-                    f"Tickets type deleted: {selected_type}",
+                    self.messages['ticket_type_delete_success'].format(type_name=selected_type),
                     ephemeral=True
                 )
 
@@ -445,157 +451,237 @@ class TicketSystem:
 
         self.conf = config.get_config('tickets')
 
-        # Channel/Category IDs
-        self.create_channel_id = self.conf.get('create_channel_id')
-        self.info_channel_id = self.conf.get('info_channel_id')
-        self.open_category_id = self.conf.get('open_category_id')
-        self.closed_category_id = self.conf.get('closed_category_id')
-
-        # Main message ID
-        self.main_message_id = self.conf.get('main_message_id')
-
         # Message content
         self.messages = self.conf['messages']
 
         # Status tracking
         self.is_ready = False
 
-    async def check_and_clean_invalid_components(self):
-        """检查所有组件并清理无效配置"""
-        invalid_components = []
-        config_changed = False
+        # 基础频道和消息ID
+        self.create_channel_id = self.conf.get('create_channel_id')
+        self.info_channel_id = self.conf.get('info_channel_id')
+        self.main_message_id = self.conf.get('main_message_id')
 
-        # 从配置中获取组件名称
-        messages = self.conf['messages']
-        component_names = {
-            'create_channel': messages.get('component_name_create_channel', 'Create Channel'),
-            'info_channel': messages.get('component_name_info_channel', 'Info Channel'),
-            'open_category': messages.get('component_name_open_category', 'Open Category'),
-            'closed_category': messages.get('component_name_closed_category', 'Closed Category'),
-            'main_message': messages.get('component_name_main_message', 'Main Message')
-        }
+        # 使用列表存储多个分类ID
+        self.open_categories = self.conf.get('open_categories', [])
+        self.closed_categories = self.conf.get('closed_categories', [])
+        self.category_channel_limit = self.conf.get('category_channel_limit', 50)  # 每个分类的频道上限
 
-        # 检查创建频道
-        if self.create_channel_id:
-            channel = self.guild.get_channel(self.create_channel_id)
-            if not channel or not isinstance(channel, discord.TextChannel):
-                invalid_components.append((component_names['create_channel'], self.create_channel_id))
-                self.create_channel_id = None
-                config_changed = True
+    async def create_new_category(self, is_closed: bool) -> discord.CategoryChannel:
+        """创建新的工单分类"""
+        categories = self.closed_categories if is_closed else self.open_categories
+        base_name = "Closed Tickets" if is_closed else "Open Tickets"
 
-        # 检查日志频道
-        if self.info_channel_id:
-            channel = self.guild.get_channel(self.info_channel_id)
-            if not channel or not isinstance(channel, discord.TextChannel):
-                invalid_components.append((component_names['info_channel'], self.info_channel_id))
-                self.info_channel_id = None
-                config_changed = True
+        # 确定新分类的序号
+        suffix = len(categories) + 1 if categories else ""
+        category_name = f"{base_name} {suffix}".strip()
 
-        # 检查开放工单分类
-        if self.open_category_id:
-            category = self.guild.get_channel(self.open_category_id)
-            if not category or not isinstance(category, discord.CategoryChannel):
-                invalid_components.append((component_names['open_category'], self.open_category_id))
-                self.open_category_id = None
-                config_changed = True
+        # 获取position
+        reference_category = None
+        if categories:
+            reference_category = self.guild.get_channel(categories[0])
 
-        # 检查关闭工单分类
-        if self.closed_category_id:
-            category = self.guild.get_channel(self.closed_category_id)
-            if not category or not isinstance(category, discord.CategoryChannel):
-                invalid_components.append((component_names['closed_category'], self.closed_category_id))
-                self.closed_category_id = None
-                config_changed = True
+        try:
+            # 创建新分类
+            category = await self.guild.create_category(
+                name=category_name,
+                overwrites={
+                    self.guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                    self.guild.me: discord.PermissionOverwrite(
+                        view_channel=True,
+                        manage_channels=True,
+                        manage_permissions=True
+                    )
+                }
+            )
 
-        # 检查主消息
-        if self.main_message_id:  # 直接检查主消息ID是否存在
-            channel = self.guild.get_channel(self.create_channel_id)
-            if channel:
+            # 设置position
+            if reference_category:
                 try:
-                    await channel.fetch_message(self.main_message_id)
-                except (discord.NotFound, discord.HTTPException):
-                    invalid_components.append((component_names['main_message'], self.main_message_id))
-                    self.main_message_id = None
-                    config_changed = True
-            else:
-                # 如果创建频道不存在，主消息也标记为无效
-                invalid_components.append((component_names['main_message'], self.main_message_id))
-                self.main_message_id = None
-                config_changed = True
+                    await category.move(after=reference_category)
+                except discord.HTTPException as e:
+                    logging.error(f"Failed to move category {category.name}: {e}")
 
-        # 如果有无效组件，更新配置文件
-        if config_changed:
-            await self.save_config()
+            # 添加到配置
+            await self.add_category(category, is_closed)
 
-        return invalid_components, config_changed
+            return category
 
-    async def check_status(self):
-        """检查系统状态并处理无效组件"""
-        invalid_components, config_changed = await self.check_and_clean_invalid_components()
+        except discord.HTTPException as e:
+            logging.error(f"Failed to create category {category_name}: {e}")
+            raise
 
-        # 如果发现无效组件，记录日志
-        if invalid_components:
-            invalid_report = "\n".join([f"- {name}: {id}" for name, id in invalid_components])
-            logging.warning(f"Found invalid ticket system components:\n{invalid_report}")
+    async def get_available_category(self, is_closed: bool) -> discord.CategoryChannel:
+        """获取可用的工单分类（未满的最小序号分类）"""
+        # 先运行清理检查
+        await self.check_and_clean_invalid_components()
 
-        # 检查是否所有必需组件都存在且有效
-        components_valid = all([
-            self.create_channel_id is not None,
-            self.info_channel_id is not None,
-            self.open_category_id is not None,
-            self.closed_category_id is not None
-        ])
+        categories = self.closed_categories if is_closed else self.open_categories
 
-        return components_valid
+        # 检查现有分类
+        for category_id in categories:
+            category = self.guild.get_channel(category_id)
+            if category and len(category.channels) < self.category_channel_limit:
+                return category
+
+        # 如果没有可用分类或所有分类都满了，创建新分类
+        try:
+            return await self.create_new_category(is_closed)
+        except Exception as e:
+            logging.error(f"Failed to create new category: {e}")
+            raise
 
     async def setup_system(self):
         """完整的系统设置流程"""
         # 首先清理无效组件
         invalid_components, config_changed = await self.check_and_clean_invalid_components()
-        
+
         messages = self.conf['messages']
         component_names = {
-            'create_channel': messages.get('component_name_create_channel', 'Create Channel'),
-            'info_channel': messages.get('component_name_info_channel', 'Info Channel'),
-            'open_category': messages.get('component_name_open_category', 'Open Category'),
-            'closed_category': messages.get('component_name_closed_category', 'Closed Category'),
-            'main_message': messages.get('component_name_main_message', 'Main Message')
+            'create_channel': messages.get('component_name_create_channel', '工单创建频道'),
+            'info_channel': messages.get('component_name_info_channel', '工单日志频道'),
+            'open_category': messages.get('component_name_open_category', '开放工单分类'),
+            'closed_category': messages.get('component_name_closed_category', '已关闭工单分类'),
+            'main_message': messages.get('component_name_main_message', '工单主消息')
         }
 
         new_components = {}
 
-        # 创建缺失的组件，只在组件不存在时创建
+        # 检查创建频道
+        if self.create_channel_id:
+            channel = self.guild.get_channel(self.create_channel_id)
+            if not channel:
+                self.create_channel_id = None
+                config_changed = True
+
+        # 检查信息频道
+        if self.info_channel_id:
+            channel = self.guild.get_channel(self.info_channel_id)
+            if not channel:
+                self.info_channel_id = None
+                config_changed = True
+
+        # 检查主消息
+        if self.main_message_id:
+            try:
+                channel = self.guild.get_channel(self.create_channel_id)
+                if channel:
+                    await channel.fetch_message(self.main_message_id)
+                else:
+                    self.main_message_id = None
+                    config_changed = True
+            except discord.NotFound:
+                self.main_message_id = None
+                config_changed = True
+
+        # 创建缺失的组件
         if not self.create_channel_id:
             channel, message_id = await self.create_ticket_channel()
-            new_components[component_names['create_channel']] = channel.id
-            if message_id:  # 如果成功创建了主消息，也添加到新组件列表中
-                new_components[component_names['main_message']] = message_id
+            if channel:
+                self.create_channel_id = channel.id
+                config_changed = True
+                new_components[component_names['create_channel']] = channel.id
+                if message_id:
+                    self.main_message_id = message_id
+                    new_components[component_names['main_message']] = message_id
 
         if not self.info_channel_id:
             channel = await self.create_info_channel()
-            new_components[component_names['info_channel']] = channel.id
+            if channel:
+                self.info_channel_id = channel.id
+                config_changed = True
+                new_components[component_names['info_channel']] = channel.id
 
-        if not self.open_category_id or not self.closed_category_id:
-            open_cat, closed_cat = await self.create_categories()
-            if not self.open_category_id:
-                new_components[component_names['open_category']] = open_cat.id
-            if not self.closed_category_id:
-                new_components[component_names['closed_category']] = closed_cat.id
+        # 检查分类是否存在且有效
+        if not self.open_categories or not any(self.guild.get_channel(cat_id) for cat_id in self.open_categories):
+            category = await self.create_new_category(is_closed=False)
+            if category:
+                config_changed = True
+                new_components[f"{component_names['open_category']} 1"] = category.id
 
-        # 只有在没有通过create_ticket_channel创建主消息时才单独创建
+        if not self.closed_categories or not any(self.guild.get_channel(cat_id) for cat_id in self.closed_categories):
+            category = await self.create_new_category(is_closed=True)
+            if category:
+                config_changed = True
+                new_components[f"{component_names['closed_category']} 1"] = category.id
+
+        # 确保主消息存在
         if not self.main_message_id and 'main_message' not in new_components:
             message = await self.create_initial_message()
             if message:
+                self.main_message_id = message.id
+                config_changed = True
                 new_components[component_names['main_message']] = message.id
+
+        # 如果配置有变化，保存更新
+        if config_changed:
+            await self.save_config()
 
         # 返回初始化报告
         report = {
             'invalid_components': invalid_components,
             'new_components': new_components,
-            'config_changed': config_changed or bool(new_components)
+            'config_changed': config_changed
         }
 
         return report
+
+    async def check_and_clean_invalid_components(self):
+        """更新的组件检查方法，包含分类管理功能"""
+        invalid_components = []
+        config_changed = False
+
+        # 检查并清理无效的开放工单分类
+        valid_open_categories = []
+        for category_id in self.open_categories:
+            category = self.guild.get_channel(category_id)
+            if category and isinstance(category, discord.CategoryChannel):
+                valid_open_categories.append(category_id)
+            else:
+                invalid_components.append((f"开放工单分类 {len(valid_open_categories) + 1}", category_id))
+                config_changed = True
+
+        # 检查并清理无效的关闭工单分类
+        valid_closed_categories = []
+        for category_id in self.closed_categories:
+            category = self.guild.get_channel(category_id)
+            if category and isinstance(category, discord.CategoryChannel):
+                valid_closed_categories.append(category_id)
+            else:
+                invalid_components.append((f"已关闭工单分类 {len(valid_closed_categories) + 1}", category_id))
+                config_changed = True
+
+        # 更新配置
+        if len(valid_open_categories) != len(self.open_categories):
+            self.open_categories = valid_open_categories
+            self.conf['open_categories'] = valid_open_categories
+            config_changed = True
+
+        if len(valid_closed_categories) != len(self.closed_categories):
+            self.closed_categories = valid_closed_categories
+            self.conf['closed_categories'] = valid_closed_categories
+            config_changed = True
+
+        return invalid_components, config_changed
+
+    async def add_category(self, category: discord.CategoryChannel, is_closed: bool):
+        """将新的分类添加到配置中"""
+        # 先运行清理检查
+        await self.check_and_clean_invalid_components()
+
+        # 添加新分类ID到相应的列表
+        if is_closed:
+            if category.id not in self.closed_categories:
+                self.closed_categories.append(category.id)
+                self.conf['closed_categories'] = self.closed_categories
+                await self.save_config()
+        else:
+            if category.id not in self.open_categories:
+                self.open_categories.append(category.id)
+                self.conf['open_categories'] = self.open_categories
+                await self.save_config()
+
+        return True
 
     async def create_ticket_channel(self):
         """Create the ticket creation channel with proper permissions"""
@@ -619,12 +705,18 @@ class TicketSystem:
             overwrites=overwrites
         )
         self.create_channel_id = channel.id
-        await self.save_config()
-        
+        self.conf['create_channel_id'] = channel.id  # 更新配置
+
         # 立即创建初始消息并获取消息对象
         message = await self.create_initial_message()
-        
-        # 返回创建的频道和消息ID，供setup_system使用
+        if message:
+            self.main_message_id = message.id
+            self.conf['main_message_id'] = message.id  # 更新配置
+
+        # 保存配置
+        await self.save_config()
+
+        # 返回创建的频道和消息ID
         return channel, message.id if message else None
 
     async def create_info_channel(self):
@@ -646,41 +738,9 @@ class TicketSystem:
             overwrites=overwrites
         )
         self.info_channel_id = channel.id
+        self.conf['info_channel_id'] = channel.id  # 更新配置
         await self.save_config()
         return channel
-
-    async def create_categories(self):
-        """Create both open and closed ticket categories"""
-        # Create open category
-        open_category = await self.guild.create_category(
-            name="Open Tickets",
-            overwrites={
-                self.guild.default_role: discord.PermissionOverwrite(view_channel=False),
-                self.guild.me: discord.PermissionOverwrite(
-                    view_channel=True,
-                    manage_channels=True,
-                    manage_permissions=True
-                )
-            }
-        )
-        self.open_category_id = open_category.id
-
-        # Create closed category
-        closed_category = await self.guild.create_category(
-            name="Closed Tickets",
-            overwrites={
-                self.guild.default_role: discord.PermissionOverwrite(view_channel=False),
-                self.guild.me: discord.PermissionOverwrite(
-                    view_channel=True,
-                    manage_channels=True,
-                    manage_permissions=True
-                )
-            }
-        )
-        self.closed_category_id = closed_category.id
-
-        await self.save_config()
-        return open_category, closed_category
 
     async def create_initial_message(self):
         """Create the initial ticket system message"""
@@ -707,7 +767,7 @@ class TicketSystem:
             description=description,
             color=discord.Color.blue()
         )
-        
+
         # 添加所有工单类型的描述
         for type_name, type_data in ticket_types.items():
             embed.add_field(
@@ -724,6 +784,7 @@ class TicketSystem:
 
         message = await channel.send(embed=embed, view=view)
         self.main_message_id = message.id
+        self.conf['main_message_id'] = message.id  # 更新配置
         await self.save_config()
         return message
 
@@ -764,7 +825,7 @@ class TicketSystem:
 
         # Add fields for each ticket type
         embed.clear_fields()
-        
+
         for type_name, type_data in ticket_types.items():
             embed.add_field(
                 name=type_name,
@@ -787,7 +848,7 @@ class TicketSystem:
         return message
 
     async def save_config(self):
-        """Save the current configuration back to the JSON file"""
+        """Save the current configuration back to the JSON file and reload it"""
         config_path = Path('./bot/config/config_tickets.json')
 
         try:
@@ -795,18 +856,33 @@ class TicketSystem:
                 content = await f.read()
                 config_data = json.loads(content)
 
+            # 更新所有ID相关的配置
             config_data.update({
                 'create_channel_id': self.create_channel_id,
                 'info_channel_id': self.info_channel_id,
-                'open_category_id': self.open_category_id,
-                'closed_category_id': self.closed_category_id,
+                'open_categories': self.open_categories,
+                'closed_categories': self.closed_categories,
+                'category_channel_limit': self.category_channel_limit,
                 'main_message_id': self.main_message_id
             })
 
             async with aiofiles.open(config_path, 'w', encoding='utf-8') as f:
                 await f.write(json.dumps(config_data, indent=2, ensure_ascii=False))
+
+            # 重新加载配置
+            self.conf = config.reload_config('tickets')
+
+            # 更新logger的channel ID
+            if hasattr(self.cog, 'logger'):
+                self.cog.logger = TicketLogger(
+                    self.cog.bot,
+                    self.conf['info_channel_id'],
+                    self.conf['messages']
+                )
+
         except Exception as e:
-            logging.error(f"Error saving config: {e}")
+            logging.error(f"Error saving ticket system config: {e}")
+            raise
 
     async def get_next_ticket_number(self):
         """Generate the next ticket number."""
@@ -818,6 +894,35 @@ class TicketSystem:
         except Exception as e:
             logging.error(f"Error getting next ticket number: {e}")
             return 1
+
+    async def check_status(self) -> bool:
+        """检查工单系统状态"""
+        # 检查必要的频道
+        if not self.create_channel_id or not self.info_channel_id:
+            logging.warning("Ticket system not fully initialized. Use /tickets_setup to initialize.")
+            return False
+
+        # 检查分类
+        if not self.open_categories or not self.closed_categories:
+            logging.warning("Ticket categories not initialized. Use /tickets_setup to initialize.")
+            return False
+
+        # 检查主消息
+        if not self.main_message_id:
+            logging.warning("Ticket main message not initialized. Use /tickets_setup to initialize.")
+            return False
+
+        # 检查组件有效性
+        invalid_components, _ = await self.check_and_clean_invalid_components()
+        if invalid_components:
+            logging.warning("Found invalid ticket system components:")
+            for name, id in invalid_components:
+                logging.warning(f"- {name}: {id}")
+            logging.warning("Ticket system not fully initialized. Use /tickets_setup to initialize.")
+            return False
+
+        logging.info("Ticket system initialized successfully")
+        return True
 
 
 class TicketConfirmView(discord.ui.View):
@@ -875,7 +980,7 @@ class TicketConfirmView(discord.ui.View):
             )
         }
 
-        # Add admin role permissions
+        # Add global admin role permissions
         for role_id in self.ticket_system.conf.get('admin_roles', []):
             role = interaction.guild.get_role(role_id)
             if role:
@@ -886,7 +991,7 @@ class TicketConfirmView(discord.ui.View):
                     manage_messages=True
                 )
 
-        # Add admin user permissions
+        # Add global admin user permissions
         for user_id in self.ticket_system.conf.get('admin_users', []):
             member = interaction.guild.get_member(user_id)
             if member:
@@ -897,13 +1002,54 @@ class TicketConfirmView(discord.ui.View):
                     manage_messages=True
                 )
 
-        # Create the ticket channel
-        open_category = interaction.guild.get_channel(self.ticket_system.open_category_id)
-        channel = await interaction.guild.create_text_channel(
-            name=channel_name,
-            category=open_category,
-            overwrites=overwrites
-        )
+        # Add type-specific admin role permissions
+        type_data = self.ticket_system.conf['ticket_types'].get(self.type_name, {})
+        for role_id in type_data.get('admin_roles', []):
+            role = interaction.guild.get_role(role_id)
+            if role:
+                overwrites[role] = discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=True,
+                    read_message_history=True,
+                    manage_messages=True
+                )
+
+        # Add type-specific admin user permissions
+        for user_id in type_data.get('admin_users', []):
+            member = interaction.guild.get_member(user_id)
+            if member:
+                overwrites[member] = discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=True,
+                    read_message_history=True,
+                    manage_messages=True
+                )
+
+        # 获取可用分类
+        try:
+            category = await self.ticket_system.get_available_category(is_closed=False)
+        except Exception as e:
+            await interaction.followup.send(
+                "Failed to get or create category for the ticket. Please contact administrators.",
+                ephemeral=True
+            )
+            logging.error(f"Failed to get category for ticket: {e}")
+            return
+
+        # 创建频道
+        try:
+            channel = await interaction.guild.create_text_channel(
+                name=channel_name,
+                category=category,
+                overwrites=overwrites  # 使用更新后的权限设置
+            )
+        except discord.HTTPException as e:
+            await interaction.followup.send(
+                "Failed to create ticket channel. Please try again later.",
+                ephemeral=True
+            )
+            logging.error(f"Failed to create ticket channel: {e}")
+            return
 
         # Create initial message and control panel
         embed = discord.Embed(
@@ -914,6 +1060,19 @@ class TicketConfirmView(discord.ui.View):
             description=self.type_data['guide'],
             color=discord.Color.blue()
         )
+        
+        # 添加创建者和时间信息
+        embed.add_field(
+            name="创建者",
+            value=f"{interaction.user.mention}",
+            inline=True
+        )
+        embed.add_field(
+            name="创建时间",
+            value=f"<t:{int(datetime.now().timestamp())}:F>",
+            inline=True
+        )
+
         embed.add_field(
             name=self.messages['ticket_instructions_title'],
             value=self.messages['ticket_instructions'],
@@ -950,6 +1109,60 @@ class TicketConfirmView(discord.ui.View):
                 creator=interaction.user,
                 channel=channel
             )
+            admins_to_notify = set()  # 使用集合避免重复
+
+            # 添加全局管理员
+            for user_id in self.ticket_system.conf.get('admin_users', []):
+                admins_to_notify.add(user_id)
+
+            # 添加拥有全局管理员角色的用户
+            for role_id in self.ticket_system.conf.get('admin_roles', []):
+                role = interaction.guild.get_role(role_id)
+                if role:
+                    for member in role.members:
+                        admins_to_notify.add(member.id)
+
+            # 添加类型特定管理员
+            type_data = self.ticket_system.conf['ticket_types'].get(self.type_name, {})
+            for user_id in type_data.get('admin_users', []):
+                admins_to_notify.add(user_id)
+
+            # 添加拥有类型特定管理员角色的用户
+            for role_id in type_data.get('admin_roles', []):
+                role = interaction.guild.get_role(role_id)
+                if role:
+                    for member in role.members:
+                        admins_to_notify.add(member.id)
+
+            # 创建管理员通知嵌入消息
+            admin_embed = discord.Embed(
+                title=self.messages['log_ticket_create_title'],
+                description=self.messages['log_ticket_create_description'].format(
+                    number=ticket_number,
+                    type_name=self.type_name,
+                    creator=interaction.user.mention
+                ),
+                color=discord.Color.blue()
+            )
+
+            # 创建跳转按钮视图
+            view = JumpToChannelView(channel)
+
+            # 发送通知给所有管理员
+            for admin_id in admins_to_notify:
+                try:
+                    admin_user = await self.ticket_system.cog.bot.fetch_user(admin_id)
+                    if admin_user:
+                        try:
+                            await admin_user.send(embed=admin_embed, view=view)
+                        except discord.Forbidden:
+                            # 用户可能关闭了私信
+                            continue
+                        except Exception as e:
+                            logging.error(f"Failed to send notification to admin {admin_id}: {e}")
+                except discord.NotFound:
+                    logging.warning(f"Could not find admin user with ID {admin_id}")
+                    continue
 
             # DM notification
             try:
@@ -1196,10 +1409,16 @@ class CloseTicketModal(discord.ui.Modal):
             result = await cursor.fetchone()
             is_accepted = result[0] if result else False
 
-        # 获取或创建已关闭分类
-        closed_category = interaction.guild.get_channel(self.cog.ticket_system.closed_category_id)
-        if not closed_category:
-            closed_category = await self.cog.ticket_system.create_categories()
+        try:
+            # 获取可用的已关闭工单分类
+            closed_category = await self.cog.ticket_system.get_available_category(is_closed=True)
+        except Exception as e:
+            await interaction.followup.send(
+                self.messages['ticket_category_get_closed_error'],
+                ephemeral=True
+            )
+            logging.error(f"Failed to get closed category for ticket: {e}")
+            return
 
         # 关闭工单
         if await self.cog.db.close_ticket(self.ticket_channel.id, interaction.user.id, self.reason.value):
@@ -1208,28 +1427,84 @@ class CloseTicketModal(discord.ui.Modal):
 
             # 更新权限
             overwrites = {
+                # 基础权限
                 interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
-                interaction.guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True),
-                self.creator: discord.PermissionOverwrite(view_channel=True, send_messages=False)
+                interaction.guild.me: discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=True,
+                    manage_channels=True,
+                    manage_messages=True
+                ),
+                # 创建者可以查看但不能发消息
+                self.creator: discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=False,
+                    read_message_history=True
+                )
             }
 
-            # 添加管���员角色权限
+            # 添加全局管理员权限
             for role_id in self.cog.conf.get('admin_roles', []):
                 role = interaction.guild.get_role(role_id)
                 if role:
-                    overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+                    overwrites[role] = discord.PermissionOverwrite(
+                        view_channel=True,
+                        send_messages=True,
+                        manage_messages=True
+                    )
 
-            # 添加工单成员权限
+            for user_id in self.cog.conf.get('admin_users', []):
+                member = interaction.guild.get_member(user_id)
+                if member:
+                    overwrites[member] = discord.PermissionOverwrite(
+                        view_channel=True,
+                        send_messages=True,
+                        manage_messages=True
+                    )
+
+            # 添加类型特定管理员权限
+            type_data = self.cog.conf['ticket_types'].get(self.type_name, {})
+            for role_id in type_data.get('admin_roles', []):
+                role = interaction.guild.get_role(role_id)
+                if role:
+                    overwrites[role] = discord.PermissionOverwrite(
+                        view_channel=True,
+                        send_messages=True,
+                        manage_messages=True
+                    )
+
+            for user_id in type_data.get('admin_users', []):
+                member = interaction.guild.get_member(user_id)
+                if member:
+                    overwrites[member] = discord.PermissionOverwrite(
+                        view_channel=True,
+                        send_messages=True,
+                        manage_messages=True
+                    )
+
+            # 添加工单成员权限（只能查看，不能发消息）
             for member_id, added_by, added_at in members:
                 member = interaction.guild.get_member(member_id)
-                if member:
-                    overwrites[member] = discord.PermissionOverwrite(view_channel=True, send_messages=False)
+                if member and member != self.creator:  # 创建者的权限已经设置过
+                    overwrites[member] = discord.PermissionOverwrite(
+                        view_channel=True,
+                        send_messages=False,
+                        read_message_history=True
+                    )
 
-            # 移动频道并更新权限
-            await self.ticket_channel.edit(
-                category=closed_category,
-                overwrites=overwrites
-            )
+            try:
+                # 更新频道设置
+                await self.ticket_channel.edit(
+                    category=closed_category,
+                    overwrites=overwrites
+                )
+            except discord.HTTPException as e:
+                await interaction.followup.send(
+                    self.messages['ticket_category_move_to_closed_error'],
+                    ephemeral=True
+                )
+                logging.error(f"Failed to move ticket to closed category: {e}")
+                return
 
             # 发送频道通知
             embed = discord.Embed(
@@ -1286,6 +1561,99 @@ class CloseTicketModal(discord.ui.Modal):
             )
 
 
+class AdminTypeSelectView(discord.ui.View):
+    def __init__(self, cog, action_type, target_type, target_id):
+        super().__init__()
+        self.cog = cog
+        self.action_type = action_type  # 'add' or 'remove'
+        self.target_type = target_type  # 'role' or 'user'
+        self.target_id = target_id
+        self.messages = self.cog.conf['messages']
+
+        # Create select menu for ticket types
+        options = [
+            discord.SelectOption(
+                label=self.messages['global_ticket_select_label'],
+                description=self.messages['global_ticket_select_description'],
+                value="global"
+            )
+        ]
+
+        # Add options for each ticket type
+        for type_name, type_data in cog.conf['ticket_types'].items():
+            options.append(
+                discord.SelectOption(
+                    label=type_name,
+                    description=type_data['description'][:100],
+                    value=type_name
+                )
+            )
+
+        select = discord.ui.Select(
+            placeholder=self.messages['ticket_type_select_placeholder'],
+            min_values=1,
+            max_values=1,
+            options=options
+        )
+        select.callback = self.select_callback
+        self.add_item(select)
+
+    async def select_callback(self, interaction: discord.Interaction):
+        selected_type = interaction.data['values'][0]
+        await interaction.response.defer(ephemeral=True)
+
+        # Get the target object (role or user)
+        if self.target_type == 'role':
+            target = interaction.guild.get_role(self.target_id)
+        else:
+            target = await self.cog.bot.fetch_user(self.target_id)
+
+        if not target:
+            await interaction.followup.send(self.messages['target_not_found'], ephemeral=True)
+            return
+
+        if selected_type == "global":
+            # Handle global admin changes
+            if self.action_type == 'add':
+                success = await self.cog.add_global_admin(
+                    self.target_type,
+                    self.target_id,
+                    interaction
+                )
+            else:
+                success = await self.cog.remove_global_admin(
+                    self.target_type,
+                    self.target_id,
+                    interaction
+                )
+        else:
+            # Handle type-specific admin changes
+            if self.action_type == 'add':
+                success = await self.cog.add_type_admin(
+                    selected_type,
+                    self.target_type,
+                    self.target_id,
+                    interaction
+                )
+            else:
+                success = await self.cog.remove_type_admin(
+                    selected_type,
+                    self.target_type,
+                    self.target_id,
+                    interaction
+                )
+
+        # Handle response
+        await self.cog.handle_admin_change_response(
+            success,
+            self.action_type,
+            self.target_type,
+            target,
+            selected_type,
+            interaction
+        )
+
+
 class TicketsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -1311,9 +1679,11 @@ class TicketsCog(commands.Cog):
         channel_id = interaction.channel_id
         allowed_channel_id = self.ticket_system.info_channel_id
 
+        messages = self.conf['messages']
+
         if channel_id != allowed_channel_id:
             await interaction.response.send_message(
-                "This command can only be used in the ticket management channel.",
+                messages['command_channel_only'],
                 ephemeral=True
             )
             return False
@@ -1322,6 +1692,7 @@ class TicketsCog(commands.Cog):
     async def update_admin_permissions(self):
         """Update permissions for all admin users and roles in relevant channels."""
         if not self.ticket_system or not self.guild:
+            logging.warning("Cannot update admin permissions: ticket system or guild not initialized")
             return
 
         # Get info channel
@@ -1329,7 +1700,7 @@ class TicketsCog(commands.Cog):
         if not info_channel:
             return
 
-        # Collect all admin overwrites
+        # Collect all admin overwrites for info channel
         overwrites = {
             self.guild.default_role: discord.PermissionOverwrite(view_channel=False),
             self.guild.me: discord.PermissionOverwrite(
@@ -1340,7 +1711,7 @@ class TicketsCog(commands.Cog):
             )
         }
 
-        # Add role overwrites
+        # Add role overwrites for info channel
         for role_id in self.conf.get('admin_roles', []):
             role = self.guild.get_role(role_id)
             if role:
@@ -1350,7 +1721,7 @@ class TicketsCog(commands.Cog):
                     manage_messages=True
                 )
 
-        # Add user overwrites
+        # Add user overwrites for info channel
         for user_id in self.conf.get('admin_users', []):
             member = self.guild.get_member(user_id)
             if member:
@@ -1363,13 +1734,11 @@ class TicketsCog(commands.Cog):
         # Update info channel permissions
         await info_channel.edit(overwrites=overwrites)
 
-        # Get all active tickets
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.execute('SELECT channel_id FROM tickets WHERE is_closed = 0')
-            active_tickets = await cursor.fetchall()
+        # Get all active tickets using existing database method
+        active_tickets = await self.db.get_active_tickets()
 
         # Update permissions for all active ticket channels
-        for (channel_id,) in active_tickets:
+        for channel_id, _, _, type_name, _ in active_tickets:
             channel = self.guild.get_channel(channel_id)
             if not channel:
                 continue
@@ -1377,7 +1746,16 @@ class TicketsCog(commands.Cog):
             # Get existing overwrites and update them
             channel_overwrites = dict(channel.overwrites)
 
-            # Add admin roles
+            # Ensure default role and bot permissions
+            channel_overwrites[self.guild.default_role] = discord.PermissionOverwrite(view_channel=False)
+            channel_overwrites[self.guild.me] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                manage_channels=True,
+                manage_messages=True
+            )
+
+            # Add global admin roles
             for role_id in self.conf.get('admin_roles', []):
                 role = self.guild.get_role(role_id)
                 if role:
@@ -1387,7 +1765,7 @@ class TicketsCog(commands.Cog):
                         manage_messages=True
                     )
 
-            # Add admin users
+            # Add global admin users
             for user_id in self.conf.get('admin_users', []):
                 member = self.guild.get_member(user_id)
                 if member:
@@ -1397,7 +1775,33 @@ class TicketsCog(commands.Cog):
                         manage_messages=True
                     )
 
-            await channel.edit(overwrites=channel_overwrites)
+            # Add type-specific admin roles
+            type_data = self.conf['ticket_types'].get(type_name, {})
+            for role_id in type_data.get('admin_roles', []):
+                role = self.guild.get_role(role_id)
+                if role:
+                    channel_overwrites[role] = discord.PermissionOverwrite(
+                        view_channel=True,
+                        send_messages=True,
+                        manage_messages=True
+                    )
+
+            # Add type-specific admin users
+            for user_id in type_data.get('admin_users', []):
+                member = self.guild.get_member(user_id)
+                if member:
+                    channel_overwrites[member] = discord.PermissionOverwrite(
+                        view_channel=True,
+                        send_messages=True,
+                        manage_messages=True
+                    )
+
+            try:
+                await channel.edit(overwrites=channel_overwrites)
+            except discord.HTTPException as e:
+                logging.error(f"Failed to update permissions for channel {channel.id}: {e}")
+
+        logging.info(f"Updated permissions for {len(active_tickets)} active tickets")
 
     @app_commands.command(
         name="tickets_setup",
@@ -1438,17 +1842,16 @@ class TicketsCog(commands.Cog):
             if not setup_report['invalid_components'] and not setup_report['new_components']:
                 response_parts.append(messages['setup_no_changes'])
 
+            # 打印调试信息
+            # print("Setup Report:", setup_report)  # 添加调试输出
+            # print("Response Parts:", response_parts)  # 添加调试输出
+
             # 发送完整报告
             await interaction.followup.send("\n".join(response_parts), ephemeral=True)
 
         except Exception as e:
             error_msg = messages['setup_error'].format(error=str(e))
-            logging.error(error_msg)
-            await interaction.followup.send(error_msg, ephemeral=True)
-
-        except Exception as e:
-            error_msg = messages['setup_error'].format(error=str(e))
-            logging.error(error_msg)
+            logging.error(f"Setup error: {e}")  # 添加错误日志
             await interaction.followup.send(error_msg, ephemeral=True)
 
     @app_commands.command(
@@ -1547,30 +1950,41 @@ class TicketsCog(commands.Cog):
                 ephemeral=True
             )
 
-    # 在 TicketsCog 类中添加
-
-    async def is_admin(self, member: discord.Member) -> bool:
-        """Enhanced admin check that considers roles, user list and Discord permissions."""
-        # 检查是否在管理员用户列表中
+    async def is_admin(self, member: discord.Member, ticket_type: str = None) -> bool:
+        """
+        Check if a member is an admin for the specified ticket type or globally.
+        If ticket_type is None, only checks global admin status.
+        """
+        # Check global admin status
         if member.id in self.conf.get('admin_users', []):
             return True
 
-        # 检查是否有管理员角色
-        admin_role_ids = self.conf.get('admin_roles', [])
-        if any(role.id in admin_role_ids for role in member.roles):
+        if any(role.id in self.conf.get('admin_roles', []) for role in member.roles):
             return True
 
-        # 检查Discord权限
-        if member.guild_permissions.administrator or \
-                member.guild_permissions.manage_guild or \
-                member.guild_permissions.manage_channels:
+        if member.guild_permissions.administrator:
+            return True
+
+        # If only checking global status or no ticket type specified, return here
+        if ticket_type is None:
+            return False
+
+        # Check type-specific admin status
+        type_data = self.conf['ticket_types'].get(ticket_type)
+        if not type_data:
+            return False
+
+        if member.id in type_data.get('admin_users', []):
+            return True
+
+        if any(role.id in type_data.get('admin_roles', []) for role in member.roles):
             return True
 
         return False
 
     async def format_admin_list(self) -> discord.Embed:
         """Format current admin configuration as an embed."""
-        guild = self.bot.get_guild(self.guild_id)  # 直接获取 guild
+        guild = self.bot.get_guild(self.guild_id)
         if not guild:
             raise ValueError("Could not find configured guild")
 
@@ -1579,38 +1993,110 @@ class TicketsCog(commands.Cog):
             color=discord.Color.blue()
         )
 
-        # 管理员角色列表
-        role_list = []
-        for role_id in self.conf.get('admin_roles', []):
-            role = guild.get_role(role_id)
-            if role:
-                role_list.append(f"• {role.mention} (ID: {role.id})")
+        # Global admins section
         embed.add_field(
-            name=self.conf['messages']['admin_list_roles'],
-            value="\n".join(role_list) if role_list else "无",
+            name="全局管理员",
+            value=self._format_admin_entries(
+                self.conf.get('admin_roles', []),
+                self.conf.get('admin_users', []),
+                guild
+            ),
             inline=False
         )
 
-        # 管理员用户列表
-        user_list = []
-        for user_id in self.conf.get('admin_users', []):
-            user = self.bot.get_user(user_id)
-            if user:
-                user_list.append(f"• {user.mention} (ID: {user.id})")
-        embed.add_field(
-            name=self.conf['messages']['admin_list_users'],
-            value="\n".join(user_list) if user_list else "无",
-            inline=False
-        )
-
-        # Discord 权限说明
-        embed.add_field(
-            name=self.conf['messages']['admin_list_perms'],
-            value="• Administrator\n• Manage Server\n• Manage Channels",
-            inline=False
-        )
+        # Type-specific admins sections
+        for type_name, type_data in self.conf['ticket_types'].items():
+            embed.add_field(
+                name=f"{type_name} 管理员",
+                value=self._format_admin_entries(
+                    type_data.get('admin_roles', []),
+                    type_data.get('admin_users', []),
+                    guild
+                ),
+                inline=False
+            )
 
         return embed
+
+    def _format_admin_entries(self, role_ids: list, user_ids: list,
+                              guild: discord.Guild) -> str:
+        """Helper method to format admin entries for each section."""
+        messages = self.conf['messages']
+        lines = []
+
+        # Format roles
+        if role_ids:
+            lines.append(messages['admin_list_roles_header'])
+            for role_id in role_ids:
+                role = guild.get_role(role_id)
+                if role:
+                    lines.append(messages['admin_list_role_item'].format(role=role.mention))
+
+        # Format users
+        if user_ids:
+            if lines:  # Add a blank line if there were roles
+                lines.append("")
+            lines.append(messages['admin_list_users_header'])
+            for user_id in user_ids:
+                user = self.bot.get_user(user_id)
+                if user:
+                    lines.append(messages['admin_list_user_item'].format(user=user.mention))
+
+        return "\n".join(lines) if lines else messages['admin_list_empty']
+
+    async def add_global_admin(self, target_type: str, target_id: int,
+                               interaction: discord.Interaction) -> bool:
+        """Add a global admin (role or user)."""
+        # Remove from all type-specific admin lists first
+        for type_data in self.conf['ticket_types'].values():
+            if target_type == 'role':
+                if target_id in type_data.get('admin_roles', []):
+                    type_data['admin_roles'].remove(target_id)
+            else:
+                if target_id in type_data.get('admin_users', []):
+                    type_data['admin_users'].remove(target_id)
+
+        # Add to global admin list
+        target_list = 'admin_roles' if target_type == 'role' else 'admin_users'
+        if target_id not in self.conf[target_list]:
+            self.conf[target_list].append(target_id)
+            await self.save_config()
+            await self.update_admin_permissions()
+            return True
+        return False
+
+    async def add_type_admin(self, ticket_type: str, target_type: str,
+                             target_id: int, interaction: discord.Interaction) -> bool:
+        """Add a type-specific admin (role or user)."""
+        # Check if target is already a global admin
+        if target_type == 'role':
+            if target_id in self.conf.get('admin_roles', []):
+                await interaction.followup.send(
+                    self.conf['messages']['admin_global_role_exists'],
+                    ephemeral=True
+                )
+                return False
+        else:
+            if target_id in self.conf.get('admin_users', []):
+                await interaction.followup.send(
+                    self.conf['messages']['admin_global_user_exists'],
+                    ephemeral=True
+                )
+                return False
+
+        type_data = self.conf['ticket_types'].get(ticket_type)
+        if not type_data:
+            return False
+
+        target_list = 'admin_roles' if target_type == 'role' else 'admin_users'
+        if target_id not in type_data.get(target_list, []):
+            if target_list not in type_data:
+                type_data[target_list] = []
+            type_data[target_list].append(target_id)
+            await self.save_config()
+            await self.update_admin_permissions()
+            return True
+        return False
 
     @app_commands.command(
         name="tickets_admin_list",
@@ -1648,33 +2134,42 @@ class TicketsCog(commands.Cog):
             )
             return
 
-        admin_roles = self.conf.get('admin_roles', [])
-        if role.id in admin_roles:
-            await interaction.response.send_message(
-                self.conf['messages']['admin_role_exists'],
-                ephemeral=True
-            )
-            return
-
-        admin_roles.append(role.id)
-        self.conf['admin_roles'] = admin_roles
-        await self.save_config()
-
-        # Update permissions after adding role
-        await self.update_admin_permissions()
-
+        view = AdminTypeSelectView(self, 'add', 'role', role.id)
         await interaction.response.send_message(
-            self.conf['messages']['admin_add_role_success'].format(role=role.mention)
+            self.conf['messages']['admin_type_select_add_role'],
+            view=view,
+            ephemeral=True
         )
 
-        # Display updated admin list
-        embed = await self.format_admin_list()
-        await interaction.followup.send(embed=embed)
+    # Remove role from either global or type-specific admin list
+    async def remove_global_admin(self, target_type: str, target_id: int,
+                                  interaction: discord.Interaction) -> bool:
+        """Remove a global admin (role or user)."""
+        target_list = 'admin_roles' if target_type == 'role' else 'admin_users'
+        if target_id in self.conf[target_list]:
+            self.conf[target_list].remove(target_id)
+            await self.save_config()
+            await self.update_admin_permissions()
+            return True
+        return False
 
-    @app_commands.command(
-        name="tickets_admin_remove_role",
-        description="移除管理员身份组"
-    )
+    async def remove_type_admin(self, ticket_type: str, target_type: str,
+                                target_id: int, interaction: discord.Interaction) -> bool:
+        """Remove a type-specific admin (role or user)."""
+        type_data = self.conf['ticket_types'].get(ticket_type)
+        if not type_data:
+            return False
+
+        target_list = 'admin_roles' if target_type == 'role' else 'admin_users'
+        if target_id in type_data.get(target_list, []):
+            type_data[target_list].remove(target_id)
+            await self.save_config()
+            await self.update_admin_permissions()
+            return True
+        return False
+
+    # Update existing admin commands
+    @app_commands.command(name="tickets_admin_remove_role")
     @app_commands.describe(role="要移除的身份组")
     async def admin_remove_role(self, interaction: discord.Interaction, role: discord.Role):
         """Remove an admin role."""
@@ -1688,33 +2183,14 @@ class TicketsCog(commands.Cog):
             )
             return
 
-        admin_roles = self.conf.get('admin_roles', [])
-        if role.id not in admin_roles:
-            await interaction.response.send_message(
-                self.conf['messages']['admin_role_not_found'],
-                ephemeral=True
-            )
-            return
-
-        admin_roles.remove(role.id)
-        self.conf['admin_roles'] = admin_roles
-        await self.save_config()
-
-        # Update permissions after removing role
-        await self.update_admin_permissions()
-
+        view = AdminTypeSelectView(self, 'remove', 'role', role.id)
         await interaction.response.send_message(
-            self.conf['messages']['admin_remove_role_success'].format(role=role.mention)
+            self.conf['messages']['admin_type_select_remove_role'],
+            view=view,
+            ephemeral=True
         )
 
-        # Display updated admin list
-        embed = await self.format_admin_list()
-        await interaction.followup.send(embed=embed)
-
-    @app_commands.command(
-        name="tickets_admin_add_user",
-        description="添加管理员用户"
-    )
+    @app_commands.command(name="tickets_admin_add_user")
     @app_commands.describe(user="要添加的用户")
     async def admin_add_user(self, interaction: discord.Interaction, user: discord.User):
         """Add an admin user."""
@@ -1728,33 +2204,14 @@ class TicketsCog(commands.Cog):
             )
             return
 
-        admin_users = self.conf.get('admin_users', [])
-        if user.id in admin_users:
-            await interaction.response.send_message(
-                self.conf['messages']['admin_user_exists'],
-                ephemeral=True
-            )
-            return
-
-        admin_users.append(user.id)
-        self.conf['admin_users'] = admin_users
-        await self.save_config()
-
-        # Update permissions after adding user
-        await self.update_admin_permissions()
-
+        view = AdminTypeSelectView(self, 'add', 'user', user.id)
         await interaction.response.send_message(
-            self.conf['messages']['admin_add_user_success'].format(user=user.mention)
+            self.conf['messages']['admin_type_select_add_user'],
+            view=view,
+            ephemeral=True
         )
 
-        # Display updated admin list
-        embed = await self.format_admin_list()
-        await interaction.followup.send(embed=embed)
-
-    @app_commands.command(
-        name="tickets_admin_remove_user",
-        description="移除管理员用户"
-    )
+    @app_commands.command(name="tickets_admin_remove_user")
     @app_commands.describe(user="要移除的用户")
     async def admin_remove_user(self, interaction: discord.Interaction, user: discord.User):
         """Remove an admin user."""
@@ -1768,28 +2225,53 @@ class TicketsCog(commands.Cog):
             )
             return
 
-        admin_users = self.conf.get('admin_users', [])
-        if user.id not in admin_users:
-            await interaction.response.send_message(
-                self.conf['messages']['admin_user_not_found'],
-                ephemeral=True
-            )
+        view = AdminTypeSelectView(self, 'remove', 'user', user.id)
+        await interaction.response.send_message(
+            self.conf['messages']['admin_type_select_remove_user'],
+            view=view,
+            ephemeral=True
+        )
+
+    # Update messages in response to changes
+    async def handle_admin_change_response(self, success: bool, action: str,
+                                           target_type: str, target: discord.Object,
+                                           ticket_type: str = "global",
+                                           interaction: discord.Interaction = None):
+        """Handle response messages for admin changes."""
+        if not interaction:
             return
 
-        admin_users.remove(user.id)
-        self.conf['admin_users'] = admin_users
-        await self.save_config()
+        messages = self.conf['messages']
+        if success:
+            if action == 'add':
+                if ticket_type == "global":
+                    message = messages['admin_add_global'].format(mention=target.mention)
+                else:
+                    message = messages['admin_add_type'].format(
+                        mention=target.mention,
+                        type=ticket_type
+                    )
+            else:  # remove
+                if ticket_type == "global":
+                    message = messages['admin_remove_global'].format(mention=target.mention)
+                else:
+                    message = messages['admin_remove_type'].format(
+                        mention=target.mention,
+                        type=ticket_type
+                    )
+        else:
+            if action == 'add':
+                message = messages['admin_add_failed'].format(mention=target.mention)
+            else:
+                message = messages['admin_remove_failed'].format(mention=target.mention)
 
-        # Update permissions after removing user
-        await self.update_admin_permissions()
-
-        await interaction.response.send_message(
-            self.conf['messages']['admin_remove_user_success'].format(user=user.mention)
-        )
+        await interaction.followup.send(message, ephemeral=True)
 
         # Display updated admin list
         embed = await self.format_admin_list()
         await interaction.followup.send(embed=embed)
+
+
 
     async def save_config(self):
         """Save the current configuration back to the JSON file"""

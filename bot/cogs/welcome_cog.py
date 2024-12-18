@@ -12,6 +12,21 @@ from pathlib import Path
 from bot.utils import config, check_channel_validity
 
 
+class WelcomeDMView(discord.ui.View):
+    def __init__(self, member_count):
+        super().__init__(timeout=None)  # No timeout for this button
+
+        self.conf = config.get_config('welcome')
+
+        # Add the member count button
+        button = discord.ui.Button(
+            style=discord.ButtonStyle.gray,
+            label=self.conf.get('member_count_button').format(member_count=member_count) if self.conf.get('member_count_button') else f"你是小鸟的第 {member_count} 名成员",
+            disabled=True  # Make it non-clickable
+        )
+        self.add_item(button)
+
+
 class WelcomeCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -37,6 +52,10 @@ class WelcomeCog(commands.Cog):
         self.base_path = Path(__file__).parent.parent.parent
         self.font_path = str(self.base_path / "resources" / "fonts" / Path(self.conf['font_path']).name)
         self.background_image = str(self.base_path / "resources" / "images" / Path(self.conf['background_image']).name)
+
+        # Add new config parameters for DM welcome message
+        self.dm_config = self.conf.get('dm', {})
+        self.welcome_dm_image = str(self.base_path / "resources" / "images" / Path(self.dm_config.get('dm_image', "welcome_dm.png")).name)
 
         # Verify resources exist
         self._verify_resources()
@@ -120,14 +139,8 @@ class WelcomeCog(commands.Cog):
             welcome_message = self.welcome_text.format(member=member)
             await channel.send(content=welcome_message.format(member=member), file=discord_file)
 
-    @commands.command(name='testwelcome')
-    async def test_welcome_command(self, ctx):
-        """Send a test welcome message using the command interface."""
-        if ctx.channel.id == self.welcome_channel_id:
-            member_number = len(ctx.guild.members)  # Get the number of members in the guild
-            await self.send_welcome(ctx.author, ctx.channel, member_number)
-        else:
-            await ctx.send("Please use this command in the 'welcome' channel.")
+        # Send the welcome DM
+        await self.send_welcome_dm(member)
 
     @app_commands.command(name="testwelcome")
     @app_commands.describe(member="Select a member to test the welcome message.")
@@ -135,8 +148,8 @@ class WelcomeCog(commands.Cog):
     async def test_welcome(self, interaction: discord.Interaction, member: discord.Member = None,
                            member_number: int = None):
         """Send a test welcome message using the slash command interface."""
-        if interaction.channel_id != self.welcome_channel_id:
-            await interaction.response.send_message("This command can only be used in the welcome channel.",
+        if interaction.channel_id != self.welcome_channel_id and not await check_channel_validity(interaction):
+            await interaction.response.send_message("This command can only be used in the welcome channel or admin channel.",
                                                     ephemeral=True)
             return
 
@@ -146,7 +159,19 @@ class WelcomeCog(commands.Cog):
         # Call send_welcome and edit the original response with the result
         await self.send_welcome(member, interaction.channel, member_number, interaction)
 
-        logging.info(f"Test welcome message sent to {member}")
+        # Only send DM if:
+        # 1. Member is the command user themselves, or
+        # 2. Command is used in admin channel
+        if member == interaction.user or await check_channel_validity(interaction):
+            await self.send_welcome_dm(member)
+            logging.info(f"Test welcome message and DM sent to {member}")
+        else:
+            logging.info(f"Test welcome message sent to {member} (DM skipped - not admin channel)")
+
+        await interaction.followup.send(
+            f"Test welcome message {'and DM ' if member == interaction.user or await check_channel_validity(interaction) else ''}sent for {member.mention}",
+            ephemeral=True
+        )
 
     async def send_welcome(self, member, channel, member_number, interaction=None):
         """A unified method to send a welcome message to a member."""
@@ -167,3 +192,68 @@ class WelcomeCog(commands.Cog):
         else:
             # Regular send for non-slash command contexts
             await channel.send(content=welcome_message, file=discord_file)
+
+    async def send_welcome_dm(self, member):
+        """Send a welcome DM to the new member"""
+        try:
+            # Create the embed
+            embed = discord.Embed(
+                description="",
+                color=discord.Color.from_rgb(*self.dm_config.get('color', [107, 104, 180]))
+            )
+
+            # Set author with member's avatar
+            embed.set_author(
+                name=self.dm_config.get('description0_title'),
+                icon_url=member.display_avatar.url
+            )
+
+            # Add the first description
+            embed.add_field(
+                name=self.dm_config.get('description1_title'),
+                value="\n".join(line.format(user=member.mention) for line in self.dm_config.get('description1', [])),
+                inline=False
+            )
+
+            # Add the second description
+            embed.add_field(
+                name=self.dm_config.get('description2_title'),
+                value="\n".join(self.dm_config.get('description2', [])),
+                inline=False
+            )
+
+            # Set the bot's avatar as the thumbnail
+            if self.bot.user.avatar:
+                embed.set_thumbnail(url=self.bot.user.avatar.url)
+
+            # Add the rules text and channel mention
+            rules_channel = member.guild.get_channel(int(self.dm_config.get('rules_channel_id')))
+            if rules_channel:
+                embed.add_field(
+                    name=self.dm_config.get('rules', {}).get('rules_title'),
+                    value=f"{self.dm_config.get('rules', {}).get('rules_text')}\n{rules_channel.mention}",
+                    inline=False
+                )
+
+            # Set footer with bot avatar
+            if self.bot.user.avatar:
+                embed.set_footer(
+                    text=self.dm_config.get('footer'),
+                    icon_url=self.bot.user.avatar.url
+                )
+
+            # Create view with member count button
+            view = WelcomeDMView(member.guild.member_count)
+
+            # Attach the welcome image if it exists
+            if os.path.exists(self.welcome_dm_image):
+                file = discord.File(self.welcome_dm_image, filename="welcome_image.png")
+                embed.set_image(url="attachment://welcome_image.png")
+                await member.send(embed=embed, file=file, view=view)
+            else:
+                await member.send(embed=embed, view=view)
+
+        except discord.Forbidden:
+            logging.warning(f"Could not send welcome DM to {member.name} - DMs are closed")
+        except Exception as e:
+            logging.error(f"Error sending welcome DM to {member.name}: {str(e)}")
