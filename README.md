@@ -1,6 +1,6 @@
 # Bird Bot
 
-`Version: 1.2.0`
+`Version: 1.2.1`
 
 ---
 
@@ -314,6 +314,12 @@ Remove a user from the ticket system's admin users. There will now be a menu for
 Add a user to the current ticket.
 - `user`: The user to be added to the ticket
 
+#### `/tickets_accept`
+Accept a ticket. This command can only be used by admins in ticket channels.
+
+#### `/tickets_close`
+Close a ticket. This command can only be used in ticket channels.
+
 
 ### Game_DnD_Cog
 Provides Dungeons & Dragons (DnD) players with a convenient way to generate random roll dice points.
@@ -342,6 +348,14 @@ A tool to check if the channel is valid.
 A module that integrates tickets_cog's interaction with the database.
 
 ## Update Log
+
+### V1.2.1 - 2024-12-19
+#### New features and improvements
+- Added `/tickets_accept` command to accept a ticket.
+- Added `/tickets_close` command to close a ticket.
+
+
+---
 ### V1.2.0 - 2024-12-18
 #### New features and improvements
 - Now every type of tickets can be set with separate admin users and roles.

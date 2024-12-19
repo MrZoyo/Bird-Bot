@@ -274,3 +274,26 @@ class TicketsDatabaseManager:
             ''', (channel_id,))
             count = await cursor.fetchone()
             return count[0] if count else 0
+
+    async def fetch_ticket(self, channel_id: int) -> Optional[dict]:
+        """Fetch ticket details by channel ID."""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.cursor()
+            await cursor.execute('''
+                SELECT channel_id, message_id, creator_id, type_name, 
+                       is_accepted, is_closed
+                FROM tickets 
+                WHERE channel_id = ?
+            ''', (channel_id,))
+            record = await cursor.fetchone()
+
+            if record:
+                return {
+                    'channel_id': record[0],
+                    'message_id': record[1],
+                    'creator_id': record[2],
+                    'type_name': record[3],
+                    'is_accepted': record[4],
+                    'is_closed': record[5]
+                }
+            return None

@@ -324,12 +324,12 @@ class SignatureModal(discord.ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        
+
         config = self.bot.get_cog('RoleCog').role_config['signature']
-        
+
         async with aiosqlite.connect(self.bot.get_cog('RoleCog').db_path) as db:
             cursor = await db.cursor()
-            
+
             # Check if user is disabled
             await cursor.execute('SELECT is_disabled FROM user_signatures WHERE user_id = ?',
                                  (interaction.user.id,))
@@ -337,7 +337,7 @@ class SignatureModal(discord.ui.Modal):
             if result and result[0]:
                 await interaction.followup.send(config['disabled_message'], ephemeral=True)
                 return
-                
+
             # Get user's change history
             await cursor.execute('''
                 SELECT change_time1, change_time2, change_time3, signature 
@@ -345,20 +345,20 @@ class SignatureModal(discord.ui.Modal):
                 WHERE user_id = ?
             ''', (interaction.user.id,))
             result = await cursor.fetchone()
-            
+
             current_time = datetime.now(timezone.utc)
-            
+
             if result:
                 times = result[:3]  # Get the three time slots
                 current_sig = result[3]  # Get current signature
-                
+
                 # Find empty slot if any
                 empty_slot = None
                 for i, t in enumerate(times, 1):
                     if not t:
                         empty_slot = i
                         break
-                
+
                 if empty_slot:
                     # Found an empty slot, use it
                     await cursor.execute(f'''
@@ -371,7 +371,7 @@ class SignatureModal(discord.ui.Modal):
                     time_slots = [datetime.fromisoformat(t) for t in times if t]
                     oldest_time = min(time_slots)
                     days_passed = (current_time - oldest_time).days
-                    
+
                     if days_passed >= 7:
                         # Can use the oldest slot
                         oldest_slot = times.index(oldest_time.isoformat()) + 1
@@ -394,9 +394,9 @@ class SignatureModal(discord.ui.Modal):
                     (user_id, signature, change_time1, is_disabled)
                     VALUES (?, ?, ?, ?)
                 ''', (interaction.user.id, str(self.signature), current_time.isoformat(), False))
-            
+
             await db.commit()
-            
+
             # Calculate remaining changes
             await cursor.execute('''
                 SELECT change_time1, change_time2, change_time3 
@@ -404,12 +404,12 @@ class SignatureModal(discord.ui.Modal):
                 WHERE user_id = ?
             ''', (interaction.user.id,))
             times = await cursor.fetchone()
-            
+
             # Count empty slots and slots older than 7 days
-            remaining_times = sum(1 for t in times 
-                                if not t or 
-                                (t and (current_time - datetime.fromisoformat(t)).days >= 7))
-            
+            remaining_times = sum(1 for t in times
+                                  if not t or
+                                  (t and (current_time - datetime.fromisoformat(t)).days >= 7))
+
             await interaction.followup.send(
                 config['success_message'].format(
                     signature=str(self.signature),
@@ -816,7 +816,7 @@ class RoleCog(commands.Cog):
 
     @app_commands.command(
         name="signature_clear",
-        description="Clear a user's signature"
+        description="Clear a user's signature and change history"
     )
     @app_commands.describe(user_id="The user ID to clear signature for")
     async def clear_signature(self, interaction: discord.Interaction, user_id: str):
@@ -925,57 +925,6 @@ class RoleCog(commands.Cog):
             ephemeral=True
         )
 
-    
-
-    @commands.Cog.listener()
-    async def on_ready(self):
-        async with aiosqlite.connect(self.db_path) as db:
-            # Create the role_views table if it does not exist
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS role_views (
-                    message_id TEXT PRIMARY KEY,
-                    channel_id TEXT
-                )
-            ''')
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS starsign_views (
-                    message_id TEXT PRIMARY KEY,
-                    channel_id TEXT
-                )
-            ''')
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS mbti_views (
-                    message_id TEXT PRIMARY KEY,
-                    channel_id TEXT
-                )
-            ''')
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS gender_views (
-                    message_id TEXT PRIMARY KEY,
-                    channel_id TEXT
-                )
-            ''')
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS signature_views (
-                    message_id TEXT PRIMARY KEY,
-                    channel_id TEXT
-                )
-            ''')
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS user_signatures (
-                    user_id INTEGER PRIMARY KEY,
-                    signature TEXT,
-                    change_time1 TIMESTAMP,
-                    change_time2 TIMESTAMP,
-                    change_time3 TIMESTAMP,
-                    is_disabled BOOLEAN DEFAULT FALSE
-                )
-            ''')
-            await db.commit()
-
-        for table in ['role_views', 'starsign_views', 'mbti_views', 'gender_views', 'signature_views']:
-            await self.load_role_views(table=table)
-
     @app_commands.command(
         name="signature_check",
         description="Check a user's signature information"
@@ -1034,15 +983,15 @@ class RoleCog(commands.Cog):
             # print(f"Time slots from DB: {[time1, time2, time3]}")
             # print(f"Processed times: {times}")
 
-            status = (self.signature_config['admin_check_status_disabled'] 
-                     if is_disabled 
-                     else self.signature_config['admin_check_status_normal'])
-            
+            status = (self.signature_config['admin_check_status_disabled']
+                      if is_disabled
+                      else self.signature_config['admin_check_status_normal'])
+
             embed = discord.Embed(
                 title=self.signature_config['admin_check_title'],
                 color=discord.Color.blue() if not is_disabled else discord.Color.red()
             )
-            
+
             embed.add_field(
                 name=self.signature_config['admin_check_user_info_title'],
                 value=f"{user.mention} ({user_id})",
@@ -1069,3 +1018,52 @@ class RoleCog(commands.Cog):
             )
 
             await interaction.followup.send(embed=embed)
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        async with aiosqlite.connect(self.db_path) as db:
+            # Create the role_views table if it does not exist
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS role_views (
+                    message_id TEXT PRIMARY KEY,
+                    channel_id TEXT
+                )
+            ''')
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS starsign_views (
+                    message_id TEXT PRIMARY KEY,
+                    channel_id TEXT
+                )
+            ''')
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS mbti_views (
+                    message_id TEXT PRIMARY KEY,
+                    channel_id TEXT
+                )
+            ''')
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS gender_views (
+                    message_id TEXT PRIMARY KEY,
+                    channel_id TEXT
+                )
+            ''')
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS signature_views (
+                    message_id TEXT PRIMARY KEY,
+                    channel_id TEXT
+                )
+            ''')
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS user_signatures (
+                    user_id INTEGER PRIMARY KEY,
+                    signature TEXT,
+                    change_time1 TIMESTAMP,
+                    change_time2 TIMESTAMP,
+                    change_time3 TIMESTAMP,
+                    is_disabled BOOLEAN DEFAULT FALSE
+                )
+            ''')
+            await db.commit()
+
+        for table in ['role_views', 'starsign_views', 'mbti_views', 'gender_views', 'signature_views']:
+            await self.load_role_views(table=table)

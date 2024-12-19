@@ -1060,7 +1060,7 @@ class TicketConfirmView(discord.ui.View):
             description=self.type_data['guide'],
             color=discord.Color.blue()
         )
-        
+
         # 添加创建者和时间信息
         embed.add_field(
             name="创建者",
@@ -2271,8 +2271,6 @@ class TicketsCog(commands.Cog):
         embed = await self.format_admin_list()
         await interaction.followup.send(embed=embed)
 
-
-
     async def save_config(self):
         """Save the current configuration back to the JSON file"""
         config_path = Path('./bot/config/config_tickets.json')
@@ -2428,6 +2426,224 @@ class TicketsCog(commands.Cog):
         # Immediately acknowledge the interaction without sending a response
         await interaction.response.defer(ephemeral=True, thinking=False)
         await self.handle_add_user(interaction, user)
+
+    @app_commands.command(
+        name="tickets_accept",
+        description="手动接受当前工单"
+    )
+    async def accept_ticket(self, interaction: discord.Interaction):
+        """Manually accept the current ticket."""
+        await interaction.response.defer()
+
+        # 确保在工单频道中使用
+        channel_id = interaction.channel_id
+        ticket_status = await self.db.check_ticket_status(channel_id)
+        if not ticket_status[0]:
+            await interaction.followup.send(
+                self.conf['messages']['command_channel_only'],
+                ephemeral=True
+            )
+            return
+
+        # 检查用户是否是管理员
+        if not await self.is_admin(interaction.user):
+            await interaction.followup.send(
+                self.conf['messages']['ticket_admin_only'],
+                ephemeral=True
+            )
+            return
+
+        # 尝试接受工单
+        if await self.db.accept_ticket(channel_id, interaction.user.id):
+            # 获取工单初始消息并更新控制面板
+            try:
+                # 获取工单信息
+                ticket_details = await self.db.fetch_ticket(channel_id)
+                if ticket_details and ticket_details['message_id']:
+                    message = await interaction.channel.fetch_message(ticket_details['message_id'])
+                    if message:
+                        # 创建新的控制面板视图
+                        creator = await self.bot.fetch_user(ticket_details['creator_id'])
+                        view = TicketControlView(
+                            self,
+                            interaction.channel,
+                            creator,
+                            ticket_details['type_name'],
+                            is_accepted=True
+                        )
+                        await message.edit(view=view)
+            except discord.NotFound:
+                logging.error(f"Could not find control message for ticket {channel_id}")
+            except Exception as e:
+                logging.error(f"Error updating ticket control panel: {e}")
+
+            # 创建通知 embed
+            embed = discord.Embed(
+                title=self.conf['messages']['ticket_accepted_title'],
+                description=self.conf['messages']['ticket_accepted_content'].format(
+                    user=interaction.user.mention
+                ),
+                color=discord.Color.green()
+            )
+            await interaction.channel.send(embed=embed)
+
+            # 记录操作
+            await self.logger.log_ticket_accept(
+                channel=interaction.channel,
+                acceptor=interaction.user
+            )
+
+            await interaction.followup.send(self.conf['messages']['ticket_accepted_title'], ephemeral=True)
+        else:
+            await interaction.followup.send(
+                self.conf['messages']['ticket_already_accepted'],
+                ephemeral=True
+            )
+
+    @app_commands.command(
+        name="tickets_close",
+        description="手动关闭当前工单"
+    )
+    @app_commands.describe(reason="关闭工单的原因")
+    async def close_ticket(self, interaction: discord.Interaction, reason: str):
+        """Manually close the current ticket."""
+        await interaction.response.defer()
+
+        # 确保在工单频道中使用
+        channel_id = interaction.channel_id
+        exists, is_closed = await self.db.check_ticket_status(channel_id)
+        if not exists:
+            await interaction.followup.send(
+                self.conf['messages']['command_channel_only'],
+                ephemeral=True
+            )
+            return
+
+        if is_closed:
+            await interaction.followup.send(
+                self.conf['messages']['ticket_close_stats_error'],
+                ephemeral=True
+            )
+            return
+
+        # 获取工单信息
+        ticket_info = await self.db.fetch_ticket(channel_id)
+        if not ticket_info:
+            await interaction.followup.send(
+                self.conf['messages']['ticket_close_get_info_error'],
+                ephemeral=True
+            )
+            return
+
+        # 关闭工单
+        if await self.db.close_ticket(channel_id, interaction.user.id, reason):
+            try:
+                # 获取创建者信息
+                creator = await self.bot.fetch_user(ticket_info['creator_id']) if ticket_info['creator_id'] else None
+
+                # 获取可用的已关闭工单分类
+                closed_category = await self.ticket_system.get_available_category(is_closed=True)
+
+                # 更新频道权限
+                overwrites = {
+                    interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                    interaction.guild.me: discord.PermissionOverwrite(
+                        view_channel=True,
+                        send_messages=True,
+                        manage_channels=True,
+                        manage_messages=True
+                    ),
+                }
+
+                # 如果存在创建者，添加他们的权限
+                if creator:
+                    overwrites[creator] = discord.PermissionOverwrite(
+                        view_channel=True,
+                        send_messages=False,
+                        read_message_history=True
+                    )
+
+                # 为工单成员设置权限
+                members = await self.db.get_ticket_members(channel_id)
+                for member_id, _, _ in members:
+                    member = interaction.guild.get_member(member_id)
+                    if member and member != creator:  # 避免重复设置创建者的权限
+                        overwrites[member] = discord.PermissionOverwrite(
+                            view_channel=True,
+                            send_messages=False,
+                            read_message_history=True
+                        )
+
+                # 更新频道设置
+                await interaction.channel.edit(
+                    category=closed_category,
+                    overwrites=overwrites
+                )
+
+                # 更新控制面板
+                try:
+                    if ticket_info['message_id']:
+                        message = await interaction.channel.fetch_message(ticket_info['message_id'])
+                        if message:
+                            view = TicketControlView(
+                                self,
+                                interaction.channel,
+                                creator,
+                                ticket_info['type_name'],
+                                is_accepted=ticket_info['is_accepted']
+                            )
+                            # 禁用所有按钮
+                            for item in view.children:
+                                if isinstance(item, discord.ui.Button):
+                                    item.disabled = True
+                            await message.edit(view=view)
+                except discord.NotFound:
+                    logging.error(f"Could not find control message for ticket {channel_id}")
+                except Exception as e:
+                    logging.error(f"Error updating ticket control panel: {e}")
+
+                # 发送关闭通知
+                embed = discord.Embed(
+                    title=self.conf['messages']['log_ticket_close_title'],
+                    description=self.conf['messages']['log_ticket_close_description'].format(
+                        closer=interaction.user.mention,
+                        reason=reason
+                    ),
+                    color=discord.Color.red()
+                )
+                await interaction.channel.send(embed=embed)
+
+                # 记录操作
+                await self.logger.log_ticket_close(
+                    channel=interaction.channel,
+                    closer=interaction.user,
+                    reason=reason
+                )
+
+                # 如果找到创建者，发送DM通知
+                if creator:
+                    try:
+                        creator_embed = discord.Embed(
+                            title=self.conf['messages']['close_dm_title'],
+                            description=self.conf['messages']['close_dm_content'].format(
+                                closer=interaction.user.display_name,
+                                reason=reason
+                            ),
+                            color=discord.Color.red()
+                        )
+                        view = JumpToChannelView(interaction.channel)
+                        await creator.send(embed=creator_embed, view=view)
+                    except discord.Forbidden:
+                        pass  # Creator has DMs disabled
+
+                await interaction.followup.send(self.conf['messages']['ticket_stats_closed'], ephemeral=True)
+
+            except Exception as e:
+                logging.error(f"Error closing ticket: {e}")
+                await interaction.followup.send(
+                    self.conf['messages']['ticket_close_error'],
+                    ephemeral=True
+                )
 
     @commands.Cog.listener()
     async def on_ready(self):
