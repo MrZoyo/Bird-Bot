@@ -1955,11 +1955,14 @@ class TicketsCog(commands.Cog):
         Check if a member is an admin for the specified ticket type or globally.
         If ticket_type is None, only checks global admin status.
         """
+        # Get fresh config
+        current_config = config.get_config('tickets')
+
         # Check global admin status
-        if member.id in self.conf.get('admin_users', []):
+        if member.id in current_config.get('admin_users', []):
             return True
 
-        if any(role.id in self.conf.get('admin_roles', []) for role in member.roles):
+        if any(role.id in current_config.get('admin_roles', []) for role in member.roles):
             return True
 
         if member.guild_permissions.administrator:
@@ -1970,7 +1973,7 @@ class TicketsCog(commands.Cog):
             return False
 
         # Check type-specific admin status
-        type_data = self.conf['ticket_types'].get(ticket_type)
+        type_data = current_config['ticket_types'].get(ticket_type)
         if not type_data:
             return False
 
@@ -2285,6 +2288,9 @@ class TicketsCog(commands.Cog):
 
             async with aiofiles.open(config_path, 'w', encoding='utf-8') as f:
                 await f.write(json.dumps(config_data, indent=2, ensure_ascii=False))
+
+            # 重新加载配置
+            self.conf = config.reload_config('tickets')
         except Exception as e:
             logging.error(f"Error saving config: {e}")
 
