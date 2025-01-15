@@ -190,6 +190,7 @@
     "ticket_category_get_closed_error": "获取已关闭工单分类时发生错误，请联系管理员。",
     "ticket_close_stats_error": "该工单已关闭，无法再次关闭。",
     "ticket_close_get_info_error": "获取工单信息时发生错误，请联系管理员。",
-    "ticket_close_error": "关闭工单时发生错误，请联系管理员。"
+    "ticket_close_error": "关闭工单时发生错误，请联系管理员。",
+    "ticket_accept_get_info_error": "获取工单信息时发生错误，请联系管理员。"
   }
 }

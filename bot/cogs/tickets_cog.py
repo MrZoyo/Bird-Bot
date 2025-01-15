@@ -1277,19 +1277,25 @@ class TicketControlView(discord.ui.View):
     async def accept_callback(self, interaction: discord.Interaction):
         await interaction.response.defer()
 
-        # Check if user is admin
-        if not await self.cog.is_admin(interaction.user):
+        # 获取当前工单类型
+        ticket_details = await self.cog.db.fetch_ticket(self.channel.id)
+        if not ticket_details:
+            await interaction.followup.send(self.messages['ticket_accept_get_info_error'], ephemeral=True)
+            return
+
+        # 检查用户是否是管理员，传入工单类型进行检查
+        if not await self.cog.is_admin(interaction.user, ticket_details['type_name']):
             await interaction.followup.send(self.messages['ticket_admin_only'], ephemeral=True)
             return
 
-        # Try to accept the ticket using database manager
+        # 尝试接受工单
         if await self.cog.db.accept_ticket(self.channel.id, interaction.user.id):
-            # Update button state
+            # 更新按钮状态
             self.accept_button.style = discord.ButtonStyle.success
             self.accept_button.label = self.messages['ticket_accept_button_disabled']
             self.accept_button.disabled = True
 
-            # Channel notification
+            # 频道通知
             embed = discord.Embed(
                 title=self.messages['ticket_accepted_title'],
                 description=self.messages['ticket_accepted_content'].format(user=interaction.user.mention),
@@ -1297,7 +1303,7 @@ class TicketControlView(discord.ui.View):
             )
             await self.channel.send(embed=embed)
 
-            # DM notification
+            # DM通知
             try:
                 creator_embed = discord.Embed(
                     title=self.messages['ticket_accepted_dm_title'],
@@ -1311,19 +1317,19 @@ class TicketControlView(discord.ui.View):
             except discord.Forbidden:
                 pass
 
-            # Log action
+            # 记录操作
             await self.cog.logger.log_ticket_accept(
                 channel=self.channel,
                 acceptor=interaction.user
             )
 
-            # Update the message view
+            # 更新消息视图
             await interaction.message.edit(
                 view=TicketControlView(
                     self.cog,
                     self.channel,
                     self.creator,
-                    self.type_name,
+                    ticket_details['type_name'],
                     is_accepted=True
                 )
             )
@@ -1731,7 +1737,29 @@ class TicketsCog(commands.Cog):
                     manage_messages=True
                 )
 
-        # Update info channel permissions
+        # 添加所有工单类型特定的管理员权限
+        for type_data in self.conf['ticket_types'].values():
+            # 添加类型特定的角色权限
+            for role_id in type_data.get('admin_roles', []):
+                role = self.guild.get_role(role_id)
+                if role and role not in overwrites:
+                    overwrites[role] = discord.PermissionOverwrite(
+                        view_channel=True,
+                        send_messages=True,
+                        manage_messages=True
+                    )
+
+            # 添加类型特定的用户权限
+            for user_id in type_data.get('admin_users', []):
+                member = self.guild.get_member(user_id)
+                if member and member not in overwrites:
+                    overwrites[member] = discord.PermissionOverwrite(
+                        view_channel=True,
+                        send_messages=True,
+                        manage_messages=True
+                    )
+
+        # 更新信息频道权限
         await info_channel.edit(overwrites=overwrites)
 
         # Get all active tickets using existing database method
@@ -2451,8 +2479,17 @@ class TicketsCog(commands.Cog):
             )
             return
 
-        # 检查用户是否是管理员
-        if not await self.is_admin(interaction.user):
+        # 获取当前工单类型
+        ticket_details = await self.db.fetch_ticket(channel_id)
+        if not ticket_details:
+            await interaction.followup.send(
+                self.conf['messages']['ticket_accept_get_info_error'],
+                ephemeral=True
+            )
+            return
+
+        # 检查用户是否是管理员，传入工单类型进行检查
+        if not await self.is_admin(interaction.user, ticket_details['type_name']):
             await interaction.followup.send(
                 self.conf['messages']['ticket_admin_only'],
                 ephemeral=True

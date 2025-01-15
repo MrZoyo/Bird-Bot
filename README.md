@@ -348,7 +348,11 @@ A tool to check if the channel is valid.
 A module that integrates tickets_cog's interaction with the database.
 
 ## Update Log
+### V1.2.3 - 2025-01-15
+#### Bug fixes
+- Fixed an issue in `tickets_cog` where permissions for the tickets info channel were not properly assigned to all administrators with permissions for tickets. Fixed an issue where non-global administrators were not receiving tickets properly.
 
+---
 ### V1.2.2 - 2025-01-05
 #### Bug fixes
 - Fixed an issue in `tickets_cog` where the `admin_list` saved in memory did not follow the modification changes and resulted in an error stating that there were no administrator privileges.
