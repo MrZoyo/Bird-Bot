@@ -1,6 +1,6 @@
 # Bird Bot
 
-`Version: 1.2.3`
+`Version: 1.2.4`
 
 ---
 
@@ -320,6 +320,9 @@ Accept a ticket. This command can only be used by admins in ticket channels.
 #### `/tickets_close`
 Close a ticket. This command can only be used in ticket channels.
 
+#### `/tickets_archive`
+Archive a series of closed tickets. This command can only be used in ticket channels.
+This command will archive all closed tickets in given category. All the files will be saved in the `archive` folder.
 
 ### Game_DnD_Cog
 Provides Dungeons & Dragons (DnD) players with a convenient way to generate random roll dice points.
@@ -346,8 +349,19 @@ A bridge to help other Cogs read settings from all config files.
 A tool to check if the channel is valid.
 ### tickets_db
 A module that integrates tickets_cog's interaction with the database.
+### file_utils
+A module that provides file operations. Mainly used for tickets archive tickets_cog.
+### media_handler
+A module that provides media operations. Mainly used for tickets archive tickets_cog.
 
 ## Update Log
+### V1.2.4 - 2025-02-24
+#### Bug fixes
+-  Fixed an issue in `tickets_cog` where global role admin settings were not synchronized to all open tickets in a timely manner in some cases.
+#### New features and improvements
+- Added a new command `/tickets_archive` to archive a series of closed tickets.
+
+---
 ### V1.2.3 - 2025-01-15
 #### Bug fixes
 - Fixed an issue in `tickets_cog` where permissions for the tickets info channel were not properly assigned to all administrators with permissions for tickets. Fixed an issue where non-global administrators were not receiving tickets properly.

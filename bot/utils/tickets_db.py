@@ -1,5 +1,6 @@
 # bot/utils/tickets_db.py
-
+import json
+import sqlite3
 import aiosqlite
 import logging
 from datetime import datetime
@@ -43,6 +44,17 @@ class TicketsDatabaseManager:
                 )
             ''')
             await db.commit()
+
+            # Add is_exported column to tickets table if it doesn't exist
+            try:
+                await db.execute('''
+                            ALTER TABLE tickets 
+                            ADD COLUMN is_exported BOOLEAN NOT NULL DEFAULT 0
+                        ''')
+                await db.commit()
+            except sqlite3.OperationalError:
+                # Column already exists
+                pass
 
     async def create_ticket(self, channel_id: int, message_id: int,
                             creator_id: int, type_name: str) -> bool:
@@ -297,3 +309,86 @@ class TicketsDatabaseManager:
                     'is_closed': record[5]
                 }
             return None
+
+    async def get_unexported_closed_tickets(self, channel_ids: List[int]) -> List[Tuple]:
+        """
+        Get all closed but unexported tickets from a list of channel IDs.
+        Returns: List of tuples containing (channel_id, message_id, creator_id, type_name)
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.cursor()
+            placeholders = ','.join('?' * len(channel_ids))
+            await cursor.execute(f'''
+                SELECT channel_id, message_id, creator_id, type_name 
+                FROM tickets 
+                WHERE is_closed = 1 
+                AND is_exported = 0 
+                AND channel_id IN ({placeholders})
+            ''', channel_ids)
+
+            return await cursor.fetchall()
+
+    async def mark_ticket_as_exported(self, channel_id: int) -> None:
+        """Mark a ticket as exported in the database."""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('''
+                UPDATE tickets 
+                SET is_exported = 1 
+                WHERE channel_id = ?
+            ''', (channel_id,))
+            await db.commit()
+
+    async def get_ticket_history(self, channel_id: int) -> dict:
+        """
+        Get complete ticket history including all metadata and members.
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.cursor()
+
+            # Get basic ticket info
+            await cursor.execute('''
+                SELECT channel_id, message_id, creator_id, type_name, 
+                       created_at, accepted_by, accepted_at, closed_by, 
+                       closed_at, close_reason
+                FROM tickets 
+                WHERE channel_id = ?
+            ''', (channel_id,))
+            ticket_data = await cursor.fetchone()
+
+            if not ticket_data:
+                return None
+
+            # Get ticket members
+            await cursor.execute('''
+                SELECT user_id, added_by, added_at 
+                FROM ticket_members 
+                WHERE channel_id = ? 
+                ORDER BY added_at ASC
+            ''', (channel_id,))
+            members = await cursor.fetchall()
+
+            # Format the data
+            ticket_history = {
+                "channel_id": ticket_data[0],
+                "message_id": ticket_data[1],
+                "creator_id": ticket_data[2],
+                "type_name": ticket_data[3],
+                "created_at": ticket_data[4],
+                "accepted_by": ticket_data[5],
+                "accepted_at": ticket_data[6],
+                "closed_by": ticket_data[7],
+                "closed_at": ticket_data[8],
+                "close_reason": ticket_data[9],
+                "members": [
+                    {
+                        "user_id": member[0],
+                        "added_by": member[1],
+                        "added_at": member[2]
+                    }
+                    for member in members
+                ]
+            }
+
+            return ticket_history
+
+

@@ -23,14 +23,6 @@
       "guide": "请详细描述你需要的功能的逻辑或者实现的功能，以及需要它的场景",
       "button_color": "b",
       "admin_roles": [],
-      "admin_users": []
-    },
-    "说悄悄话": {
-      "name": "说悄悄话",
-      "description": "有什么想说的来这里说",
-      "guide": "快点说",
-      "button_color": "r",
-      "admin_roles": [],
       "admin_users": [
         1145141919810
       ]
@@ -54,6 +46,38 @@
         1145141919810
       ],
       "admin_users": []
+    },
+    "🔇说悄悄话": {
+      "name": "🔇说悄悄话",
+      "description": "有什么想说的来这里说",
+      "guide": "快点说",
+      "button_color": "r",
+      "admin_roles": [],
+      "admin_users": [
+        1145141919810
+      ]
+    }
+  },
+  "archive": {
+    "output_path": "./archives/tickets",
+    "_comment2": "media_size_limit设置为52428800即限制最大下载媒体文件为50MB",
+    "media_size_limit": 52428800,
+    "messages": {
+      "archive_start": "开始归档分类 {category_name}",
+      "archive_complete": "归档完成。共归档了 {ticket_count} 个工单到 {archive_path}",
+      "archive_no_tickets": "分类中没有已关闭的工单可以归档",
+      "archive_error": "归档过程中发生错误: {error}",
+      "file_too_large": "文件 {filename} 超过大小限制 ({size}MB)，仅保存引用",
+      "ticket_archived_embed": {
+        "title": "📦 工单已归档",
+        "description": "此工单的内容已被存档，可在以下位置找到相关文件：",
+        "fields": {
+          "archive_time": "归档时间",
+          "archive_path": "归档位置",
+          "archive_file": "归档文件"
+        },
+        "footer": "工单归档系统"
+      }
     }
   },
   "messages": {
@@ -79,7 +103,7 @@
     "ticket_add_user_button": "👥添加用户",
     "add_user_modal_title": "添加用户",
     "add_user_modal_label": "用户 ID",
-    "add_user_modal_placeholder": "输入用户 ID (例如: 1145141919810)",
+    "add_user_modal_placeholder": "输入用户 ID (例如: 123456789012345678)",
     "add_user_invalid_id": "无效的用户 ID",
     "add_user_not_found": "找不到该用户",
     "add_user_already_added": "该用户已经在工单中",
@@ -188,7 +212,7 @@
     "global_ticket_select_description": "全局管理员权限",
     "ticket_category_move_to_closed_error": "将工单移至已关闭分类时发生错误，请联系管理员。",
     "ticket_category_get_closed_error": "获取已关闭工单分类时发生错误，请联系管理员。",
-    "ticket_close_stats_error": "该工单已关闭，无法再次关闭。",
+    "ticket_close_stats_error": "该工单已关闭，无法再次关闭",
     "ticket_close_get_info_error": "获取工单信息时发生错误，请联系管理员。",
     "ticket_close_error": "关闭工单时发生错误，请联系管理员。",
     "ticket_accept_get_info_error": "获取工单信息时发生错误，请联系管理员。"

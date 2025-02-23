@@ -1,19 +1,20 @@
-import sqlite3
-import discord
 from discord.ext import commands
-from discord import app_commands
-import logging
 import json
+import logging
+import os
+import tempfile
+from datetime import datetime
 from pathlib import Path
+from typing import Optional, List
+from typing import Tuple
+
 import aiofiles
 import aiosqlite
-from typing import Optional
-from datetime import datetime
-
-from bot.utils import config, check_channel_validity, TicketsDatabaseManager
-
 import discord
-from typing import Optional, List
+from discord import app_commands
+from discord.ext import commands
+
+from bot.utils import config, check_channel_validity, TicketsDatabaseManager, MediaHandler, generate_file_tree
 
 
 class EmbedColors:
@@ -1737,9 +1738,9 @@ class TicketsCog(commands.Cog):
                     manage_messages=True
                 )
 
-        # 添加所有工单类型特定的管理员权限
+        # Add type-specific admin permissions
         for type_data in self.conf['ticket_types'].values():
-            # 添加类型特定的角色权限
+            # Add type-specific role permissions
             for role_id in type_data.get('admin_roles', []):
                 role = self.guild.get_role(role_id)
                 if role and role not in overwrites:
@@ -1749,7 +1750,7 @@ class TicketsCog(commands.Cog):
                         manage_messages=True
                     )
 
-            # 添加类型特定的用户权限
+            # Add type-specific user permissions
             for user_id in type_data.get('admin_users', []):
                 member = self.guild.get_member(user_id)
                 if member and member not in overwrites:
@@ -1759,73 +1760,105 @@ class TicketsCog(commands.Cog):
                         manage_messages=True
                     )
 
-        # 更新信息频道权限
+        # Update info channel permissions
         await info_channel.edit(overwrites=overwrites)
 
-        # Get all active tickets using existing database method
+        # Get all active tickets
         active_tickets = await self.db.get_active_tickets()
 
         # Update permissions for all active ticket channels
-        for channel_id, _, _, type_name, _ in active_tickets:
+        for channel_id, message_id, creator_id, type_name, is_accepted in active_tickets:
             channel = self.guild.get_channel(channel_id)
             if not channel:
                 continue
 
-            # Get existing overwrites and update them
-            channel_overwrites = dict(channel.overwrites)
+            # Start with fresh overwrites, preserving only the base permissions
+            fresh_overwrites = {
+                self.guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                self.guild.me: discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=True,
+                    manage_channels=True,
+                    manage_messages=True
+                )
+            }
 
-            # Ensure default role and bot permissions
-            channel_overwrites[self.guild.default_role] = discord.PermissionOverwrite(view_channel=False)
-            channel_overwrites[self.guild.me] = discord.PermissionOverwrite(
-                view_channel=True,
-                send_messages=True,
-                manage_channels=True,
-                manage_messages=True
-            )
+            # Add creator permissions (if they still exist in the guild)
+            creator = self.guild.get_member(creator_id)
+            if creator:
+                fresh_overwrites[creator] = discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=True,
+                    read_message_history=True
+                )
 
-            # Add global admin roles
+            # Get ticket members
+            ticket_info = await self.db.fetch_ticket(channel_id)
+            if ticket_info and ticket_info.get('is_closed'):
+                # If ticket is closed, members can only view
+                members = await self.db.get_ticket_members(channel_id)
+                for member_id, _, _ in members:
+                    member = self.guild.get_member(member_id)
+                    if member and member != creator:
+                        fresh_overwrites[member] = discord.PermissionOverwrite(
+                            view_channel=True,
+                            send_messages=False,
+                            read_message_history=True
+                        )
+            else:
+                # For open tickets, members can view and send messages
+                members = await self.db.get_ticket_members(channel_id)
+                for member_id, _, _ in members:
+                    member = self.guild.get_member(member_id)
+                    if member and member != creator:
+                        fresh_overwrites[member] = discord.PermissionOverwrite(
+                            view_channel=True,
+                            send_messages=True,
+                            read_message_history=True
+                        )
+
+            # Add global admin permissions
             for role_id in self.conf.get('admin_roles', []):
                 role = self.guild.get_role(role_id)
                 if role:
-                    channel_overwrites[role] = discord.PermissionOverwrite(
+                    fresh_overwrites[role] = discord.PermissionOverwrite(
                         view_channel=True,
                         send_messages=True,
                         manage_messages=True
                     )
 
-            # Add global admin users
             for user_id in self.conf.get('admin_users', []):
                 member = self.guild.get_member(user_id)
                 if member:
-                    channel_overwrites[member] = discord.PermissionOverwrite(
+                    fresh_overwrites[member] = discord.PermissionOverwrite(
                         view_channel=True,
                         send_messages=True,
                         manage_messages=True
                     )
 
-            # Add type-specific admin roles
+            # Add type-specific admin permissions
             type_data = self.conf['ticket_types'].get(type_name, {})
             for role_id in type_data.get('admin_roles', []):
                 role = self.guild.get_role(role_id)
                 if role:
-                    channel_overwrites[role] = discord.PermissionOverwrite(
+                    fresh_overwrites[role] = discord.PermissionOverwrite(
                         view_channel=True,
                         send_messages=True,
                         manage_messages=True
                     )
 
-            # Add type-specific admin users
             for user_id in type_data.get('admin_users', []):
                 member = self.guild.get_member(user_id)
                 if member:
-                    channel_overwrites[member] = discord.PermissionOverwrite(
+                    fresh_overwrites[member] = discord.PermissionOverwrite(
                         view_channel=True,
                         send_messages=True,
                         manage_messages=True
                     )
 
             try:
-                await channel.edit(overwrites=channel_overwrites)
+                # Update channel with fresh overwrites
+                await channel.edit(overwrites=fresh_overwrites)
             except discord.HTTPException as e:
                 logging.error(f"Failed to update permissions for channel {channel.id}: {e}")
 
@@ -2687,6 +2720,246 @@ class TicketsCog(commands.Cog):
                     self.conf['messages']['ticket_close_error'],
                     ephemeral=True
                 )
+
+    async def export_ticket_content(self, channel: discord.TextChannel, ticket_history: dict) -> dict:
+        """
+        Export all content of the work order channel, including message history and media files.
+        """
+        try:
+            # 创建工单专属导出目录
+            ticket_dir = os.path.join(self.conf['archive']['output_path'], f"ticket_{channel.id}")
+            os.makedirs(ticket_dir, exist_ok=True)
+
+            # 初始化媒体处理器
+            media_handler = MediaHandler(
+                archive_path=self.conf['archive']['output_path'],
+                size_limit=self.conf['archive']['media_size_limit']
+            )
+
+            # 获取所有消息
+            messages = []
+            async for message in channel.history(limit=None, oldest_first=True):
+                message_data = {
+                    "id": message.id,
+                    "author_id": message.author.id,
+                    "author_name": message.author.name,
+                    "content": message.content,
+                    "created_at": message.created_at.isoformat(),
+                    "attachments": [],
+                    "embeds": []
+                }
+
+                # 处理附件
+                for attachment in message.attachments:
+                    media_info = await media_handler.download_media(attachment.url, f"ticket_{channel.id}")
+                    if media_info:
+                        message_data["attachments"].append(media_info)
+
+                # 处理嵌入内容中的图片
+                for embed in message.embeds:
+                    embed_data = {
+                        "title": embed.title,
+                        "description": embed.description,
+                        "image": None,
+                        "thumbnail": None
+                    }
+
+                    # 处理嵌入图片
+                    if embed.image:
+                        media_info = await media_handler.download_media(
+                            embed.image.url,
+                            f"ticket_{channel.id}"
+                        )
+                        embed_data["image"] = media_info
+
+                    if embed.thumbnail:
+                        media_info = await media_handler.download_media(
+                            embed.thumbnail.url,
+                            f"ticket_{channel.id}"
+                        )
+                        embed_data["thumbnail"] = media_info
+
+                    message_data["embeds"].append(embed_data)
+
+                messages.append(message_data)
+
+            # 创建完整的导出数据
+            export_data = {
+                "ticket_info": ticket_history,
+                "messages": messages,
+                "export_time": datetime.now().isoformat(),
+                "channel_name": channel.name,
+                "channel_id": channel.id
+            }
+
+            # 写入JSON文件
+            json_path = os.path.join(ticket_dir, "ticket_data.json")
+            async with aiofiles.open(json_path, 'w', encoding='utf-8') as f:
+                await f.write(json.dumps(export_data, indent=2, ensure_ascii=False))
+
+            return export_data
+
+        except Exception as e:
+            logging.error(f"Error exporting ticket {channel.id}: {e}")
+            raise
+
+    async def archive_category(self, category: discord.CategoryChannel) -> Tuple[int, list]:
+        """
+        Archive all closed work orders in the specified category.
+        returns: (number of Work Orders filed, list of Work Order IDs in error)
+        """
+        archived_count = 0
+        failed_tickets = []
+
+        # Get channel IDs from the category
+        channel_ids = [channel.id for channel in category.channels]
+
+        # Get all unexported closed tickets
+        unexported_tickets = await self.db.get_unexported_closed_tickets(channel_ids)
+
+        for channel_id, message_id, creator_id, type_name in unexported_tickets:
+            channel = self.bot.get_channel(channel_id)
+            if not channel:
+                continue
+
+            try:
+                # 获取工单完整历史
+                ticket_history = await self.db.get_ticket_history(channel_id)
+                if not ticket_history:
+                    continue
+
+                # 导出工单内容
+                await self.export_ticket_content(channel, ticket_history)
+
+                # 创建并发送归档通知嵌入消息
+                archive_messages = self.conf['archive']['messages']
+                embed_config = archive_messages['ticket_archived_embed']
+
+                archive_path = os.path.abspath(os.path.join(
+                    self.conf['archive']['output_path'],
+                    f"ticket_{channel.id}"
+                ))
+
+                embed = discord.Embed(
+                    title=embed_config['title'],
+                    description=embed_config['description'],
+                    color=discord.Color.blue(),
+                    timestamp=discord.utils.utcnow()
+                )
+
+                # 添加归档信息字段
+                embed.add_field(
+                    name=embed_config['fields']['archive_time'],
+                    value=f"<t:{int(datetime.now().timestamp())}:F>",
+                    inline=False
+                )
+                embed.add_field(
+                    name=embed_config['fields']['archive_path'],
+                    value=f"`{archive_path}`",
+                    inline=False
+                )
+                embed.add_field(
+                    name=embed_config['fields']['archive_file'],
+                    value="`ticket_data.json`",
+                    inline=False
+                )
+
+                embed.set_footer(text=embed_config['footer'])
+
+                # 发送归档通知
+                await channel.send(embed=embed)
+
+                # 标记为已导出
+                await self.db.mark_ticket_as_exported(channel_id)
+                archived_count += 1
+
+            except Exception as e:
+                logging.error(f"Failed to archive ticket {channel_id}: {e}")
+                failed_tickets.append(channel_id)
+
+        return archived_count, failed_tickets
+
+    @app_commands.command(
+        name="tickets_archive",
+        description="Archive all closed tickets in specified category"
+    )
+    @app_commands.describe(
+        category_id="ID of the category to archive"
+    )
+    async def archive_tickets(self, interaction: discord.Interaction, category_id: str):
+        """Archive all closed tickets in specified category"""
+        if not await self.check_ticket_channel(interaction):
+            return
+
+        await interaction.response.defer()
+
+        try:
+            category_id = int(category_id)
+            category = self.bot.get_channel(category_id)
+
+            if not category or not isinstance(category, discord.CategoryChannel):
+                await interaction.followup.send("Invalid category ID", ephemeral=True)
+                return
+
+            # Start archiving
+            await interaction.followup.send(
+                self.conf['archive']['messages']['archive_start'].format(
+                    category_name=category.name
+                )
+            )
+
+            archived_count, failed_tickets = await self.archive_category(category)
+
+            if archived_count == 0:
+                await interaction.followup.send(
+                    self.conf['archive']['messages']['archive_no_tickets']
+                )
+                return
+
+            # Generate archive report
+            archive_path = os.path.abspath(self.conf['archive']['output_path'])
+            # Build report header
+            tree_report = []
+            tree_report.append(f"Archive Location: {archive_path}")
+            tree_report.append(f"Archive Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            tree_report.append(f"Archived Tickets: {archived_count}")
+            tree_report.append("")
+            tree_report.append("Directory Structure:")
+            tree_report.append(generate_file_tree(archive_path))
+
+            # Add failed tickets information if any
+            if failed_tickets:
+                tree_report.append("")
+                tree_report.append("Failed Ticket IDs:")
+                tree_report.append(", ".join(map(str, failed_tickets)))
+
+            # Create temporary file and write report
+            with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.txt', encoding='utf-8') as temp:
+                temp.write("\n".join(tree_report))
+                temp_path = temp.name
+
+            try:
+                # Send archive report
+                await interaction.followup.send(
+                    self.conf['archive']['messages']['archive_complete'].format(
+                        ticket_count=archived_count,
+                        archive_path=archive_path
+                    ),
+                    file=discord.File(temp_path, filename=f"archive_report_{category.name}.txt")
+                )
+            finally:
+                # Clean up temporary file
+                try:
+                    os.unlink(temp_path)
+                except Exception as e:
+                    logging.error(f"Failed to delete temporary file {temp_path}: {e}")
+
+        except Exception as e:
+            await interaction.followup.send(
+                self.conf['archive']['messages']['archive_error'].format(error=str(e)),
+                ephemeral=True
+            )
+            logging.error(f"Error during archive process: {e}")
 
     @commands.Cog.listener()
     async def on_ready(self):
