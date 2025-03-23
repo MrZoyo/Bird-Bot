@@ -1,6 +1,6 @@
 # Bird Bot
 
-`Version: 1.2.4`
+`Version: 1.3.0b`
 
 ---
 
@@ -26,7 +26,6 @@ The bot's code is deeply optimised for low-performance devices, using asynchrono
   - [Voice_Channel_Cog](#voice_channel_cog)
   - [Create_Invitation_Cog](#create_invitation_cog)
   - [Welcome_Cog](#welcome_cog)
-  - [Illegal_Team_Act_Cog](#illegal_team_act_cog)
   - [Check_Status_Cog](#checkstatuscog)
   - [Achievement_Cog](#achievement_cog)
   - [Role_Cog](#role_cog)
@@ -35,12 +34,18 @@ The bot's code is deeply optimised for low-performance devices, using asynchrono
   - [Giveaway_Cog](#giveaway_cog)
   - [Rating_Cog](#rating_cog)
   - [Tickets_Cog](#tickets_cog)
+  - [Shop_Cog](#shop_cog)
+  - [PrivateRoom_cog](#privateroom_cog)
   - [Game_DnD_Cog](#game_dnd_cog)
   - [Game_Spymode_Cog](#game_spymode_cog)
 - [Utilities and Tools](#utilities-and-tools)
   - [config](#config)
   - [channel_validator](#channel_validator)
   - [tickets_db](#tickets_db)
+  - [file_utils](#file_utils)
+  - [media_handler](#media_handler)
+  - [shop_db](#shop_db)
+  - [privateroom_db](#privateroom_db)
 - [Update Log](#update-log)
 
 ---
@@ -86,19 +91,6 @@ The bot will also send a DM to the user who joins the server.
 This feature contains command functions that allow the welcome message to be summoned manually by the user.
 - `/testwelcome <member> <member_number>` - Send the welcome message for specific member with specific number.
 - For default `<member>` is the user who uses the command, `<member_number>` is the total number of people in the server.
-
-### Illegal_Team_Act_Cog(about to be deprecated)
-From version `1.0.0`, the bot will not automatically record the user's illegal teaming behaviour.
-
-For users who are not in the server's channel but sent a teaming message, the bot will record their id, what they sent and when they sent it.
-If the user resends a normal teaming message, the bot deletes their illegal teaming record for 5 minutes.
-
-Provides commands to search for records:
-- `!illegal_ranking` or `/illegal_ranking`- Query the 20 users with the most records of illegal teaming behaviour.
-- `!illegal_greater_than <number>` or `/illegal_greater_than` - Query all users whose number of illegal teaming behaviours is greater than `<number>`.
-- `/illegal_member <member>` - Query all illegal teaming records for the specified `member`.
-- `/illegal_member_by_id <member_id>` - Query all illegal teaming records for the specified `member_id`.
-- `/illegal_add_record <member> <content> <time>` - Manually add a record for a specified member.
 
 ### Check_Status_Cog
 Provide some convenient functions for querying related data.
@@ -264,7 +256,6 @@ A cancelled rating item is no longer interactive and no statistics will be displ
 - This command allows the user to modify the description of a rating item.
 - Only the description of an open rating item can be modified.
 
-
 ### Tickets_Cog
 The Tickets_Cog provides a comprehensive ticket management system that allows users to create, manage, and track support tickets. It includes features for ticket creation, user management, and statistical tracking.
 
@@ -324,6 +315,44 @@ Close a ticket. This command can only be used in ticket channels.
 Archive a series of closed tickets. This command can only be used in ticket channels.
 This command will archive all closed tickets in given category. All the files will be saved in the `archive` folder.
 
+### shop_cog
+
+The shop system provides ways for users to earn and spend points, with features including:
+
+- **Balance management**: Check balances, transfer points between users
+- **Check-in system**: Daily check-ins with streak tracking
+- **Transaction history**: View detailed history of all transactions
+- **Admin commands**: Manually adjust user balances
+
+Commands:
+- `/balance`: View your current points balance
+- `/checkin`: Perform daily check-in to earn points
+- `/transfer`: Transfer points to another user
+- `/adjust_balance`: (Admin) Adjust a user's balance
+- `/transaction_history`: View transaction history
+- `/checkin_history`: View check-in history by month
+
+### privateroom_cog
+
+The private room system allows users to create and manage their own voice channels with full permissions.
+
+Features:
+- **Temporary ownership**: Rooms expire after a configurable period
+- **Point-based purchase**: Users spend points to acquire rooms
+- **Activity discounts**: Users with more voice activity receive discounts
+- **Room restoration**: Users can restore accidentally deleted rooms
+
+Commands:
+- `/privateroom_init`: (Admin) Initialize the private room system
+- `/privateroom_setup`: (Admin) Set up the private room shop
+- `/privateroom_reset`: (Admin) Reset the entire system
+- `/privateroom_list`: List all active private rooms
+- `/privateroom_ban`: (Admin) Ban a user from having private rooms
+
+Shop interface:
+- **Purchase button**: Buy a new private room
+- **Restore button**: Restore a previously owned room
+
 ### Game_DnD_Cog
 Provides Dungeons & Dragons (DnD) players with a convenient way to generate random roll dice points.
 - Supports up to 100 up to 1,000 dice 🎲 Randomized.
@@ -353,8 +382,19 @@ A module that integrates tickets_cog's interaction with the database.
 A module that provides file operations. Mainly used for tickets archive tickets_cog.
 ### media_handler
 A module that provides media operations. Mainly used for tickets archive tickets_cog.
+### shop_db
+A module that integrates shop_cog's interaction with the database.
+### privateroom_db
+A module that integrates privateroom_cog's interaction with the database.
 
 ## Update Log
+
+### V1.3.0b - 2025-03-24
+#### New features and improvements
+- Added a new command `/rank` to provide a new ranking system surface for the server.
+- Added a new cog `Shop_Cog` to provide a shop system for users to earn and spend points. For more details, please check the function introduction [Shop_Cog](#shop_cog).
+- Added a new cog `PrivateRoom_Cog` to provide a private room system for users to buy their own voice channels. For more details, please check the function introduction [PrivateRoom_Cog](#privateroom_cog).
+
 ### V1.2.4 - 2025-02-24
 #### Bug fixes
 -  Fixed an issue in `tickets_cog` where global role admin settings were not synchronized to all open tickets in a timely manner in some cases.

@@ -164,5 +164,45 @@
     "giveaway": "\uD83D\uDFE2 参加抽奖"
   },
   "achievements_progress_title": "{date} 成就进度 ",
+  "_comment": "New additions for the rank command UI",
+  "rank": {
+    "all_button_label": "\uD83D\uDFE3 全部排名",
+    "type_button_labels": {
+      "reaction": "添加反应",
+      "message": "发送消息",
+      "time_spent": "语音时长",
+      "giveaway": "参加抽奖"
+    },
+    "embed_title_all": "🏆 成就排行榜 🏆",
+    "embed_title_single": "🏆 {type_name}排行榜 🏆",
+    "embed_title_date_format": "{title} ({year}-{month})",
+    "pagination_field_name": "排名 {start}-{end}",
+    "rank_prefix": "#{rank}",
+    "no_data_message": "暂无数据",
+    "extended_emojis": [
+      ":first_place:",
+      ":second_place:",
+      ":third_place:",
+      ":four:",
+      ":five:",
+      ":six:",
+      ":seven:",
+      ":eight:",
+      ":nine:",
+      ":keycap_ten:"
+    ],
+
+    "_comment": "Initial introduction screen texts",
+    "intro_title": "🏆 成就排行榜 🏆",
+    "intro_description": "欢迎使用成就排行榜！请点击下方按钮查看不同类型的成就排行：",
+    "intro_all_button": "查看全部成就排行 TOP 10",
+    "intro_type_buttons": {
+      "reaction": "查看 **添加反应** 成就 TOP 40",
+      "message": "查看 **发送消息** 成就 TOP 40",
+      "time_spent": "查看 **语音时长** 成就 TOP 40",
+      "giveaway": "查看 **参加抽奖** 成就 TOP 40"
+    },
+    "intro_footer": "---------点击按钮查看对应排名--------"
+  },
   "_comment": "====================================================================="
 }

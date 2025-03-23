@@ -33,3 +33,22 @@ async def check_channel_validity(ctx_or_interaction, allowed_channel_id=None):
             await ctx_or_interaction.response.send_message(message, ephemeral=True)
         return False
     return True
+
+
+async def check_voice_state(ctx_or_interaction):
+    """
+    Check if a user is in a voice channel.
+
+    Args:
+        ctx_or_interaction: Context or Interaction from Discord
+
+    Returns:
+        bool: True if user is in a voice channel, False otherwise
+    """
+    # Determine if it's a Context or Interaction
+    if isinstance(ctx_or_interaction, discord.ext.commands.Context):
+        user = ctx_or_interaction.author
+    else:  # It's an Interaction
+        user = ctx_or_interaction.user
+
+    return user.voice is not None and user.voice.channel is not None
