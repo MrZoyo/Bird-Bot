@@ -1032,6 +1032,12 @@ class PrivateRoomCog(commands.Cog):
 
         embed.add_field(
             name="",
+            value=self.conf['messages']['room_info_warning'],
+            inline=False
+        )
+
+        embed.add_field(
+            name="",
             value=self.conf['messages']['room_info_expires'].format(
                 end_date=end_date.strftime("%Y-%m-%d %H:%M")
             ),

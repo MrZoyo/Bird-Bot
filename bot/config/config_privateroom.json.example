@@ -48,6 +48,7 @@
     "room_info_owner": "👑 房主: {owner}",
     "room_info_created": "🕒 创建时间: {start_date}",
     "room_info_expires": "⌛ 到期时间: {end_date}",
+    "room_info_warning": "⚠️ 由于discord的权限设置存在漏洞，请明确在私房中禁止任何人拥有和使用[服务器静音]或者[服务器双向禁止]权限，这会导致严重后果。对于权限滥用，您可能会被取消私房权限。",
     "room_info_footer": "房间到期后将自动删除，包括所有聊天记录。",
 
     "room_expired_title": "📢 您的私人房间已过期",
