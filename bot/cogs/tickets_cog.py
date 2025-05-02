@@ -115,16 +115,75 @@ class TicketLogger:
         await self._send_log(embed)
 
     async def log_ticket_close(self, channel: discord.TextChannel,
-                               closer: discord.Member, reason: str):
+                               closer: discord.Member, reason: str, ticket_type=None):
         """Log ticket closure"""
         ticket_number = await self.get_ticket_number(channel.id)
         title = await self.format_title(self.messages['log_ticket_close_title'], ticket_number)
+
+        # Use a default unavailable text from config or fallback
+        unavailable = self.messages.get('unavailable_text', "无")
+
+        # Gather ticket information from database
+        db_ticket = await self.db.fetch_ticket(channel.id)
+        ticket_history = await self.db.get_ticket_history(channel.id)
+
+        # Default values for all required fields
+        creator_mention = unavailable
+        acceptor_mention = unavailable
+        members_text = unavailable
+        created_at = unavailable
+        type_name = ticket_type or (db_ticket.get('type_name') if db_ticket else unavailable)
+
+        # If we have ticket history, populate the information
+        if ticket_history:
+            # Get creator information
+            creator_id = ticket_history.get("creator_id")
+            if creator_id:
+                creator = self.bot.get_user(creator_id)
+                creator_mention = creator.mention if creator else f"<@{creator_id}>"
+
+            # Get acceptor information
+            acceptor_id = ticket_history.get("accepted_by")
+            if acceptor_id:
+                acceptor = self.bot.get_user(acceptor_id)
+                acceptor_mention = acceptor.mention if acceptor else f"<@{acceptor_id}>"
+
+            # Format creation time
+            created_at_str = ticket_history.get("created_at")
+            if created_at_str:
+                try:
+                    dt = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
+                    created_at = f"<t:{int(dt.timestamp())}:F>"
+                except (ValueError, TypeError) as e:
+                    created_at = created_at_str
+
+            # Get added members
+            members = ticket_history.get("members", [])
+            if members:
+                member_mentions = []
+                for member_data in members:
+                    if isinstance(member_data, dict):
+                        member_id = member_data.get("user_id")
+                        if member_id and member_id != creator_id:
+                            member = self.bot.get_user(member_id)
+                            member_mentions.append(member.mention if member else f"<@{member_id}>")
+
+                members_text = ", ".join(member_mentions) if member_mentions else unavailable
+
+        # Create the formatted description with all required fields
+        description = self.messages['log_ticket_close_description'].format(
+            closer=closer.mention,
+            reason=reason,
+            type_name=type_name,
+            creator=creator_mention,
+            acceptor=acceptor_mention,
+            members=members_text,
+            created_at=created_at
+        )
+
         embed = await self._create_base_embed(
             title=title,
-            description=self.messages['log_ticket_close_description'].format(
-                closer=closer.mention,
-                reason=reason
-            ),
+            description=description,
             color=self.colors.CLOSE,
             channel_mentions=[(self.messages['log_ticket_view_button'], channel)]
         )
@@ -926,40 +985,39 @@ class TicketSystem:
         return True
 
 
-class TicketConfirmView(discord.ui.View):
+class TicketConfirmModal(discord.ui.Modal):
     def __init__(self, ticket_system, type_name, type_data):
-        super().__init__(timeout=60)
+        messages = ticket_system.conf['messages']
+        super().__init__(title=messages['ticket_modal_confirm_title'].format(type_name=type_name))
         self.ticket_system = ticket_system
         self.type_name = type_name
         self.type_data = type_data
-        self.messages = self.ticket_system.conf['messages']
+        self.messages = messages
 
-        # 添加确认和取消按钮
-        confirm_button = discord.ui.Button(
-            style=discord.ButtonStyle.green,
-            label=self.messages['ticket_create_confirm_button']
-        )
-        confirm_button.callback = self.confirm
-
-        cancel_button = discord.ui.Button(
-            style=discord.ButtonStyle.grey,
-            label=self.messages['ticket_create_cancel_button']
-        )
-        cancel_button.callback = self.cancel
-
-        self.add_item(confirm_button)
-        self.add_item(cancel_button)
-
-    async def cancel(self, interaction: discord.Interaction):
-        """Handle cancellation of ticket creation"""
-        await interaction.response.edit_message(
-            content=self.messages['ticket_create_cancelled'],
-            view=None
+        # Confirmation input field
+        self.confirmation = discord.ui.TextInput(
+            label=self.messages['ticket_modal_confirm_label'].format(
+                type_name=self.type_name
+            ),
+            placeholder=self.messages['ticket_modal_confirm_placeholder'],
+            required=True,
+            min_length=3,
+            max_length=10
         )
 
-    async def confirm(self, interaction: discord.Interaction):
-        """Handle the confirmation of ticket creation"""
-        await interaction.response.defer()
+        self.add_item(self.confirmation)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        # Validate the confirmation text
+        if self.confirmation.value.lower() != "yes":
+            await interaction.response.send_message(
+                self.messages['ticket_confirmation_failed'],
+                ephemeral=True
+            )
+            return
+
+        # Defer the response to handle longer operations
+        await interaction.response.defer(ephemeral=True)
 
         # Get the next available ticket number
         ticket_number = await self.ticket_system.get_next_ticket_number()
@@ -1026,27 +1084,27 @@ class TicketConfirmView(discord.ui.View):
                     manage_messages=True
                 )
 
-        # 获取可用分类
+        # Get available category
         try:
             category = await self.ticket_system.get_available_category(is_closed=False)
         except Exception as e:
             await interaction.followup.send(
-                "Failed to get or create category for the ticket. Please contact administrators.",
+                self.messages['ticket_category_get_error'],
                 ephemeral=True
             )
             logging.error(f"Failed to get category for ticket: {e}")
             return
 
-        # 创建频道
+        # Create channel
         try:
             channel = await interaction.guild.create_text_channel(
                 name=channel_name,
                 category=category,
-                overwrites=overwrites  # 使用更新后的权限设置
+                overwrites=overwrites
             )
         except discord.HTTPException as e:
             await interaction.followup.send(
-                "Failed to create ticket channel. Please try again later.",
+                self.messages['ticket_channel_create_error'],
                 ephemeral=True
             )
             logging.error(f"Failed to create ticket channel: {e}")
@@ -1062,14 +1120,14 @@ class TicketConfirmView(discord.ui.View):
             color=discord.Color.blue()
         )
 
-        # 添加创建者和时间信息
+        # Add creator and time information
         embed.add_field(
-            name="创建者",
+            name=self.messages['ticket_created_creator'],
             value=f"{interaction.user.mention}",
             inline=True
         )
         embed.add_field(
-            name="创建时间",
+            name=self.messages['ticket_created_time'],
             value=f"<t:{int(datetime.now().timestamp())}:F>",
             inline=True
         )
@@ -1098,9 +1156,9 @@ class TicketConfirmView(discord.ui.View):
                 type_name=self.type_name
         ):
             # Send notifications
-            await interaction.edit_original_response(
-                content=self.messages['ticket_create_success'].format(channel=channel.mention),
-                view=None
+            await interaction.followup.send(
+                self.messages['ticket_create_success'].format(channel=channel.mention),
+                ephemeral=True
             )
 
             # Log notification
@@ -1110,32 +1168,33 @@ class TicketConfirmView(discord.ui.View):
                 creator=interaction.user,
                 channel=channel
             )
-            admins_to_notify = set()  # 使用集合避免重复
 
-            # 添加全局管理员
+            # Notify admins
+            admins_to_notify = set()  # Use a set to avoid duplicates
+
+            # Add global admins
             for user_id in self.ticket_system.conf.get('admin_users', []):
                 admins_to_notify.add(user_id)
 
-            # 添加拥有全局管理员角色的用户
+            # Add users with global admin roles
             for role_id in self.ticket_system.conf.get('admin_roles', []):
                 role = interaction.guild.get_role(role_id)
                 if role:
                     for member in role.members:
                         admins_to_notify.add(member.id)
 
-            # 添加类型特定管理员
-            type_data = self.ticket_system.conf['ticket_types'].get(self.type_name, {})
+            # Add type-specific admins
             for user_id in type_data.get('admin_users', []):
                 admins_to_notify.add(user_id)
 
-            # 添加拥有类型特定管理员角色的用户
+            # Add users with type-specific admin roles
             for role_id in type_data.get('admin_roles', []):
                 role = interaction.guild.get_role(role_id)
                 if role:
                     for member in role.members:
                         admins_to_notify.add(member.id)
 
-            # 创建管理员通知嵌入消息
+            # Create admin notification embed
             admin_embed = discord.Embed(
                 title=self.messages['log_ticket_create_title'],
                 description=self.messages['log_ticket_create_description'].format(
@@ -1146,10 +1205,10 @@ class TicketConfirmView(discord.ui.View):
                 color=discord.Color.blue()
             )
 
-            # 创建跳转按钮视图
+            # Create jump button view
             view = JumpToChannelView(channel)
 
-            # 发送通知给所有管理员
+            # Send notifications to all admins
             for admin_id in admins_to_notify:
                 try:
                     admin_user = await self.ticket_system.cog.bot.fetch_user(admin_id)
@@ -1157,7 +1216,7 @@ class TicketConfirmView(discord.ui.View):
                         try:
                             await admin_user.send(embed=admin_embed, view=view)
                         except discord.Forbidden:
-                            # 用户可能关闭了私信
+                            # User may have DMs disabled
                             continue
                         except Exception as e:
                             logging.error(f"Failed to send notification to admin {admin_id}: {e}")
@@ -1165,7 +1224,7 @@ class TicketConfirmView(discord.ui.View):
                     logging.warning(f"Could not find admin user with ID {admin_id}")
                     continue
 
-            # DM notification
+            # DM notification to ticket creator
             try:
                 creator_embed = discord.Embed(
                     title=self.messages['ticket_created_dm_title'],
@@ -1182,9 +1241,9 @@ class TicketConfirmView(discord.ui.View):
         else:
             # Handle creation failure
             await channel.delete()
-            await interaction.edit_original_response(
-                content="Failed to create ticket. Please try again.",
-                view=None
+            await interaction.followup.send(
+                self.messages['ticket_create_db_error'],
+                ephemeral=True
             )
 
 
@@ -1230,13 +1289,9 @@ class TicketButton(discord.ui.Button):
             return discord.ButtonStyle.secondary
 
     async def callback(self, interaction: discord.Interaction):
-        # Use the correct initialization for TicketConfirmView with the expected arguments
-        await interaction.response.send_message(
-            self.messages['ticket_create_confirm'].format(type_name=self.type_name),
-            view=TicketConfirmView(self.ticket_system, self.type_name, self.type_data),
-            ephemeral=True,
-            delete_after=10,
-        )
+        # Create and send the modal instead of a confirmation view
+        modal = TicketConfirmModal(self.ticket_system, self.type_name, self.type_data)
+        await interaction.response.send_modal(modal)
 
 
 class TicketControlView(discord.ui.View):
@@ -1514,11 +1569,56 @@ class CloseTicketModal(discord.ui.Modal):
                 return
 
             # 发送频道通知
+            # In the CloseTicketModal class, update the send notification part:
+
+            # Get unavailable text from config or use default
+            unavailable = self.messages.get('unavailable_text', "无")
+
+            # Get ticket details from database
+            ticket_info = await self.cog.db.fetch_ticket(self.ticket_channel.id)
+            ticket_details = await self.cog.db.get_ticket_history(self.ticket_channel.id)
+
+            # Prepare acceptor mention if available
+            acceptor_mention = unavailable
+            if ticket_info and ticket_info.get('is_accepted') and ticket_details and ticket_details.get('accepted_by'):
+                acceptor_id = ticket_details.get('accepted_by')
+                acceptor = self.cog.bot.get_user(acceptor_id)
+                acceptor_mention = acceptor.mention if acceptor else f"<@{acceptor_id}>"
+
+            # Prepare members list if available
+            members_text = unavailable
+            if ticket_details and ticket_details.get('members'):
+                members = ticket_details.get('members', [])
+                member_mentions = []
+                for member_data in members:
+                    if isinstance(member_data, dict):
+                        member_id = member_data.get('user_id')
+                        if member_id and member_id != self.creator.id:
+                            member = self.cog.bot.get_user(member_id)
+                            member_mentions.append(member.mention if member else f"<@{member_id}>")
+                members_text = ", ".join(member_mentions) if member_mentions else unavailable
+
+            # Prepare creation time if available
+            created_at = unavailable
+            if ticket_details and ticket_details.get('created_at'):
+                created_at_str = ticket_details.get('created_at')
+                try:
+                    dt = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
+                    created_at = f"<t:{int(dt.timestamp())}:F>"
+                except (ValueError, TypeError):
+                    created_at = created_at_str
+
+            # Prepare channel notification embed with all required fields
             embed = discord.Embed(
                 title=self.messages['log_ticket_close_title'],
                 description=self.messages['log_ticket_close_description'].format(
                     closer=interaction.user.mention,
-                    reason=self.reason.value
+                    reason=self.reason.value,
+                    type_name=self.type_name,
+                    creator=self.creator.mention if self.creator else unavailable,
+                    acceptor=acceptor_mention,
+                    members=members_text,
+                    created_at=created_at
                 ),
                 color=discord.Color.red()
             )
@@ -1564,7 +1664,8 @@ class CloseTicketModal(discord.ui.Modal):
             await self.cog.logger.log_ticket_close(
                 channel=self.ticket_channel,
                 closer=interaction.user,
-                reason=self.reason.value
+                reason=self.reason.value,
+                ticket_type=self.type_name
             )
 
 

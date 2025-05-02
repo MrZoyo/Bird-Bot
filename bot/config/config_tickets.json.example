@@ -81,16 +81,12 @@
     }
   },
   "messages": {
-    "ticket_create_confirm": "确认要创建 {type_name} 工单吗？",
-    "ticket_create_confirm_button": "☑️确认创建",
-    "ticket_create_cancel_button": "❎取消",
-    "ticket_create_cancelled": "已取消创建工单",
     "ticket_create_success": "工单已创建: {channel}",
     "ticket_created_title": "工单 #{number} - {type_name}",
     "ticket_created_dm_title": "工单已创建",
     "ticket_created_dm_content": "你的工单已创建成功。\n**工单编号:** #{number}\n**类型:** {type_name}",
     "ticket_instructions_title": "使用说明",
-    "ticket_instructions": "• 管理员可点击「接受反馈」接收工单\n• 使用「添加用户」按钮或 `/tickets_add_user` 命令添加其他用户到工单\n• 任何人都能使用「关闭工单」按钮关闭工单",
+    "ticket_instructions": "• 管理员可点击「接受反馈」接收工单\n• 使用「添加用户」按钮或 `/tickets_add_user` (可复制)命令添加其他用户到工单\n• 任何人都能使用「关闭工单」按钮关闭工单",
     "ticket_jump_button": "跳转到工单",
     "ticket_accept_button": "✅接受反馈",
     "ticket_accept_button_disabled": "已接受",
@@ -129,7 +125,7 @@
     "log_ticket_accept_title": "✅ 工单已受理 ",
     "log_ticket_accept_description": "该工单已被管理员接手处理\n\n**受理人:** {acceptor}",
     "log_ticket_close_title": "🔒 工单已关闭 ",
-    "log_ticket_close_description": "该工单已完成处理并关闭\n\n**关闭人:** {closer}\n**关闭原因:**\n{reason}",
+    "log_ticket_close_description": "该工单已完成处理并关闭\n\n**工单类型:** {type_name}\n**发起人:** {creator}\n**受理人:** {acceptor}\n**添加的用户:** {members}\n**发起时间:** {created_at}\n**关闭人:** {closer}\n**关闭原因:**\n{reason}",
     "log_type_add_title": "🆕 新增工单类型 ",
     "log_type_add_description": "系统增加了新的工单类型\n\n**操作人:** {admin}\n**类型名称:** {name}\n**类型说明:** {description}\n**用户指引:** {guide}",
     "log_type_edit_title": "✏️ 修改工单类型 ",
@@ -215,6 +211,16 @@
     "ticket_close_stats_error": "该工单已关闭，无法再次关闭",
     "ticket_close_get_info_error": "获取工单信息时发生错误，请联系管理员。",
     "ticket_close_error": "关闭工单时发生错误，请联系管理员。",
-    "ticket_accept_get_info_error": "获取工单信息时发生错误，请联系管理员。"
+    "ticket_accept_get_info_error": "获取工单信息时发生错误，请联系管理员。",
+    "ticket_modal_confirm_title": "确认创建工单: {type_name}",
+    "ticket_modal_confirm_label": "类型：{type_name}   \n\n请输入 \"yes\" 确认创建",
+    "ticket_modal_confirm_placeholder": "输入 yes 确认",
+    "ticket_confirmation_failed": "确认失败，请输入 \"yes\" 确认创建工单。",
+    "ticket_category_get_error": "获取工单分类失败，请联系管理员。",
+    "ticket_channel_create_error": "创建工单频道失败，请联系管理员。",
+    "ticket_create_db_error": "创建工单记录失败，请联系管理员。",
+    "ticket_created_creator": "创建者",
+    "ticket_created_time": "创建时间",
+    "unavailable_text": "无"
   }
 }

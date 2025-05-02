@@ -708,7 +708,54 @@ class PrivateRoomCog(commands.Cog):
 
         # 检查余额是否足够支付购买成本
         if cost > 0 and balance < cost:
-            await interaction.followup.send(self.conf['messages']['error_insufficient_balance'], ephemeral=True)
+            # Create an informative embed instead of simple error message
+            embed = discord.Embed(
+                title=self.conf['messages']['error_insufficient_balance_title'],
+                description=self.conf['messages']['error_insufficient_balance_description'],
+                color=discord.Color.red()
+            )
+
+            # Calculate the points needed
+            points_needed = cost - balance
+            original_cost = self.conf['points_cost']
+            discount_amount = original_cost - cost
+
+            # Add details to the embed
+            embed.add_field(
+                name=self.conf['messages']['error_insufficient_balance_original_price'],
+                value=f"**{original_cost}** {self.conf['messages']['points_label']}",
+                inline=False
+            )
+
+            embed.add_field(
+                name=self.conf['messages']['error_insufficient_balance_voice_time'],
+                value=self.conf['messages']['error_insufficient_balance_voice_format'].format(
+                    hours=round(hours, 1),
+                    minutes=int(hours * 60),
+                    discount=discount_amount
+                ),
+                inline=False
+            )
+
+            embed.add_field(
+                name=self.conf['messages']['error_insufficient_balance_after_discount'],
+                value=f"**{cost}** {self.conf['messages']['points_label']}",
+                inline=False
+            )
+
+            embed.add_field(
+                name=self.conf['messages']['error_insufficient_balance_current'],
+                value=self.conf['messages']['error_insufficient_balance_current_format'].format(
+                    balance=balance,
+                    needed=points_needed
+                ),
+                inline=False
+            )
+
+            # Set footer with suggestion
+            embed.set_footer(text=self.conf['messages']['error_insufficient_balance_footer'])
+
+            await interaction.followup.send(embed=embed, ephemeral=True)
             return
 
         # 创建确认嵌入消息

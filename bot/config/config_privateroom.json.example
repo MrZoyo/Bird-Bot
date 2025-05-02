@@ -48,15 +48,15 @@
     "room_info_owner": "👑 房主: {owner}",
     "room_info_created": "🕒 创建时间: {start_date}",
     "room_info_expires": "⌛ 到期时间: {end_date}",
-    "room_info_warning": "⚠️ 由于discord的权限设置存在漏洞，请明确在私房中禁止任何人拥有和使用[服务器静音]或者[服务器双向禁止]权限，这会导致严重后果。对于权限滥用，您可能会被取消私房权限。",
     "room_info_footer": "房间到期后将自动删除，包括所有聊天记录。",
+    "room_info_warning": "⚠️ 由于discord的权限设置存在漏洞，请明确在私房中禁止任何人拥有和使用[服务器静音]或者[服务器双向禁止]权限，这会导致严重后果。对于权限滥用，您可能会被取消私房权限。",
 
     "room_expired_title": "📢 您的私人房间已过期",
     "room_expired_description": "您的私人房间 **{room_name}** 已到期并被删除。\n\n如果您想继续使用私人房间，可以再次购买。",
     "room_expired_button": "🔄 再次购买",
     "room_expired_footer": "感谢您使用私人房间服务！",
 
-    "shop_restore_button_label": "🔄 恢复我的房间",
+    "shop_restore_button_label": "🔄 恢复误删房间",
     "room_restore_title": "🔄 恢复私人房间",
     "room_restore_description": "您的私人房间在有效期内被删除，您可以恢复它！\n\n原房间创建于: {start_date}\n到期时间: {end_date}",
     "room_restore_cost": "💰 恢复需要: **{cost}** 积分",
@@ -87,6 +87,16 @@
     "error_insufficient_balance": "❌ 积分不足，无法购买私人房间。",
     "error_already_owns": "❌ 您已拥有一个私人房间，无法同时拥有多个。",
     "error_confirmation_failed": "❌ 确认失败，请输入 'yes' 确认购买。",
-    "error_create_failed": "❌ 创建房间失败，请联系管理员。"
+    "error_create_failed": "❌ 创建房间失败，请联系管理员。",
+    "error_insufficient_balance_title": "❌ 积分不足",
+    "error_insufficient_balance_description": "您的积分不足以购买私人房间",
+    "error_insufficient_balance_original_price": "🏷️ 原价",
+    "error_insufficient_balance_voice_time": "🎙️ 语音时长折扣",
+    "error_insufficient_balance_after_discount": "💰 折扣后价格",
+    "error_insufficient_balance_current": "💳 当前余额",
+    "error_insufficient_balance_current_format": "**{balance}** 积分（还需 **{needed}** 积分）",
+    "error_insufficient_balance_voice_format": "上个月语音 **{hours}** 小时（**{minutes}** 分钟），抵扣 **{discount}** 积分",
+    "error_insufficient_balance_footer": "提示：每日签到可获得积分，或者增加语音时长来获得下个月更多折扣",
+    "points_label": "积分"
   }
 }
