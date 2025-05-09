@@ -552,6 +552,9 @@ class RoleCog(commands.Cog):
         self.achievements = self.achievement_config['achievements']
         self.role_type_name = self.role_config['role_type_name']
 
+        self.role_pickup_title = self.role_config['role_pickup_title']
+        self.role_pickup_footer = self.role_config['role_pickup_footer']
+
         # StarSign configs
         self.starsign_name = self.role_config['starsign_name']
         self.starsign_pickup_title = self.role_config['starsign_pickup_title']

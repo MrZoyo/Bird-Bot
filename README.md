@@ -1,6 +1,6 @@
 # Bird Bot
 
-`Version: 1.3.1`
+`Version: 1.3.2`
 
 ---
 
@@ -387,7 +387,12 @@ A module that integrates privateroom_cog's interaction with the database.
 
 ## Update Log
 
-### V1.3.0b - 2025-05-02
+### V1.3.2 - 2025-05-10
+#### Bug fixes
+- Fixed an issue that had caused creating achievement pickup messages to fail.
+- 
+---
+### V1.3.1 - 2025-05-02
 #### New features and improvements
 - In `PrivateRoom_Cog`, now that a user with an insufficient balance uses the buy room function, the bot will return to show that user's purchase price and missing points.
 - In `Tickets_Cog`:
