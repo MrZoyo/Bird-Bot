@@ -1,6 +1,6 @@
-# Bird Bot
+# Bird Bot 
 
-`Version: 1.3.2`
+`Version: 1.4.0b`
 
 ---
 
@@ -16,7 +16,6 @@ The bot incorporates the functionality used in several bots and has been develop
 
 The bot's code is deeply optimised for low-performance devices, using asynchronous handling of API responses and database operations. Therefore, for this bot working on a 10k members and 500 online voice users server, a 1 vCPU + 1GB RAM cloud server for about $5 a month is perfectly adequate for performance.
 
-
 ---
 
 ## Table of Contents
@@ -26,21 +25,23 @@ The bot's code is deeply optimised for low-performance devices, using asynchrono
   - [Voice_Channel_Cog](#voice_channel_cog)
   - [Create_Invitation_Cog](#create_invitation_cog)
   - [Welcome_Cog](#welcome_cog)
-  - [Check_Status_Cog](#checkstatuscog)
+  - [Check_Status_Cog](#check_status_cog)
   - [Achievement_Cog](#achievement_cog)
   - [Role_Cog](#role_cog)
   - [Notebook_Cog](#notebook_cog)
   - [Backup_Cog](#backup_cog)
   - [Giveaway_Cog](#giveaway_cog)
   - [Rating_Cog](#rating_cog)
-  - [Tickets_Cog](#tickets_cog)
+  - [Tickets_New_Cog](#tickets_new_cog)
+  - [Tickets_Cog (Legacy)](#tickets_cog-legacy)
   - [Shop_Cog](#shop_cog)
-  - [PrivateRoom_cog](#privateroom_cog)
+  - [PrivateRoom_Cog](#privateroom_cog)
   - [Game_DnD_Cog](#game_dnd_cog)
   - [Game_Spymode_Cog](#game_spymode_cog)
 - [Utilities and Tools](#utilities-and-tools)
   - [config](#config)
   - [channel_validator](#channel_validator)
+  - [tickets_new_db](#tickets_new_db)
   - [tickets_db](#tickets_db)
   - [file_utils](#file_utils)
   - [media_handler](#media_handler)
@@ -61,7 +62,7 @@ aiosqlite, matplotlib, aiohttp, pillow, discord.py, aiofiles
 3. Run `run.py`. If you are using a Linux server, you can use `nohup python3 run.py &` to run the bot in the background.
 4. Invite the bot to your server and give it the necessary permissions.(Required permissions: bot, application command, administrator)
 5. For updating the bot, you can use the `git pull` command to update the bot to the latest version.
-6. For some cogs like `tickets_cog`, you need to use command `/tickets_setup` to initialize the ticket system. Please check function introduction for more details.
+6. For some cogs like `tickets_new_cog`, you need to use command `/tickets_setup` to initialize the ticket system. Please check function introduction for more details.
 
 ---
 ## Function Introduction
@@ -72,325 +73,425 @@ Similarly, if the channel was created by the bot, the bot will delete the channe
 - `/set_soundboard`: Change the soundboard status of the channel between `on` and `off`. Only the owner of the channel can use this command.
 - `/vc_add`: Add a voice channel that automatically creates new voice channels.
 - `/vc_remove`: Remove a voice channel that automatically creates new voice channels.
+- `/vc_list`: List all voice channels that automatically create new voice channels.
 
 ### Create_Invitation_Cog
 A user sends a teaming message and bot replies with an invitation link to that user's channel to make it easy for other users to quickly join the user's room.
 If the user is not currently on a channel, bot will prompt the user to create a new channel using `Voice_Channel_Cog` first.
+
+**Enhanced Features:**
+- **Intelligent keyword detection** using regex patterns to automatically detect team-up requests
+- **User signature system** allowing personalized signatures in invitations
+- **Room status tracking** with "room full" functionality
+- **Separate logging system** for keyword detection activities
+
+**Commands:**
 - `/invt <title>`: Create an invitation with a specified title(optional).
 - `/invt_checkignorelist`: Check the current server's invitation channel ignore list.
-- `invt_addignorelist <channel_id>`: Add a channel to the invitation channel ignore list.
-- `invt_removeignorelist <channel_id>`: Remove a channel from the invitation channel ignore list.
+- `/invt_addignorelist <channel_id>`: Add a channel to the invitation channel ignore list.
+- `/invt_removeignorelist <channel_id>`: Remove a channel from the invitation channel ignore list.
 
 ### Welcome_Cog
-When a new user joins the server, the bot sends a welcome message to the user in the welcome channel. 
+When a new user joins the server, the bot sends a welcome message to the user in the welcome channel with enhanced features:
 
-- This includes a more complex feature: creating a unique welcome image with the current server population for a user using a specified background image, specified text content, their id and avatar.
+**Features:**
+- **Dynamic welcome images** with user avatars and member count
+- **Customizable welcome messages** with font and styling support
+- **Automatic DM system** sending personalized direct messages to new members
+- **Resource verification system** to ensure required assets are available
+- **Server statistics integration** displaying current member count
 
-- The bot will also send a DM to the user who joins the server.
-
--This feature contains command functions that allow the welcome message to be summoned manually by the user.
+**Commands:**
 - `/testwelcome <member> <member_number>` - Send the welcome message for specific member with specific number.
   - For default `<member>` is the user who uses the command, `<member_number>` is the total number of people in the server.
 
 ### Check_Status_Cog
-Provide some convenient functions for querying related data.
-- `/check_log <number=x>` - Returns the last `x` lines of the log file. If the number of lines exceeds the limit, the bot will send a file with the log content.
-Provides commands to query the number of active rooms and the number of in-voice users within the current server.
-- `/check_voice_status` - Returns the number of active rooms and the number of in-voice users within the current server.
+Provide enhanced monitoring and status checking functions with comprehensive data tracking.
+
+**Enhanced Logging System:**
+- **Dual log system** supporting both main application logs and keyword detection logs
+- **Log file size management** with automatic file generation for large logs
+- **Chinese interface** for better user experience
+
+**Voice Monitoring:**
+- **Real-time voice statistics** with database storage
+- **Automated data collection** every 10 minutes for trend analysis
+- **Chart generation** capabilities for activity visualization
+- **Category-based tracking** of voice channel usage
+
+**Commands:**
+- `/check_log <number=x> [keyword_log=False]` - Returns the last `x` lines of the specified log file. Use `keyword_log=True` to check keyword detection logs instead of main logs.
+- `/check_voice_status` - Returns comprehensive voice channel statistics and member counts.
 - `/where_is <member>` - Returns the position of the selected member within the channel. Only visible to user.
 - `/print_voice_status` - Print the longtime server voice channel and number information.
+- `/test_keyword_log [test_message]` - Test the keyword detection logging system.
 
 ### Achievement_Cog
-It is designed to track and display user achievements based on their activity in the server. 
+Comprehensive achievement tracking system for user activity monitoring.
 
-- **Features**
-  - Message Count: The bot tracks the number of messages a user sends in the server. Achievements are awarded when a user reaches certain message count thresholds.  
-  - Reaction Count: The bot also keeps track of the number of reactions a user adds to messages. Achievements are given when a user reaches certain reaction count thresholds.  
-  - Time Spent in Voice Channels: The bot monitors the amount of time a user spends in voice channels. Achievements are granted when a user reaches certain time thresholds.  
+**Features:**
+- **Message Count Tracking**: Monitor user message activity with milestone achievements
+- **Reaction Count Tracking**: Track reaction usage with progress rewards  
+- **Voice Time Tracking**: Monitor time spent in voice channels with time-based achievements
+- **Monthly Statistics**: View achievements and rankings by specific months
+- **Admin Management**: Manual adjustment capabilities for achievement progress
 
-
-- It listens to message, reaction, and voice state update events to track user activity.  
-- To view a user's achievements, use the `/achievements` command. Use `<member>` to view the achievements of a specific user.
-- Use `<date>` to view the achievements of a specific month(eg. 2024-07).
-- If no user is specified, the command will display the achievements of the user who invoked the command.  
-- To manually increase or decrease a user's achievement progress, use the `/increase_achievement` and `/decrease_achievement` commands respectively. 
-
-- These commands require the following parameters:  
-  - `member`: The member whose achievement progress to modify.
-  - `reactions:int`: The number of reactions to add or subtract.
-  - `messages:int`: The number of messages to add or subtract.
-  - `time_spent:int`: The time spent on the server to add or subtract (in seconds).
-- `member` is a required parameter, while the other parameters are at least 1 optional.
-
-- Use `/achievement_ranking` to show the top 10 users with the every highest achievement indicators in the server. 
-- Use `<date>` to view the achievements ranking of a specific month(eg. 2024-07).
-
-- Use `/check_achi_op` to check the history of manual operation logging for the Achievement System.
+**Commands:**
+- `/achievements [member] [date]`: View user achievements. Use `<date>` format like "2024-07" for monthly views.
+- `/increase_achievement <member> [reactions] [messages] [time_spent]`: Manually increase achievement progress.
+- `/decrease_achievement <member> [reactions] [messages] [time_spent]`: Manually decrease achievement progress.
+- `/achievement_ranking [date]`: Show top 10 users in various achievement categories.
+- `/check_achi_op`: Check manual operation history for the achievement system.
+- `/rank`: Enhanced ranking system interface for server leaderboards.
 
 ### Role_Cog
-The Role_Cog is a feature in the bot that allows users to assign roles to users who complete achievements.
-Note that in order to use this feature properly, you need to create the role manually and add the role's id to config.
+Comprehensive role assignment system with multiple assignment categories.
 
-#### `/create_role_pickup <channel_id>`
-- This command causes the bot to send a message listing all achievements with the 4 achievement type buttons on the specified channel. The user can click on the buttons to update the corresponding type of achievement role.
-#### `/create_starsign_pickup <channel_id>`
-- This command causes the bot to send a message listing all star signs with the 12 star sign buttons on the specified channel. The user can click on the buttons to update the corresponding star sign role.
-#### `/create_mbti_pickup <channel_id>`
-- This command causes the bot to send a message listing all MBTI identities with the 16 MBTI identity buttons on the specified channel. The user can click on the buttons to update the corresponding MBTI identity role.
-#### `/create_gender_pickup <channel_id>`
-- This command causes the bot to send a message listing all genders with 3 gender buttons on the specified channel. The user can click on the buttons to update.
-#### `/create_signature_pickup <channel_id>`
-- This command causes the bot to send a message with a signature setup button and check button on the specified channel. The user can click on the buttons to update and check the signature.
-#### `signature_permission_toggle <user_id> <disable>`
-- This command allows the user to toggle the permission of a member's signature setup permission. If the member has no permission, he/she can not change or check his signature. And the signature will not be displayed in the invitation message.
-  - `<user_id>` The member's id to be toggled.
-  - `<disable>` Whether to disable the signature setup button.
-#### `signature_clear <user_id>`
-- Clear a user's signature and change history.
-#### `signature_set_requirement <minutes>`
-- Set the voice time requirement for signature feature.
-#### `signature_check <user_id>`
-- Check a user's signature information.
+**Features:**
+- **Achievement-based role assignment** with automatic role updates
+- **Star sign role system** with 12 zodiac options
+- **MBTI personality role system** with all 16 types
+- **Gender role assignment** with inclusive options
+- **User signature system** with permission management and voice time requirements
+
+**Commands:**
+- `/create_role_pickup <channel_id>`: Create achievement role selection interface
+- `/create_starsign_pickup <channel_id>`: Create star sign role selection interface
+- `/create_mbti_pickup <channel_id>`: Create MBTI role selection interface
+- `/create_gender_pickup <channel_id>`: Create gender role selection interface
+- `/create_signature_pickup <channel_id>`: Create signature management interface
+- `/signature_permission_toggle <user_id> <disable>`: Toggle user's signature permissions
+- `/signature_clear <user_id>`: Clear user's signature and history
+- `/signature_set_requirement <minutes>`: Set voice time requirement for signatures
+- `/signature_check <user_id>`: Check user's signature information
 
 ### Notebook_Cog
-The Notebook_Cog is a feature in the bot that allows administrators to manually log user events. This can be useful for tracking user behavior, recording important events, or keeping a record of specific interactions.
+Administrative event logging system for tracking member incidents and administrative actions.
 
-#### `/notebook_log <member> <event>`
-- This command allows to manually log a user event. 
-- This command can only be used on specific channels. Users who have used this command become **administrators**.
+**Features:**
+- **Admin permission system** with database tracking of authorized users
+- **Event logging** with timestamps and serial numbering
+- **Member-specific event histories** with paginated viewing
+- **Event deletion capabilities** for record management
+- **Channel-restricted usage** for security
 
-- The command takes the following parameters:  
-
-  - `member`: The member whose event you want to log.
-  - `event`: The event that you want to log for the member.
-
-#### `/notebook_member <member>`
-- This command allows **administrators** to check the event log for a specific member. 
-
-- The command takes the following parameter:
-  - `member`: The member whose event log you want to check.
-
-#### `/notebook_all`
-- This command allows **administrators** to check the event log for all members in the server.
-
-#### `/notebook_delete <member> <event_serial_number>`
-- This command allows to delete a specific event from a member's event log. This command can only be used on specific channels. 
-
-- The command takes the following parameters:
-  - `member`: The member whose event log you want to delete an event from.
-  - `event_serial_number`: The serial number of the event you want to delete.
+**Commands:**
+- `/notebook_log <member> <event>`: Log an event for a specific member (admin only)
+- `/notebook_member <member>`: View event log for a specific member (admin only)
+- `/notebook_all`: View event logs for all members in the server (admin only)
+- `/notebook_delete <member> <event_serial_number>`: Delete a specific event from member's log (admin only)
 
 ### Backup_Cog
-Backup_Cog is used to create automatic backups of the server's databases for data security.
-- Backup_Cog creates backups at 0:00, 6:00, 12:00 and 18:00 every day. The current limit is 20 backups, and the oldest backups will be deleted if there are more than 20.
-#### `/backup_now`
-- This command will manually create a backup file. Manually created backup files do not affect automatically saved backups. However, it still follows the 20 backup limit.
+Automated database backup system with scheduled and manual backup capabilities.
 
+**Features:**
+- **Automated backups** every 6 hours (0:00, 6:00, 12:00, 18:00)
+- **Backup rotation** maintaining latest 20 backups with automatic cleanup
+- **Manual backup capability** for immediate backup needs
+- **Backup limit management** to prevent storage overflow
 
+**Commands:**
+- `/backup_now`: Create an immediate backup file manually
 
 ### Giveaway_Cog
+Comprehensive giveaway management system with achievement-based restrictions.
 
-Giveaway_Cog creates the Giveaway mechanism. All giveaways will be posted in the Giveaway channel.
-#### `/ga_create <reaction_req> <message_req> <timespent_req>` 
-- This command allows users to create Giveaway with restrictions.
-- The command parameters are as follows:
-  - `reaction_req` Limits the achievement progress of added reactions for users participating in Giveaway. Not recommended.
-  - `message_req` Limits the progress of the Send Message achievement for users participating in Giveaway. Not recommended.
-  - `timespent_req` Limits the progress of the in-channel voice time (in minutes) achievement for users participating in Giveaway. Recommended].
+**Features:**
+- **Achievement-based entry requirements** for reaction, message, and voice time thresholds
+- **Time-based giveaway management** with flexible duration formats
+- **Winner selection system** with configurable winner counts
+- **Archive system** preserving original giveaway information
+- **Interactive forms** for detailed giveaway configuration
 
-- An interactive form will pop up after using the command, containing the following parameters:
-  - `duration` Giveaway duration, support mainstream time abbreviation, recommended format is abbreviation. For example: 1d/24h/60m. winners The number of prizes.
-  - `winners` The number of prizes, BOT will draw the corresponding number of winners, default value is 1.
-  - `prizes` The name of the prizes. Note that the number of prizes should not be included here.
-  - `description` Giveaway description. Please include the Giveaway limitations and description of the prize here. Note that if you use a non-discord default emoticon here, please use the full emoticon code. For example, for the in-server custom emoji :064:, use <a:064:1174704124768550963> instead of :064:.
-  - `providers` Prize provider. If left blank, the default value is a custom parameter.
-- Giveaway will be displayed in the Giveaway channel after submission. A copy of the original version is generated as an arch. in the channel where the command was sent. Any subsequent changes will not affect the archived version.
-  The published Giveaway will be assigned a unique random ID, which will be used to identify the Giveaway.
-
-#### `ga_cancel <giveaway_id>` 
-- This command allows the user to cancel the giveaway.
-- Cancelling a giveaway immediately ends the giveaway and marks it as a giveaway, no winner will be selected if the giveaway is cancelled.
-  - `<giveaway_id>` giveaway identification ID.
-  
-#### `ga_end <giveaway_id>` 
-- This command allows user to end the giveaway early.
-- Ending a giveaway early will immediately end the raffle and mark it as a giveaway, ending a giveaway early will result in winners being selected.
-  - `<giveaway_id>` giveaway identification ID.
-  
-#### `ga_time_extend <giveaway_id> <time>` 
-- This command allows user to extend the giveaway time.
-- The command parameters are as follows:
-  - `<giveaway_id>` giveaway identification ID.
-  - `<time>` The time is numeric only and is expressed in minutes.
-
-#### `ga_participant <giveaway_id>`
-- This command allows user to list all participants in the giveaway.
-  - `<giveaway_id>` giveaway identification ID.
-
-#### `ga_description <giveaway_id> <description>`
-- This command allows user to change the description of the giveaway.
-  - `<giveaway_id>` giveaway identification ID.
-  - `<description>` The new description of the giveaway.
-
-#### `ga_sendtowinner <giveaway_id>`
-- This command allows user to send message to the winner.
-  - `<giveaway_id>` giveaway identification ID.
+**Commands:**
+- `/ga_create <reaction_req> <message_req> <timespent_req>`: Create new giveaway with requirements
+- `/ga_cancel <giveaway_id>`: Cancel active giveaway
+- `/ga_end <giveaway_id>`: End giveaway early and select winners
+- `/ga_time_extend <giveaway_id> <time>`: Extend giveaway duration
+- `/ga_participant <giveaway_id>`: List all giveaway participants
+- `/ga_description <giveaway_id> <description>`: Update giveaway description
+- `/ga_sendtowinner <giveaway_id>`: Send message to giveaway winners
 
 ### Rating_Cog
-#### `/rt_create`
-- This command allows users to create an event with a rating system. It is set to a 10-point scale, with anonymous scoring, manual start and end of scoring and display of average scores and score distribution statistics when finished.
-- Using the command will call out a form that will appear in the `rating_channel` with the description filled in. Each rating item is assigned a unique `rating_id` that is used to manipulate and identify the rating item.
+Anonymous rating system for events and activities.
 
-#### `/rt_end <rating_id>`
-- This command allows the user to end a rating item.
-The ended rating item will no longer allow interaction, and the average score and rating distribution statistics will be displayed when it is ended.
-- For closed ratings use this command to query the ratings.
+**Features:**
+- **10-point rating scale** with anonymous submissions
+- **Manual start/end control** for rating periods
+- **Statistical analysis** showing average scores and distribution
+- **Rating item management** with unique ID system
 
-#### `rt_cancel <rating_id>`
-- This command allows the user to cancel a rating item.
-A cancelled rating item is no longer interactive and no statistics will be displayed.
+**Commands:**
+- `/rt_create`: Create new rating item with interactive form
+- `/rt_end <rating_id>`: End rating and display statistics
+- `/rt_cancel <rating_id>`: Cancel rating without showing results
+- `/rt_description <rating_id> <description>`: Modify rating description
 
-#### `rt_description <rating_id> <description>`
-- This command allows the user to modify the description of a rating item.
-- Only the description of an open rating item can be modified.
+### Tickets_New_Cog
+**🆕 Next-generation ticket system** using Discord's native thread architecture for enhanced performance and user experience.
 
-### Tickets_Cog
-The Tickets_Cog provides a comprehensive ticket management system that allows users to create, manage, and track support tickets. It includes features for ticket creation, user management, and statistical tracking.
+**Key Features:**
+- **Thread-based tickets** leveraging Discord's native functionality
+- **Modal confirmations** preventing accidental ticket creation
+- **Dynamic button states** that update based on ticket status (pending/accepted/closed)
+- **Comprehensive admin system** with type-specific and global permissions
+- **Automatic admin notifications** via DM with jump buttons
+- **Persistent state management** surviving bot restarts
+- **Statistics and analytics** for ticket system monitoring
 
-#### `/tickets_setup`
-- Initialize the ticket system. This command sets up necessary channels, categories, and messages for the ticket system to function.
+**Admin Management:**
+- **Type-specific permissions** allowing different admins for different ticket types
+- **Global admin system** for overall ticket management
+- **Automatic admin addition** to ticket threads with rate limiting
+- **Permission inheritance** from Discord roles and individual user assignments
 
-#### `/tickets_stats`
-- Display comprehensive statistics about the ticket system, including:
-  - Total number of tickets
-  - Number of active tickets
-  - Number of closed tickets
-  - Average response time
-  - Breakdown by ticket type
+**Commands:**
+- `/tickets_init`: Initialize the new ticket system
+- `/tickets_new_stats`: Display comprehensive ticket statistics
+- `/tickets_admin_list`: Show current admin configuration
+- `/tickets_admin_add_role <role>`: Add admin role with type selection
+- `/tickets_admin_remove_role <role>`: Remove admin role from system
+- `/tickets_admin_add_user <user>`: Add individual admin user
+- `/tickets_admin_remove_user <user>`: Remove individual admin user
+- `/tickets_new_add_user <user>`: Add user to current ticket
+- `/tickets_new_accept`: Accept current ticket (admin only)
+- `/tickets_new_close <reason>`: Close current ticket with reason
+- `/tickets_refresh_buttons`: Refresh all ticket button states
+- `/tickets_refresh_main`: Refresh main ticket creation page
 
-#### `/tickets_add_type`
-- Add a new ticket type to the system. Opens a modal form to input:
-  - Type name
-  - Description
-  - User guide
-  - Button color (R/G/B)
+**User Experience:**
+- **Jump buttons** for easy navigation to ticket threads
+- **Rich embeds** with comprehensive ticket information
+- **Button state indicators** showing ticket status at a glance
+- **Modal confirmations** for important actions
 
-#### `/tickets_edit_type`
-- Edit an existing ticket type. Displays a selection menu of existing types and opens a modal form to modify the selected type.
+### Tickets_Cog (Legacy)
+**⚠️ Legacy system** - The original channel-based ticket system maintained for compatibility.
 
-#### `/tickets_delete_type`
-- Delete an existing ticket type. Displays a selection menu of existing types for deletion.
+**Note:** This system is now primarily used for fallback and compatibility purposes. New installations should use the `Tickets_New_Cog` system.
 
-#### `/tickets_admin_list`
-- Display current admin configuration, including:
-  - Admin roles
-  - Admin users
-  - Discord permissions that grant admin access
+**Features:**
+- **Channel-based tickets** using private Discord channels
+- **Basic admin system** with role-based permissions
+- **Ticket statistics** and management capabilities
+- **Category-based archive functionality** for closed tickets with complete message history and file download (up to 50MB per file)
 
-#### `/tickets_admin_add_role`
-- Add a role to the ticket system's admin roles. There will now be a menu for selecting the corresponding ticket type that needs to be added.
+**Commands:**
+- `/tickets_setup`: Initialize legacy ticket system
+- `/tickets_stats`: Display ticket statistics
+- `/tickets_cleanup`: Clean up invalid ticket data
+- `/tickets_add_type`: Add new ticket type
+- `/tickets_edit_type`: Edit existing ticket type
+- `/tickets_delete_type`: Delete ticket type
+- `/tickets_add_user <user>`: Add user to current ticket
+- `/tickets_accept`: Accept current ticket
+- `/tickets_close <reason>`: Close current ticket
+- `/tickets_archive`: Archive all closed tickets in the current category with complete message history and attachment download (≤50MB per file)
 
-#### `/tickets_admin_remove_role`
-- Remove a role from the ticket system's admin roles. There will now be a menu for selecting the corresponding ticket type that needs to be removed.
+### Shop_Cog
+Point-based economy system for user engagement and rewards.
 
-#### `/tickets_admin_add_user`
-- Add a user to the ticket system's admin users. There will now be a menu for selecting the corresponding ticket type that needs to be added.
+**Features:**
+- **Balance management** with point tracking and transfers
+- **Daily check-in system** with streak bonuses and rewards
+- **Transaction history** with detailed logging and monthly views
+- **Admin controls** for manual balance adjustments
+- **Check-in streaks** encouraging daily engagement
 
-#### `/tickets_admin_remove_user`
-- Remove a user from the ticket system's admin users. There will now be a menu for selecting the corresponding ticket type that needs to be removed.
-
-#### `/tickets_add_user <user>`
-- Add a user to the current ticket.
-  - `user`: The user to be added to the ticket
-
-#### `/tickets_accept`
-- Accept a ticket. This command can only be used by admins in ticket channels.
-
-#### `/tickets_close`
-- Close a ticket. This command can only be used in ticket channels.
-
-#### `/tickets_archive`
-- Archive a series of closed tickets. This command can only be used in ticket channels.
-- This command will archive all closed tickets in given category. All the files will be saved in the `archive` folder.
-
-### shop_cog
-
-The shop system provides ways for users to earn and spend points, with features including:
-
-- **Balance management**: Check balances, transfer points between users
-- **Check-in system**: Daily check-ins with streak tracking
-- **Transaction history**: View detailed history of all transactions
-- **Admin commands**: Manually adjust user balances
-
-Commands:
-- `/balance`: View your current points balance
+**Commands:**
+- `/balance [user]`: View current points balance
 - `/checkin`: Perform daily check-in to earn points
-- `/transfer`: Transfer points to another user
-- `/adjust_balance`: (Admin) Adjust a user's balance
-- `/transaction_history`: View transaction history
-- `/checkin_history`: View check-in history by month
+- `/transfer <user> <amount>`: Transfer points to another user
+- `/adjust_balance <user> <amount> <reason>`: (Admin) Manually adjust user balance
+- `/transaction_history [user] [month]`: View transaction history
+- `/checkin_history [user] [month]`: View check-in history by month
 
-### privateroom_cog
+### PrivateRoom_Cog
+Point-based private voice channel system with activity-based pricing.
 
-The private room system allows users to create and manage their own voice channels with full permissions.
+**Features:**
+- **Temporary ownership system** with configurable expiration periods
+- **Point-based purchasing** integrated with shop system
+- **Activity-based discounts** rewarding active voice users
+- **Room restoration** for accidentally deleted channels
+- **Automatic cleanup** of expired or deleted rooms
 
-Features:
-- **Temporary ownership**: Rooms expire after a configurable period
-- **Point-based purchase**: Users spend points to acquire rooms
-- **Activity discounts**: Users with more voice activity receive discounts
-- **Room restoration**: Users can restore accidentally deleted rooms
+**Commands:**
+- `/privateroom_init`: (Admin) Initialize private room system
+- `/privateroom_setup`: (Admin) Configure private room shop interface
+- `/privateroom_reset`: (Admin) Reset entire private room system
+- `/privateroom_list`: List all active private rooms with details
+- `/privateroom_ban <user>`: (Admin) Ban user from private room system
 
-Commands:
-- `/privateroom_init`: (Admin) Initialize the private room system
-- `/privateroom_setup`: (Admin) Set up the private room shop
-- `/privateroom_reset`: (Admin) Reset the entire system
-- `/privateroom_list`: List all active private rooms
-- `/privateroom_ban`: (Admin) Ban a user from having private rooms
-
-Shop interface:
-- **Purchase button**: Buy a new private room
-- **Restore button**: Restore a previously owned room
+**Shop Interface:**
+- **Purchase Button**: Buy new private room with activity-based pricing
+- **Restore Button**: Restore previously owned room if available
 
 ### Game_DnD_Cog
-Provides Dungeons & Dragons (DnD) players with a convenient way to generate random roll dice points.
-- Supports up to 100 up to 1,000 dice 🎲 Randomized.
--  `/dnd_roll <expression> <x>` - The command takes an expression as an argument, which represents the dice roll in DnD notation. 
-For example, an expression like `3+4d6` would represent rolling four 6-sided dice and adding 3 to the result. The command parses the expression, performs the dice roll, and sends a message back to the user with the result and the details of the roll.
-Supports the use of 0-containing dice. `d6` means a 6-sided die without `0`, where the result is randomized from `1,2,3,4,5,6`, 
-and `d06` means a 7-sided die with 0, where the result is randomized from `0,1,2,3,4,5,6`. Common use case: using a `d02` die with a result of `0,1,2`.
-Command `/dnd_roll` has an optional parameter `x` to specify the number of times to repeat the roll. 
-- Expression `5#3+4d6` can repeat a roll of `3+4d6` for 5 times quickly. Use the expression to specify that the number before the `#` has a higher priority than the parameter `x`.
+Advanced Dungeons & Dragons dice rolling system with comprehensive notation support.
+
+**Features:**
+- **Advanced dice notation** supporting complex expressions (3+4d6, 2d04 for 0-4 range)
+- **Multiple roll support** with detailed breakdown of each roll
+- **Zero-inclusive dice** (d06 for 0-6 range vs d6 for 1-6 range)
+- **Batch rolling** with expression-based repetition (5#3+4d6)
+- **Table format results** for easy reading
+
+**Commands:**
+- `/dnd_roll <expression> [x]`: Roll dice using DnD notation
+  - Examples: `3+4d6` (roll 4 six-sided dice and add 3)
+  - `d02` (roll 0-2 inclusive die)
+  - `5#3+4d6` (repeat `3+4d6` roll 5 times)
+  - Parameter `x` specifies repetition count (overridden by `#` in expression)
 
 ### Game_Spymode_Cog
-Provides a simple way to play the game in "Spy Mode" in the server.
-For example, a 5v5 League of Legends custom duel has a spy on each side who aims to make their opponent win without being detected.
-- `/spy_mode <team_size> <spy>`: Set the number of players and spies on each team. Then sign up the teams, start the game and reveal the identity of the spies at the end of the game.
+Interactive spy-based team game system for voice channel activities.
 
+**Features:**
+- **Team formation system** with button-based signup
+- **Voice channel validation** ensuring participants are in voice
+- **Spy randomization** with secret DM notifications
+- **Multi-stage game flow** from setup to reveal
+- **Interactive buttons** for team management and game control
+
+**Commands:**
+- `/spy_mode <team_size> <spy>`: Create spy mode game with specified team size and spy count
+  - Example: `/spy_mode 5 1` creates 5v5 teams with 1 spy per team
+
+**Game Flow:**
+1. **Setup Phase**: Define team sizes and spy counts
+2. **Registration Phase**: Players join teams via buttons
+3. **Game Start**: Spy assignments sent via DM
+4. **Reveal Phase**: Show spy identities to all participants
 
 ---
 
 ## Utilities and Tools
+
 ### config
-A bridge to help other Cogs read settings from all config files.
+Enhanced configuration bridge with lazy loading and caching capabilities.
+- **Multi-file configuration** support for different cog types
+- **Lazy loading** improving startup performance
+- **Configuration caching** reducing file I/O operations
+- **Type-specific configuration** management
+
 ### channel_validator
-A tool to check if the channel is valid.
+Unified validation system supporting both Context and Interaction objects.
+- **Admin channel validation** for command restrictions
+- **Voice state checking** utilities for voice-dependent features
+- **Flexible validation** supporting multiple Discord API patterns
+
+### tickets_new_db
+Comprehensive database manager for the new thread-based ticket system.
+- **Thread-based ticket management** with full CRUD operations
+- **Member tracking** with addition timestamps and relationship management
+- **Statistics collection** for reporting and analytics
+- **Configuration storage** in database for dynamic updates
+
 ### tickets_db
-A module that integrates tickets_cog's interaction with the database.
+Legacy database manager for the original channel-based ticket system.
+- **Channel-based ticket** management for compatibility
+- **Archive functionality** for ticket data preservation
+- **Statistics tracking** for legacy system monitoring
+
 ### file_utils
-A module that provides file operations. Mainly used for tickets archive tickets_cog.
+Enhanced file operations module with advanced capabilities.
+- **Directory tree generation** for archive organization
+- **File size validation** before processing
+- **Automatic cleanup** of temporary files
+- **Archive creation** with compression support
+
 ### media_handler
-A module that provides media operations. Mainly used for tickets archive tickets_cog.
+Media processing module with validation and security features.
+- **File size validation** before download with configurable limits
+- **Hash-based file naming** preventing conflicts and duplicates
+- **Automatic directory creation** for organized storage
+- **Size limit enforcement** for resource management
+
 ### shop_db
-A module that integrates shop_cog's interaction with the database.
+Database integration module for the economy system.
+- **Transaction tracking** with detailed logging
+- **Balance management** with audit trails
+- **Check-in streak tracking** for engagement rewards
+- **Monthly statistics** generation for reporting
+
 ### privateroom_db
-A module that integrates privateroom_cog's interaction with the database.
+Database manager for private voice channel system.
+- **Room ownership tracking** with expiration management
+- **Purchase history** with pricing calculations
+- **Activity-based discount** calculations
+- **Automatic cleanup** of expired room data
+
+---
 
 ## Update Log
+
+### V1.4.0b - 2025-06-16
+#### 🆕 Major New Features
+- **Complete Ticket System Overhaul**: Introduced `Tickets_New_Cog` with thread-based architecture
+  - Thread-based tickets using Discord's native functionality
+  - Modal confirmations for ticket creation
+  - Dynamic button states with persistent management
+  - Comprehensive admin system with type-specific permissions
+  - Automatic DM notifications with jump buttons
+  - Rate-limited admin addition to prevent API limits
+
+- **Dual Logging System**: Implemented separate logging for main application and keyword detection
+  - Main application logs: `./data/bot.log`
+  - Keyword detection logs: `./data/keyword_detection.log`
+  - Enhanced `/check_log` command with `keyword_log` parameter
+  - UTF-8 encoding support and configurable log paths
+
+- **New Administrative Systems**:
+  - **Notebook_Cog**: Event logging system for member incident tracking
+  - **Backup_Cog**: Automated database backup system with 6-hour intervals
+
+- **Enhanced Game Systems**:
+  - **Game_DnD_Cog**: Advanced dice rolling with complex notation support
+  - **Game_Spymode_Cog**: Interactive spy-based team game system
+
+#### 🔧 Major Improvements
+- **Enhanced Create_Invitation_Cog**: 
+  - Intelligent keyword detection with regex patterns
+  - User signature system integration
+  - Room status tracking with "room full" functionality
+  - Separate logging for keyword activities
+
+- **Upgraded Welcome_Cog**:
+  - Dynamic welcome image generation with user avatars
+  - Automatic DM system for new members
+  - Resource verification and server statistics integration
+
+- **Enhanced Check_Status_Cog**:
+  - Real-time voice statistics with database storage
+  - Automated data collection every 10 minutes
+  - Chart generation capabilities for activity visualization
+  - Dual logging system support
+
+- **Performance and Architecture**:
+  - Rate limiting implementation for Discord API calls
+  - Persistent view system across bot restarts
+  - Enhanced error handling and graceful degradation
+  - Memory-efficient pagination systems
+
+#### 🛠️ Technical Improvements
+- **Database Architecture**: New thread-based ticket tables and enhanced relationship management
+- **Button Persistence**: Comprehensive state management surviving bot restarts
+- **Media Handler**: Enhanced file validation and hash-based naming
+- **Configuration System**: Improved lazy loading and multi-file support
+
+#### 🔄 Migration Notes
+- **Ticket System**: New installations should use `Tickets_New_Cog`
+- **Legacy Support**: `Tickets_Cog` maintained for compatibility
+- **Configuration**: New `keyword_log_file` setting in main configuration
+- **Database**: Automatic migration for new ticket system tables
+
+---
 
 ### V1.3.2 - 2025-05-10
 #### Bug fixes
 - Fixed an issue that had caused creating achievement pickup messages to fail.
-- 
+
 ---
 ### V1.3.1 - 2025-05-02
 #### New features and improvements
@@ -430,7 +531,6 @@ A module that integrates privateroom_cog's interaction with the database.
   - Added `/tickets_accept` command to accept a ticket.
   - Added `/tickets_close` command to close a ticket.
 
-
 ---
 ### V1.2.0 - 2024-12-18
 #### New features and improvements
@@ -440,7 +540,6 @@ A module that integrates privateroom_cog's interaction with the database.
 - Added a signature pickup system for the role_cog.
 - The signature will be displayed in the invitation message.
 - Added a automatic DM message for the welcome_cog. The bot will send a DM message to the user who joins the server.
-
 - Dropped the `!testwelcome` command.
 
 #### Bug fixes
@@ -453,13 +552,12 @@ A module that integrates privateroom_cog's interaction with the database.
 - Created separate configuration file for Rating_Cog.
 - Modified welcome image font style and background file paths in Welcome_Cog.
 - Added verification mechanism to Welcome_Cog.
-
 - Dropped config_cog.
 
 #### Bug fixes
 - Adjusted Check_Status_Cog's log file character limit from 2000 to 1900 to prevent Discord message length issues.
----
 
+---
 ### V1.0.1 - 2024-11-27
 #### New features and improvements
 - Added `/vc_list` command to list all voice channels that automatically create new voice channels.
@@ -473,10 +571,10 @@ A module that integrates privateroom_cog's interaction with the database.
 - A more modern architecture was built for the project.
 - Separated config settings files by function.
 - Split reused functionality separately.
-
 - It is now possible to add voice channels for creating rooms with commands.
 - Channels that do not allow bots to reply can now be added with a command.
 - Achievements can now be canceled by clicking again.
 - DnD Random Dice now supports dice containing 0.
+
 #### Bug fixes
 - Fixed an issue where the number of participants in Giveaway was not recorded properly in the Achievement Ranking System for rankings indexed by month.

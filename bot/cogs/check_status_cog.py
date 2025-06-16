@@ -42,6 +42,8 @@ class CheckStatusCog(commands.Cog):
         self.logging_file = self.main_config['logging_file']
 
         self.conf = config.get_config('checkstatus')
+        # Add main config to self.conf so check_log can access keyword_log_file
+        self.conf.update(self.main_config)
 
         self.where_is_not_found_message = self.conf['where_is_not_found_message']
         self.where_is_title_message = self.conf['where_is_title_message']
@@ -163,27 +165,46 @@ class CheckStatusCog(commands.Cog):
             await interaction.followup.send(f"An error occurred: {str(e)}", ephemeral=True)
 
     @discord.app_commands.command(name="check_log")
-    @discord.app_commands.describe(x="Number of lines from the end of the log file to return.")
-    async def check_log(self, interaction: discord.Interaction, x: int):
+    @discord.app_commands.describe(
+        x="Number of lines from the end of the log file to return.",
+        keyword_log="Whether to check keyword detection log instead of main log (default: False)"
+    )
+    async def check_log(self, interaction: discord.Interaction, x: int, keyword_log: bool = False):
         if not await check_channel_validity(interaction):
             return
+        
+        # Determine which log file to read
+        if keyword_log:
+            log_file = self.conf.get('keyword_log_file', './data/keyword_detection.log')
+            log_type = "关键词检测"
+        else:
+            log_file = self.logging_file
+            log_type = "主要"
+        
         try:
-            with open(self.logging_file, 'r', encoding='utf-8') as f:
+            with open(log_file, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
         except FileNotFoundError:
-            await interaction.response.send_message("The log file does not exist.")
+            await interaction.response.send_message(f"{log_type}日志文件不存在。")
             return
+        
+        if not lines:
+            await interaction.response.send_message(f"{log_type}日志文件为空。")
+            return
+            
         last_x_lines = ''.join(lines[-x:])
         if len(last_x_lines) > 1900:
             # If the message is too long, write it to a temporary file and send the file
             with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as temp:
                 temp.write(last_x_lines.encode())
                 temp_file_name = temp.name
-            await interaction.response.send_message("The log is too long to display, sending as a file instead.",
-                                                    file=discord.File(temp_file_name))
+            await interaction.response.send_message(
+                f"{log_type}日志过长，以文件形式发送。",
+                file=discord.File(temp_file_name, filename=f"{log_type}_log.txt")
+            )
             os.remove(temp_file_name)  # Delete the temporary file
         else:
-            await interaction.response.send_message(f"**Last {x} lines of the log file**:\n```{last_x_lines}```")
+            await interaction.response.send_message(f"**{log_type}日志最后 {x} 行**:\n```{last_x_lines}```")
 
     @discord.app_commands.command(name="check_voice_status")
     async def check_voice_status(self, interaction: discord.Interaction):

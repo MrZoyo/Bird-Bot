@@ -253,7 +253,9 @@ class CreateInvitationCog(commands.Cog):
                 await message.reply(self.ignore_channel_message, delete_after=10)
                 return
 
-            logging.info(f'检测到 {message.author} 的内容: {message.content}, 匹配项: {valid_matches}!')
+            # Use keyword detection logger
+            keyword_logger = logging.getLogger('keyword_detection')
+            keyword_logger.info(f'检测到 {message.author} 的内容: {message.content}, 匹配项: {valid_matches}!')
 
             # Check if the author is in a voice channel
             if message.author.voice and message.author.voice.channel:

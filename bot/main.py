@@ -9,7 +9,7 @@ from bot.cogs import (
     AchievementCog, BackupCog, CheckStatusCog,
     CreateInvitationCog, DnDCog, SpyModeCog, GiveawayCog,
     IllegalTeamActCog, NotebookCog, RatingCog, RoleCog,
-    VoiceStateCog, WelcomeCog, TicketsCog, ShopCog, PrivateRoomCog
+    VoiceStateCog, WelcomeCog, TicketsCog, ShopCog, PrivateRoomCog, TicketsNewCog
 )
 
 
@@ -56,7 +56,7 @@ async def setup_bot(bot):
     # Load configuration
     conf = config.get_config()
 
-    # Configure logging
+    # Configure main logging
     logging.basicConfig(
         level=logging.INFO,
         filename=conf['logging_file'],
@@ -64,6 +64,19 @@ async def setup_bot(bot):
         format='%(asctime)s - %(levelname)s - %(message)s',
         encoding='utf-8'
     )
+    
+    # Configure keyword detection logging
+    keyword_logger = logging.getLogger('keyword_detection')
+    keyword_logger.setLevel(logging.INFO)
+    
+    # Create separate handler for keyword detection logs
+    keyword_log_file = conf.get('keyword_log_file', './data/keyword_detection.log')
+    keyword_handler = logging.FileHandler(keyword_log_file, mode='a', encoding='utf-8')
+    keyword_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    keyword_logger.addHandler(keyword_handler)
+    
+    # Prevent keyword logs from appearing in main log
+    keyword_logger.propagate = False
 
     # Add all cogs
     illegal_act_cog = IllegalTeamActCog(bot)
@@ -81,6 +94,7 @@ async def setup_bot(bot):
     await bot.add_cog(BackupCog(bot))
     await bot.add_cog(RatingCog(bot))
     await bot.add_cog(TicketsCog(bot))
+    await bot.add_cog(TicketsNewCog(bot))
     await bot.add_cog(ShopCog(bot))
     await bot.add_cog(PrivateRoomCog(bot))
 

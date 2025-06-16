@@ -56,7 +56,7 @@
     "room_expired_button": "🔄 再次购买",
     "room_expired_footer": "感谢您使用私人房间服务！",
 
-    "shop_restore_button_label": "🔄 恢复误删房间",
+    "shop_restore_button_label": "🔄 误删恢复",
     "room_restore_title": "🔄 恢复私人房间",
     "room_restore_description": "您的私人房间在有效期内被删除，您可以恢复它！\n\n原房间创建于: {start_date}\n到期时间: {end_date}",
     "room_restore_cost": "💰 恢复需要: **{cost}** 积分",

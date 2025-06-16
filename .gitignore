@@ -90,3 +90,4 @@ Desktop.ini
 # Optional: Add if using Jupyter notebooks
 .ipynb_checkpoints
 *.ipynb
+bot/cogs/tickets_cog.old

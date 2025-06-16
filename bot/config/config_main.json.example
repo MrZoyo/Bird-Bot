@@ -4,6 +4,7 @@
 	"_comment": "====FOR main program bot.py or all cog===============================",
 	"token": "YOUR_BOT_TOKEN",
     "logging_file": "./data/bot.log",
+    "keyword_log_file": "./data/keyword_detection.log",
 	"db_path": "./data/bot.db",
     "guild_id": 1145141919810,
 	"_comment": "=====================================================================",

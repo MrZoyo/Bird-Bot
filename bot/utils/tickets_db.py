@@ -391,4 +391,78 @@ class TicketsDatabaseManager:
 
             return ticket_history
 
+    async def get_closed_tickets(self) -> List[dict]:
+        """Get all closed tickets."""
+        async with aiosqlite.connect(self.db_path) as db:
+            try:
+                cursor = await db.execute('''
+                    SELECT channel_id, message_id, creator_id, type_name, created_at, 
+                           accepted_by, accepted_at, closed_by, closed_at, close_reason
+                    FROM tickets 
+                    WHERE is_closed = 1
+                    ORDER BY closed_at DESC
+                ''')
+                rows = await cursor.fetchall()
+                
+                tickets = []
+                for row in rows:
+                    tickets.append({
+                        'channel_id': row[0],
+                        'message_id': row[1],
+                        'creator_id': row[2],
+                        'type_name': row[3],
+                        'created_at': row[4],
+                        'accepted_by': row[5],
+                        'accepted_at': row[6],
+                        'closed_by': row[7],
+                        'closed_at': row[8],
+                        'close_reason': row[9],
+                        'ticket_number': row[0]  # Use channel_id as ticket number for compatibility
+                    })
+                
+                return tickets
+            except Exception as e:
+                logging.error(f"Error getting closed tickets: {e}")
+                return []
+
+    async def get_closed_tickets_in_category(self, category_channel_ids: List[int]) -> List[dict]:
+        """Get closed tickets that are in the specified category (list of channel IDs)."""
+        if not category_channel_ids:
+            return []
+            
+        async with aiosqlite.connect(self.db_path) as db:
+            try:
+                # Create placeholders for the IN clause
+                placeholders = ','.join('?' for _ in category_channel_ids)
+                
+                cursor = await db.execute(f'''
+                    SELECT channel_id, message_id, creator_id, type_name, created_at, 
+                           accepted_by, accepted_at, closed_by, closed_at, close_reason
+                    FROM tickets 
+                    WHERE is_closed = 1 AND channel_id IN ({placeholders})
+                    ORDER BY closed_at DESC
+                ''', category_channel_ids)
+                rows = await cursor.fetchall()
+                
+                tickets = []
+                for row in rows:
+                    tickets.append({
+                        'channel_id': row[0],
+                        'message_id': row[1],
+                        'creator_id': row[2],
+                        'type_name': row[3],
+                        'created_at': row[4],
+                        'accepted_by': row[5],
+                        'accepted_at': row[6],
+                        'closed_by': row[7],
+                        'closed_at': row[8],
+                        'close_reason': row[9],
+                        'ticket_number': row[0]  # Use channel_id as ticket number for compatibility
+                    })
+                
+                return tickets
+            except Exception as e:
+                logging.error(f"Error getting closed tickets in category: {e}")
+                return []
+
 
