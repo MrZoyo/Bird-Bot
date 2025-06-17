@@ -229,7 +229,7 @@ class ShopCog(commands.Cog):
         self.conf = config.get_config('shop')
 
         # Initialize database manager
-        self.db = ShopDatabaseManager(self.db_path)
+        self.db = ShopDatabaseManager(self.db_path, self.conf)
 
     async def cog_load(self):
         """Initialize database when cog loads."""
@@ -320,6 +320,47 @@ class ShopCog(commands.Cog):
 
         return embed
 
+    def create_checkin_status_embed(self, user, balance, streak, max_streak):
+        """Create an embed showing check-in status information (different from actual check-in)."""
+        embed = discord.Embed(
+            title=self.conf['checkin_check_embed_title'],
+            description=self.conf['checkin_check_embed_description'],
+            color=discord.Color.blue()
+        )
+
+        # Add user avatar as thumbnail
+        if user.avatar:
+            embed.set_thumbnail(url=user.avatar.url)
+        elif self.bot.user.avatar:
+            embed.set_thumbnail(url=self.bot.user.avatar.url)
+
+        # Add fields with check-in information
+        embed.add_field(
+            name="👤 用户",
+            value=user.display_name,
+            inline=False
+        )
+
+        embed.add_field(
+            name="💰 当前积分",
+            value=f"{balance}",
+            inline=True
+        )
+
+        embed.add_field(
+            name="🔥 连续签到",
+            value=f"{streak}天",
+            inline=True
+        )
+
+        embed.add_field(
+            name="⭐ 最大连续签到",
+            value=f"{max_streak}天",
+            inline=True
+        )
+
+        return embed
+
     @app_commands.command(name="checkin_check", description="查看签到与余额信息")
     @app_commands.describe(user="要查看的用户 (默认为自己)")
     async def checkin_check(self, interaction: discord.Interaction, user: discord.User = None):
@@ -331,7 +372,7 @@ class ShopCog(commands.Cog):
         checkin_status = await self.db.get_checkin_status(target_user.id)
 
         # Create an embed with the information
-        embed = self.create_checkin_embed(
+        embed = self.create_checkin_status_embed(
             target_user,
             balance,
             checkin_status["streak"],
@@ -342,8 +383,8 @@ class ShopCog(commands.Cog):
         if checkin_status["last_checkin"]:
             last_date = datetime.fromisoformat(checkin_status["last_checkin"]).strftime('%Y-%m-%d')
             embed.add_field(
-                name="",
-                value=self.conf['checkin_embed_last_checkin'].format(date=last_date),
+                name="📅 最后签到",
+                value=last_date,
                 inline=False
             )
 
@@ -505,3 +546,146 @@ class ShopCog(commands.Cog):
 
         # Join all ranges with commas
         return ", ".join(ranges)
+
+    @app_commands.command(name="checkin_makeup", description="补签功能，消耗积分补签漏签日期")
+    async def checkin_makeup(self, interaction: discord.Interaction):
+        """Makeup check-in command to make up for missed days."""
+        user_id = interaction.user.id
+        
+        # Check remaining makeup count
+        remaining_count = await self.db.get_remaining_makeup_count(user_id)
+        if remaining_count <= 0:
+            embed = discord.Embed(
+                title=self.conf['makeup_checkin_no_quota_title'],
+                description=self.conf['makeup_checkin_no_quota_description'].format(
+                    limit=self.conf['makeup_checkin_limit_per_month']
+                ),
+                color=discord.Color.red()
+            )
+            embed.set_thumbnail(url=interaction.user.avatar.url if interaction.user.avatar else None)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
+        # Check if user has any manual check-ins first
+        first_checkin = await self.db.get_first_checkin_date(user_id)
+        if not first_checkin:
+            embed = discord.Embed(
+                title=self.conf['makeup_checkin_no_manual_checkin_title'],
+                description=self.conf['makeup_checkin_no_manual_checkin_description'],
+                color=discord.Color.orange()
+            )
+            embed.set_thumbnail(url=interaction.user.avatar.url if interaction.user.avatar else None)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
+        # Find the latest missed check-in date
+        missed_date = await self.db.find_latest_missed_checkin(user_id)
+        if not missed_date:
+            embed = discord.Embed(
+                title=self.conf['makeup_checkin_no_missed_days_title'],
+                description=self.conf['makeup_checkin_no_missed_days_description'],
+                color=discord.Color.blue()
+            )
+            embed.set_thumbnail(url=interaction.user.avatar.url if interaction.user.avatar else None)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
+        # Check user balance
+        current_balance = await self.db.get_user_balance(user_id)
+        makeup_cost = self.conf['makeup_checkin_cost']
+        
+        if current_balance < makeup_cost:
+            embed = discord.Embed(
+                title=self.conf['makeup_checkin_insufficient_balance_title'],
+                description=self.conf['makeup_checkin_insufficient_balance_description'].format(
+                    cost=makeup_cost,
+                    balance=current_balance
+                ),
+                color=discord.Color.red()
+            )
+            embed.set_thumbnail(url=interaction.user.avatar.url if interaction.user.avatar else None)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
+        # Perform makeup check-in
+        success = await self.db.add_makeup_record(user_id, missed_date)
+        if not success:
+            embed = discord.Embed(
+                title=self.conf['makeup_checkin_no_quota_title'],
+                description=self.conf['makeup_checkin_no_quota_description'].format(
+                    limit=self.conf['makeup_checkin_limit_per_month']
+                ),
+                color=discord.Color.red()
+            )
+            embed.set_thumbnail(url=interaction.user.avatar.url if interaction.user.avatar else None)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
+        # Deduct balance and record transaction
+        new_balance = await self.db.update_user_balance_with_record(
+            user_id,
+            -makeup_cost,
+            "makeup_checkin",
+            user_id,
+            f"Makeup check-in for {missed_date}"
+        )
+        
+        # Get updated remaining count
+        new_remaining_count = await self.db.get_remaining_makeup_count(user_id)
+        
+        # Get updated check-in status for streak information
+        updated_checkin_status = await self.db.get_checkin_status(user_id)
+        
+        # Create success embed
+        embed = discord.Embed(
+            title=self.conf['makeup_checkin_success_title'],
+            description=self.conf['makeup_checkin_success_description'].format(cost=makeup_cost),
+            color=discord.Color.green()
+        )
+        
+        # Add user avatar as thumbnail
+        if interaction.user.avatar:
+            embed.set_thumbnail(url=interaction.user.avatar.url)
+        elif self.bot.user.avatar:
+            embed.set_thumbnail(url=self.bot.user.avatar.url)
+        
+        # Add fields
+        embed.add_field(
+            name="📅 补签日期",
+            value=missed_date,
+            inline=True
+        )
+        
+        embed.add_field(
+            name="💰 当前积分",
+            value=f"{new_balance}",
+            inline=True
+        )
+        
+        embed.add_field(
+            name=self.conf['makeup_checkin_remaining_field'],
+            value=f"{new_remaining_count}/{self.conf['makeup_checkin_limit_per_month']}",
+            inline=True
+        )
+        
+        # Add streak information
+        embed.add_field(
+            name="🔥 连续签到",
+            value=f"{updated_checkin_status['streak']}天",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="⭐ 最大连续签到",
+            value=f"{updated_checkin_status['max_streak']}天",
+            inline=True
+        )
+        
+        # Add footer
+        embed.set_footer(text=f"💸 补签消耗 {makeup_cost} 积分")
+        
+        await interaction.response.send_message(embed=embed)
+
+
+async def setup(bot):
+    await bot.add_cog(ShopCog(bot))

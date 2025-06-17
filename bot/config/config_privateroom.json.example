@@ -6,6 +6,8 @@
   "check_time_minute": 10,
   "room_duration_days": 32,
   "max_rooms": 40,
+  "renewal_days_threshold": 7,
+  "renewal_extend_days": 31,
 
   "messages": {
     "init_success": "✅ 私人房间系统已初始化成功！Category ID: {category_id}",
@@ -97,6 +99,37 @@
     "error_insufficient_balance_current_format": "**{balance}** 积分（还需 **{needed}** 积分）",
     "error_insufficient_balance_voice_format": "上个月语音 **{hours}** 小时（**{minutes}** 分钟），抵扣 **{discount}** 积分",
     "error_insufficient_balance_footer": "提示：每日签到可获得积分，或者增加语音时长来获得下个月更多折扣",
-    "points_label": "积分"
+    "points_label": "积分",
+
+    "shop_renewal_button_label": "⏰ 提前续费",
+
+    "renewal_confirm_title": "确认提前续费私人房间",
+    "renewal_current_room": "🏠 当前房间: **{room_name}** (剩余 **{days_remaining}** 天)",
+    "renewal_extend_days": "⏰ 续费延长: **{extend_days}** 天",
+    "renewal_cost": "💰 续费费用: **{cost}** 积分",
+    "renewal_confirm_button": "✅ 确认续费", 
+    "renewal_cancel_button": "❌ 取消",
+    "renewal_cancelled": "🛑 已取消续费。",
+
+    "renewal_modal_title": "最终确认续费",
+    "renewal_modal_label": "请输入 'yes' 确认续费",
+    "renewal_modal_placeholder": "输入 yes 确认",
+
+    "renewal_success_title": "🎉 私人房间续费成功！",
+
+    "renewal_room_success_title": "🔄 房间续费成功！",
+    "renewal_room_success_description": "🎉 {owner} 已成功续费此私人房间！\n\n⏰ 延长时间: **{extend_days}** 天\n📅 新到期时间: **{new_end_date}**",
+    "renewal_room_success_footer": "感谢您继续使用私人房间服务！",
+
+    "renewal_dm_success_title": "🎉 私人房间续费成功！",
+    "renewal_dm_success_description": "您的私人房间已成功续费！\n\n⏰ 延长时间: **{extend_days}** 天\n📅 新到期时间: **{new_end_date}**",
+    "renewal_dm_success_button": "👉 前往我的房间",
+
+    "error_no_room_for_renewal": "❌ 您没有可续费的私人房间。",
+    "error_room_not_found": "❌ 您的私人房间未找到，请联系管理员。",
+    "error_renewal_too_early": "❌ 私人房间剩余时间还有 **{days_remaining}** 天，至少要少于 **{threshold}** 天才能续费。",
+    "error_renewal_insufficient_balance_description": "您的积分不足以续费私人房间",
+    "error_renewal_failed": "❌ 续费失败，请联系管理员。"
+
   }
 }

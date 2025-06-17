@@ -1,6 +1,6 @@
 # Bird Bot 
 
-`Version: 1.4.0b`
+`Version: 1.4.1b`
 
 ---
 
@@ -289,43 +289,66 @@ Anonymous rating system for events and activities.
 - `/tickets_archive`: Archive all closed tickets in the current category with complete message history and attachment download (≤50MB per file)
 
 ### Shop_Cog
-Point-based economy system for user engagement and rewards.
+**🔥 Enhanced point-based economy system** with makeup check-in functionality and improved user experience.
 
-**Features:**
-- **Balance management** with point tracking and transfers
-- **Daily check-in system** with streak bonuses and rewards
+**Core Features:**
+- **Balance management** with point tracking and transfer capabilities
+- **Daily check-in system** with streak bonuses and reward tracking
+- **Advanced makeup check-in system** for missed days (NEW in v1.7.1b)
 - **Transaction history** with detailed logging and monthly views
-- **Admin controls** for manual balance adjustments
-- **Check-in streaks** encouraging daily engagement
+- **Admin controls** for manual balance adjustments with audit trails
+- **Check-in streaks** encouraging daily engagement with accurate tracking
+
+**🆕 Makeup Check-in System:**
+- **Monthly limit**: 3 makeup check-ins per month with intelligent quota management
+- **Smart validation**: Prevents makeup before first manual check-in
+- **Cost-based system**: 20 points per makeup (configurable) vs 10 points earned per check-in
+- **Automatic streak recalculation** ensuring accurate statistics after makeup
+- **Comprehensive UI** showing remaining quotas and streak information
 
 **Commands:**
-- `/balance [user]`: View current points balance
-- `/checkin`: Perform daily check-in to earn points
-- `/transfer <user> <amount>`: Transfer points to another user
-- `/adjust_balance <user> <amount> <reason>`: (Admin) Manually adjust user balance
-- `/transaction_history [user] [month]`: View transaction history
-- `/checkin_history [user] [month]`: View check-in history by month
+- `/checkin`: Perform daily check-in to earn points (must be in voice channel)
+- `/checkin_makeup`: **NEW** - Make up for missed check-in days (costs 20 points)
+- `/checkin_check [user]`: View check-in status with enhanced interface
+- `/checkin_history [user]`: View complete check-in history including makeup records
+- `/balance_change <user>`: (Admin) Modify user balance with detailed forms
+- `/balance_history [user]`: View transaction history with pagination
 
 ### PrivateRoom_Cog
-Point-based private voice channel system with activity-based pricing.
+**🏠 Enhanced private voice channel system** with intelligent settings preservation and restoration capabilities.
 
-**Features:**
-- **Temporary ownership system** with configurable expiration periods
-- **Point-based purchasing** integrated with shop system
-- **Activity-based discounts** rewarding active voice users
-- **Room restoration** for accidentally deleted channels
-- **Automatic cleanup** of expired or deleted rooms
+**Core Features:**
+- **Temporary ownership system** with configurable expiration periods (32 days default)
+- **Point-based purchasing** integrated with shop system and voice activity discounts
+- **Activity-based discounts** rewarding active voice users (up to 100% off)
+- **Room restoration** for accidentally deleted channels within validity period
+- **Automatic cleanup** of expired rooms with smart scheduling
+
+**🆕 Settings Preservation System:**
+- **Automatic settings backup** when rooms expire or are deleted
+- **Complete permission preservation** including user-specific and role-based permissions
+- **Channel name preservation** maintaining user customizations
+- **Intelligent restoration options** when purchasing new rooms
+- **6-month storage period** for saved settings with automatic cleanup
+- **Smart UI choices** between restoring previous settings or creating fresh rooms
+
+**Enhanced User Experience:**
+- **Dual purchase options**: Restore previous settings vs create new room
+- **Settings preview interface** showing saved room name, permissions count, and save date
+- **Seamless permission restoration** automatically applying saved configurations
+- **Invalid user handling** gracefully skipping users who left the server
 
 **Commands:**
-- `/privateroom_init`: (Admin) Initialize private room system
+- `/privateroom_init`: (Admin) Initialize private room system with settings table
 - `/privateroom_setup`: (Admin) Configure private room shop interface
 - `/privateroom_reset`: (Admin) Reset entire private room system
-- `/privateroom_list`: List all active private rooms with details
+- `/privateroom_list`: List all active private rooms with pagination
 - `/privateroom_ban <user>`: (Admin) Ban user from private room system
 
 **Shop Interface:**
-- **Purchase Button**: Buy new private room with activity-based pricing
-- **Restore Button**: Restore previously owned room if available
+- **🛍️ Purchase Button**: Buy new private room with intelligent settings detection
+- **🔄 Restore Button**: Restore previously owned room if available within validity period
+- **⚙️ Smart Settings Choice**: Automatically detects saved settings and offers restoration options
 
 ### Game_DnD_Cog
 Advanced Dungeons & Dragons dice rolling system with comprehensive notation support.
@@ -409,22 +432,34 @@ Media processing module with validation and security features.
 - **Size limit enforcement** for resource management
 
 ### shop_db
-Database integration module for the economy system.
-- **Transaction tracking** with detailed logging
-- **Balance management** with audit trails
-- **Check-in streak tracking** for engagement rewards
-- **Monthly statistics** generation for reporting
+**🔥 Enhanced database integration module** for the comprehensive economy system.
+- **Transaction tracking** with detailed logging and categorization
+- **Balance management** with comprehensive audit trails
+- **Advanced check-in streak tracking** with makeup support and accurate recalculation
+- **Makeup check-in management** with monthly quota tracking and intelligent validation
+- **Monthly statistics** generation for reporting and analytics
+- **First check-in tracking** for makeup validation and user progress monitoring
 
 ### privateroom_db
-Database manager for private voice channel system.
-- **Room ownership tracking** with expiration management
-- **Purchase history** with pricing calculations
-- **Activity-based discount** calculations
-- **Automatic cleanup** of expired room data
+**🏠 Enhanced database manager** for the intelligent private voice channel system.
+- **Room ownership tracking** with comprehensive expiration management
+- **Settings preservation system** with JSON-based permission storage
+- **Purchase history** with pricing calculations and discount tracking
+- **Activity-based discount** calculations for user engagement rewards
+- **Automatic cleanup** of expired room data and settings with configurable retention
+- **Permission restoration capabilities** with user/role validation and fallback handling
 
 ---
 
 ## Update Log
+
+### V1.4.1b - 2025-06-17
+#### 🎯 Major Feature Enhancements
+- **Private room system extend**
+  - Users can now extend their private rooms by one month in advance.
+- **Check In make up**
+  - Users can now spend a certain number of points each month to make up for three missed sign-ins.
+---
 
 ### V1.4.0b - 2025-06-16
 #### 🆕 Major New Features

@@ -10,6 +10,8 @@
   "checkin_embed_max_streak": "⭐ 最大连续签到: {max_streak}天",
   "checkin_footer": "📅 每日签到 +{reward} 积分",
   "checkin_embed_last_checkin": "📅 最后签到: {date}",
+  "checkin_check_embed_title": "🔍 签到状态查询",
+  "checkin_check_embed_description": "查看您的签到状态和积分信息",
   "modify_balance_error": "❌ 修改余额时出错: {error}",
   "history_no_transactions": "⚠️ 该用户没有余额变更记录",
   "modify_balance_modal_title": "修改 {user_name} 的余额",
@@ -33,11 +35,25 @@
   "history_type_emoji": {
     "checkin": "✅",
     "shop": "🛒",
-    "admin": "🔧"
+    "admin": "🔧",
+    "makeup_checkin": "🗓️"
   },
   "history_default_emoji": "🔄",
   "checkin_history_message": "📊 {user_name} 的签到历史记录",
   "checkin_history_no_data": "⚠️ 该用户没有签到记录",
   "checkin_history_header": "   时间   | 签到天数 | 签到记录",
+  "makeup_checkin_cost": 50,
+  "makeup_checkin_limit_per_month": 3,
+  "makeup_checkin_success_title": "✅ 补签成功",
+  "makeup_checkin_success_description": "补签成功！扣除 {cost} 积分",
+  "makeup_checkin_remaining_field": "📊 本月剩余补签次数",
+  "makeup_checkin_insufficient_balance_title": "❌ 积分不足",
+  "makeup_checkin_insufficient_balance_description": "补签需要 {cost} 积分，您当前只有 {balance} 积分",
+  "makeup_checkin_no_quota_title": "⚠️ 补签次数不足",
+  "makeup_checkin_no_quota_description": "本月补签次数已用完（{limit}次/月），请等待下月重置",
+  "makeup_checkin_no_missed_days_title": "✨ 无需补签",
+  "makeup_checkin_no_missed_days_description": "您最近没有漏签的日期需要补签",
+  "makeup_checkin_no_manual_checkin_title": "⚠️ 无法补签",
+  "makeup_checkin_no_manual_checkin_description": "您还没有进行过手动签到，无法使用补签功能。请先进行一次正常签到。",
   "_comment": "====================================================================="
 }

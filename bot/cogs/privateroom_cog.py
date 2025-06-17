@@ -5,15 +5,16 @@ from discord.ext import commands, tasks
 from discord import app_commands
 import logging
 import asyncio
+import json
 from datetime import datetime, timedelta, time
-from typing import Optional, Dict, List, Tuple
+from typing import Optional, Dict, List, Tuple, Any
 
 from bot.utils import config, check_channel_validity, ShopDatabaseManager
 from bot.utils.privateroom_db import PrivateRoomDatabaseManager
 
 
 class ConfirmPurchaseView(discord.ui.View):
-    def __init__(self, cog, user, hours, percentage, cost, balance, is_restore=False, old_room=None):
+    def __init__(self, cog, user, hours, percentage, cost, balance, is_restore=False, old_room=None, is_renewal=False):
         super().__init__(timeout=300)
         self.cog = cog
         self.user = user
@@ -23,14 +24,22 @@ class ConfirmPurchaseView(discord.ui.View):
         self.balance = balance
         self.is_restore = is_restore
         self.old_room = old_room
+        self.is_renewal = is_renewal
 
         # 加载消息文本
         self.messages = cog.conf['messages']
 
         # 添加确认按钮
+        if is_renewal:
+            confirm_label = self.messages['renewal_confirm_button']
+            cancel_label = self.messages['renewal_cancel_button']
+        else:
+            confirm_label = self.messages['confirm_button']
+            cancel_label = self.messages['cancel_button']
+
         confirm_button = discord.ui.Button(
             style=discord.ButtonStyle.green,
-            label=self.messages['confirm_button'],
+            label=confirm_label,
             custom_id='confirm_purchase'
         )
         confirm_button.callback = self.confirm_callback
@@ -38,7 +47,7 @@ class ConfirmPurchaseView(discord.ui.View):
         # 添加取消按钮
         cancel_button = discord.ui.Button(
             style=discord.ButtonStyle.red,
-            label=self.messages['cancel_button'],
+            label=cancel_label,
             custom_id='cancel_purchase'
         )
         cancel_button.callback = self.cancel_callback
@@ -50,8 +59,15 @@ class ConfirmPurchaseView(discord.ui.View):
         if interaction.user.id != self.user.id:
             return
 
-        # Display the final confirmation modal
-        modal = PurchaseModal(self.cog, self.cost, self.balance, self.is_restore, self.old_room)
+        # 显示购买确认modal
+        modal = PurchaseModal(
+            self.cog, 
+            self.cost, 
+            self.balance, 
+            self.is_restore, 
+            self.old_room,
+            is_renewal=self.is_renewal
+        )
         await interaction.response.send_modal(modal)
 
         # Schedule message deletion after 15 seconds
@@ -65,29 +81,41 @@ class ConfirmPurchaseView(discord.ui.View):
         if interaction.user.id != self.user.id:
             return
 
+        cancel_message = self.messages['renewal_cancelled'] if self.is_renewal else self.messages['purchase_cancelled']
         await interaction.response.edit_message(
-            content=self.messages['purchase_cancelled'],
+            content=cancel_message,
             embed=None,
             view=None
         )
 
 
 class PurchaseModal(discord.ui.Modal):
-    def __init__(self, cog, cost, balance, is_restore=False, old_room=None):
-        super().__init__(title=cog.conf['messages']['modal_title'])
+    def __init__(self, cog, cost, balance, is_restore=False, old_room=None, is_restore_settings=False, is_renewal=False):
+        if is_renewal:
+            title = cog.conf['messages']['renewal_modal_title']
+            label = cog.conf['messages']['renewal_modal_label']
+            placeholder = cog.conf['messages']['renewal_modal_placeholder']
+        else:
+            title = cog.conf['messages']['modal_title']
+            label = cog.conf['messages']['modal_label']
+            placeholder = cog.conf['messages']['modal_placeholder']
+            
+        super().__init__(title=title)
         self.cog = cog
         self.cost = cost
         self.balance = balance
         self.is_restore = is_restore
         self.old_room = old_room
+        self.is_restore_settings = is_restore_settings
+        self.is_renewal = is_renewal
 
         # 加载消息文本
         self.messages = cog.conf['messages']
 
-        # 添加文本输入
+        # 添加确认输入
         self.confirmation = discord.ui.TextInput(
-            label=self.messages['modal_label'],
-            placeholder=self.messages['modal_placeholder'],
+            label=label,
+            placeholder=placeholder,
             required=True,
             max_length=5
         )
@@ -96,12 +124,22 @@ class PurchaseModal(discord.ui.Modal):
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
 
-        # 检查确认输入
+        # 确认输入验证
         if self.confirmation.value.lower() != 'yes':
             await interaction.followup.send(
                 self.messages['error_confirmation_failed'],
                 ephemeral=True
             )
+            return
+
+        # 处理续费逻辑
+        if self.is_renewal:
+            success = await self.cog.process_advance_renewal(interaction, self.cost)
+            if not success:
+                await interaction.followup.send(
+                    self.messages['error_renewal_failed'],
+                    ephemeral=True
+                )
             return
 
         # 最终检查用户是否已有活跃的私人房间
@@ -138,6 +176,7 @@ class PurchaseModal(discord.ui.Modal):
             )
 
 
+
 class PrivateRoomShopView(discord.ui.View):
     def __init__(self, cog):
         super().__init__(timeout=None)  # 永久有效
@@ -154,6 +193,14 @@ class PrivateRoomShopView(discord.ui.View):
         )
         purchase_button.callback = self.purchase_callback
 
+        # 添加提前续费按钮
+        renewal_button = discord.ui.Button(
+            style=discord.ButtonStyle.secondary,
+            label=self.messages['shop_renewal_button_label'],
+            custom_id='advance_renewal_privateroom'
+        )
+        renewal_button.callback = self.renewal_callback
+
         # 添加恢复按钮
         restore_button = discord.ui.Button(
             style=discord.ButtonStyle.success,
@@ -163,10 +210,14 @@ class PrivateRoomShopView(discord.ui.View):
         restore_button.callback = self.restore_callback
 
         self.add_item(purchase_button)
+        self.add_item(renewal_button)
         self.add_item(restore_button)
 
     async def purchase_callback(self, interaction: discord.Interaction):
         await self.cog.handle_purchase_request(interaction)
+
+    async def renewal_callback(self, interaction: discord.Interaction):
+        await self.cog.handle_advance_renewal_request(interaction)
 
     async def restore_callback(self, interaction: discord.Interaction):
         await self.cog.handle_restore_request(interaction)
@@ -795,7 +846,162 @@ class PrivateRoomCog(commands.Cog):
 
         # 创建确认视图
         view = ConfirmPurchaseView(self, user, hours, percentage, cost, balance)
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
+    async def handle_advance_renewal_request(self, interaction: discord.Interaction):
+        """处理提前续费私人房间的请求"""
+        await interaction.response.defer(ephemeral=True)
+
+        user = interaction.user
+        user_id = user.id
+
+        # 检查用户是否有活跃的私人房间
+        active_room = await self.db.get_active_room_by_user(user_id)
+        if not active_room:
+            await interaction.followup.send(
+                self.conf['messages']['error_no_room_for_renewal'],
+                ephemeral=True
+            )
+            return
+
+        # 检查房间是否确实存在
+        channel = self.bot.get_channel(active_room['room_id'])
+        if not channel:
+            await interaction.followup.send(
+                self.conf['messages']['error_room_not_found'],
+                ephemeral=True
+            )
+            return
+
+        # 检查房间剩余时间是否符合续费条件
+        end_date = active_room['end_date']
+        now = datetime.now()
+        days_remaining = (end_date - now).days
+
+        renewal_threshold = self.conf.get('renewal_days_threshold', 7)
+        if days_remaining > renewal_threshold:
+            await interaction.followup.send(
+                self.conf['messages']['error_renewal_too_early'].format(
+                    days_remaining=days_remaining,
+                    threshold=renewal_threshold
+                ),
+                ephemeral=True
+            )
+            return
+
+        # 获取用户余额
+        balance = await self.shop_db.get_user_balance(user_id)
+
+        # 计算续费折扣和最终成本
+        hours, percentage, discount, cost = await self.calculate_discount(user_id)
+
+        # 检查余额是否足够支付续费成本
+        if cost > 0 and balance < cost:
+            # 创建详细的余额不足消息
+            embed = discord.Embed(
+                title=self.conf['messages']['error_insufficient_balance_title'],
+                description=self.conf['messages']['error_renewal_insufficient_balance_description'],
+                color=discord.Color.red()
+            )
+
+            # 计算所需积分
+            points_needed = cost - balance
+            original_cost = self.conf['points_cost']
+            discount_amount = original_cost - cost
+
+            # 添加详细信息到embed
+            embed.add_field(
+                name=self.conf['messages']['error_insufficient_balance_original_price'],
+                value=f"**{original_cost}** {self.conf['messages']['points_label']}",
+                inline=False
+            )
+
+            embed.add_field(
+                name=self.conf['messages']['error_insufficient_balance_voice_time'],
+                value=self.conf['messages']['error_insufficient_balance_voice_format'].format(
+                    hours=round(hours, 1),
+                    minutes=int(hours * 60),
+                    discount=discount_amount
+                ),
+                inline=False
+            )
+
+            embed.add_field(
+                name=self.conf['messages']['error_insufficient_balance_after_discount'],
+                value=f"**{cost}** {self.conf['messages']['points_label']}",
+                inline=False
+            )
+
+            embed.add_field(
+                name=self.conf['messages']['error_insufficient_balance_current'],
+                value=self.conf['messages']['error_insufficient_balance_current_format'].format(
+                    balance=balance,
+                    needed=points_needed
+                ),
+                inline=False
+            )
+
+            # 设置页脚
+            embed.set_footer(text=self.conf['messages']['error_insufficient_balance_footer'])
+
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            return
+
+        # 创建续费确认嵌入消息
+        embed = discord.Embed(
+            title=self.conf['messages']['renewal_confirm_title'],
+            color=discord.Color.gold()
+        )
+
+        # 显示当前房间信息
+        embed.add_field(
+            name="",
+            value=self.conf['messages']['renewal_current_room'].format(
+                room_name=channel.name,
+                days_remaining=days_remaining
+            ),
+            inline=False
+        )
+
+        embed.add_field(
+            name="",
+            value=self.conf['messages']['renewal_extend_days'].format(
+                extend_days=self.conf.get('renewal_extend_days', 31)
+            ),
+            inline=False
+        )
+
+        embed.add_field(
+            name="",
+            value=self.conf['messages']['confirm_last_month'].format(
+                hours=round(hours, 1),
+                percentage=round(percentage, 1)
+            ),
+            inline=False
+        )
+
+        embed.add_field(
+            name="",
+            value=self.conf['messages']['confirm_discount'].format(
+                discount=round(discount, 1)
+            ),
+            inline=False
+        )
+
+        embed.add_field(
+            name="",
+            value=self.conf['messages']['renewal_cost'].format(cost=cost),
+            inline=False
+        )
+
+        embed.add_field(
+            name="",
+            value=self.conf['messages']['confirm_balance'].format(balance=balance),
+            inline=False
+        )
+
+        # 创建确认视图
+        view = ConfirmPurchaseView(self, user, hours, percentage, cost, balance, is_renewal=True)
         await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
     async def handle_restore_request(self, interaction: discord.Interaction):
@@ -875,6 +1081,85 @@ class PrivateRoomCog(commands.Cog):
 
         await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
+    async def process_advance_renewal(self, interaction: discord.Interaction, cost: int) -> bool:
+        """处理提前续费操作"""
+        user = interaction.user
+        user_id = user.id
+
+        try:
+            # 再次检查用户余额
+            if cost > 0:
+                current_balance = await self.shop_db.get_user_balance(user_id)
+                if current_balance < cost:
+                    await interaction.followup.send(
+                        self.conf['messages']['error_insufficient_balance'],
+                        ephemeral=True
+                    )
+                    return False
+
+            # 获取当前活跃房间
+            active_room = await self.db.get_active_room_by_user(user_id)
+            if not active_room:
+                await interaction.followup.send(
+                    self.conf['messages']['error_no_room_for_renewal'],
+                    ephemeral=True
+                )
+                return False
+
+            # 检查房间是否存在
+            channel = self.bot.get_channel(active_room['room_id'])
+            if not channel:
+                await interaction.followup.send(
+                    self.conf['messages']['error_room_not_found'],
+                    ephemeral=True
+                )
+                return False
+
+            # 计算新的结束时间
+            current_end_date = active_room['end_date']
+            extend_days = self.conf.get('renewal_extend_days', 31)
+            new_end_date = current_end_date + timedelta(days=extend_days)
+
+            # 设置结束时间为8:00
+            new_end_date = new_end_date.replace(
+                hour=self.conf['check_time_hour'], 
+                minute=0, 
+                second=0, 
+                microsecond=0
+            )
+
+            # 更新数据库中的房间到期时间
+            await self.db.extend_room_validity(active_room['room_id'], new_end_date)
+
+            # 扣除积分
+            if cost > 0:
+                await self.shop_db.update_user_balance_with_record(
+                    user_id, -cost, "shop", user_id,
+                    f"提前续费私人房间 ({extend_days}天)"
+                )
+
+            # 发送成功确认
+            await interaction.followup.send(
+                self.conf['messages']['renewal_success_title'],
+                ephemeral=True
+            )
+
+            # 在房间中发送续费成功的embed
+            await self.send_renewal_success_embed(channel, user, new_end_date, extend_days)
+
+            # 发送私信通知
+            await self.send_renewal_confirmation(user, channel, new_end_date, extend_days)
+
+            return True
+
+        except Exception as e:
+            logging.error(f"Error processing advance renewal: {e}", exc_info=True)
+            await interaction.followup.send(
+                self.conf['messages']['error_renewal_failed'],
+                ephemeral=True
+            )
+            return False
+
     async def create_private_room(self, interaction: discord.Interaction, cost: int) -> bool:
         """创建新的私人房间"""
         user = interaction.user
@@ -888,10 +1173,10 @@ class PrivateRoomCog(commands.Cog):
         end_date = end_date.replace(hour=self.conf['check_time_hour'], minute=0, second=0, microsecond=0)
 
         # 创建房间
-        success, _ = await self._create_room_channel(
+        success, channel = await self._create_room_channel(
             interaction, user, now, end_date, cost, is_restore=False
         )
-
+        
         if success:
             # 确认购买成功
             await interaction.followup.send(
@@ -1036,6 +1321,10 @@ class PrivateRoomCog(commands.Cog):
                     f"{'恢复' if is_restore else '购买'}私人房间 ({duration_days}天)"
                 )
 
+            # 如果是恢复且用户有保存的设置，应用这些设置
+            if is_restore:
+                await self.apply_saved_settings(channel, user.id)
+
             # 发送房间信息
             await self.send_room_info(channel, user, start_date, end_date)
 
@@ -1138,6 +1427,55 @@ class PrivateRoomCog(commands.Cog):
         except discord.HTTPException as e:
             logging.error(f"Failed to send purchase confirmation to user {user.id}: {e}")
 
+    async def send_renewal_success_embed(self, channel, user, new_end_date, extend_days):
+        """在私人房间中发送续费成功的嵌入消息"""
+        embed = discord.Embed(
+            title=self.conf['messages']['renewal_room_success_title'],
+            description=self.conf['messages']['renewal_room_success_description'].format(
+                owner=user.mention,
+                extend_days=extend_days,
+                new_end_date=new_end_date.strftime("%Y-%m-%d %H:%M")
+            ),
+            color=discord.Color.green()
+        )
+
+        # 如果用户有头像，添加为嵌入消息的缩略图
+        if user.avatar:
+            embed.set_thumbnail(url=user.avatar.url)
+        elif self.bot.user.avatar:
+            embed.set_thumbnail(url=self.bot.user.avatar.url)
+
+        embed.set_footer(text=self.conf['messages']['renewal_room_success_footer'])
+
+        await channel.send(embed=embed)
+
+    async def send_renewal_confirmation(self, user, channel, new_end_date, extend_days):
+        """向用户发送私信确认续费成功"""
+        try:
+            embed = discord.Embed(
+                title=self.conf['messages']['renewal_dm_success_title'],
+                description=self.conf['messages']['renewal_dm_success_description'].format(
+                    extend_days=extend_days,
+                    new_end_date=new_end_date.strftime("%Y-%m-%d %H:%M")
+                ),
+                color=discord.Color.green()
+            )
+
+            # 创建跳转按钮
+            view = discord.ui.View()
+            button = discord.ui.Button(
+                style=discord.ButtonStyle.link,
+                label=self.conf['messages']['renewal_dm_success_button'],
+                url=channel.jump_url
+            )
+            view.add_item(button)
+
+            # 发送私信
+            await user.send(embed=embed, view=view)
+
+        except discord.HTTPException as e:
+            logging.error(f"Failed to send renewal confirmation to user {user.id}: {e}")
+
     async def verify_shop_messages(self):
         """验证并清理不存在的商店消息"""
         removed_count = await self.db.clean_nonexistent_shop_messages(self.bot)
@@ -1212,6 +1550,7 @@ class PrivateRoomCog(commands.Cog):
         except Exception as e:
             logging.error(f"Error listing private rooms: {e}")
             await interaction.followup.send(f"获取房间列表时出错: {e}")
+
 
     @app_commands.command(
         name="privateroom_ban",
@@ -1311,3 +1650,5 @@ class PrivateRoomCog(commands.Cog):
                     logging.error(f"Error updating shop message {message_id} in channel {channel_id}: {e}")
         except Exception as e:
             logging.error(f"Error in update_shop_messages: {e}")
+
+

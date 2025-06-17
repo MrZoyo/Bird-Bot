@@ -3,6 +3,7 @@ import discord
 import aiosqlite
 from datetime import datetime, timedelta
 import logging
+import json
 from typing import Dict, List, Optional, Tuple, Any
 
 
@@ -39,6 +40,18 @@ class PrivateRoomDatabaseManager:
                     message_id INTEGER NOT NULL,
                     created_at TEXT NOT NULL,
                     PRIMARY KEY (channel_id, message_id)
+                )
+            ''')
+
+            # 私房设置保存表 - 保存用户的房间权限和名称设置
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS privateroom_saved_settings (
+                    user_id INTEGER PRIMARY KEY,
+                    saved_at TEXT NOT NULL,
+                    channel_name TEXT,
+                    settings_data TEXT NOT NULL,
+                    original_room_id INTEGER,
+                    expires_at TEXT
                 )
             ''')
 
@@ -315,3 +328,94 @@ class PrivateRoomDatabaseManager:
 
             rooms = await cursor.fetchall()
             return rooms, total_count
+
+    async def save_user_room_settings(self, user_id: int, settings_data: Dict[str, Any], 
+                                     original_room_id: Optional[int] = None) -> None:
+        """保存用户的房间设置（权限和名称）"""
+        current_time = datetime.now().isoformat()
+        # 设置过期时间为6个月后
+        expires_at = (datetime.now() + timedelta(days=180)).isoformat()
+        
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('''
+                INSERT INTO privateroom_saved_settings 
+                (user_id, saved_at, channel_name, settings_data, original_room_id, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    saved_at = ?,
+                    channel_name = ?,
+                    settings_data = ?,
+                    original_room_id = ?,
+                    expires_at = ?
+            ''', (
+                user_id, current_time, settings_data.get("channel_name"), 
+                json.dumps(settings_data), original_room_id, expires_at,
+                current_time, settings_data.get("channel_name"),
+                json.dumps(settings_data), original_room_id, expires_at
+            ))
+            await db.commit()
+
+    async def get_user_saved_settings(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """获取用户保存的房间设置"""
+        now = datetime.now()
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('''
+                SELECT saved_at, channel_name, settings_data, original_room_id
+                FROM privateroom_saved_settings
+                WHERE user_id = ? AND (expires_at IS NULL OR datetime(expires_at) > datetime(?))
+            ''', (user_id, now.isoformat()))
+            row = await cursor.fetchone()
+            
+            if not row:
+                return None
+            
+            try:
+                settings_data = json.loads(row[2])
+                return {
+                    "saved_at": row[0],
+                    "channel_name": row[1],
+                    "settings_data": settings_data,
+                    "original_room_id": row[3]
+                }
+            except json.JSONDecodeError:
+                logging.error(f"Failed to parse saved settings for user {user_id}")
+                return None
+
+    async def delete_user_saved_settings(self, user_id: int) -> None:
+        """删除用户保存的房间设置"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('DELETE FROM privateroom_saved_settings WHERE user_id = ?', (user_id,))
+            await db.commit()
+
+    async def clean_expired_settings(self) -> int:
+        """清理过期的保存设置，返回清理数量"""
+        now = datetime.now()
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('''
+                SELECT COUNT(*) FROM privateroom_saved_settings 
+                WHERE expires_at IS NOT NULL AND datetime(expires_at) <= datetime(?)
+            ''', (now.isoformat(),))
+            count = (await cursor.fetchone())[0]
+            
+            await db.execute('''
+                DELETE FROM privateroom_saved_settings 
+                WHERE expires_at IS NOT NULL AND datetime(expires_at) <= datetime(?)
+            ''', (now.isoformat(),))
+            await db.commit()
+            
+            return count
+
+    async def extend_room_validity(self, room_id: int, new_end_date: datetime) -> None:
+        """延长房间的有效期
+        
+        Args:
+            room_id: 房间ID
+            new_end_date: 新的结束日期
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('''
+                UPDATE privateroom_rooms 
+                SET end_date = ?
+                WHERE room_id = ?
+            ''', (new_end_date.isoformat(), room_id))
+            await db.commit()
