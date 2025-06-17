@@ -372,9 +372,9 @@ class CloseTicketModal(discord.ui.Modal):
                 )
                 return
             
-            # Create close embed
+            # Create close embed (for in-thread display)
             embed = discord.Embed(
-                title=self.messages['log_ticket_close_title'],
+                title=self.messages['close_dm_title'],
                 description=self.messages['close_dm_content'].format(
                     closer=interaction.user.mention,
                     reason=reason
@@ -471,6 +471,12 @@ class TicketsNewCog(commands.Cog):
     async def cog_load(self):
         """Initialize the cog"""
         await self.db_manager.initialize_database()
+        
+        # Fix any tickets with NULL ticket_number
+        fixed_count = await self.db_manager.fix_null_ticket_numbers()
+        if fixed_count > 0:
+            logging.info(f"Fixed {fixed_count} tickets with NULL ticket_number")
+        
         logging.info("TicketsNewCog loaded successfully")
 
     @commands.Cog.listener()
@@ -857,8 +863,15 @@ class TicketsNewCog(commands.Cog):
                     acceptor_mention = f"<@{ticket_data['accepted_by']}>" if ticket_data['accepted_by'] else self.conf['messages']['unavailable_text']
                     creator_mention = f"<@{ticket_data['creator_id']}>"
                     
+                    # Get ticket number, fallback to basic fetch if history doesn't have it
+                    ticket_number = ticket_data.get('ticket_number')
+                    if not ticket_number:
+                        basic_ticket_data = await self.db_manager.fetch_ticket(thread_id)
+                        ticket_number = basic_ticket_data['ticket_number'] if basic_ticket_data else None
+                    
+                    ticket_number = ticket_number or 'Unknown'
                     embed = discord.Embed(
-                        title=self.conf['messages']['log_ticket_close_title'].format(number=ticket_data['ticket_number']),
+                        title=self.conf['messages']['log_ticket_close_title'].format(number=ticket_number),
                         description=self.conf['messages']['log_ticket_close_description'].format(
                             type_name=ticket_data['type_name'],
                             creator=creator_mention,

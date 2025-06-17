@@ -452,6 +452,9 @@ Media processing module with validation and security features.
 ---
 
 ## Update Log
+### V1.4.1b2 - 2025-06-17
+#### 🐛 Bug Fixes
+- Fixed an issue with close ticket number display in the new ticket system.
 
 ### V1.4.1b - 2025-06-17
 #### 🎯 Major Feature Enhancements

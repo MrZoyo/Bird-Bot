@@ -357,14 +357,13 @@ class TicketsNewDatabaseManager:
                 logging.error(f"Error cleaning invalid tickets: {e}")
 
     async def get_ticket_number(self, thread_id: int = None) -> int:
-        """Get next ticket number based on total count of tickets."""
+        """Get next ticket number based on highest existing ticket number."""
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.execute('''
-                SELECT COUNT(*) + 1
-                FROM tickets_new
+                SELECT MAX(ticket_number) FROM tickets_new WHERE ticket_number IS NOT NULL
             ''')
-            count = await cursor.fetchone()
-            return count[0] if count else 1
+            max_number = await cursor.fetchone()
+            return (max_number[0] or 0) + 1
 
     async def fetch_ticket(self, thread_id: int) -> Optional[dict]:
         """Fetch ticket details by thread ID."""
@@ -445,6 +444,45 @@ class TicketsNewDatabaseManager:
             }
 
             return ticket_history
+
+    async def fix_null_ticket_numbers(self) -> int:
+        """Fix tickets with NULL ticket_number by assigning sequential numbers."""
+        async with aiosqlite.connect(self.db_path) as db:
+            try:
+                # Get all tickets with NULL ticket_number ordered by created_at
+                cursor = await db.execute('''
+                    SELECT thread_id, created_at 
+                    FROM tickets_new 
+                    WHERE ticket_number IS NULL 
+                    ORDER BY created_at ASC
+                ''')
+                null_tickets = await cursor.fetchall()
+                
+                if not null_tickets:
+                    return 0
+                
+                # Get the highest existing ticket_number
+                cursor = await db.execute('''
+                    SELECT MAX(ticket_number) FROM tickets_new WHERE ticket_number IS NOT NULL
+                ''')
+                max_number = await cursor.fetchone()
+                start_number = (max_number[0] or 0) + 1
+                
+                # Update each ticket with sequential number
+                fixed_count = 0
+                for i, (thread_id, created_at) in enumerate(null_tickets):
+                    await db.execute('''
+                        UPDATE tickets_new 
+                        SET ticket_number = ? 
+                        WHERE thread_id = ?
+                    ''', (start_number + i, thread_id))
+                    fixed_count += 1
+                
+                await db.commit()
+                return fixed_count
+            except Exception as e:
+                logging.error(f"Error fixing null ticket numbers: {e}")
+                return 0
 
     async def update_ticket_message_id(self, thread_id: int, message_id: int) -> bool:
         """Update the message ID for a ticket."""
