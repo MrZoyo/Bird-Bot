@@ -1,6 +1,17 @@
-aiosqlite~=0.20.0
-matplotlib~=3.9.1
-aiohttp~=3.9.1
-pillow~=10.2.0
+# Core Discord bot dependencies
 discord.py>=2.3.2
+# Database
+aiosqlite
+# HTTP and networking
+aiohttp
+requests
+# File operations
 aiofiles
+# Image processing
+pillow
+# Data visualization
+matplotlib
+# Progress bars
+tqdm
+# GUI (for test/development tools)
+PySimpleGUI
