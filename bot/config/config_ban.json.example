@@ -1,11 +1,13 @@
 {
   "_comment": "Ban system configuration",
   "admin_roles": [
+    1145141919810
   ],
   "admin_users": [
+    1145141919810
   ],
-  "ban_notification_channel_id": "",
-  "invite_link": "",
+  "ban_notification_channel_id": 1145141919810,
+  "invite_link": "https://discord.gg/1145141919810",
   "messages": {
     "no_permission": "你没有权限使用此指令。",
     "invalid_delete_days": "删除消息天数必须在0-7之间。",
@@ -62,6 +64,17 @@
     "rejoin_button_label": "🏠 重新加入服务器",
     "invite_link_set": "邀请链接已设置为: {link}",
     "invite_link_removed": "邀请链接已移除。",
-    "invite_link_not_set": "未设置邀请链接。"
+    "invite_link_not_set": "未设置邀请链接。",
+    "member_not_found": "❌ 在服务器中找不到该成员。请确保用户在服务器中并重试。",
+    "mute_dm_title": "🔇 你已被禁言",
+    "mute_dm_description": "你在 **{guild_name}** 被禁言。",
+    "mute_dm_reason_field": "📝 禁言原因",
+    "mute_dm_duration_field": "⏱️ 禁言时长",
+    "mute_dm_unmute_time_field": "🔊 解除时间",
+    "mute_dm_footer": "禁言结束后，你就可以重新发言了。",
+    "user_already_tempbanned": "⚠️ 用户 {user} 已经有一个活跃的临时封禁。请先解封或等待当前封禁到期。",
+    "no_active_tempbans": "✅ 当前没有活跃的临时封禁。",
+    "active_tempbans_title": "⏰ 活跃临时封禁列表",
+    "tempban_list_error": "❌ 获取临时封禁列表时出错。"
   }
 }

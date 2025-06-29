@@ -86,73 +86,123 @@ class BanCog(commands.Cog):
     async def recover_tempbans(self):
         """Recover active tempbans from database after bot restart."""
         try:
-            active_tempbans = await self.db.get_active_tempbans()
+            # 使用新方法获取所有活跃的tempbans（包括过期的）
+            active_tempbans = await self.db.get_all_active_tempbans_including_expired()
             current_time = discord.utils.utcnow()
+            expired_count = 0
+            recovered_count = 0
             
             for tempban in active_tempbans:
                 tempban_id, user_id, guild_id, banned_by, reason, banned_at, unban_at, delete_message_days = tempban
                 # Ensure unban_time is timezone-aware
                 if isinstance(unban_at, str):
                     unban_time = datetime.fromisoformat(unban_at.replace('Z', '+00:00'))
+                    if unban_time.tzinfo is None:
+                        unban_time = unban_time.replace(tzinfo=discord.utils.utc)
                 elif isinstance(unban_at, datetime):
                     # If it's already a datetime object, make sure it's timezone-aware
                     unban_time = unban_at.replace(tzinfo=discord.utils.utc) if unban_at.tzinfo is None else unban_at
                 else:
                     # Handle SQLite datetime objects
-                    unban_time = datetime.fromisoformat(str(unban_at)).replace(tzinfo=discord.utils.utc)
+                    unban_time = datetime.fromisoformat(str(unban_at))
+                    if unban_time.tzinfo is None:
+                        unban_time = unban_time.replace(tzinfo=discord.utils.utc)
                 
-                # Skip if already expired
-                if unban_time <= current_time:
-                    continue
-                
-                # Get guild and user objects
+                # Get guild object
                 guild = self.bot.get_guild(guild_id)
                 if not guild:
+                    # Mark as inactive if guild not found
+                    success = await self.db.deactivate_tempban(tempban_id)
+                    logging.info(f"Deactivated tempban {tempban_id} - guild {guild_id} not found - success: {success}")
                     continue
                 
+                # Process expired tempbans
+                if unban_time <= current_time:
+                    try:
+                        user = await self.bot.fetch_user(user_id)
+                        # Try to unban the user
+                        await guild.unban(user, reason="Automatic unban after tempban period (startup recovery)")
+                        logging.info(f"Unbanned expired tempban user {user_id} from guild {guild_id}")
+                    except discord.NotFound:
+                        # User was already unbanned
+                        logging.info(f"User {user_id} was already unbanned from guild {guild_id}")
+                    except Exception as e:
+                        logging.warning(f"Failed to unban expired tempban user {user_id}: {e}")
+                    
+                    # Mark as inactive in database regardless
+                    success = await self.db.deactivate_tempban(tempban_id)
+                    if success:
+                        expired_count += 1
+                        logging.info(f"Successfully deactivated expired tempban {tempban_id}")
+                    else:
+                        logging.error(f"Failed to deactivate expired tempban {tempban_id}")
+                    continue
+                
+                # Schedule future unbans for active tempbans
                 try:
                     user = await self.bot.fetch_user(user_id)
-                except:
-                    continue
+                    await self.schedule_unban_with_db(guild, user, unban_time, tempban_id)
+                    recovered_count += 1
+                except Exception as e:
+                    logging.warning(f"Failed to recover tempban for user {user_id}: {e}")
+                    # Mark as inactive if we can't recover it
+                    await self.db.deactivate_tempban(tempban_id)
                 
-                # Schedule the unban
-                await self.schedule_unban_with_db(guild, user, unban_time, tempban_id)
-                
-            logging.info(f"Recovered {len(active_tempbans)} active tempbans")
+            logging.info(f"Tempban recovery completed: {recovered_count} recovered, {expired_count} expired and processed")
         except Exception as e:
-            logging.error(f"Failed to recover tempbans: {e}")
+            logging.error(f"Failed to recover tempbans: {e}", exc_info=True)
 
     @tasks.loop(minutes=5)
     async def check_expired_tempbans(self):
         """Check for expired tempbans and process them."""
+        # Wait for bot to be ready
+        if not self.bot.is_ready():
+            return
+            
         try:
             expired_tempbans = await self.db.get_expired_tempbans()
+            
+            if expired_tempbans:
+                logging.info(f"Processing {len(expired_tempbans)} expired tempbans")
             
             for tempban in expired_tempbans:
                 tempban_id, user_id, guild_id, banned_by, reason, banned_at, unban_at, delete_message_days = tempban
                 
                 guild = self.bot.get_guild(guild_id)
                 if not guild:
-                    await self.db.deactivate_tempban(tempban_id)
+                    success = await self.db.deactivate_tempban(tempban_id)
+                    logging.warning(f"Guild {guild_id} not found, deactivating tempban {tempban_id} - success: {success}")
                     continue
                 
                 try:
                     user = await self.bot.fetch_user(user_id)
                     await guild.unban(user, reason="Automatic unban after tempban period")
-                    await self.db.deactivate_tempban(tempban_id)
-                    
-                    # Clean up task if exists
-                    if user_id in self.tempban_tasks:
-                        self.tempban_tasks[user_id].cancel()
-                        del self.tempban_tasks[user_id]
-                    
-                    logging.info(f"Automatically unbanned user {user_id} from guild {guild_id}")
+                    logging.info(f"Successfully unbanned user {user_id} from guild {guild_id}")
+                except discord.NotFound:
+                    # User was already unbanned
+                    logging.info(f"User {user_id} was already unbanned from guild {guild_id}")
                 except Exception as e:
                     logging.error(f"Failed to unban user {user_id}: {e}")
-                    await self.db.deactivate_tempban(tempban_id)
+                
+                # Always deactivate the tempban in database
+                success = await self.db.deactivate_tempban(tempban_id)
+                if success:
+                    logging.info(f"Successfully deactivated tempban {tempban_id}")
+                else:
+                    logging.error(f"Failed to deactivate tempban {tempban_id} in database")
+                
+                # Clean up task if exists
+                if user_id in self.tempban_tasks:
+                    self.tempban_tasks[user_id].cancel()
+                    del self.tempban_tasks[user_id]
                     
         except Exception as e:
-            logging.error(f"Error checking expired tempbans: {e}")
+            logging.error(f"Error checking expired tempbans: {e}", exc_info=True)
+
+    @check_expired_tempbans.before_loop
+    async def before_check_expired_tempbans(self):
+        """Wait for bot to be ready before starting the loop."""
+        await self.bot.wait_until_ready()
 
     async def has_ban_permission(self, interaction: discord.Interaction) -> bool:
         """Check if user has permission to use ban commands"""
@@ -382,6 +432,57 @@ class BanCog(commands.Cog):
         except Exception as e:
             logging.error(f"Failed to send tempban DM to user {user.id}: {e}")
 
+    async def send_mute_dm(self, user: discord.User, guild: discord.Guild, reason: str, duration: str, unmute_time: datetime):
+        """Send mute notification DM to user"""
+        try:
+            messages = self.config_data.get('messages', {})
+            
+            # Create embed for DM
+            embed = discord.Embed(
+                title=messages.get('mute_dm_title', 'You have been muted'),
+                description=messages.get('mute_dm_description', 'You have been muted in **{guild_name}**.').format(guild_name=guild.name),
+                color=discord.Color.yellow(),
+                timestamp=discord.utils.utcnow()
+            )
+            
+            # Set guild icon as thumbnail
+            if guild.icon:
+                embed.set_thumbnail(url=guild.icon.url)
+            
+            # Add fields
+            embed.add_field(
+                name=messages.get('mute_dm_reason_field', 'Reason'),
+                value=reason,
+                inline=False
+            )
+            
+            embed.add_field(
+                name=messages.get('mute_dm_duration_field', 'Duration'),
+                value=duration,
+                inline=True
+            )
+            
+            embed.add_field(
+                name=messages.get('mute_dm_unmute_time_field', 'Unmute Time'),
+                value=f"<t:{int(unmute_time.timestamp())}:F>",
+                inline=True
+            )
+            
+            # Set footer
+            embed.set_footer(
+                text=messages.get('mute_dm_footer', 'You can speak again after the mute ends.'),
+                icon_url=user.display_avatar.url
+            )
+            
+            # Send DM
+            await user.send(embed=embed)
+            logging.info(f"Sent mute DM to user {user.id}")
+            
+        except discord.Forbidden:
+            logging.warning(f"Cannot send DM to user {user.id} - DMs disabled or blocked")
+        except Exception as e:
+            logging.error(f"Failed to send mute DM to user {user.id}: {e}")
+
     async def schedule_unban_with_db(self, guild: discord.Guild, user: discord.User, unban_time: datetime, tempban_id: int):
         """Schedule automatic unban with database integration"""
         async def unban_task():
@@ -539,15 +640,28 @@ class BanCog(commands.Cog):
             return
         
         try:
+            # Check if user already has an active tempban
+            existing_tempban = await self.db.get_user_tempban(user.id, interaction.guild.id)
+            if existing_tempban:
+                messages = self.config_data.get('messages', {})
+                await interaction.response.send_message(
+                    messages.get('user_already_tempbanned', 'User {user} already has an active temporary ban. Please unban them first or wait for the current ban to expire.').format(user=user.mention),
+                    ephemeral=False
+                )
+                return
+            
+            # Calculate unban time (use timezone-aware datetime)
+            unban_time = discord.utils.utcnow() + ban_duration
+            
+            # Send DM to user BEFORE banning (so they can receive it)
+            await self.send_tempban_dm(user, interaction.guild, reason, duration, unban_time)
+            
             # Ban the user
             await interaction.guild.ban(
                 user,
                 reason=f"Temporary ban: {reason} (Duration: {duration})",
                 delete_message_days=delete_message_days
             )
-            
-            # Calculate unban time (use timezone-aware datetime)
-            unban_time = discord.utils.utcnow() + ban_duration
             
             # Save to database
             tempban_id = await self.db.add_tempban(
@@ -574,9 +688,6 @@ class BanCog(commands.Cog):
             
             # Send notification
             await self.send_ban_notification(user, reason, duration, unban_time)
-            
-            # Send DM to user
-            await self.send_tempban_dm(user, interaction.guild, reason, duration, unban_time)
             
             logging.info(f"User {user.id} temporarily banned for {duration} by {interaction.user.id} in guild {interaction.guild.id}")
             
@@ -646,6 +757,9 @@ class BanCog(commands.Cog):
         try:
             # Calculate unmute time
             unmute_time = discord.utils.utcnow() + mute_duration
+            
+            # Send DM to user BEFORE muting (so they can receive it)
+            await self.send_mute_dm(user, interaction.guild, reason, duration, unmute_time)
             
             # Mute the user using Discord's timeout feature
             await user.timeout(unmute_time, reason=reason)
@@ -1090,6 +1204,77 @@ class BanCog(commands.Cog):
             ephemeral=False
         )
 
+
+
+    @app_commands.command(name="ban_list_tempbans", description="List all active temporary bans")
+    async def ban_list_tempbans(self, interaction: discord.Interaction):
+        """List all active temporary bans in the server"""
+        # Check if user has permission
+        if not await self.has_ban_permission(interaction):
+            messages = self.config_data.get('messages', {})
+            await interaction.response.send_message(
+                messages.get('no_permission', 'You do not have permission to use this command.'),
+                ephemeral=False
+            )
+            return
+        
+        try:
+            active_tempbans = await self.db.get_active_tempbans(interaction.guild.id)
+            
+            if not active_tempbans:
+                messages = self.config_data.get('messages', {})
+                await interaction.response.send_message(
+                    messages.get('no_active_tempbans', '✅ 当前没有活跃的临时封禁。'),
+                    ephemeral=False
+                )
+                return
+            
+            messages = self.config_data.get('messages', {})
+            embed = discord.Embed(
+                title=messages.get('active_tempbans_title', '⏰ 活跃临时封禁列表'),
+                color=discord.Color.orange(),
+                timestamp=discord.utils.utcnow()
+            )
+            
+            # Add each tempban as a field
+            for tempban in active_tempbans[:10]:  # Limit to 10 to avoid embed limits
+                tempban_id, user_id, guild_id, banned_by, reason, banned_at, unban_at, delete_message_days = tempban
+                
+                try:
+                    user = await self.bot.fetch_user(user_id)
+                    banned_by_user = await self.bot.fetch_user(banned_by)
+                    
+                    # Convert unban_at to proper datetime if needed
+                    if isinstance(unban_at, str):
+                        unban_time = discord.utils.parse_time(unban_at)
+                    else:
+                        unban_time = unban_at
+                    
+                    embed.add_field(
+                        name=f"👤 {user.display_name}",
+                        value=f"**ID:** {user_id}\n**原因:** {reason}\n**管理员:** {banned_by_user.display_name}\n**解封时间:** <t:{int(unban_time.timestamp())}:R>",
+                        inline=False
+                    )
+                except:
+                    embed.add_field(
+                        name=f"👤 用户 {user_id}",
+                        value=f"**原因:** {reason}\n**解封时间:** <t:{int(unban_time.timestamp())}:R>",
+                        inline=False
+                    )
+            
+            if len(active_tempbans) > 10:
+                embed.set_footer(text=f"显示前10个，总共{len(active_tempbans)}个活跃临时封禁")
+            
+            await interaction.response.send_message(embed=embed, ephemeral=False)
+            
+        except Exception as e:
+            logging.error(f"Error listing tempbans: {e}")
+            messages = self.config_data.get('messages', {})
+            await interaction.response.send_message(
+                messages.get('tempban_list_error', '❌ 获取临时封禁列表时出错。'),
+                ephemeral=False
+            )
+
     @app_commands.command(name="ban_remove_invite_link", description="Remove the invite link for tempbanned users")
     async def ban_remove_invite_link(self, interaction: discord.Interaction):
         """Remove the invite link for tempbanned users"""
@@ -1131,6 +1316,19 @@ class BanCog(commands.Cog):
             messages.get('invite_link_removed', 'Invite link has been removed.'),
             ephemeral=False
         )
+
+    @mute_command.error
+    async def mute_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        """Handle mute command errors"""
+        if isinstance(error, app_commands.TransformerError):
+            messages = self.config_data.get('messages', {})
+            await interaction.response.send_message(
+                messages.get('member_not_found', 'Could not find that member in the server. Please make sure the user is in the server and try again.'),
+                ephemeral=False
+            )
+        else:
+            # Re-raise other errors for default handling
+            raise error
 
 
 async def setup(bot):

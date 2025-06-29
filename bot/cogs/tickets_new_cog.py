@@ -1750,6 +1750,69 @@ class TicketsNewCog(commands.Cog):
                 ephemeral=True
             )
 
+    # ================== Ticket Type Management Commands ==================
+
+    @app_commands.command(name="tickets_add_type", description="添加新的工单类型")
+    async def add_ticket_type(self, interaction: discord.Interaction):
+        """Add a new ticket type"""
+        if not await self.is_admin_for_type(interaction.user):
+            await interaction.response.send_message(
+                self.conf['messages']['admin_no_permission'], 
+                ephemeral=True
+            )
+            return
+
+        modal = TicketTypeModal(self)
+        await interaction.response.send_modal(modal)
+
+    @app_commands.command(name="tickets_edit_type", description="编辑现有的工单类型")
+    async def edit_ticket_type(self, interaction: discord.Interaction):
+        """Edit an existing ticket type"""
+        if not await self.is_admin_for_type(interaction.user):
+            await interaction.response.send_message(
+                self.conf['messages']['admin_no_permission'], 
+                ephemeral=True
+            )
+            return
+
+        if not self.conf.get('ticket_types'):
+            await interaction.response.send_message(
+                "❌ 没有可编辑的工单类型",
+                ephemeral=True
+            )
+            return
+
+        view = TypeSelectView(self, 'edit')
+        await interaction.response.send_message(
+            self.conf['messages'].get('ticket_type_edit_title', '选择要修改的工单类型'),
+            view=view,
+            ephemeral=True
+        )
+
+    @app_commands.command(name="tickets_delete_type", description="删除工单类型")
+    async def delete_ticket_type(self, interaction: discord.Interaction):
+        """Delete a ticket type"""
+        if not await self.is_admin_for_type(interaction.user):
+            await interaction.response.send_message(
+                self.conf['messages']['admin_no_permission'], 
+                ephemeral=True
+            )
+            return
+
+        if not self.conf.get('ticket_types'):
+            await interaction.response.send_message(
+                "❌ 没有可删除的工单类型",
+                ephemeral=True
+            )
+            return
+
+        view = TypeSelectView(self, 'delete')
+        await interaction.response.send_message(
+            self.conf['messages'].get('ticket_type_delete_title', '选择要删除的工单类型'),
+            view=view,
+            ephemeral=True
+        )
+
     # Helper methods for admin management
     async def format_admin_list(self) -> discord.Embed:
         """Format current admin configuration as an embed."""
@@ -2169,4 +2232,237 @@ class AdminTypeSelectView(discord.ui.View):
             selected_type,
             interaction
         )
+
+
+# ================== Ticket Type Management ==================
+
+class TicketTypeModal(discord.ui.Modal):
+    def __init__(self, cog, edit_type=None):
+        title = cog.conf['messages'].get('ticket_type_modal_edit_title', '修改工单类型：{type_name}').format(type_name=edit_type) if edit_type else cog.conf['messages'].get('ticket_type_modal_title', '添加工单类型')
+        super().__init__(title=title)
+        self.cog = cog
+        self.edit_type = edit_type
+        self.messages = cog.conf['messages']
+
+        # Pre-fill if editing
+        existing_data = cog.conf['ticket_types'].get(edit_type, {}) if edit_type else {}
+
+        self.type_name = discord.ui.TextInput(
+            label=self.messages.get('ticket_type_name_label', '类型名称'),
+            placeholder=self.messages.get('ticket_type_name_placeholder', '例如: 功能反馈'),
+            default=edit_type or "",
+            required=True,
+            max_length=50
+        )
+        self.add_item(self.type_name)
+
+        self.description = discord.ui.TextInput(
+            label=self.messages.get('ticket_type_description_label', '类型说明'),
+            placeholder=self.messages.get('ticket_type_description_placeholder', '在主页面显示的说明文字'),
+            default=existing_data.get('description', ''),
+            required=True,
+            max_length=100
+        )
+        self.add_item(self.description)
+
+        self.guide = discord.ui.TextInput(
+            label=self.messages.get('ticket_type_guide_label', '用户指引'),
+            placeholder=self.messages.get('ticket_type_guide_placeholder', '用户创建工单后看到的指引文字'),
+            style=discord.TextStyle.paragraph,
+            default=existing_data.get('guide', ''),
+            required=True,
+            max_length=1000
+        )
+        self.add_item(self.guide)
+
+        self.button_color = discord.ui.TextInput(
+            label=self.messages.get('ticket_type_color_label', '按钮颜色 (R, G, B)'),
+            placeholder=self.messages.get('ticket_type_color_placeholder', '例如: R, G, B 或 red, green, blue'),
+            default=existing_data.get('button_color', 'b'),
+            required=False,
+            max_length=10
+        )
+        self.add_item(self.button_color)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            type_name = self.type_name.value.strip()
+            description = self.description.value.strip()
+            guide = self.guide.value.strip()
+            button_color = self.button_color.value.strip().lower() or 'b'
+
+            # Validate button color
+            valid_colors = {'r': 'r', 'g': 'g', 'b': 'b', 'grey': 'grey', 'gray': 'grey', 
+                           'red': 'r', 'green': 'g', 'blue': 'b'}
+            button_color = valid_colors.get(button_color, 'b')
+
+            # Check if editing or creating new
+            if self.edit_type and self.edit_type != type_name:
+                # Renaming: remove old and add new
+                if type_name in self.cog.conf['ticket_types']:
+                    await interaction.response.send_message(
+                        f"❌ 工单类型 '{type_name}' 已存在",
+                        ephemeral=True
+                    )
+                    return
+                
+                # Save old data
+                old_data = self.cog.conf['ticket_types'][self.edit_type].copy()
+                # Remove old type
+                del self.cog.conf['ticket_types'][self.edit_type]
+                
+                # Add new type with updated data
+                self.cog.conf['ticket_types'][type_name] = {
+                    'name': type_name,
+                    'description': description,
+                    'guide': guide,
+                    'button_color': button_color,
+                    'admin_roles': old_data.get('admin_roles', []),
+                    'admin_users': old_data.get('admin_users', [])
+                }
+                
+                action = "edit"
+                old_name = self.edit_type
+            else:
+                # Creating new or editing without rename
+                if not self.edit_type and type_name in self.cog.conf['ticket_types']:
+                    await interaction.response.send_message(
+                        f"❌ 工单类型 '{type_name}' 已存在",
+                        ephemeral=True
+                    )
+                    return
+                
+                # Preserve existing admin settings if editing
+                existing_admin_data = {}
+                if self.edit_type:
+                    existing_admin_data = {
+                        'admin_roles': self.cog.conf['ticket_types'][self.edit_type].get('admin_roles', []),
+                        'admin_users': self.cog.conf['ticket_types'][self.edit_type].get('admin_users', [])
+                    }
+                
+                self.cog.conf['ticket_types'][type_name] = {
+                    'name': type_name,
+                    'description': description,
+                    'guide': guide,
+                    'button_color': button_color,
+                    'admin_roles': existing_admin_data.get('admin_roles', []),
+                    'admin_users': existing_admin_data.get('admin_users', [])
+                }
+                
+                action = "edit" if self.edit_type else "add"
+                old_name = self.edit_type if self.edit_type else None
+
+            # Save to database
+            await self.cog.db_manager.save_config('ticket_types', self.cog.conf['ticket_types'])
+            
+            # Reload config
+            self.cog.conf = await self.cog.db_manager.get_config()
+
+            # Send success message
+            if action == "add":
+                await interaction.response.send_message(
+                    f"✅ 已添加工单类型: **{type_name}**",
+                    ephemeral=True
+                )
+                
+                # TODO: Add logging functionality if needed
+            else:
+                await interaction.response.send_message(
+                    f"✅ 已更新工单类型: **{type_name}**",
+                    ephemeral=True
+                )
+                
+                # TODO: Add logging functionality if needed
+
+        except Exception as e:
+            logging.error(f"Error in TicketTypeModal: {e}")
+            await interaction.response.send_message(
+                "❌ 操作失败，请联系管理员",
+                ephemeral=True
+            )
+
+
+class TypeSelectView(discord.ui.View):
+    def __init__(self, cog, action):
+        super().__init__()
+        self.cog = cog
+        self.action = action  # 'edit' or 'delete'
+
+        if not cog.conf.get('ticket_types'):
+            return
+
+        options = []
+        for type_name, type_data in cog.conf['ticket_types'].items():
+            options.append(discord.SelectOption(
+                label=type_name,
+                description=type_data.get('description', '')[:100],
+                emoji='✏️' if action == 'edit' else '🗑️'
+            ))
+
+        if options:
+            select = discord.ui.Select(
+                placeholder=cog.conf['messages'].get('ticket_type_select_placeholder', '选择工单类型'),
+                options=options[:25]  # Discord limit
+            )
+            select.callback = self.select_callback
+            self.add_item(select)
+
+    async def select_callback(self, interaction: discord.Interaction):
+        selected_type = interaction.data['values'][0]
+        
+        if self.action == 'edit':
+            modal = TicketTypeModal(self.cog, edit_type=selected_type)
+            await interaction.response.send_modal(modal)
+        elif self.action == 'delete':
+            # Confirm deletion
+            embed = discord.Embed(
+                title="⚠️ 确认删除",
+                description=f"确定要删除工单类型 **{selected_type}** 吗？\n\n这个操作无法撤销！",
+                color=discord.Color.red()
+            )
+            
+            view = DeleteConfirmView(self.cog, selected_type)
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+
+class DeleteConfirmView(discord.ui.View):
+    def __init__(self, cog, type_name):
+        super().__init__()
+        self.cog = cog
+        self.type_name = type_name
+
+    @discord.ui.button(label="确认删除", style=discord.ButtonStyle.danger, emoji="🗑️")
+    async def confirm_delete(self, interaction: discord.Interaction, button: discord.ui.Button):
+        try:
+            # Remove from config
+            if self.type_name in self.cog.conf['ticket_types']:
+                del self.cog.conf['ticket_types'][self.type_name]
+                
+                # Save to database
+                await self.cog.db_manager.save_config('ticket_types', self.cog.conf['ticket_types'])
+                
+                # Reload config
+                self.cog.conf = await self.cog.db_manager.get_config()
+                
+                await interaction.response.send_message(
+                    self.cog.conf['messages'].get('ticket_type_delete_success', '已删除工单类型: {type_name}').format(type_name=self.type_name),
+                    ephemeral=True
+                )
+                
+                # TODO: Add logging functionality if needed
+            else:
+                await interaction.response.send_message(
+                    f"❌ 工单类型 '{self.type_name}' 不存在",
+                    ephemeral=True
+                )
+        except Exception as e:
+            logging.error(f"Error deleting ticket type: {e}")
+            await interaction.response.send_message(
+                "❌ 删除失败，请联系管理员",
+                ephemeral=True
+            )
+
+    @discord.ui.button(label="取消", style=discord.ButtonStyle.secondary, emoji="❌")
+    async def cancel_delete(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("已取消删除操作", ephemeral=True)
 

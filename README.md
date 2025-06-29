@@ -1,6 +1,6 @@
 # Bird Bot 
 
-`Version: 1.5.0b`
+`Version: 1.5.1b`
 
 ---
 
@@ -410,6 +410,7 @@ Interactive spy-based team game system for voice channel activities.
 - `/ban <user> <reason> [delete_message_days]`: Permanently ban a user
 - `/tempban <user> <duration> <reason> [delete_message_days]`: Temporarily ban a user
 - `/mute <user> <duration> <reason>`: Mute a user using Discord timeout
+- `/ban_list_tempbans`: List all active temporary bans in the server
 - `/ban_admin_list`: Display current admin permissions and settings
 - `/ban_admin_add_role <role>`: Add role to ban admin permissions
 - `/ban_admin_delete_role <role>`: Remove role from ban admin permissions
@@ -493,6 +494,16 @@ Media processing module with validation and security features.
 ---
 
 ## Update Log
+### V1.5.1b - 2025-06-29
+#### 🐛 Critical Bug Fixes
+- **Tempban System Fixes**: Resolved major issues with temporary ban management
+  - Fixed automatic unban logic that wasn't processing expired tempbans correctly
+#### 📋 New Features
+- **Administrative Tools**: 
+  - `/ban_list_tempbans` - View all active temporary bans in the server
+  - Improved startup logic with better expired tempban processing
+---
+
 ### V1.5.0b - 2025-06-29
 #### 🆕 Major New Features
 - **Ban System Implementation**: Added comprehensive `Ban_Cog` with moderation capabilities

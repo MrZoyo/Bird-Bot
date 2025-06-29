@@ -1032,10 +1032,10 @@ class TicketsCog(commands.Cog):
 
         logging.info(f"Updated permissions for {len(active_tickets)} active tickets")
 
-    @app_commands.command(
-        name="tickets_setup",
-        description="Initialize the ticket system"
-    )
+    # @app_commands.command(
+    #     name="tickets_setup",
+    #     description="Initialize the ticket system"
+    # )
     async def ticket_setup(self, interaction: discord.Interaction):
         """Initialize the ticket system."""
         if not await check_channel_validity(interaction):
@@ -1073,10 +1073,10 @@ class TicketsCog(commands.Cog):
             logging.error(f"Setup error: {e}")
             await interaction.followup.send(error_msg, ephemeral=True)
 
-    @app_commands.command(
-        name="tickets_old_stats",
-        description="显示工单统计信息（旧系统）"
-    )
+    # @app_commands.command(
+    #     name="tickets_old_stats",
+    #     description="显示工单统计信息（旧系统）"
+    # )
     async def ticket_stats(self, interaction: discord.Interaction):
         """Display ticket statistics."""
         if not await self.check_ticket_channel(interaction):
@@ -1119,10 +1119,10 @@ class TicketsCog(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(
-        name="tickets_cleanup",
-        description="清理无效的工单数据"
-    )
+    # @app_commands.command(
+    #     name="tickets_cleanup",
+    #     description="清理无效的工单数据"
+    # )
     async def cleanup_tickets(self, interaction: discord.Interaction):
         """Clean up invalid ticket data."""
         if not await self.check_ticket_channel(interaction):
@@ -1387,7 +1387,7 @@ class TicketsCog(commands.Cog):
         except Exception as e:
             logging.error(f"Error saving config: {e}")
 
-    @app_commands.command(name="tickets_add_type")
+    # @app_commands.command(name="tickets_add_type")
     async def add_ticket_type(self, interaction: discord.Interaction):
         """Add a new ticket type"""
         if not await self.check_ticket_channel(interaction):
@@ -1396,7 +1396,7 @@ class TicketsCog(commands.Cog):
         modal = TicketTypeModal(self)
         await interaction.response.send_modal(modal)
 
-    @app_commands.command(name="tickets_edit_type")
+    # @app_commands.command(name="tickets_edit_type")
     async def edit_ticket_type(self, interaction: discord.Interaction):
         """Edit an existing ticket type"""
         if not await self.check_ticket_channel(interaction):
@@ -1409,7 +1409,7 @@ class TicketsCog(commands.Cog):
             ephemeral=True
         )
 
-    @app_commands.command(name="tickets_delete_type")
+    # @app_commands.command(name="tickets_delete_type")
     async def delete_ticket_type(self, interaction: discord.Interaction):
         """Delete a ticket type"""
         if not await self.check_ticket_channel(interaction):
@@ -1504,21 +1504,21 @@ class TicketsCog(commands.Cog):
             await interaction.followup.send(error_message, ephemeral=True)
             return False
 
-    @app_commands.command(
-        name="tickets_old_add_user",
-        description="添加用户到当前工单（旧系统）"
-    )
-    @app_commands.describe(
-        user="要添加的用户"
-    )
+    # @app_commands.command(
+    #     name="tickets_old_add_user",
+    #     description="添加用户到当前工单（旧系统）"
+    # )
+    # @app_commands.describe(
+    #     user="要添加的用户"
+    # )
     async def ticket_add_user(self, interaction: discord.Interaction, user: discord.Member):
         await interaction.response.defer(ephemeral=True, thinking=False)
         await self.handle_add_user(interaction, user)
 
-    @app_commands.command(
-        name="tickets_old_accept",
-        description="手动接受当前工单（旧系统）"
-    )
+    # @app_commands.command(
+    #     name="tickets_old_accept",
+    #     description="手动接受当前工单（旧系统）"
+    # )
     async def accept_ticket(self, interaction: discord.Interaction):
         """Manually accept the current ticket."""
         await interaction.response.defer()
@@ -1588,11 +1588,11 @@ class TicketsCog(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(
-        name="tickets_old_close",
-        description="手动关闭当前工单（旧系统）"
-    )
-    @app_commands.describe(reason="关闭工单的原因")
+    # @app_commands.command(
+    #     name="tickets_old_close",
+    #     description="手动关闭当前工单（旧系统）"
+    # )
+    # @app_commands.describe(reason="关闭工单的原因")
     async def close_ticket(self, interaction: discord.Interaction, reason: str):
         """Manually close the current ticket."""
         await interaction.response.defer()
@@ -1714,10 +1714,10 @@ class TicketsCog(commands.Cog):
                     ephemeral=True
                 )
 
-    @app_commands.command(
-        name="tickets_archive",
-        description="归档当前分类中所有已关闭的工单"
-    )
+    # @app_commands.command(
+    #     name="tickets_archive",
+    #     description="归档当前分类中所有已关闭的工单"
+    # )
     async def archive_tickets(self, interaction: discord.Interaction):
         """Archive closed tickets to files."""
         if not await self.check_ticket_channel(interaction):
