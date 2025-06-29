@@ -1,6 +1,6 @@
 # Bird Bot 
 
-`Version: 1.4.1b`
+`Version: 1.5.0b`
 
 ---
 
@@ -34,6 +34,7 @@ The bot's code is deeply optimised for low-performance devices, using asynchrono
   - [Rating_Cog](#rating_cog)
   - [Tickets_New_Cog](#tickets_new_cog)
   - [Tickets_Cog (Legacy)](#tickets_cog-legacy)
+  - [Ban_Cog](#ban_cog)
   - [Shop_Cog](#shop_cog)
   - [PrivateRoom_Cog](#privateroom_cog)
   - [Game_DnD_Cog](#game_dnd_cog)
@@ -228,7 +229,7 @@ Anonymous rating system for events and activities.
 - `/rt_description <rating_id> <description>`: Modify rating description
 
 ### Tickets_New_Cog
-**🆕 Next-generation ticket system** using Discord's native thread architecture for enhanced performance and user experience.
+**🆕 Recommended ticket system** using Discord's native thread architecture for enhanced performance and user experience.
 
 **Key Features:**
 - **Thread-based tickets** leveraging Discord's native functionality
@@ -266,9 +267,9 @@ Anonymous rating system for events and activities.
 - **Modal confirmations** for important actions
 
 ### Tickets_Cog (Legacy)
-**⚠️ Legacy system** - The original channel-based ticket system maintained for compatibility.
+**⚠️ Deprecated system** - The original channel-based ticket system is being phased out.
 
-**Note:** This system is now primarily used for fallback and compatibility purposes. New installations should use the `Tickets_New_Cog` system.
+**Important:** This legacy system will be removed in future versions. All servers should migrate to the new `Tickets_New_Cog` system. Commands and functionality may change or become unavailable.
 
 **Features:**
 - **Channel-based tickets** using private Discord channels
@@ -387,6 +388,38 @@ Interactive spy-based team game system for voice channel activities.
 3. **Game Start**: Spy assignments sent via DM
 4. **Reveal Phase**: Show spy identities to all participants
 
+### Ban_Cog
+**🔨 Comprehensive moderation system** providing ban, tempban, and mute functionality with automated management.
+
+**Key Features:**
+- **Permanent bans** with configurable message deletion periods
+- **Temporary bans** with automatic unban scheduling and DM notifications
+- **Mute system** using Discord's native timeout feature (up to 28 days)
+- **Admin permission system** with role and user-based access control
+- **Notification system** with customizable channel alerts
+- **Automatic recovery** of active tempbans after bot restart
+
+**Enhanced Functionality:**
+- **Duration parsing** supporting multiple formats (1m, 1h, 1d, 1w)
+- **Database persistence** for tempban tracking and recovery
+- **User DM notifications** with server rejoin links for tempbans
+- **Rich embed notifications** with user avatars and timestamps
+- **Comprehensive admin management** with role and user assignment
+
+**Commands:**
+- `/ban <user> <reason> [delete_message_days]`: Permanently ban a user
+- `/tempban <user> <duration> <reason> [delete_message_days]`: Temporarily ban a user
+- `/mute <user> <duration> <reason>`: Mute a user using Discord timeout
+- `/ban_admin_list`: Display current admin permissions and settings
+- `/ban_admin_add_role <role>`: Add role to ban admin permissions
+- `/ban_admin_delete_role <role>`: Remove role from ban admin permissions
+- `/ban_admin_add_user <user>`: Add user to ban admin permissions
+- `/ban_admin_delete_user <user>`: Remove user from ban admin permissions
+- `/ban_set_notification_channel <channel>`: Set ban notification channel
+- `/ban_remove_notification_channel`: Remove ban notification channel
+- `/ban_set_invite_link <invite_link>`: Set rejoin link for tempbanned users
+- `/ban_remove_invite_link`: Remove rejoin link setting
+
 ---
 
 ## Utilities and Tools
@@ -449,9 +482,36 @@ Media processing module with validation and security features.
 - **Automatic cleanup** of expired room data and settings with configurable retention
 - **Permission restoration capabilities** with user/role validation and fallback handling
 
+### ban_db
+**🔨 Comprehensive moderation database manager** for the ban system.
+- **Tempban tracking** with automatic expiration management
+- **Ban history storage** with detailed logging and timestamps
+- **Active tempban recovery** ensuring continuity after bot restarts
+- **Database cleanup** of expired records with configurable retention
+- **Admin permission persistence** with role and user tracking
+
 ---
 
 ## Update Log
+### V1.5.0b - 2025-06-29
+#### 🆕 Major New Features
+- **Ban System Implementation**: Added comprehensive `Ban_Cog` with moderation capabilities
+  - Permanent ban functionality with configurable message deletion
+  - Temporary ban system with automatic unban scheduling
+  - Mute system using Discord's native timeout feature
+  - Advanced admin permission management with roles and users
+  - Rich notification system with channel alerts and user DMs
+  - Database persistence and automatic recovery after restarts
+
+#### ⚠️ Important Changes
+- **Tickets System Update**: Modified command structure in new ticket system
+  - Updated command names and functionality for better user experience
+  - Enhanced thread-based ticket management
+- **Legacy Tickets Deprecation**: Old `Tickets_Cog` marked as deprecated
+  - Legacy system will be removed in future versions
+  - Users should migrate to `Tickets_New_Cog` for continued support
+---
+
 ### V1.4.1b2 - 2025-06-17
 #### 🐛 Bug Fixes
 - Fixed an issue with close ticket number display in the new ticket system.

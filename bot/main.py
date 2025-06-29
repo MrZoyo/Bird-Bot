@@ -9,7 +9,7 @@ from bot.cogs import (
     AchievementCog, BackupCog, CheckStatusCog,
     CreateInvitationCog, DnDCog, SpyModeCog, GiveawayCog,
     IllegalTeamActCog, NotebookCog, RatingCog, RoleCog,
-    VoiceStateCog, WelcomeCog, TicketsCog, ShopCog, PrivateRoomCog, TicketsNewCog
+    VoiceStateCog, WelcomeCog, TicketsCog, ShopCog, PrivateRoomCog, TicketsNewCog, BanCog
 )
 
 
@@ -97,6 +97,7 @@ async def setup_bot(bot):
     await bot.add_cog(TicketsNewCog(bot))
     await bot.add_cog(ShopCog(bot))
     await bot.add_cog(PrivateRoomCog(bot))
+    await bot.add_cog(BanCog(bot))
 
     return conf['token']
 

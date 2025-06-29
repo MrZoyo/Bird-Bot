@@ -1074,8 +1074,8 @@ class TicketsCog(commands.Cog):
             await interaction.followup.send(error_msg, ephemeral=True)
 
     @app_commands.command(
-        name="tickets_stats",
-        description="显示工单统计信息"
+        name="tickets_old_stats",
+        description="显示工单统计信息（旧系统）"
     )
     async def ticket_stats(self, interaction: discord.Interaction):
         """Display ticket statistics."""
@@ -1505,8 +1505,8 @@ class TicketsCog(commands.Cog):
             return False
 
     @app_commands.command(
-        name="tickets_add_user",
-        description="添加用户到当前工单"
+        name="tickets_old_add_user",
+        description="添加用户到当前工单（旧系统）"
     )
     @app_commands.describe(
         user="要添加的用户"
@@ -1516,8 +1516,8 @@ class TicketsCog(commands.Cog):
         await self.handle_add_user(interaction, user)
 
     @app_commands.command(
-        name="tickets_accept",
-        description="手动接受当前工单"
+        name="tickets_old_accept",
+        description="手动接受当前工单（旧系统）"
     )
     async def accept_ticket(self, interaction: discord.Interaction):
         """Manually accept the current ticket."""
@@ -1589,8 +1589,8 @@ class TicketsCog(commands.Cog):
             )
 
     @app_commands.command(
-        name="tickets_close",
-        description="手动关闭当前工单"
+        name="tickets_old_close",
+        description="手动关闭当前工单（旧系统）"
     )
     @app_commands.describe(reason="关闭工单的原因")
     async def close_ticket(self, interaction: discord.Interaction, reason: str):

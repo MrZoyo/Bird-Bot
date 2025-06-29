@@ -4,7 +4,7 @@
   "voice_hours_threshold": 180,
   "check_time_hour": 8,
   "check_time_minute": 10,
-  "room_duration_days": 32,
+  "room_duration_days": 31,
   "max_rooms": 40,
   "renewal_days_threshold": 7,
   "renewal_extend_days": 31,

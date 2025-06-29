@@ -1117,7 +1117,7 @@ class TicketsNewCog(commands.Cog):
         except:
             return False
 
-    @app_commands.command(name="tickets_new_add_user", description="添加用户到工单")
+    @app_commands.command(name="tickets_add_user", description="添加用户到工单")
     @app_commands.describe(user="要添加的用户")
     async def add_user_command(self, interaction: discord.Interaction, user: discord.Member):
         """Add user to ticket via command"""
@@ -1174,7 +1174,7 @@ class TicketsNewCog(commands.Cog):
         await interaction.response.send_message(embed=embed)
         await self.log_ticket_action('add_user', thread_id, interaction.user, extra_user=user)
 
-    @app_commands.command(name="tickets_new_stats", description="查看新版工单系统统计")
+    @app_commands.command(name="tickets_stats", description="查看工单系统统计")
     async def stats_command(self, interaction: discord.Interaction):
         """Show ticket statistics"""
         if not await self.is_admin_for_type(interaction.user):
@@ -1323,7 +1323,7 @@ class TicketsNewCog(commands.Cog):
             ephemeral=True
         )
 
-    @app_commands.command(name="tickets_new_accept", description="手动接受当前工单")
+    @app_commands.command(name="tickets_accept", description="手动接受当前工单")
     async def accept_ticket_command(self, interaction: discord.Interaction):
         """Accept ticket via command"""
         if not isinstance(interaction.channel, discord.Thread):
@@ -1422,7 +1422,7 @@ class TicketsNewCog(commands.Cog):
                 except:
                     pass  # DM failed
 
-    @app_commands.command(name="tickets_new_close", description="手动关闭当前工单")
+    @app_commands.command(name="tickets_close", description="手动关闭当前工单")
     @app_commands.describe(reason="关闭工单的原因")
     async def close_ticket_command(self, interaction: discord.Interaction, reason: str):
         """Close ticket via command"""
@@ -1488,7 +1488,7 @@ class TicketsNewCog(commands.Cog):
         
         # Create success embed
         embed = discord.Embed(
-            title=self.conf['messages']['log_ticket_close_title'],
+            title=self.conf['messages']['close_dm_title'],
             description=self.conf['messages']['close_dm_content'].format(
                 closer=interaction.user.mention,
                 reason=reason

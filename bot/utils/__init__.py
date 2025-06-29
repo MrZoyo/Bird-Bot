@@ -7,6 +7,7 @@ from .media_handler import MediaHandler
 from .file_utils import generate_file_tree, format_size
 from .shop_db import ShopDatabaseManager
 from .channel_validator import check_channel_validity, check_voice_state
+from .ban_db import BanDatabaseManager
 
 __all__ = [
     'config',
@@ -18,5 +19,6 @@ __all__ = [
     'ShopDatabaseManager',
     'check_channel_validity',
     'check_voice_state',
-    'PrivateRoomDatabaseManager'
+    'PrivateRoomDatabaseManager',
+    'BanDatabaseManager'
 ]

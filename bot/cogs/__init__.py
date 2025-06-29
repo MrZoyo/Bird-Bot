@@ -16,3 +16,4 @@ from .tickets_cog import TicketsCog
 from .tickets_new_cog import TicketsNewCog
 from .shop_cog import ShopCog
 from .privateroom_cog import PrivateRoomCog
+from .ban_cog import BanCog

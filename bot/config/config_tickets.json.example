@@ -5,15 +5,10 @@
   "main_message_id": 1145141919810,
   "category_channel_limit": 50,
   "open_categories": [
-    1145141919810
   ],
   "closed_categories": [
-    1145141919810,
-    1145141919810
   ],
   "admin_roles": [
-    1145141919810,
-    1145141919810
   ],
   "admin_users": [],
   "ticket_types": {
