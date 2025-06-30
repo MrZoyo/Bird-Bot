@@ -1,6 +1,6 @@
 # Bird Bot 
 
-`Version: 1.5.1b`
+`Version: 1.5.2b`
 
 ---
 
@@ -494,6 +494,13 @@ Media processing module with validation and security features.
 ---
 
 ## Update Log
+### V1.5.2b - 2025-06-30
+#### 🐛 Critical Bug Fixes
+- **Ban System Fixes**: 
+  - Fixed database unique errors
+  - Fixed ban logging issues
+
+---
 ### V1.5.1b - 2025-06-29
 #### 🐛 Critical Bug Fixes
 - **Tempban System Fixes**: Resolved major issues with temporary ban management
@@ -551,94 +558,3 @@ Media processing module with validation and security features.
   - Enhanced `/check_log` command with `keyword_log` parameter
   - UTF-8 encoding support and configurable log paths
 ---
-
-### V1.3.2 - 2025-05-10
-#### Bug fixes
-- Fixed an issue that had caused creating achievement pickup messages to fail.
-
----
-### V1.3.1 - 2025-05-02
-#### New features and improvements
-- In `PrivateRoom_Cog`, now that a user with an insufficient balance uses the buy room function, the bot will return to show that user's purchase price and missing points.
-- In `Tickets_Cog`:
-  - Now the user creating a ticket needs to confirm the ticket creation by typing yes in the modal to avoid false touches and repeated ticket creation.
-  - Now when closing a work order, a more detailed embed is provided to show all the information.
-
----
-### V1.3.0b - 2025-03-24
-#### New features and improvements
-- For `Achievement_Cog`, added a new command `/rank` to provide a new ranking system surface for the server.
-- Added a new cog `Shop_Cog` to provide a shop system for users to earn and spend points. For more details, please check the function introduction [Shop_Cog](#shop_cog).
-- Added a new cog `PrivateRoom_Cog` to provide a private room system for users to buy their own voice channels. For more details, please check the function introduction [PrivateRoom_Cog](#privateroom_cog).
-
----
-### V1.2.4 - 2025-02-24
-#### Bug fixes
--  Fixed an issue in `Tickets_Cog` where global role admin settings were not synchronized to all open tickets in a timely manner in some cases.
-#### New features and improvements
-- Added a new command `/tickets_archive` to archive a series of closed tickets.
-
----
-### V1.2.3 - 2025-01-15
-#### Bug fixes
-- Fixed an issue in `Tickets_Cog` where permissions for the tickets info channel were not properly assigned to all administrators with permissions for tickets. Fixed an issue where non-global administrators were not receiving tickets properly.
-
----
-### V1.2.2 - 2025-01-05
-#### Bug fixes
-- Fixed an issue in `Tickets_Cog` where the `admin_list` saved in memory did not follow the modification changes and resulted in an error stating that there were no administrator privileges.
-
----
-### V1.2.1 - 2024-12-19
-#### New features and improvements
-- In a ticket in `Tickets_Cog`:
-  - Added `/tickets_accept` command to accept a ticket.
-  - Added `/tickets_close` command to close a ticket.
-
----
-### V1.2.0 - 2024-12-18
-#### New features and improvements
-- Now every type of tickets can be set with separate admin users and roles.
-- When a new ticket is created, the bot will send a DM to the corresponding admin users.
-- Addresses the issue of capping the number of tickets that will occur in the future.
-- Added a signature pickup system for the role_cog.
-- The signature will be displayed in the invitation message.
-- Added a automatic DM message for the welcome_cog. The bot will send a DM message to the user who joins the server.
-- Dropped the `!testwelcome` command.
-
-#### Bug fixes
-- Fixed an issue with the ticket component id initialization issues.
-
----
-### V1.1.0 - 2024-12-11
-#### New features and improvements
-- Added new Tickets_Cog for ticket management system with its associated tickets_db.
-- Created separate configuration file for Rating_Cog.
-- Modified welcome image font style and background file paths in Welcome_Cog.
-- Added verification mechanism to Welcome_Cog.
-- Dropped config_cog.
-
-#### Bug fixes
-- Adjusted Check_Status_Cog's log file character limit from 2000 to 1900 to prevent Discord message length issues.
-
----
-### V1.0.1 - 2024-11-27
-#### New features and improvements
-- Added `/vc_list` command to list all voice channels that automatically create new voice channels.
-#### Bug fixes
-- Fixed an issue where bots were not deleting from the ignore channel list correctly.
-
----
-### V1.0.0 - 2024-11-25
-#### New features and improvements
-- All code was refactored in its entirety.
-- A more modern architecture was built for the project.
-- Separated config settings files by function.
-- Split reused functionality separately.
-- It is now possible to add voice channels for creating rooms with commands.
-- Channels that do not allow bots to reply can now be added with a command.
-- Achievements can now be canceled by clicking again.
-- DnD Random Dice now supports dice containing 0.
-
-#### Bug fixes
-- Fixed an issue where the number of participants in Giveaway was not recorded properly in the Achievement Ranking System for rankings indexed by month.

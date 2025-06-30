@@ -249,18 +249,34 @@ class BanCog(commands.Cog):
         
         return None
 
-    async def send_ban_notification(self, user: discord.User, reason: str, duration: Optional[str] = None, unban_time: Optional[datetime] = None):
+    async def send_ban_notification(self, user: discord.User, reason: str, duration: Optional[str] = None,
+                                    unban_time: Optional[datetime] = None):
         """Send ban notification to configured channel"""
         channel_id = self.config_data.get('ban_notification_channel_id')
         if not channel_id:
+            logging.warning("Ban notification channel ID not configured")
             return
-        
+
         channel = self.bot.get_channel(channel_id)
         if not channel:
+            logging.error(f"Ban notification channel {channel_id} not found")
             return
-        
+
+        # 添加权限检查日志
+        guild = channel.guild
+        bot_member = guild.get_member(self.bot.user.id)
+        perms = channel.permissions_for(bot_member)
+
+        if not perms.send_messages:
+            logging.error(f"Bot lacks Send Messages permission in channel {channel_id}")
+            return
+
+        if not perms.embed_links:
+            logging.error(f"Bot lacks Embed Links permission in channel {channel_id}")
+            return
+
         messages = self.config_data.get('messages', {})
-        
+
         # Create embed
         if duration:
             title = messages.get('tempban_notification_title', 'User Temporarily Banned')
@@ -268,38 +284,38 @@ class BanCog(commands.Cog):
         else:
             title = messages.get('ban_notification_title', 'User Banned')
             description = messages.get('ban_notification_description', 'User {user} has been banned')
-        
+
         embed = discord.Embed(
             title=title,
             description=description.format(user=user.mention),
             color=discord.Color.red(),
             timestamp=discord.utils.utcnow()
         )
-        
+
         # Set bot avatar as thumbnail
         if self.bot.user.avatar:
             embed.set_thumbnail(url=self.bot.user.avatar.url)
-        
+
         # Add user avatar to footer
         embed.set_footer(
             text=f"User: {user.display_name}",
             icon_url=user.display_avatar.url
         )
-        
+
         # Add fields
         embed.add_field(
             name=messages.get('reason_field', 'Reason'),
             value=reason or messages.get('no_reason', 'No reason provided'),
             inline=False
         )
-        
+
         if duration:
             embed.add_field(
                 name=messages.get('duration_field', 'Duration'),
                 value=duration,
                 inline=True
             )
-            
+
             if unban_time:
                 embed.add_field(
                     name=messages.get('unban_time_field', 'Unban Time'),
@@ -312,11 +328,16 @@ class BanCog(commands.Cog):
                 value=messages.get('permanent', 'Permanent'),
                 inline=True
             )
-        
+
         try:
             await channel.send(embed=embed)
-        except discord.HTTPException:
-            logging.error(f"Failed to send ban notification for user {user.id}")
+            logging.info(f"Successfully sent ban notification for user {user.id} to channel {channel_id}")
+        except discord.Forbidden:
+            logging.error(f"Bot lacks permission to send message in channel {channel_id}")
+        except discord.HTTPException as e:
+            logging.error(f"Failed to send ban notification for user {user.id}: {e}")
+        except Exception as e:
+            logging.error(f"Unexpected error sending ban notification: {type(e).__name__}: {e}")
 
     async def send_mute_notification(self, user: discord.User, reason: str, duration: str, unmute_time: datetime):
         """Send mute notification to configured channel"""

@@ -13,21 +13,32 @@ class BanDatabaseManager:
     async def initialize_database(self) -> None:
         """Create necessary database tables if they don't exist."""
         async with aiosqlite.connect(self.db_path) as db:
-            # Tempbans table
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS tempbans (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    guild_id INTEGER NOT NULL,
-                    banned_by INTEGER NOT NULL,
-                    reason TEXT NOT NULL,
-                    banned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    unban_at TIMESTAMP NOT NULL,
-                    is_active BOOLEAN NOT NULL DEFAULT 1,
-                    delete_message_days INTEGER DEFAULT 0,
-                    UNIQUE(user_id, guild_id, is_active)
-                )
+            # Check if table exists and if it has the old constraint
+            cursor = await db.execute('''
+                SELECT sql FROM sqlite_master 
+                WHERE type='table' AND name='tempbans'
             ''')
+            existing_schema = await cursor.fetchone()
+            
+            if existing_schema and 'UNIQUE(user_id, guild_id, is_active)' in existing_schema[0]:
+                # Need to migrate the table
+                await self._migrate_tempbans_table(db)
+            else:
+                # Create new table with correct schema
+                await db.execute('''
+                    CREATE TABLE IF NOT EXISTS tempbans (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        guild_id INTEGER NOT NULL,
+                        banned_by INTEGER NOT NULL,
+                        reason TEXT NOT NULL,
+                        banned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        unban_at TIMESTAMP NOT NULL,
+                        is_active BOOLEAN NOT NULL DEFAULT 1,
+                        delete_message_days INTEGER DEFAULT 0,
+                        UNIQUE(user_id, guild_id)
+                    )
+                ''')
             
             # Create index for faster queries
             await db.execute('''
@@ -36,6 +47,41 @@ class BanDatabaseManager:
             ''')
             
             await db.commit()
+
+    async def _migrate_tempbans_table(self, db) -> None:
+        """Migrate tempbans table to new schema without is_active in unique constraint."""
+        # Create new table with correct schema
+        await db.execute('''
+            CREATE TABLE tempbans_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                guild_id INTEGER NOT NULL,
+                banned_by INTEGER NOT NULL,
+                reason TEXT NOT NULL,
+                banned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                unban_at TIMESTAMP NOT NULL,
+                is_active BOOLEAN NOT NULL DEFAULT 1,
+                delete_message_days INTEGER DEFAULT 0,
+                UNIQUE(user_id, guild_id)
+            )
+        ''')
+        
+        # Copy data, keeping only the most recent record per user/guild
+        await db.execute('''
+            INSERT INTO tempbans_new 
+            SELECT * FROM tempbans t1
+            WHERE t1.id = (
+                SELECT MAX(t2.id) 
+                FROM tempbans t2 
+                WHERE t2.user_id = t1.user_id AND t2.guild_id = t1.guild_id
+            )
+        ''')
+        
+        # Drop old table and rename new one
+        await db.execute('DROP TABLE tempbans')
+        await db.execute('ALTER TABLE tempbans_new RENAME TO tempbans')
+        
+        logging.info("Successfully migrated tempbans table to new schema")
 
     async def add_tempban(self, user_id: int, guild_id: int, banned_by: int, 
                          reason: str, unban_at: datetime, delete_message_days: int = 0) -> int:
