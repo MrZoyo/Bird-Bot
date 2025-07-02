@@ -92,52 +92,51 @@ class TeamupDisplayCog(commands.Cog):
         
         if not invitations:
             embed.description = self.messages['no_teamup_message']
-            return embed
-        
-        # Get game type configurations
-        game_types = await self.db_manager.get_all_game_types()
-        
-        # Group invitations by game type
-        grouped_invitations = {}
-        general_invitations = []
-        
-        for invitation in invitations:
-            game_type = invitation.get('game_type')
-            if game_type and game_type in game_types.values():
-                if game_type not in grouped_invitations:
-                    grouped_invitations[game_type] = []
-                grouped_invitations[game_type].append(invitation)
-            else:
-                general_invitations.append(invitation)
-        
-        # Build embed content
-        embed_content = []
-        
-        # Display game types in configured order
-        for channel_id, game_type in game_types.items():
-            if game_type in grouped_invitations:
-                embed_content.append(f"\n**{game_type}**")
-                for i, invitation in enumerate(grouped_invitations[game_type]):
+        else:
+            # Get game type configurations
+            game_types = await self.db_manager.get_all_game_types()
+            
+            # Group invitations by game type
+            grouped_invitations = {}
+            general_invitations = []
+            
+            for invitation in invitations:
+                game_type = invitation.get('game_type')
+                if game_type and game_type in game_types.values():
+                    if game_type not in grouped_invitations:
+                        grouped_invitations[game_type] = []
+                    grouped_invitations[game_type].append(invitation)
+                else:
+                    general_invitations.append(invitation)
+            
+            # Build embed content
+            embed_content = []
+            
+            # Display game types in configured order
+            for channel_id, game_type in game_types.items():
+                if game_type in grouped_invitations:
+                    embed_content.append(f"\n**{game_type}**")
+                    for i, invitation in enumerate(grouped_invitations[game_type]):
+                        line = await self.format_invitation_line(invitation)
+                        embed_content.append(line)
+                        # Add space between invitations of the same type (but not after the last one)
+                        if i < len(grouped_invitations[game_type]) - 1:
+                            embed_content.append("")
+            
+            # Add general teamup section
+            if general_invitations:
+                embed_content.append(f"\n**{self.messages['general_teamup_title']}**")
+                for i, invitation in enumerate(general_invitations):
                     line = await self.format_invitation_line(invitation)
                     embed_content.append(line)
                     # Add space between invitations of the same type (but not after the last one)
-                    if i < len(grouped_invitations[game_type]) - 1:
+                    if i < len(general_invitations) - 1:
                         embed_content.append("")
-        
-        # Add general teamup section
-        if general_invitations:
-            embed_content.append(f"\n**{self.messages['general_teamup_title']}**")
-            for i, invitation in enumerate(general_invitations):
-                line = await self.format_invitation_line(invitation)
-                embed_content.append(line)
-                # Add space between invitations of the same type (but not after the last one)
-                if i < len(general_invitations) - 1:
-                    embed_content.append("")
-        
-        if embed_content:
-            embed.description = "\n".join(embed_content)
-        else:
-            embed.description = self.messages['no_teamup_message']
+            
+            if embed_content:
+                embed.description = "\n".join(embed_content)
+            else:
+                embed.description = self.messages['no_teamup_message']
         
         # Add footer with bot avatar
         if self.bot.user.avatar:
