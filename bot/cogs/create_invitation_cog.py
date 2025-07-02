@@ -177,6 +177,11 @@ class TeamInvitationView(discord.ui.View):
         # 更新消息
         await interaction.message.edit(embed=new_embed, view=self)
         await interaction.followup.send(self.roomfull_set_message, ephemeral=True)
+        
+        # 从展示板移除组队信息
+        teamup_cog = self.bot.get_cog('TeamupDisplayCog')
+        if teamup_cog:
+            await teamup_cog.remove_teamup_from_display(self.user.id, original_channel_id)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         return interaction.user == self.user
@@ -262,6 +267,16 @@ class CreateInvitationCog(commands.Cog):
                 try:
                     channel = message.author.voice.channel
                     view = TeamInvitationView(self.bot, channel, message.author)
+                    
+                    # 添加到展示板
+                    teamup_cog = self.bot.get_cog('TeamupDisplayCog')
+                    if teamup_cog:
+                        await teamup_cog.add_teamup_to_display(
+                            message.author.id, 
+                            message.channel.id, 
+                            channel.id, 
+                            message.content
+                        )
                     embed = await view.create_embed(message)
                     await message.reply(embed=embed, view=view)
                 except Exception as e:
@@ -295,6 +310,17 @@ class CreateInvitationCog(commands.Cog):
                 view = TeamInvitationView(self.bot, channel, interaction.user)
                 embed = await view.create_embed(interaction)
                 embed.title = title or self.default_invite_embed_title
+                
+                # 添加到展示板
+                teamup_cog = self.bot.get_cog('TeamupDisplayCog')
+                if teamup_cog:
+                    content = title or self.default_invite_embed_title
+                    await teamup_cog.add_teamup_to_display(
+                        interaction.user.id, 
+                        interaction.channel.id, 
+                        channel.id, 
+                        content
+                    )
                 # Truncate the content to 256 characters if longer
                 if len(embed.title) > 256:
                     embed.title = embed.title[:253] + "..."

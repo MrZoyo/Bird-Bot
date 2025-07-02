@@ -1,6 +1,6 @@
 # Bird Bot 
 
-`Version: 1.5.2b`
+`Version: 1.6.0b`
 
 ---
 
@@ -31,7 +31,8 @@ The bot's code is deeply optimised for low-performance devices, using asynchrono
   - [Notebook_Cog](#notebook_cog)
   - [Backup_Cog](#backup_cog)
   - [Giveaway_Cog](#giveaway_cog)
-  - [Rating_Cog](#rating_cog)
+  - [Rating_Cog (Legacy)](#rating_cog)
+  - [TeamupDisplay_Cog](#teamupdisplay_cog)
   - [Tickets_New_Cog](#tickets_new_cog)
   - [Tickets_Cog (Legacy)](#tickets_cog-legacy)
   - [Ban_Cog](#ban_cog)
@@ -214,19 +215,36 @@ Comprehensive giveaway management system with achievement-based restrictions.
 - `/ga_sendtowinner <giveaway_id>`: Send message to giveaway winners
 
 ### Rating_Cog
-Anonymous rating system for events and activities.
+**⚠️ Deprecated system** - The rating system has been removed in version 1.6.0b.
 
-**Features:**
+**Important:** This system is no longer available. All rating-related commands and functionality have been discontinued. Rating data remains in the database but is no longer accessible through bot commands.
+
+**Previous Features:**
 - **10-point rating scale** with anonymous submissions
 - **Manual start/end control** for rating periods
 - **Statistical analysis** showing average scores and distribution
 - **Rating item management** with unique ID system
 
-**Commands:**
+**Previous Commands (No longer available):**
 - `/rt_create`: Create new rating item with interactive form
 - `/rt_end <rating_id>`: End rating and display statistics
 - `/rt_cancel <rating_id>`: Cancel rating without showing results
 - `/rt_description <rating_id> <description>`: Modify rating description
+
+### TeamupDisplay_Cog
+Real-time teamup information display system for organizing team activities.
+
+**Features:**
+- **Real-time display board** with automatic updates every 2 minutes
+- **Game type categorization** for organized teamup information
+- **Automatic cleanup** of expired invitations and invalid data
+- **Discord integration** with native time formatting and channel links
+
+**Commands:**
+- `/teamup_init <channel_id>`: Create teamup display board in specified channel
+- `/teamup_type_add <channel_id> <game_type>`: Add game type configuration
+- `/teamup_type_delete <channel_id>`: Delete game type configuration
+- `/teamup_type_list`: View all game type configurations
 
 ### Tickets_New_Cog
 **🆕 Recommended ticket system** using Discord's native thread architecture for enhanced performance and user experience.
@@ -494,6 +512,19 @@ Media processing module with validation and security features.
 ---
 
 ## Update Log
+### V1.6.0b - 2025-07-02
+#### 🆕 Major New Features
+- **TeamupDisplay System Implementation**: Added comprehensive `TeamupDisplay_Cog` with real-time team organization capabilities
+  - Real-time display board with automatic updates every 2 minutes
+  - Game type categorization for organized teamup information
+  - Automatic cleanup of expired invitations and invalid data
+  - Discord integration with native time formatting and channel links
+
+#### ⚠️ Important Changes
+- **Rating System Removal**: Completely removed `Rating_Cog` functionality
+  - All rating-related commands and features have been discontinued
+  - Rating data will be preserved in database but no longer accessible through bot commands
+
 ### V1.5.2b - 2025-06-30
 #### 🐛 Critical Bug Fixes
 - **Ban System Fixes**: 

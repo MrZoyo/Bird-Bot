@@ -367,194 +367,194 @@ class RatingCog(commands.Cog):
             await db.commit()
             await cursor.close()
 
-    @app_commands.command(name="rt_create", description="Create a rating")
-    async def create_rating(self, interaction: discord.Interaction):
-        if not await check_channel_validity(interaction):
-            return
+    # @app_commands.command(name="rt_create", description="Create a rating")
+    # async def create_rating(self, interaction: discord.Interaction):
+    #     if not await check_channel_validity(interaction):
+    #         return
 
-        form = RatingForm(self.bot)
-        await interaction.response.send_modal(form)
+    #     form = RatingForm(self.bot)
+    #     await interaction.response.send_modal(form)
 
-    @app_commands.command(name="rt_end", description="End a rating")
-    @app_commands.describe(rating_id="The ID of the rating to end")
-    async def end_rating(self, interaction: discord.Interaction, rating_id: str):
-        if not await check_channel_validity(interaction):
-            return
+    # @app_commands.command(name="rt_end", description="End a rating")
+    # @app_commands.describe(rating_id="The ID of the rating to end")
+    # async def end_rating(self, interaction: discord.Interaction, rating_id: str):
+    #     if not await check_channel_validity(interaction):
+    #         return
 
-        await interaction.response.defer()
+    #     await interaction.response.defer()
 
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute('SELECT message_id, person_with_point FROM rating WHERE rating_id = ?', (rating_id,))
-            record = await cursor.fetchone()
+    #     async with aiosqlite.connect(self.db_path) as db:
+    #         cursor = await db.cursor()
+    #         await cursor.execute('SELECT message_id, person_with_point FROM rating WHERE rating_id = ?', (rating_id,))
+    #         record = await cursor.fetchone()
 
-            if not record:
-                await interaction.followup.send(f"Rating {rating_id} not found.")
-                return
+    #         if not record:
+    #             await interaction.followup.send(f"Rating {rating_id} not found.")
+    #             return
 
-            # If the rating has already ended, just give the average score
-            await cursor.execute('SELECT is_end, average_score FROM rating WHERE rating_id = ?', (rating_id,))
-            is_end, average_score = await cursor.fetchone()
-            if is_end:
-                await interaction.followup.send(f"The rating {rating_id} has already ended."
-                                                f"The average score for rating {rating_id} is {average_score}.")
-                return
+    #         # If the rating has already ended, just give the average score
+    #         await cursor.execute('SELECT is_end, average_score FROM rating WHERE rating_id = ?', (rating_id,))
+    #         is_end, average_score = await cursor.fetchone()
+    #         if is_end:
+    #             await interaction.followup.send(f"The rating {rating_id} has already ended."
+    #                                             f"The average score for rating {rating_id} is {average_score}.")
+    #             return
 
-            # Update the rating to end
-            message_id, person_with_point = record
-            await cursor.execute('UPDATE rating SET is_end = 1 WHERE rating_id = ?', (rating_id,))
-            await db.commit()
+    #         # Update the rating to end
+    #         message_id, person_with_point = record
+    #         await cursor.execute('UPDATE rating SET is_end = 1 WHERE rating_id = ?', (rating_id,))
+    #         await db.commit()
 
-            scores = parse_person_with_point(person_with_point)
-            average_score = sum(scores.values()) / len(scores) if scores else 0
+    #         scores = parse_person_with_point(person_with_point)
+    #         average_score = sum(scores.values()) / len(scores) if scores else 0
 
-            # Generate bar chart for voting distribution
-            score_counts = {i: 0 for i in range(1, 11)}
-            for score in scores.values():
-                score_counts[score] += 1
+    #         # Generate bar chart for voting distribution
+    #         score_counts = {i: 0 for i in range(1, 11)}
+    #         for score in scores.values():
+    #             score_counts[score] += 1
 
-            fig, ax = plt.subplots()
-            ax.bar(score_counts.keys(), score_counts.values())
-            ax.set_xticks(list(score_counts.keys()))  # Ensure all labels from 1 to 10 are shown
-            ax.set_xlabel('Scores')
-            ax.set_xlabel('Scores')
-            ax.set_ylabel('Votes')
-            ax.set_title('Voting Distribution')
+    #         fig, ax = plt.subplots()
+    #         ax.bar(score_counts.keys(), score_counts.values())
+    #         ax.set_xticks(list(score_counts.keys()))  # Ensure all labels from 1 to 10 are shown
+    #         ax.set_xlabel('Scores')
+    #         ax.set_xlabel('Scores')
+    #         ax.set_ylabel('Votes')
+    #         ax.set_title('Voting Distribution')
 
-            buf = io.BytesIO()
-            plt.savefig(buf, format='png')
-            buf.seek(0)
-            file = discord.File(buf, 'voting_distribution.png')
+    #         buf = io.BytesIO()
+    #         plt.savefig(buf, format='png')
+    #         buf.seek(0)
+    #         file = discord.File(buf, 'voting_distribution.png')
 
-            # Fetch and edit the original message
-            channel = self.bot.get_channel(self.rating_channel_id)
-            message = await channel.fetch_message(int(message_id))
-            embed = message.embeds[0]
-            embed.title = "[END] " + embed.title
-            embed.color = discord.Color.red()
-            embed.add_field(name="Average Score", value=str(average_score), inline=False)
-            embed.set_image(url="attachment://voting_distribution.png")
+    #         # Fetch and edit the original message
+    #         channel = self.bot.get_channel(self.rating_channel_id)
+    #         message = await channel.fetch_message(int(message_id))
+    #         embed = message.embeds[0]
+    #         embed.title = "[END] " + embed.title
+    #         embed.color = discord.Color.red()
+    #         embed.add_field(name="Average Score", value=str(average_score), inline=False)
+    #         embed.set_image(url="attachment://voting_distribution.png")
 
-            # Disable all buttons
-            view = RatingView(self.bot, rating_id, self.rating_channel_id)
-            view.disable_all_buttons()
+    #         # Disable all buttons
+    #         view = RatingView(self.bot, rating_id, self.rating_channel_id)
+    #         view.disable_all_buttons()
 
-            await message.edit(embed=embed, view=view, attachments=[file])
+    #         await message.edit(embed=embed, view=view, attachments=[file])
 
-            buf.close()
+    #         buf.close()
 
-            await interaction.followup.send(f"Rating {rating_id} has ended. The average score is {average_score}.")
+    #         await interaction.followup.send(f"Rating {rating_id} has ended. The average score is {average_score}.")
 
-    @app_commands.command(name="rt_cancel", description="Cancel a rating")
-    @app_commands.describe(rating_id="The ID of the rating to cancel")
-    async def cancel_rating(self, interaction: discord.Interaction, rating_id: str):
-        if not await check_channel_validity(interaction):
-            return
+    # @app_commands.command(name="rt_cancel", description="Cancel a rating")
+    # @app_commands.describe(rating_id="The ID of the rating to cancel")
+    # async def cancel_rating(self, interaction: discord.Interaction, rating_id: str):
+    #     if not await check_channel_validity(interaction):
+    #         return
 
-        await interaction.response.defer()
+    #     await interaction.response.defer()
 
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute('SELECT message_id FROM rating WHERE rating_id = ?', (rating_id,))
-            record = await cursor.fetchone()
+    #     async with aiosqlite.connect(self.db_path) as db:
+    #         cursor = await db.cursor()
+    #         await cursor.execute('SELECT message_id FROM rating WHERE rating_id = ?', (rating_id,))
+    #         record = await cursor.fetchone()
 
-            if not record:
-                await interaction.followup.send(f"Rating {rating_id} not found.")
-                return
+    #         if not record:
+    #             await interaction.followup.send(f"Rating {rating_id} not found.")
+    #             return
 
-            # If the rating has already ended, inform the user
-            await cursor.execute('SELECT is_end FROM rating WHERE rating_id = ?', (rating_id,))
-            is_end = await cursor.fetchone()
-            if is_end and is_end[0]:
-                await interaction.followup.send(f"The rating {rating_id} has already ended.")
-                return
+    #         # If the rating has already ended, inform the user
+    #         await cursor.execute('SELECT is_end FROM rating WHERE rating_id = ?', (rating_id,))
+    #         is_end = await cursor.fetchone()
+    #         if is_end and is_end[0]:
+    #             await interaction.followup.send(f"The rating {rating_id} has already ended.")
+    #             return
 
-            # Update the rating to end and set it as cancelled
-            message_id = record[0]
-            await cursor.execute('UPDATE rating SET is_end = 1 WHERE rating_id = ?', (rating_id,))
-            await db.commit()
+    #         # Update the rating to end and set it as cancelled
+    #         message_id = record[0]
+    #         await cursor.execute('UPDATE rating SET is_end = 1 WHERE rating_id = ?', (rating_id,))
+    #         await db.commit()
 
-            # Fetch and edit the original message
-            channel = self.bot.get_channel(self.rating_channel_id)
-            message = await channel.fetch_message(int(message_id))
-            embed = message.embeds[0]
-            embed.title = "[CANCEL] " + embed.title
-            embed.color = discord.Color.orange()
+    #         # Fetch and edit the original message
+    #         channel = self.bot.get_channel(self.rating_channel_id)
+    #         message = await channel.fetch_message(int(message_id))
+    #         embed = message.embeds[0]
+    #         embed.title = "[CANCEL] " + embed.title
+    #         embed.color = discord.Color.orange()
 
-            # Disable all buttons
-            view = RatingView(self.bot, rating_id, self.rating_channel_id)
-            view.disable_all_buttons()
+    #         # Disable all buttons
+    #         view = RatingView(self.bot, rating_id, self.rating_channel_id)
+    #         view.disable_all_buttons()
 
-            await message.edit(embed=embed, view=view)
+    #         await message.edit(embed=embed, view=view)
 
-            await interaction.followup.send(f"Rating {rating_id} has been cancelled.")
+    #         await interaction.followup.send(f"Rating {rating_id} has been cancelled.")
 
-    @app_commands.command(name="rt_description", description="Change the description of an unended rating")
-    @app_commands.describe(rating_id="The ID of the rating to change", new_description="The new description")
-    async def change_description(self, interaction: discord.Interaction, rating_id: str, new_description: str):
-        if not await check_channel_validity(interaction):
-            return
+    # @app_commands.command(name="rt_description", description="Change the description of an unended rating")
+    # @app_commands.describe(rating_id="The ID of the rating to change", new_description="The new description")
+    # async def change_description(self, interaction: discord.Interaction, rating_id: str, new_description: str):
+    #     if not await check_channel_validity(interaction):
+    #         return
 
-        await interaction.response.defer()
+    #     await interaction.response.defer()
 
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute('SELECT message_id, is_end FROM rating WHERE rating_id = ?', (rating_id,))
-            record = await cursor.fetchone()
+    #     async with aiosqlite.connect(self.db_path) as db:
+    #         cursor = await db.cursor()
+    #         await cursor.execute('SELECT message_id, is_end FROM rating WHERE rating_id = ?', (rating_id,))
+    #         record = await cursor.fetchone()
 
-            if not record:
-                await interaction.followup.send(f"Rating {rating_id} not found.")
-                return
+    #         if not record:
+    #             await interaction.followup.send(f"Rating {rating_id} not found.")
+    #             return
 
-            message_id, is_end = record
-            if is_end:
-                await interaction.followup.send(
-                    f"The rating {rating_id} has already ended. You cannot change its description.")
-                return
+    #         message_id, is_end = record
+    #         if is_end:
+    #             await interaction.followup.send(
+    #                 f"The rating {rating_id} has already ended. You cannot change its description.")
+    #             return
 
-            # Update the description in the database
-            await cursor.execute('UPDATE rating SET description = ? WHERE rating_id = ?', (new_description, rating_id))
-            await db.commit()
+    #         # Update the description in the database
+    #         await cursor.execute('UPDATE rating SET description = ? WHERE rating_id = ?', (new_description, rating_id))
+    #         await db.commit()
 
-            # Fetch and edit the original message
-            channel = self.bot.get_channel(self.rating_channel_id)
-            message = await channel.fetch_message(int(message_id))
-            embed = message.embeds[0]
-            for i, field in enumerate(embed.fields):
-                if field.name == "Description":
-                    embed.set_field_at(i, name="Description", value=new_description, inline=False)
-                    break
-            else:
-                embed.add_field(name="Description", value=new_description, inline=False)
+    #         # Fetch and edit the original message
+    #         channel = self.bot.get_channel(self.rating_channel_id)
+    #         message = await channel.fetch_message(int(message_id))
+    #         embed = message.embeds[0]
+    #         for i, field in enumerate(embed.fields):
+    #             if field.name == "Description":
+    #                 embed.set_field_at(i, name="Description", value=new_description, inline=False)
+    #                 break
+    #         else:
+    #             embed.add_field(name="Description", value=new_description, inline=False)
 
-            await message.edit(embed=embed)
+    #         await message.edit(embed=embed)
 
-            await interaction.followup.send(f"The description for rating {rating_id} "
-                                            f"has been updated to:\n{new_description}")
+    #         await interaction.followup.send(f"The description for rating {rating_id} "
+    #                                         f"has been updated to:\n{new_description}")
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        # Ensure the table exists
-        async with aiosqlite.connect(self.db_path) as db:
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS rating (
-                    rating_id INTEGER NOT NULL,
-                    message_id TEXT NOT NULL,
-                    description TEXT,
-                    creator_id TEXT NOT NULL,
-                    person_with_point TEXT,
-                    average_score REAL DEFAULT 0,
-                    is_end BOOLEAN DEFAULT 0
-                )
-            ''')
+    # @commands.Cog.listener()
+    # async def on_ready(self):
+    #     # Ensure the table exists
+    #     async with aiosqlite.connect(self.db_path) as db:
+    #         await db.execute('''
+    #             CREATE TABLE IF NOT EXISTS rating (
+    #                 rating_id INTEGER NOT NULL,
+    #                 message_id TEXT NOT NULL,
+    #                 description TEXT,
+    #                 creator_id TEXT NOT NULL,
+    #                 person_with_point TEXT,
+    #                 average_score REAL DEFAULT 0,
+    #                 is_end BOOLEAN DEFAULT 0
+    #             )
+    #         ''')
 
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS rating_views (
-                    rating_id TEXT PRIMARY KEY,
-                    rating_channel_id TEXT,
-                    message_id TEXT
-                )
-            ''')
-            await db.commit()
+    #         await db.execute('''
+    #             CREATE TABLE IF NOT EXISTS rating_views (
+    #                 rating_id TEXT PRIMARY KEY,
+    #                 rating_channel_id TEXT,
+    #                 message_id TEXT
+    #             )
+    #         ''')
+    #         await db.commit()
 
-            await self.load_rating()
+    #         await self.load_rating()
