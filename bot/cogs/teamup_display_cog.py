@@ -115,23 +115,39 @@ class TeamupDisplayCog(commands.Cog):
             # Display game types in configured order
             for channel_id, game_type in game_types.items():
                 if game_type in grouped_invitations:
-                    embed_content.append(f"\n**{game_type}**")
-                    for i, invitation in enumerate(grouped_invitations[game_type]):
+                    # Get valid invitation lines first
+                    valid_lines = []
+                    for invitation in grouped_invitations[game_type]:
                         line = await self.format_invitation_line(invitation)
-                        embed_content.append(line)
-                        # Add space between invitations of the same type (but not after the last one)
-                        if i < len(grouped_invitations[game_type]) - 1:
-                            embed_content.append("")
+                        if line:  # Only add non-empty lines
+                            valid_lines.append(line)
+                    
+                    # Only add section title if there are valid lines
+                    if valid_lines:
+                        embed_content.append(f"\n**{game_type}**")
+                        for i, line in enumerate(valid_lines):
+                            embed_content.append(line)
+                            # Add space between invitations of the same type (but not after the last one)
+                            if i < len(valid_lines) - 1:
+                                embed_content.append("")
             
             # Add general teamup section
             if general_invitations:
-                embed_content.append(f"\n**{self.messages['general_teamup_title']}**")
-                for i, invitation in enumerate(general_invitations):
+                # Get valid invitation lines first
+                valid_general_lines = []
+                for invitation in general_invitations:
                     line = await self.format_invitation_line(invitation)
-                    embed_content.append(line)
-                    # Add space between invitations of the same type (but not after the last one)
-                    if i < len(general_invitations) - 1:
-                        embed_content.append("")
+                    if line:  # Only add non-empty lines
+                        valid_general_lines.append(line)
+                
+                # Only add section title if there are valid lines
+                if valid_general_lines:
+                    embed_content.append(f"\n**{self.messages['general_teamup_title']}**")
+                    for i, line in enumerate(valid_general_lines):
+                        embed_content.append(line)
+                        # Add space between invitations of the same type (but not after the last one)
+                        if i < len(valid_general_lines) - 1:
+                            embed_content.append("")
             
             if embed_content:
                 embed.description = "\n".join(embed_content)
@@ -156,6 +172,8 @@ class TeamupDisplayCog(commands.Cog):
         # Get voice channel
         voice_channel = self.bot.get_channel(invitation['voice_channel_id'])
         if not voice_channel:
+            # Clean up invalid invitation from database
+            await self.db_manager.remove_invalid_invitation(invitation['voice_channel_id'])
             return ""
         
         # Get user

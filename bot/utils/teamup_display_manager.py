@@ -219,6 +219,20 @@ class TeamupDisplayManager:
                 logging.error(f"Failed to cleanup expired invitations: {e}")
                 return 0
     
+    async def remove_invalid_invitation(self, voice_channel_id: int) -> bool:
+        """Remove invitation for non-existent voice channel"""
+        async with aiosqlite.connect(self.db_path) as db:
+            try:
+                await db.execute('''
+                    DELETE FROM teamup_invitations 
+                    WHERE voice_channel_id = ?
+                ''', (voice_channel_id,))
+                await db.commit()
+                return True
+            except Exception as e:
+                logging.error(f"Failed to remove invalid invitation for channel {voice_channel_id}: {e}")
+                return False
+    
     async def get_active_invitations(self) -> List[Dict]:
         """Get all active teamup invitations"""
         async with aiosqlite.connect(self.db_path) as db:
