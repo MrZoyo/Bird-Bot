@@ -164,8 +164,12 @@ class TeamupDisplayCog(commands.Cog):
     
     async def format_invitation_line(self, invitation: Dict) -> str:
         """Format single invitation information line"""
-        # Truncate message content
+        # Remove mentions from content
         content = invitation['message_content']
+        content = re.sub(r'<@\d+>', '', content)
+        content = re.sub(r'<@&\d+>', '', content)
+        
+        # Truncate message content
         if len(content) > self.max_content_length:
             content = content[:self.max_content_length-3] + "..."
         

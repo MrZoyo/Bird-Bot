@@ -112,7 +112,7 @@ class TicketConfirmModal(discord.ui.Modal):
 
 
 class TicketThreadView(discord.ui.View):
-    def __init__(self, cog, thread_id: int, type_name: str):
+    def __init__(self, cog, thread_id: int, type_name: str, is_accepted: bool = False):
         super().__init__(timeout=None)
         self.cog = cog
         self.thread_id = thread_id
@@ -122,8 +122,9 @@ class TicketThreadView(discord.ui.View):
         # Accept button
         accept_button = discord.ui.Button(
             style=discord.ButtonStyle.success,
-            label=self.messages['ticket_accept_button'],
-            custom_id=f'accept_ticket_{thread_id}'
+            label=self.messages['ticket_accept_button_disabled'] if is_accepted else self.messages['ticket_accept_button'],
+            custom_id=f'accept_ticket_{thread_id}',
+            disabled=is_accepted
         )
         accept_button.callback = self.accept_callback
         self.add_item(accept_button)
@@ -145,6 +146,13 @@ class TicketThreadView(discord.ui.View):
         )
         close_button.callback = self.close_callback
         self.add_item(close_button)
+    
+    @classmethod
+    async def create_with_status(cls, cog, thread_id: int, type_name: str):
+        """Create a TicketThreadView with proper ticket status from database"""
+        ticket_data = await cog.db_manager.fetch_ticket(thread_id)
+        is_accepted = ticket_data.get('is_accepted', False) if ticket_data else False
+        return cls(cog, thread_id, type_name, is_accepted)
 
     async def accept_callback(self, interaction: discord.Interaction):
         """Handle ticket acceptance"""
@@ -172,10 +180,7 @@ class TicketThreadView(discord.ui.View):
             )
             
             # Update view to disable accept button
-            new_view = TicketThreadView(self.cog, self.thread_id, self.type_name)
-            new_view.children[0].disabled = True
-            new_view.children[0].label = self.messages['ticket_accept_button_disabled']
-            new_view.children[0].style = discord.ButtonStyle.success
+            new_view = TicketThreadView(self.cog, self.thread_id, self.type_name, is_accepted=True)
             
             # Register the updated view for persistence
             self.cog.bot.add_view(new_view)
@@ -393,8 +398,8 @@ class CloseTicketModal(discord.ui.Modal):
                     try:
                         control_message = await thread.fetch_message(ticket_data['message_id'])
                         
-                        # Create disabled view
-                        disabled_view = TicketThreadView(self.cog, self.thread_id, "")
+                        # Create disabled view with proper ticket status
+                        disabled_view = await TicketThreadView.create_with_status(self.cog, self.thread_id, "")
                         for child in disabled_view.children:
                             child.disabled = True
                         
@@ -546,13 +551,7 @@ class TicketsNewCog(commands.Cog):
                         thread = self.bot.get_channel(thread_id)
                         if thread and not thread.archived:  # Only process non-archived threads
                             # Create persistent view for ticket control buttons with correct state
-                            ticket_view = TicketThreadView(self, thread_id, type_name)
-                            
-                            # Update button states based on ticket status
-                            if is_accepted:
-                                ticket_view.children[0].disabled = True  # Accept button
-                                ticket_view.children[0].label = self.conf['messages']['ticket_accept_button_disabled']
-                                ticket_view.children[0].style = discord.ButtonStyle.success
+                            ticket_view = TicketThreadView(self, thread_id, type_name, is_accepted)
                             
                             if is_closed:
                                 # Disable all buttons for closed tickets
@@ -1505,8 +1504,8 @@ class TicketsNewCog(commands.Cog):
                 try:
                     control_message = await thread.fetch_message(ticket_data['message_id'])
                     
-                    # Create disabled view
-                    disabled_view = TicketThreadView(self, thread_id, "")
+                    # Create disabled view with proper ticket status
+                    disabled_view = await TicketThreadView.create_with_status(self, thread_id, "")
                     for child in disabled_view.children:
                         child.disabled = True
                     
@@ -1606,13 +1605,7 @@ class TicketsNewCog(commands.Cog):
                                 continue
                             
                             # Create view with correct state
-                            ticket_view = TicketThreadView(self, thread_id, type_name)
-                            
-                            # Update button states based on ticket status
-                            if is_accepted:
-                                ticket_view.children[0].disabled = True  # Accept button
-                                ticket_view.children[0].label = self.conf['messages']['ticket_accept_button_disabled']
-                                ticket_view.children[0].style = discord.ButtonStyle.success
+                            ticket_view = TicketThreadView(self, thread_id, type_name, is_accepted)
                             
                             if is_closed:
                                 # Disable all buttons for closed tickets

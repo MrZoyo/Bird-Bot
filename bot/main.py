@@ -8,7 +8,8 @@ from bot.utils import config
 from bot.cogs import (
     AchievementCog, BackupCog, CheckStatusCog,
     CreateInvitationCog, DnDCog, SpyModeCog, GiveawayCog,
-    IllegalTeamActCog, NotebookCog, # RatingCog, 
+    # IllegalTeamActCog,  # Moved to old_function
+    NotebookCog, # RatingCog, 
     RoleCog, VoiceStateCog, WelcomeCog, TicketsCog,
     ShopCog, PrivateRoomCog, TicketsNewCog, BanCog, TeamupDisplayCog
 )
@@ -80,8 +81,8 @@ async def setup_bot(bot):
     keyword_logger.propagate = False
 
     # Add all cogs
-    illegal_act_cog = IllegalTeamActCog(bot)
-    await bot.add_cog(illegal_act_cog)
+    # illegal_act_cog = IllegalTeamActCog(bot)  # Moved to old_function
+    # await bot.add_cog(illegal_act_cog)
     await bot.add_cog(VoiceStateCog(bot))
     await bot.add_cog(WelcomeCog(bot))
     await bot.add_cog(CreateInvitationCog(bot))

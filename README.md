@@ -1,6 +1,6 @@
 # Bird Bot 
 
-`Version: 1.6.0b`
+`Version: 1.6.1`
 
 ---
 
@@ -287,25 +287,11 @@ Real-time teamup information display system for organizing team activities.
 ### Tickets_Cog (Legacy)
 **⚠️ Deprecated system** - The original channel-based ticket system is being phased out.
 
-**Important:** This legacy system will be removed in future versions. All servers should migrate to the new `Tickets_New_Cog` system. Commands and functionality may change or become unavailable.
-
 **Features:**
-- **Channel-based tickets** using private Discord channels
-- **Basic admin system** with role-based permissions
-- **Ticket statistics** and management capabilities
-- **Category-based archive functionality** for closed tickets with complete message history and file download (up to 50MB per file)
+- **Category-based archive functionality** for tickets with complete message history and file download
 
 **Commands:**
-- `/tickets_setup`: Initialize legacy ticket system
-- `/tickets_stats`: Display ticket statistics
-- `/tickets_cleanup`: Clean up invalid ticket data
-- `/tickets_add_type`: Add new ticket type
-- `/tickets_edit_type`: Edit existing ticket type
-- `/tickets_delete_type`: Delete ticket type
-- `/tickets_add_user <user>`: Add user to current ticket
-- `/tickets_accept`: Accept current ticket
-- `/tickets_close <reason>`: Close current ticket
-- `/tickets_archive`: Archive all closed tickets in the current category with complete message history and attachment download (≤50MB per file)
+- `/tickets_archive`: Archive all tickets in the current category with complete message history and attachment download (≤50MB per file)
 
 ### Shop_Cog
 **🔥 Enhanced point-based economy system** with makeup check-in functionality and improved user experience.
@@ -512,6 +498,15 @@ Media processing module with validation and security features.
 ---
 
 ## Update Log
+### V1.6.1 - 2025-07-04
+#### 🐛 Critical Bug Fixes
+- **TeamupDisplay System Fixes**: 
+  - Optimised the display of the teamup dashboard and blocked the display of the @ section.
+  
+- **Old Tickets System**: 
+  - Restored the `/tickets_archive` command to archive all tickets.
+  
+---
 ### V1.6.0b - 2025-07-02
 #### 🆕 Major New Features
 - **TeamupDisplay System Implementation**: Added comprehensive `TeamupDisplay_Cog` with real-time team organization capabilities
