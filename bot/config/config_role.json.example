@@ -21,6 +21,16 @@
             "name": "\uD83D\uDFE2 成就-参加抽奖",
             "type": "giveaway",
             "data": "giveaway_count"
+        },
+        {
+            "name": "\uD83D\uDFE0 成就-累计签到",
+            "type": "checkin_sum",
+            "data": "checkin_sum"
+        },
+        {
+            "name": "\uD83D\uDFE3 成就-连续签到",
+            "type": "checkin_combo",
+            "data": "checkin_combo"
         }
     ],
     "role_no_column_name_message": "错误：未知的成就类型。请联系管理员。",

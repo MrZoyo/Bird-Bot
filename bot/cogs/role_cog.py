@@ -3,11 +3,11 @@ import discord
 from discord import app_commands, components
 from discord.ext import commands
 from discord.ui import Button, View
-import aiosqlite
 import logging
 from datetime import datetime, timezone
 
 from bot.utils import config, check_channel_validity
+from bot.utils.role_db import RoleDatabaseManager
 
 
 class AchievementRoleView(View):
@@ -16,7 +16,7 @@ class AchievementRoleView(View):
         self.bot = bot
 
         self.main_config = config.get_config('main')
-        self.db_path = self.main_config['db_path']
+        self.role_db = RoleDatabaseManager(self.main_config['db_path'])
 
         self.achievement_config = config.get_config('achievements')
 
@@ -30,10 +30,12 @@ class AchievementRoleView(View):
         self.role_success_message = self.role_config['role_success_message']
         self.role_remove_message = self.role_config['role_remove_message']
 
-        for role in self.role_type_name:
+        for index, role in enumerate(self.role_type_name):
+            row = index // 3  # Calculate row: 0, 1, 2 go to row 0; 3, 4, 5 go to row 1
             button = Button(style=components.ButtonStyle.green,
                             label=role['name'],
-                            custom_id=role['type'])
+                            custom_id=role['type'],
+                            row=row)
             button.callback = self.on_button_click
             self.add_item(button)
 
@@ -52,28 +54,13 @@ class AchievementRoleView(View):
             start_role = discord.utils.get(interaction.guild.roles, id=self.achievement_start_role_id)
             await interaction.user.add_roles(start_role, reason="Adding achievement start role")
 
-        # Get the column name for the achievement type
-        column_name = next((role['data'] for role in self.role_type_name if role['type'] == achievement_type), None)
-        if column_name is None:
-            await interaction.followup.send(self.role_no_column_name_message, ephemeral=True)
-            return
-
-        # Connect to the database
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-
-            # Get the user's progress for the achievement type
-            await cursor.execute(f"SELECT {column_name} FROM achievements WHERE user_id = ?", (user_id,))
-            user_achievement = await cursor.fetchone()
-
+        # Get the user's progress for the achievement type
+        user_progress = await self.role_db.get_user_achievement_progress(user_id, achievement_type)
+        
         # If the user has no progress for this achievement type, do nothing
-        if user_achievement is None or user_achievement[0] is None:
+        if user_progress is None:
             await interaction.followup.send(self.role_no_progress_message, ephemeral=True)
             return
-
-        # If the achievement type is 'time_spent', divide the user's data by 60
-        if achievement_type == 'time_spent':
-            user_achievement = (user_achievement[0] / 60,)
 
         # Filter the achievements to only include those of the same type
         same_type_achievements = [a for a in self.achievements if a['type'] == achievement_type]
@@ -82,7 +69,7 @@ class AchievementRoleView(View):
 
         # Find the highest achievement the user is eligible for
         highest_eligible_achievement = next(
-            (a for a in same_type_achievements if user_achievement[0] >= a['threshold']), None)
+            (a for a in same_type_achievements if user_progress >= a['threshold']), None)
 
         if highest_eligible_achievement is None:
             await interaction.followup.send(self.role_no_achievement_message, ephemeral=True)
@@ -142,7 +129,7 @@ class StarSignView(View):
         self.buttons_per_row = 4
 
         self.main_config = config.get_config('main')
-        self.db_path = self.main_config['db_path']
+        self.role_db = RoleDatabaseManager(self.main_config['db_path'])
 
         self.role_config = config.get_config('role')
         self.starsign_name = self.role_config['starsign_name']
@@ -204,7 +191,7 @@ class MBTIView(View):
         self.buttons_per_row = 4
 
         self.main_config = config.get_config('main')
-        self.db_path = self.main_config['db_path']
+        self.role_db = RoleDatabaseManager(self.main_config['db_path'])
 
         self.role_config = config.get_config('role')
         self.mbti_name = self.role_config['mbti_name']
@@ -262,7 +249,7 @@ class GenderView(View):
         self.buttons_per_row = 3  # Since we have 3 options
 
         self.main_config = config.get_config('main')
-        self.db_path = self.main_config['db_path']
+        self.role_db = RoleDatabaseManager(self.main_config['db_path'])
 
         self.role_config = config.get_config('role')
         self.gender_name = self.role_config['gender_name']
@@ -327,89 +314,30 @@ class SignatureModal(discord.ui.Modal):
 
         config = self.bot.get_cog('RoleCog').role_config['signature']
 
-        async with aiosqlite.connect(self.bot.get_cog('RoleCog').db_path) as db:
-            cursor = await db.cursor()
-
-            # Check if user is disabled
-            await cursor.execute('SELECT is_disabled FROM user_signatures WHERE user_id = ?',
-                                 (interaction.user.id,))
-            result = await cursor.fetchone()
-            if result and result[0]:
-                await interaction.followup.send(config['disabled_message'], ephemeral=True)
-                return
-
-            # Get user's change history
-            await cursor.execute('''
-                SELECT change_time1, change_time2, change_time3, signature 
-                FROM user_signatures 
-                WHERE user_id = ?
-            ''', (interaction.user.id,))
-            result = await cursor.fetchone()
-
-            current_time = datetime.now(timezone.utc)
-
-            if result:
-                times = result[:3]  # Get the three time slots
-                current_sig = result[3]  # Get current signature
-
-                # Find empty slot if any
-                empty_slot = None
-                for i, t in enumerate(times, 1):
-                    if not t:
-                        empty_slot = i
-                        break
-
-                if empty_slot:
-                    # Found an empty slot, use it
-                    await cursor.execute(f'''
-                        UPDATE user_signatures 
-                        SET signature = ?, change_time{empty_slot} = ?
-                        WHERE user_id = ?
-                    ''', (str(self.signature), current_time.isoformat(), interaction.user.id))
-                else:
-                    # All slots are used, check the oldest one
-                    time_slots = [datetime.fromisoformat(t) for t in times if t]
-                    oldest_time = min(time_slots)
-                    days_passed = (current_time - oldest_time).days
-
-                    if days_passed >= 7:
-                        # Can use the oldest slot
-                        oldest_slot = times.index(oldest_time.isoformat()) + 1
-                        await cursor.execute(f'''
-                            UPDATE user_signatures 
-                            SET signature = ?, change_time{oldest_slot} = ?
-                            WHERE user_id = ?
-                        ''', (str(self.signature), current_time.isoformat(), interaction.user.id))
-                    else:
-                        # Cannot change signature yet
-                        await interaction.followup.send(
-                            config['cooldown_message'].format(signature=current_sig or "无"),
-                            ephemeral=True
-                        )
-                        return
-            else:
-                # First time setting signature, use first slot
-                await cursor.execute('''
-                    INSERT INTO user_signatures 
-                    (user_id, signature, change_time1, is_disabled)
-                    VALUES (?, ?, ?, ?)
-                ''', (interaction.user.id, str(self.signature), current_time.isoformat(), False))
-
-            await db.commit()
-
+        role_db = RoleDatabaseManager(self.bot.get_cog('RoleCog').main_config['db_path'])
+        
+        # Check if user is disabled
+        signature_data = await role_db.get_user_signature(interaction.user.id)
+        if signature_data and signature_data['is_disabled']:
+            await interaction.followup.send(config['disabled_message'], ephemeral=True)
+            return
+        
+        # Find available time slot
+        available_slot = await role_db.find_available_time_slot(interaction.user.id)
+        if available_slot is None:
+            # Cannot change signature yet
+            current_sig = signature_data['signature'] if signature_data else "无"
+            await interaction.followup.send(
+                config['cooldown_message'].format(signature=current_sig),
+                ephemeral=True
+            )
+            return
+        
+        # Update signature
+        if await role_db.update_user_signature(interaction.user.id, str(self.signature), available_slot):
             # Calculate remaining changes
-            await cursor.execute('''
-                SELECT change_time1, change_time2, change_time3 
-                FROM user_signatures 
-                WHERE user_id = ?
-            ''', (interaction.user.id,))
-            times = await cursor.fetchone()
-
-            # Count empty slots and slots older than 7 days
-            remaining_times = sum(1 for t in times
-                                  if not t or
-                                  (t and (current_time - datetime.fromisoformat(t)).days >= 7))
-
+            remaining_times = await role_db.get_signature_remaining_changes(interaction.user.id)
+            
             await interaction.followup.send(
                 config['success_message'].format(
                     signature=str(self.signature),
@@ -417,6 +345,8 @@ class SignatureModal(discord.ui.Modal):
                 ),
                 ephemeral=True
             )
+        else:
+            await interaction.followup.send("更新签名失败，请稍后重试。", ephemeral=True)
 
 
 class SignatureView(View):
@@ -458,20 +388,8 @@ class SignatureView(View):
                 return True, 0  # 如果是助力成员，直接返回True
 
         # 如果不是助力成员，检查语音时长
-        async with aiosqlite.connect(self.bot.get_cog('RoleCog').db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute(
-                "SELECT time_spent FROM achievements WHERE user_id = ?",
-                (user_id,)
-            )
-            result = await cursor.fetchone()
-
-            if not result or not result[0]:
-                return False, 0
-
-            # Convert seconds to minutes
-            current_time = result[0] / 60
-            return current_time >= required_time, current_time
+        role_db = RoleDatabaseManager(self.bot.get_cog('RoleCog').main_config['db_path'])
+        return await role_db.check_voice_time_requirement(user_id, required_time)
 
     async def on_button_click(self, interaction: discord.Interaction):
         config = self.bot.get_cog('RoleCog').role_config['signature']
@@ -507,35 +425,25 @@ class SignatureView(View):
             )
             return
 
-        async with aiosqlite.connect(self.bot.get_cog('RoleCog').db_path) as db:
-            cursor = await db.cursor()
+        role_db = RoleDatabaseManager(self.bot.get_cog('RoleCog').main_config['db_path'])
+        signature_data = await role_db.get_user_signature(interaction.user.id)
 
-            # 检查是否被禁用
-            await cursor.execute('''
-                SELECT signature, is_disabled 
-                FROM user_signatures 
-                WHERE user_id = ?
-            ''', (interaction.user.id,))
-            result = await cursor.fetchone()
+        if not signature_data:
+            await interaction.followup.send(config['no_signature_message'], ephemeral=True)
+            return
 
-            if not result:
-                await interaction.followup.send(config['no_signature_message'], ephemeral=True)
-                return
+        if signature_data['is_disabled']:
+            await interaction.followup.send(config['disabled_message'], ephemeral=True)
+            return
 
-            signature, is_disabled = result
+        if not signature_data['signature']:
+            await interaction.followup.send(config['no_signature_message'], ephemeral=True)
+            return
 
-            if is_disabled:
-                await interaction.followup.send(config['disabled_message'], ephemeral=True)
-                return
-
-            if not signature:
-                await interaction.followup.send(config['no_signature_message'], ephemeral=True)
-                return
-
-            await interaction.followup.send(
-                config['view_message'].format(signature=signature),
-                ephemeral=True
-            )
+        await interaction.followup.send(
+            config['view_message'].format(signature=signature_data['signature']),
+            ephemeral=True
+        )
 
 
 class RoleCog(commands.Cog):
@@ -543,7 +451,7 @@ class RoleCog(commands.Cog):
         self.bot = bot
 
         self.main_config = config.get_config('main')
-        self.db_path = self.main_config['db_path']
+        self.role_db = RoleDatabaseManager(self.main_config['db_path'])
 
         self.achievement_config = config.get_config('achievements')
 
@@ -633,7 +541,7 @@ class RoleCog(commands.Cog):
         message = await channel.send(embed=embed, view=view)
 
         # Save the view to the database
-        await self.save_role_view(message.id, channel.id, table='role_views')
+        await self.role_db.save_role_view(message.id, channel.id, table='role_views')
 
         await interaction.followup.send(f"Role pickup message created in {channel.mention}.")
 
@@ -672,7 +580,7 @@ class RoleCog(commands.Cog):
         message = await channel.send(embed=embed, view=view)
 
         # Save the view to the database
-        await self.save_role_view(message.id, channel.id, table='starsign_views')
+        await self.role_db.save_role_view(message.id, channel.id, table='starsign_views')
 
         await interaction.followup.send(f"Star sign pickup message created in {channel.mention}.")
 
@@ -713,7 +621,7 @@ class RoleCog(commands.Cog):
         message = await channel.send(embed=embed, view=view)
 
         # Save the view to the database
-        await self.save_role_view(message.id, channel.id, table='mbti_views')
+        await self.role_db.save_role_view(message.id, channel.id, table='mbti_views')
 
         await interaction.followup.send(f"MBTI pickup message created in {channel.mention}.")
 
@@ -749,7 +657,7 @@ class RoleCog(commands.Cog):
         message = await channel.send(embed=embed, view=view)
 
         # Save the view to the database
-        await self.save_role_view(message.id, channel.id, table='gender_views')
+        await self.role_db.save_role_view(message.id, channel.id, table='gender_views')
 
         await interaction.followup.send(f"Gender pickup message created in {channel.mention}.")
 
@@ -781,7 +689,7 @@ class RoleCog(commands.Cog):
             embed.set_thumbnail(url=self.bot.user.avatar.url)
 
         message = await channel.send(embed=embed, view=view)
-        await self.save_role_view(message.id, channel.id, table='signature_views')
+        await self.role_db.save_role_view(message.id, channel.id, table='signature_views')
         await interaction.followup.send(f"Signature pickup message created in {channel.mention}.")
 
     @app_commands.command(
@@ -800,14 +708,7 @@ class RoleCog(commands.Cog):
             await interaction.followup.send("User not found.", ephemeral=True)
             return
 
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute('''
-                INSERT INTO user_signatures (user_id, is_disabled)
-                VALUES (?, ?)
-                ON CONFLICT(user_id) DO UPDATE SET is_disabled = ?
-            ''', (int(user_id), disable, disable))
-            await db.commit()
+        await self.role_db.toggle_signature_permission(int(user_id), disable)
 
         message_key = 'admin_disable_message' if disable else 'admin_enable_message'
         await interaction.followup.send(
@@ -833,17 +734,7 @@ class RoleCog(commands.Cog):
             await interaction.followup.send("User not found.", ephemeral=True)
             return
 
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute('''
-                UPDATE user_signatures
-                SET signature = NULL,
-                    change_time1 = NULL,
-                    change_time2 = NULL,
-                    change_time3 = NULL
-                WHERE user_id = ?
-            ''', (int(user_id),))
-            await db.commit()
+        await self.role_db.clear_user_signature(int(user_id))
 
         await interaction.followup.send(
             self.signature_config['admin_clear_success'].format(
@@ -852,26 +743,15 @@ class RoleCog(commands.Cog):
             )
         )
 
-    async def save_role_view(self, message_id, channel_id, table='role_views'):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute(f'INSERT INTO {table} (message_id, channel_id) VALUES (?, ?)',
-                                 (message_id, channel_id))
-            await db.commit()
-            await cursor.close()
 
     async def load_role_views(self, table='role_views'):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute(f'SELECT message_id, channel_id FROM {table} ')
-            records = await cursor.fetchall()
-            await cursor.close()
+        records = await self.role_db.get_all_role_views(table)
 
         for message_id, channel_id in records:
             channel = self.bot.get_channel(int(channel_id))
             if channel is None:
                 logging.error(f"Error: Channel {channel_id} from {table} not found, removing from database")
-                await self.remove_role_view(message_id, channel_id, table=table)
+                await self.role_db.remove_role_view(message_id, channel_id, table=table)
                 continue
 
             try:
@@ -879,7 +759,7 @@ class RoleCog(commands.Cog):
             except discord.NotFound:
                 logging.error(f"Error: Message {message_id} from {table} not found in channel {channel_id}, "
                               f"removing from database")
-                await self.remove_role_view(message_id, channel_id, table=table)
+                await self.role_db.remove_role_view(message_id, channel_id, table=table)
                 continue
 
             # Recreate the View and add it to the message
@@ -898,13 +778,6 @@ class RoleCog(commands.Cog):
 
             await message.edit(view=view)
 
-    async def remove_role_view(self, message_id, channel_id, table='role_views'):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute(f'DELETE FROM {table} WHERE message_id = ? AND channel_id = ?',
-                                 (message_id, channel_id))
-            await db.commit()
-            await cursor.close()
 
     @app_commands.command(
         name="signature_set_requirement",
@@ -944,129 +817,74 @@ class RoleCog(commands.Cog):
             await interaction.followup.send("User not found.", ephemeral=True)
             return
 
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute('''
-                SELECT signature, change_time1, change_time2, change_time3, is_disabled
-                FROM user_signatures 
-                WHERE user_id = ?
-            ''', (int(user_id),))
-            result = await cursor.fetchone()
+        signature_data = await self.role_db.get_user_signature(int(user_id))
 
-            if not result:
-                await interaction.followup.send(
-                    self.signature_config['admin_check_no_record_message'].format(
-                        user_mention=user.mention,
-                        user_id=user_id
-                    )
+        if not signature_data:
+            await interaction.followup.send(
+                self.signature_config['admin_check_no_record_message'].format(
+                    user_mention=user.mention,
+                    user_id=user_id
                 )
-                return
+            )
+            return
 
-            signature, time1, time2, time3, is_disabled = result
-            current_time = datetime.now(timezone.utc)
-
-            # 计算每个时间槽距今多少天
-            times = []
-            for t in [time1, time2, time3]:
-                try:
-                    if t:
-                        time_obj = datetime.fromisoformat(t)
-                        days = (current_time - time_obj).days
-                        times.append(self.signature_config['admin_check_time_format'].format(
-                            timestamp=int(time_obj.timestamp()),
-                            days=days
-                        ))
-                    else:
-                        times.append(self.signature_config['admin_check_time_unused'])
-                except (ValueError, TypeError):
-                    # 如果时间格式有问题，显示为未使用
+        current_time = datetime.now(timezone.utc)
+        
+        # 计算每个时间槽距今多少天
+        times = []
+        for t in [signature_data['change_time1'], signature_data['change_time2'], signature_data['change_time3']]:
+            try:
+                if t:
+                    time_obj = datetime.fromisoformat(t)
+                    days = (current_time - time_obj).days
+                    times.append(self.signature_config['admin_check_time_format'].format(
+                        timestamp=int(time_obj.timestamp()),
+                        days=days
+                    ))
+                else:
                     times.append(self.signature_config['admin_check_time_unused'])
+            except (ValueError, TypeError):
+                times.append(self.signature_config['admin_check_time_unused'])
 
-            # Debug logging
-            # print(f"Time slots from DB: {[time1, time2, time3]}")
-            # print(f"Processed times: {times}")
+        status = (self.signature_config['admin_check_status_disabled']
+                  if signature_data['is_disabled']
+                  else self.signature_config['admin_check_status_normal'])
 
-            status = (self.signature_config['admin_check_status_disabled']
-                      if is_disabled
-                      else self.signature_config['admin_check_status_normal'])
+        embed = discord.Embed(
+            title=self.signature_config['admin_check_title'],
+            color=discord.Color.blue() if not signature_data['is_disabled'] else discord.Color.red()
+        )
 
-            embed = discord.Embed(
-                title=self.signature_config['admin_check_title'],
-                color=discord.Color.blue() if not is_disabled else discord.Color.red()
-            )
+        embed.add_field(
+            name=self.signature_config['admin_check_user_info_title'],
+            value=f"{user.mention} ({user_id})",
+            inline=False
+        )
+        embed.add_field(
+            name=self.signature_config['admin_check_status_title'],
+            value=status,
+            inline=False
+        )
+        embed.add_field(
+            name=self.signature_config['admin_check_signature_title'],
+            value=signature_data['signature'] or self.signature_config['admin_check_no_signature'],
+            inline=False
+        )
+        embed.add_field(
+            name=self.signature_config['admin_check_history_title'],
+            value=self.signature_config['admin_check_history_format'].format(
+                time1=times[0],
+                time2=times[1],
+                time3=times[2]
+            ),
+            inline=False
+        )
 
-            embed.add_field(
-                name=self.signature_config['admin_check_user_info_title'],
-                value=f"{user.mention} ({user_id})",
-                inline=False
-            )
-            embed.add_field(
-                name=self.signature_config['admin_check_status_title'],
-                value=status,
-                inline=False
-            )
-            embed.add_field(
-                name=self.signature_config['admin_check_signature_title'],
-                value=signature or self.signature_config['admin_check_no_signature'],
-                inline=False
-            )
-            embed.add_field(
-                name=self.signature_config['admin_check_history_title'],
-                value=self.signature_config['admin_check_history_format'].format(
-                    time1=times[0],
-                    time2=times[1],
-                    time3=times[2]
-                ),
-                inline=False
-            )
-
-            await interaction.followup.send(embed=embed)
+        await interaction.followup.send(embed=embed)
 
     @commands.Cog.listener()
     async def on_ready(self):
-        async with aiosqlite.connect(self.db_path) as db:
-            # Create the role_views table if it does not exist
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS role_views (
-                    message_id TEXT PRIMARY KEY,
-                    channel_id TEXT
-                )
-            ''')
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS starsign_views (
-                    message_id TEXT PRIMARY KEY,
-                    channel_id TEXT
-                )
-            ''')
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS mbti_views (
-                    message_id TEXT PRIMARY KEY,
-                    channel_id TEXT
-                )
-            ''')
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS gender_views (
-                    message_id TEXT PRIMARY KEY,
-                    channel_id TEXT
-                )
-            ''')
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS signature_views (
-                    message_id TEXT PRIMARY KEY,
-                    channel_id TEXT
-                )
-            ''')
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS user_signatures (
-                    user_id INTEGER PRIMARY KEY,
-                    signature TEXT,
-                    change_time1 TIMESTAMP,
-                    change_time2 TIMESTAMP,
-                    change_time3 TIMESTAMP,
-                    is_disabled BOOLEAN DEFAULT FALSE
-                )
-            ''')
-            await db.commit()
+        await self.role_db.initialize_database()
 
         for table in ['role_views', 'starsign_views', 'mbti_views', 'gender_views', 'signature_views']:
             await self.load_role_views(table=table)

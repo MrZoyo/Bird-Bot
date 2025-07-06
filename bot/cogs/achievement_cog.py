@@ -4,21 +4,18 @@ import datetime
 import re
 from discord.ext import commands
 from discord import app_commands
-import aiosqlite
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from discord.ui import Button, View
-from bot.utils import config, check_channel_validity
+from bot.utils import config, check_channel_validity, AchievementDatabaseManager
 
 
 class AchievementRefreshView(View):
-    def __init__(self, bot, user_id):
+    def __init__(self, bot, user_id, db_manager):
         super().__init__(timeout=180.0)
         self.bot = bot
         self.user_id = user_id
         self.message = None
-
-        self.main_config = config.get_config('main')
-        self.db_path = self.main_config['db_path']
+        self.db = db_manager
 
         self.achievement_config = config.get_config('achievements')
 
@@ -26,21 +23,12 @@ class AchievementRefreshView(View):
         return interaction.user.id == self.user_id
 
     async def format_page(self):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute("SELECT * FROM achievements WHERE user_id = ?", (self.user_id,))
-            user_record = await cursor.fetchone()
-
-            if user_record is None:
-                # This user is not in the database, so create a new record for them
-                await cursor.execute(
-                    "INSERT INTO achievements (user_id) VALUES (?)",
-                    (self.user_id,))
-                message_count, reaction_count, time_spent, giveaway_count = 0, 0, 0, 0
-            else:
-                _, message_count, reaction_count, time_spent, giveaway_count = user_record
-
-            await db.commit()
+        # Get user achievements using database manager
+        user_achievements = await self.db.get_user_achievements(self.user_id)
+        message_count = user_achievements['message_count']
+        reaction_count = user_achievements['reaction_count']
+        time_spent = user_achievements['time_spent']
+        giveaway_count = user_achievements['giveaway_count']
 
         # Load the achievements from the config.json file
         achievements = self.bot.get_cog('AchievementCog').achievements
@@ -55,6 +43,24 @@ class AchievementRefreshView(View):
                 achievement['count'] = time_spent / 60  # Convert seconds to minutes
             elif achievement['type'] == 'giveaway':
                 achievement['count'] = giveaway_count
+            elif achievement['type'] == 'checkin_sum':
+                achievement['count'] = user_achievements['checkin_sum']
+            elif achievement['type'] == 'checkin_combo':
+                achievement['count'] = user_achievements['checkin_combo']
+
+        # Group all achievements by type
+        achievement_groups = {
+            'reaction': [],
+            'message': [],
+            'time_spent': [],
+            'giveaway': [],
+            'checkin_sum': [],
+            'checkin_combo': []
+        }
+        
+        for achievement in achievements:
+            if achievement['type'] in achievement_groups:
+                achievement_groups[achievement['type']].append(achievement)
 
         # Count the number of completed achievements
         completed_achievements = sum(1 for a in achievements if a["count"] >= a["threshold"])
@@ -73,34 +79,44 @@ class AchievementRefreshView(View):
         achievements_incomplete_emoji = self.achievement_config['achievements_incomplete_emoji']
 
         embed = discord.Embed(title=title, description=description, color=discord.Color.blue())
+        
+        # Add user avatar to embed
+        embed.set_author(name=user_name, icon_url=user.display_avatar.url)
 
-        for achievement in achievements:
-            emoji = achievements_finish_emoji if achievement["count"] >= achievement[
-                "threshold"] else achievements_incomplete_emoji
-            progress = min(1, achievement["count"] / achievement["threshold"])
-            progress_bar = f"{emoji} **{achievement['description']}** → `{int(achievement['count'])}/{int(achievement['threshold'])}`\n`{'█' * int(progress * 20)}{' ' * (20 - int(progress * 20))}` `{progress * 100:.2f}%`"
-            embed.add_field(name=achievement["name"], value=progress_bar, inline=False)
+        # Add achievements by type with minimal separators
+        first_group = True
+        for type_key, achievements_list in achievement_groups.items():
+            if not achievements_list:
+                continue
+                
+            # Add simple separator between groups (single line)
+            if not first_group:
+                embed.add_field(name="", value="\u200b", inline=False)
+            first_group = False
+            
+            # Add achievements for this type
+            for achievement in achievements_list:
+                is_completed = achievement["count"] >= achievement["threshold"]
+                
+                if is_completed:
+                    # For completed achievements, show checkmark with name only
+                    embed.add_field(name=f"{achievements_finish_emoji} {achievement['name']}", value="", inline=False)
+                else:
+                    # For incomplete achievements, show progress bar
+                    progress = min(1, achievement["count"] / achievement["threshold"])
+                    progress_bar = f"{achievements_incomplete_emoji} **{achievement['description']}** → `{int(achievement['count'])}/{int(achievement['threshold'])}`\n`{'█' * int(progress * 20)}{' ' * (20 - int(progress * 20))}` `{progress * 100:.2f}%`"
+                    embed.add_field(name=achievement["name"], value=progress_bar, inline=False)
 
         return embed
 
     async def format_page_monthly(self, date):
         year, month = date.split("-")
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute("SELECT * FROM monthly_achievements WHERE user_id = ? AND year = ? AND month = ?",
-                                 (self.user_id, year, month))
-            user_record = await cursor.fetchone()
-
-            if user_record is None:
-                # This user is not in the database, so create a new record for them
-                await cursor.execute(
-                    "INSERT INTO monthly_achievements (user_id, year, month) VALUES (?, ?, ?)",
-                    (self.user_id, year, month))
-                message_count, reaction_count, time_spent, giveaway_count = 0, 0, 0, 0
-            else:
-                _, _, _, message_count, reaction_count, time_spent, giveaway_count = user_record
-
-            await db.commit()
+        # Get user monthly achievements using database manager
+        user_achievements = await self.db.get_monthly_achievements(self.user_id, int(year), int(month))
+        message_count = user_achievements['message_count']
+        reaction_count = user_achievements['reaction_count']
+        time_spent = user_achievements['time_spent']
+        giveaway_count = user_achievements['giveaway_count']
 
         # Get the user's mention and name
         user = await self.bot.fetch_user(self.user_id)
@@ -123,7 +139,7 @@ class AchievementRefreshView(View):
 
 
 class ConfirmationView(View):
-    def __init__(self, bot, member_id, reactions, messages, time_spent, giveaways, operation):
+    def __init__(self, bot, member_id, reactions, messages, time_spent, giveaways, operation, db_manager):
         super().__init__(timeout=120.0)
         self.bot = bot
         self.member_id = member_id
@@ -132,9 +148,7 @@ class ConfirmationView(View):
         self.time_spent = time_spent
         self.giveaways = giveaways
         self.operation = operation
-
-        self.main_config = config.get_config('main')
-        self.db_path = self.main_config['db_path']
+        self.db = db_manager
 
         self.achievement_config = config.get_config('achievements')
 
@@ -149,41 +163,23 @@ class ConfirmationView(View):
         # Immediate feedback
         await interaction.response.edit_message(content="**Processing your request...**", view=None)
 
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute("SELECT * FROM achievements WHERE user_id = ?", (self.member_id,))
-            user_record = await cursor.fetchone()
-
-            if user_record is None:
-                await cursor.execute(
-                    "INSERT INTO achievements (user_id) VALUES (?)",
-                    (self.member_id,))
-            new_values = (self.messages, self.reactions, self.time_spent, self.giveaways, self.member_id)
-            if self.operation == 'increase':
-                await cursor.execute(
-                    "UPDATE achievements SET message_count = message_count + ?, reaction_count = reaction_count + ?, time_spent = time_spent + ?, giveaway_count = giveaway_count + ? WHERE user_id = ?",
-                    new_values)
-
-                # Record the operation in the achievement_operation table
-                await cursor.execute(
-                    "INSERT INTO achievement_operation (user_id, target_user_id, operation, message_count, reaction_count, time_spent, giveaway_count) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (interaction.user.id, self.member_id, 'increase', self.messages, self.reactions, self.time_spent,
-                     self.giveaways))
-
-            elif self.operation == 'decrease':
-                await cursor.execute(
-                    "UPDATE achievements SET message_count = message_count - ?, reaction_count = reaction_count - ?, time_spent = time_spent - ?, giveaway_count = giveaway_count - ? WHERE user_id = ?",
-                    new_values)
-
-                # Record the operation in the achievement_operation table
-                await cursor.execute(
-                    "INSERT INTO achievement_operation (user_id, target_user_id, operation, message_count, reaction_count, time_spent, giveaway_count) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (interaction.user.id, self.member_id, 'decrease', self.messages, self.reactions, self.time_spent,
-                     self.giveaways))
-
-            await db.commit()
-
-        await interaction.edit_original_response(content=f"**Operation {self.operation} complete!**", view=None)
+        # Apply changes using database manager
+        changes = {
+            'message_count': self.messages,
+            'reaction_count': self.reactions,
+            'time_spent': self.time_spent,
+            'giveaway_count': self.giveaways
+        }
+        
+        # Apply the changes
+        success = await self.db.apply_manual_changes(self.member_id, changes, self.operation)
+        
+        if success:
+            # Log the operation
+            await self.db.log_manual_operation(interaction.user.id, self.member_id, self.operation, changes)
+            await interaction.edit_original_response(content=f"**Operation {self.operation} complete!**", view=None)
+        else:
+            await interaction.edit_original_response(content="**Error processing request!**", view=None)
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.red)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -191,60 +187,42 @@ class ConfirmationView(View):
 
 
 class AchievementRankingView(View):
-    def __init__(self, bot, year=None, month=None):
+    def __init__(self, bot, db_manager, year=None, month=None):
         super().__init__(timeout=180.0)
         self.bot = bot
         self.year = year
         self.month = month
-
-        self.main_config = config.get_config('main')
-        self.db_path = self.main_config['db_path']
+        self.db = db_manager
 
         self.achievement_config = config.get_config('achievements')
 
     async def format_page(self):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-
-            if self.year is None and self.month is None:
-                # Fetch the top 10 users for each category from the achievements table
-                await cursor.execute(
-                    "SELECT user_id, reaction_count FROM achievements ORDER BY reaction_count DESC LIMIT 10")
-                top_reactions = await cursor.fetchall()
-                await cursor.execute(
-                    "SELECT user_id, message_count FROM achievements ORDER BY message_count DESC LIMIT 10")
-                top_messages = await cursor.fetchall()
-                await cursor.execute(
-                    "SELECT user_id, time_spent FROM achievements ORDER BY time_spent DESC LIMIT 10")
-                top_time_spent = await cursor.fetchall()
-                await cursor.execute(
-                    "SELECT user_id, giveaway_count FROM achievements ORDER BY giveaway_count DESC LIMIT 10")
-                top_giveaways = await cursor.fetchall()
-            else:
-                # Fetch the top 10 users for each category from the monthly_achievements table
-                await cursor.execute(
-                    "SELECT user_id, reaction_count FROM monthly_achievements WHERE year = ? AND month = ? ORDER BY reaction_count DESC LIMIT 10",
-                    (self.year, self.month))
-                top_reactions = await cursor.fetchall()
-                await cursor.execute(
-                    "SELECT user_id, message_count FROM monthly_achievements WHERE year = ? AND month = ? ORDER BY message_count DESC LIMIT 10",
-                    (self.year, self.month))
-                top_messages = await cursor.fetchall()
-                await cursor.execute(
-                    "SELECT user_id, time_spent FROM monthly_achievements WHERE year = ? AND month = ? ORDER BY time_spent DESC LIMIT 10",
-                    (self.year, self.month))
-                top_time_spent = await cursor.fetchall()
-                await cursor.execute(
-                    "SELECT user_id, giveaway_count FROM monthly_achievements WHERE year = ? AND month = ? ORDER BY giveaway_count DESC LIMIT 10",
-                    (self.year, self.month))
-                top_giveaways = await cursor.fetchall()
+        # Fetch leaderboards using database manager
+        if self.year is None and self.month is None:
+            # Get all-time leaderboards
+            top_reactions = await self.db.get_leaderboard("reaction", 10)
+            top_messages = await self.db.get_leaderboard("message", 10)
+            top_time_spent = await self.db.get_leaderboard("time_spent", 10)
+            top_giveaways = await self.db.get_leaderboard("giveaway", 10)
+            top_checkin_sum = await self.db.get_leaderboard("checkin_sum", 10)
+            top_checkin_combo = await self.db.get_leaderboard("checkin_combo", 10)
+        else:
+            # Get monthly leaderboards
+            top_reactions = await self.db.get_monthly_leaderboard(self.year, self.month, "reaction", 10)
+            top_messages = await self.db.get_monthly_leaderboard(self.year, self.month, "message", 10)
+            top_time_spent = await self.db.get_monthly_leaderboard(self.year, self.month, "time_spent", 10)
+            top_giveaways = await self.db.get_monthly_leaderboard(self.year, self.month, "giveaway", 10)
+            top_checkin_sum = await self.db.get_monthly_leaderboard(self.year, self.month, "checkin_sum", 10)
+            top_checkin_combo = await self.db.get_monthly_leaderboard(self.year, self.month, "checkin_combo", 10)
 
         # Map the types to the corresponding SQL query results
         top_users = {
             "reaction": top_reactions,
             "message": top_messages,
             "time_spent": top_time_spent,
-            "giveaway": top_giveaways
+            "giveaway": top_giveaways,
+            "checkin_sum": top_checkin_sum,
+            "checkin_combo": top_checkin_combo
         }
 
         # Define the emojis for the ranks
@@ -280,9 +258,6 @@ class AchievementOperationView(discord.ui.View):
         self.operations = operations
         self.page = page
         self.message = None  # This will hold the reference to the message
-
-        self.main_config = config.get_config('main')
-        self.db_path = self.main_config['db_path']
 
         self.achievement_config = config.get_config('achievements')
 
@@ -359,9 +334,6 @@ class RankView(discord.ui.View):
         self.month = month
         self.all_rankings = all_rankings  # Store all pre-fetched rankings
         self.message = None  # Will hold reference to the message
-
-        self.main_config = config.get_config('main')
-        self.db_path = self.main_config['db_path']
 
         self.achievement_config = config.get_config('achievements')
         self.rank_config = self.achievement_config.get('rank', {})
@@ -539,6 +511,12 @@ class AchievementCog(commands.Cog):
 
         self.achievement_config = config.get_config('achievements')
         self.achievements = self.achievement_config['achievements']
+        
+        # Initialize database manager
+        self.db = AchievementDatabaseManager(self.db_path, self.achievement_config)
+
+    async def cog_load(self):
+        await self.db.initialize_database()
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -547,36 +525,9 @@ class AchievementCog(commands.Cog):
 
         current_year, current_month = datetime.now().year, datetime.now().month
 
-        async with aiosqlite.connect(self.db_path) as db:
-            # For table achievements
-            cursor = await db.cursor()
-            await cursor.execute("SELECT * FROM achievements WHERE user_id = ?", (message.author.id,))
-            user_record = await cursor.fetchone()
-
-            if user_record is None:
-                # This user is not in the database, so create a new record for them
-                await cursor.execute(
-                    "INSERT INTO achievements (user_id, message_count) VALUES (?, ?)",
-                    (message.author.id, 1))
-            else:
-                # This user is in the database, so increment their message count
-                await cursor.execute("UPDATE achievements SET message_count = message_count + 1 WHERE user_id = ?",
-                                     (message.author.id,))
-
-            # For table monthly_achievements
-            await cursor.execute("SELECT * FROM monthly_achievements WHERE user_id = ? AND year = ? AND month = ?",
-                                 (message.author.id, current_year, current_month))
-            user_record = await cursor.fetchone()
-
-            if user_record is None:
-                await cursor.execute(
-                    "INSERT INTO monthly_achievements (user_id, year, month, message_count) VALUES (?, ?, ?, ?)",
-                    (message.author.id, current_year, current_month, 1))
-            else:
-                await cursor.execute(
-                    "UPDATE monthly_achievements SET message_count = message_count + 1 WHERE user_id = ? AND year = ? AND month = ?",
-                    (message.author.id, current_year, current_month))
-            await db.commit()
+        # Update achievements using database manager
+        await self.db.update_achievement_count(message.author.id, "message", 1)
+        await self.db.update_monthly_achievement_count(message.author.id, "message", 1, current_year, current_month)
 
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction, user):
@@ -585,102 +536,35 @@ class AchievementCog(commands.Cog):
 
         current_year, current_month = datetime.now().year, datetime.now().month
 
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            # For table achievements
-            await cursor.execute("SELECT * FROM achievements WHERE user_id = ?", (user.id,))
-            user_record = await cursor.fetchone()
-
-            if user_record is None:
-                # This user is not in the database, so create a new record for them
-                await cursor.execute(
-                    "INSERT INTO achievements (user_id, reaction_count) VALUES (?, ?)",
-                    (user.id, 1))
-            else:
-                # This user is in the database, so increment their reaction count
-                await cursor.execute("UPDATE achievements SET reaction_count = reaction_count + 1 WHERE user_id = ?",
-                                     (user.id,))
-
-            # For table monthly_achievements
-            await cursor.execute("SELECT * FROM monthly_achievements WHERE user_id = ? AND year = ? AND month = ?",
-                                 (user.id, current_year, current_month))
-            user_record = await cursor.fetchone()
-
-            if user_record is None:
-                await cursor.execute(
-                    "INSERT INTO monthly_achievements (user_id, year, month, reaction_count) VALUES (?, ?, ?, ?)",
-                    (user.id, current_year, current_month, 1))
-            else:
-                await cursor.execute(
-                    "UPDATE monthly_achievements SET reaction_count = reaction_count + 1 WHERE user_id = ? AND year = ? AND month = ?",
-                    (user.id, current_year, current_month))
-
-            await db.commit()
+        # Update achievements using database manager
+        await self.db.update_achievement_count(user.id, "reaction", 1)
+        await self.db.update_monthly_achievement_count(user.id, "reaction", 1, current_year, current_month)
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
         if member.bot:
             return
 
-        current_time = datetime.now(timezone.utc)
-
         # When the member leaves a channel
         if before.channel is not None:
-            async with aiosqlite.connect(self.db_path) as db:
-                cursor = await db.cursor()
-                # Retrieve the start time and channel ID from the database for the user
-                await cursor.execute("SELECT start_time, channel_id FROM voice_channel_entries WHERE user_id = ?",
-                                     (member.id,))
-                entry = await cursor.fetchone()
-
-                # Process time spent only if the user left the same channel they entered
-                if entry and entry[1] == before.channel.id:
-                    start_time = datetime.fromisoformat(entry[0])
-                    time_spent = (current_time - start_time).total_seconds()
-
-                    start_month = start_time.month
-                    start_year = start_time.year
-
-                    # Update or insert time spent in achievements
-                    await cursor.execute("SELECT time_spent FROM achievements WHERE user_id = ?",
-                                         (member.id,))
-                    user_record = await cursor.fetchone()
-                    if user_record:
-                        await cursor.execute("UPDATE achievements SET time_spent = time_spent + ? WHERE user_id = ?",
-                                             (time_spent, member.id))
-                    else:
-                        await cursor.execute("INSERT INTO achievements (user_id, time_spent) VALUES (?, ?)",
-                                             (member.id, time_spent))
-
-                    # Update or insert time spent in monthly_achievements
-                    await cursor.execute(
-                        "SELECT time_spent FROM monthly_achievements WHERE user_id = ? AND year = ? AND month = ?",
-                        (member.id, start_year, start_month))
-                    user_record = await cursor.fetchone()
-                    if user_record:
-                        await cursor.execute(
-                            "UPDATE monthly_achievements SET time_spent = time_spent + ? WHERE user_id = ? AND year = ? AND month = ?",
-                            (time_spent, member.id, start_year, start_month))
-                    else:
-                        await cursor.execute(
-                            "INSERT INTO monthly_achievements (user_id, year, month, time_spent) VALUES (?, ?, ?, ?)",
-                            (member.id, start_year, start_month, time_spent))
-
-                    # Delete the entry from voice_channel_entries since the session is complete
-                    await cursor.execute("DELETE FROM voice_channel_entries WHERE user_id = ? AND channel_id = ?",
-                                         (member.id, before.channel.id))
-
-                await db.commit()
+            # End voice session and get time spent
+            time_spent = await self.db.end_voice_session(member.id, before.channel.id)
+            
+            if time_spent > 0:
+                # Get start time for monthly calculation (approximate using current time)
+                current_time = datetime.now(timezone.utc)
+                start_time = current_time - timedelta(seconds=time_spent)
+                start_month = start_time.month
+                start_year = start_time.year
+                
+                # Update achievements
+                await self.db.update_achievement_count(member.id, "time_spent", int(time_spent))
+                await self.db.update_monthly_achievement_count(member.id, "time_spent", int(time_spent), start_year, start_month)
 
         # Handle joining a new channel
         if after.channel is not None:
-            async with aiosqlite.connect(self.db_path) as db:
-                cursor = await db.cursor()
-                # Record the new channel entry
-                await cursor.execute(
-                    "REPLACE INTO voice_channel_entries (user_id, channel_id, start_time) VALUES (?, ?, ?)",
-                    (member.id, after.channel.id, current_time.isoformat()))
-                await db.commit()
+            # Start new voice session
+            await self.db.start_voice_session(member.id, after.channel.id)
 
     @app_commands.command(
         name="achievements",
@@ -700,7 +584,7 @@ class AchievementCog(commands.Cog):
             await interaction.followup.send("Invalid date format. Please use YYYY-MM.", ephemeral=True)
             return
 
-        view = AchievementRefreshView(self.bot, member.id)
+        view = AchievementRefreshView(self.bot, member.id, self.db)
 
         if date:
             embed = await view.format_page_monthly(date)
@@ -730,29 +614,20 @@ class AchievementCog(commands.Cog):
 
         await interaction.response.defer()  # Properly defer to handle possibly lengthy DB operations
 
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute("SELECT * FROM achievements WHERE user_id = ?", (member.id,))
-            user_record = await cursor.fetchone()
+        # Ensure user exists in database
+        await self.db.create_user_if_not_exists(member.id)
 
-            if user_record is None:
-                # This user is not in the database, so create a new empty record for them
-                await cursor.execute(
-                    "INSERT INTO achievements (user_id) VALUES (?)",
-                    (member.id,))
-            await db.commit()
-
-            # Create a confirmation view and send it with an embed
-            view = ConfirmationView(self.bot, member.id, reactions, messages, time_spent, giveaways, 'increase')
-            embed = discord.Embed(title="Increase Achievement Progress",
-                                  description=f"You will increase the achievement progress of {member.mention}.",
-                                  color=discord.Color.blue())
-            embed.add_field(name="Reactions to Add", value=str(reactions), inline=True)
-            embed.add_field(name="Messages to Add", value=str(messages), inline=True)
-            embed.add_field(name="", value="\u200b", inline=False)
-            embed.add_field(name="Time to Add (seconds)", value=str(time_spent), inline=True)
-            embed.add_field(name="Giveaways to Add", value=str(giveaways), inline=True)
-            await interaction.edit_original_response(embed=embed, view=view)
+        # Create a confirmation view and send it with an embed
+        view = ConfirmationView(self.bot, member.id, reactions, messages, time_spent, giveaways, 'increase', self.db)
+        embed = discord.Embed(title="Increase Achievement Progress",
+                              description=f"You will increase the achievement progress of {member.mention}.",
+                              color=discord.Color.blue())
+        embed.add_field(name="Reactions to Add", value=str(reactions), inline=True)
+        embed.add_field(name="Messages to Add", value=str(messages), inline=True)
+        embed.add_field(name="", value="\u200b", inline=False)
+        embed.add_field(name="Time to Add (seconds)", value=str(time_spent), inline=True)
+        embed.add_field(name="Giveaways to Add", value=str(giveaways), inline=True)
+        await interaction.edit_original_response(embed=embed, view=view)
 
     @app_commands.command(
         name="decrease_achievement",
@@ -775,29 +650,20 @@ class AchievementCog(commands.Cog):
 
         await interaction.response.defer()  # Defer interaction for database operations
 
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute("SELECT * FROM achievements WHERE user_id = ?", (member.id,))
-            user_record = await cursor.fetchone()
+        # Ensure user exists in database
+        await self.db.create_user_if_not_exists(member.id)
 
-            if user_record is None:
-                # This user is not in the database, so create a new empty record for them
-                await cursor.execute(
-                    "INSERT INTO achievements (user_id) VALUES (?)",
-                    (member.id,))
-            await db.commit()
-
-            # Create a confirmation view and send it with an embed
-            view = ConfirmationView(self.bot, member.id, reactions, messages, time_spent, giveaways, 'decrease')
-            embed = discord.Embed(title="Decrease Achievement Progress",
-                                  description=f"You will decrease the achievement progress of {member.mention}.",
-                                  color=discord.Color.blue())
-            embed.add_field(name="Reactions to Subtract", value=str(reactions), inline=True)
-            embed.add_field(name="Messages to Subtract", value=str(messages), inline=True)
-            embed.add_field(name="", value="\u200b", inline=False)
-            embed.add_field(name="Time to Subtract (seconds)", value=str(time_spent), inline=True)
-            embed.add_field(name="Giveaways to Subtract", value=str(giveaways), inline=True)
-            await interaction.edit_original_response(embed=embed, view=view)
+        # Create a confirmation view and send it with an embed
+        view = ConfirmationView(self.bot, member.id, reactions, messages, time_spent, giveaways, 'decrease', self.db)
+        embed = discord.Embed(title="Decrease Achievement Progress",
+                              description=f"You will decrease the achievement progress of {member.mention}.",
+                              color=discord.Color.blue())
+        embed.add_field(name="Reactions to Subtract", value=str(reactions), inline=True)
+        embed.add_field(name="Messages to Subtract", value=str(messages), inline=True)
+        embed.add_field(name="", value="\u200b", inline=False)
+        embed.add_field(name="Time to Subtract (seconds)", value=str(time_spent), inline=True)
+        embed.add_field(name="Giveaways to Subtract", value=str(giveaways), inline=True)
+        await interaction.edit_original_response(embed=embed, view=view)
 
     @app_commands.command(
         name="achievement_ranking",
@@ -814,10 +680,10 @@ class AchievementCog(commands.Cog):
             return
 
         if not date:
-            view = AchievementRankingView(self.bot)
+            view = AchievementRankingView(self.bot, self.db)
         else:
             year, month = date.split("-")
-            view = AchievementRankingView(self.bot, year, month)
+            view = AchievementRankingView(self.bot, self.db, int(year), int(month))
 
         embed = await view.format_page()
         # Correct method to edit the message after deferring
@@ -834,11 +700,7 @@ class AchievementCog(commands.Cog):
         await interaction.response.defer()
 
         try:
-            async with aiosqlite.connect(self.db_path) as db:
-                cursor = await db.cursor()
-                await cursor.execute("SELECT * FROM achievement_operation ORDER BY timestamp DESC")
-                operations = await cursor.fetchall()
-
+            operations = await self.db.get_all_operations()
         except Exception as e:
             await interaction.edit_original_response(
                 content=f"An error occurred while fetching the records. Error: {e}")
@@ -849,111 +711,31 @@ class AchievementCog(commands.Cog):
         message = await interaction.edit_original_response(embeds=[embed], view=view)
         view.message = message
 
-    async def check_table_exists(self, table_name='achievements'):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-
-            # Check if the achievements table exists
-            await cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'")
-            table_exists = await cursor.fetchone() is not None
-
-            await cursor.close()
-
-        return table_exists
-
-    async def add_giveaway_count_column(self, table_name):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-
-            # Fetch the information of all columns in the specified table
-            await cursor.execute(f"PRAGMA table_info({table_name})")
-            columns = await cursor.fetchall()
-
-            # Check if the giveaway_count column exists
-            if not any(column[1] == 'giveaway_count' for column in columns):
-                # The giveaway_count column does not exist, so add it
-                await cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN giveaway_count INTEGER DEFAULT 0")
-
-            await db.commit()
-            await cursor.close()
-
     @app_commands.command(
         name="fix_achievements",
         description="If you have run this bot before version 0.7.0, use this command to repair the database."
     )
     async def fix_achievements(self, interaction: discord.Interaction):
-        # if the achievements table exists, add the giveaway_count column
-        if await self.check_table_exists(table_name='achievements'):
-            await self.add_giveaway_count_column(table_name='achievements')
-
-        # if the achievement_operation table exists, add the giveaway_count column
-        if await self.check_table_exists(table_name='achievement_operation'):
-            await self.add_giveaway_count_column(table_name='achievement_operation')
-
+        # Add giveaway_count column to tables if they don't exist
+        await self.db.add_column_if_not_exists('achievements', 'giveaway_count', 'INTEGER DEFAULT 0')
+        await self.db.add_column_if_not_exists('achievement_operation', 'giveaway_count', 'INTEGER DEFAULT 0')
+        
         await interaction.response.send_message("The database has been repaired.")
 
     async def fetch_extended_rankings(self, year=None, month=None):
-        """Fetch top 40 users for each achievement type"""
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
+        """Fetch top 40 users for each achievement type using database manager"""
+        # Define result structure based on achievement_ranking config
+        achievement_types = []
+        for achievement in self.achievement_config.get('achievements_ranking', []):
+            achievement_types.append(achievement.get('type'))
 
-            # Define result structure based on achievement_ranking config
-            results = {}
-            for achievement in self.achievement_config.get('achievements_ranking', []):
-                type_name = achievement.get('type')
-                results[type_name] = []
+        if year is None and month is None:
+            # Get all-time rankings
+            return await self.db.get_all_leaderboards(achievement_types, 40)
+        else:
+            # Get monthly rankings  
+            return await self.db.get_all_monthly_leaderboards(year, month, achievement_types, 40)
 
-            # Query for each achievement type separately
-            if year is None and month is None:
-                # All-time rankings
-                await cursor.execute(
-                    "SELECT user_id, reaction_count FROM achievements WHERE reaction_count > 0 ORDER BY reaction_count DESC LIMIT 40"
-                )
-                results["reaction"] = await cursor.fetchall()
-
-                await cursor.execute(
-                    "SELECT user_id, message_count FROM achievements WHERE message_count > 0 ORDER BY message_count DESC LIMIT 40"
-                )
-                results["message"] = await cursor.fetchall()
-
-                # Specifically query time_spent data
-                await cursor.execute(
-                    "SELECT user_id, time_spent FROM achievements WHERE time_spent > 0 ORDER BY time_spent DESC LIMIT 40"
-                )
-                results["time_spent"] = await cursor.fetchall()
-
-                await cursor.execute(
-                    "SELECT user_id, giveaway_count FROM achievements WHERE giveaway_count > 0 ORDER BY giveaway_count DESC LIMIT 40"
-                )
-                results["giveaway"] = await cursor.fetchall()
-            else:
-                # Monthly rankings
-                await cursor.execute(
-                    "SELECT user_id, reaction_count FROM monthly_achievements WHERE year = ? AND month = ? AND reaction_count > 0 ORDER BY reaction_count DESC LIMIT 40",
-                    (year, month)
-                )
-                results["reaction"] = await cursor.fetchall()
-
-                await cursor.execute(
-                    "SELECT user_id, message_count FROM monthly_achievements WHERE year = ? AND month = ? AND message_count > 0 ORDER BY message_count DESC LIMIT 40",
-                    (year, month)
-                )
-                results["message"] = await cursor.fetchall()
-
-                # Specifically query time_spent data for the month
-                await cursor.execute(
-                    "SELECT user_id, time_spent FROM monthly_achievements WHERE year = ? AND month = ? AND time_spent > 0 ORDER BY time_spent DESC LIMIT 40",
-                    (year, month)
-                )
-                results["time_spent"] = await cursor.fetchall()
-
-                await cursor.execute(
-                    "SELECT user_id, giveaway_count FROM monthly_achievements WHERE year = ? AND month = ? AND giveaway_count > 0 ORDER BY giveaway_count DESC LIMIT 40",
-                    (year, month)
-                )
-                results["giveaway"] = await cursor.fetchall()
-
-            return results
 
     @app_commands.command(
         name="rank",
@@ -1027,65 +809,12 @@ class AchievementCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute("""
-                CREATE TABLE IF NOT EXISTS achievements (
-                    user_id INTEGER PRIMARY KEY,
-                    message_count INTEGER DEFAULT 0,
-                    reaction_count INTEGER DEFAULT 0,
-                    time_spent INTEGER DEFAULT 0,
-                    giveaway_count INTEGER DEFAULT 0
-                )
-            """)
-            await cursor.execute("""
-                CREATE TABLE IF NOT EXISTS voice_channel_entries (
-                    user_id INTEGER NOT NULL,
-                    channel_id INTEGER NOT NULL,
-                    start_time TIMESTAMP NOT NULL,
-                    PRIMARY KEY (user_id, channel_id)
-                )
-            """)
-
-            await cursor.execute("""
-                CREATE TABLE IF NOT EXISTS achievement_operation (
-                    user_id INTEGER NOT NULL,
-                    target_user_id INTEGER NOT NULL,
-                    operation TEXT NOT NULL,
-                    message_count INTEGER DEFAULT 0,
-                    reaction_count INTEGER DEFAULT 0,
-                    time_spent INTEGER DEFAULT 0,
-                    giveaway_count INTEGER DEFAULT 0,
-                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                 )
-            """)
-
-            await cursor.execute("""
-                CREATE TABLE IF NOT EXISTS monthly_achievements (
-                    user_id INTEGER NOT NULL,
-                    year INTEGER NOT NULL,
-                    month INTEGER NOT NULL,
-                    message_count INTEGER DEFAULT 0,
-                    reaction_count INTEGER DEFAULT 0,
-                    time_spent INTEGER DEFAULT 0,
-                    giveaway_count INTEGER DEFAULT 0,
-                    PRIMARY KEY (user_id, year, month)
-                )
-            """)
-
-            # Fetch all the users that have been logged in voice_channel_entries
-            await cursor.execute("SELECT user_id, channel_id FROM voice_channel_entries")
-            entries = await cursor.fetchall()
-
-            for user_id, channel_id in entries:
-                member = None
-                for guild in self.bot.guilds:
-                    member = guild.get_member(user_id)
-                    if member is not None:
-                        break
-                if member is None or member.voice is None or member.voice.channel.id != channel_id:
-                    # The member is no longer on the server or is currently in a different room
-                    await cursor.execute("DELETE FROM voice_channel_entries WHERE user_id = ? AND channel_id = ?",
-                                         (user_id, channel_id))
-            await db.commit()
+        # Clean up invalid voice sessions
+        valid_sessions = []
+        for guild in self.bot.guilds:
+            for voice_channel in guild.voice_channels:
+                for member in voice_channel.members:
+                    if not member.bot:
+                        valid_sessions.append((member.id, voice_channel.id))
+        
+        await self.db.cleanup_invalid_voice_sessions(valid_sessions)

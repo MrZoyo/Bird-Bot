@@ -1,6 +1,6 @@
 # Bird Bot 
 
-`Version: 1.6.1`
+`Version: 1.6.2b`
 
 ---
 
@@ -49,6 +49,9 @@ The bot's code is deeply optimised for low-performance devices, using asynchrono
   - [media_handler](#media_handler)
   - [shop_db](#shop_db)
   - [privateroom_db](#privateroom_db)
+  - [achievement_db](#achievement_db)
+  - [role_db](#role_db)
+  - [ban_db](#ban_db)
 - [Update Log](#update-log)
 
 ---
@@ -487,6 +490,24 @@ Media processing module with validation and security features.
 - **Automatic cleanup** of expired room data and settings with configurable retention
 - **Permission restoration capabilities** with user/role validation and fallback handling
 
+### achievement_db
+**🏆 Comprehensive achievement tracking database manager** for user progress monitoring.
+- **Multi-category achievement tracking** for messages, reactions, voice time, and giveaways
+- **Monthly statistics system** with separate tracking for monthly achievements
+- **Voice session management** with start/stop tracking and time calculation
+- **Leaderboard generation** with ranking and extended leaderboard support
+- **Manual operation logging** for admin adjustments with audit trails
+- **Checkin integration** with shop system for total and streak-based achievements
+
+### role_db
+**🎭 Role assignment database manager** for interactive role systems.
+- **View persistence management** for role selection interfaces across different types
+- **Achievement progress queries** with unified data retrieval from multiple sources
+- **Signature system management** with time-slot based change tracking and cooldowns
+- **Voice time requirement checking** for signature permissions
+- **Permission management** with user signature enable/disable functionality
+- **Database operations** for role views, star sign, MBTI, gender, and signature systems
+
 ### ban_db
 **🔨 Comprehensive moderation database manager** for the ban system.
 - **Tempban tracking** with automatic expiration management
@@ -498,6 +519,14 @@ Media processing module with validation and security features.
 ---
 
 ## Update Log
+### V1.6.2b - 2025-07-06
+#### New Features
+- Reconstructed the achievement cog and role cog. Used a more advanced database and logic separation architecture.
+- Support for achievements related to total check-ins and consecutive check-ins has been created.
+#### Bug Fixes
+- Fixed an issue where the ‘Accept’ button displayed an incorrect status in closed tickets.
+
+---
 ### V1.6.1 - 2025-07-04
 #### 🐛 Critical Bug Fixes
 - **TeamupDisplay System Fixes**: 

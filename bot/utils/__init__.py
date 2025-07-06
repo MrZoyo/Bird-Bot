@@ -8,6 +8,8 @@ from .file_utils import generate_file_tree, format_size
 from .shop_db import ShopDatabaseManager
 from .channel_validator import check_channel_validity, check_voice_state
 from .ban_db import BanDatabaseManager
+from .role_db import RoleDatabaseManager
+from .achievement_db import AchievementDatabaseManager
 
 __all__ = [
     'config',
@@ -20,5 +22,7 @@ __all__ = [
     'check_channel_validity',
     'check_voice_state',
     'PrivateRoomDatabaseManager',
-    'BanDatabaseManager'
+    'BanDatabaseManager',
+    'RoleDatabaseManager',
+    'AchievementDatabaseManager'
 ]
