@@ -1,6 +1,6 @@
 # Bird Bot 
 
-`Version: 1.6.2b`
+`Version: 1.6.3b`
 
 ---
 
@@ -519,6 +519,10 @@ Media processing module with validation and security features.
 ---
 
 ## Update Log
+### V1.6.3b - 2025-07-08
+#### 🐛 Critical Bug Fixes
+- Quick fix for the achievement check crash when there are too many achievements.
+---
 ### V1.6.2b - 2025-07-06
 #### New Features
 - Reconstructed the achievement cog and role cog. Used a more advanced database and logic separation architecture.

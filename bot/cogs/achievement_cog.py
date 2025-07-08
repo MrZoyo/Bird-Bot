@@ -83,31 +83,45 @@ class AchievementRefreshView(View):
         # Add user avatar to embed
         embed.set_author(name=user_name, icon_url=user.display_avatar.url)
 
-        # Add achievements by type with minimal separators
+        # Add achievements grouped by type
+        type_names = {
+            'reaction': '表达情绪',
+            'message': '消息发送',
+            'time_spent': '在线时长',
+            'giveaway': '抽奖参与',
+            'checkin_sum': '签到累计',
+            'checkin_combo': '签到连击'
+        }
+        
         first_group = True
         for type_key, achievements_list in achievement_groups.items():
             if not achievements_list:
                 continue
                 
-            # Add simple separator between groups (single line)
+            # Add separator between groups
             if not first_group:
-                embed.add_field(name="", value="\u200b", inline=False)
+                embed.add_field(name="", value="​", inline=False)
             first_group = False
             
-            # Add achievements for this type
+            # Build the field value for this category
+            category_value = ""
             for achievement in achievements_list:
                 is_completed = achievement["count"] >= achievement["threshold"]
                 
                 if is_completed:
-                    # For completed achievements, show checkmark with name only
-                    embed.add_field(name=f"{achievements_finish_emoji} {achievement['name']}", value="", inline=False)
+                    # For completed achievements, show checkmark with bold name
+                    category_value += f"{achievements_finish_emoji} **{achievement['name']}**\n"
                 else:
-                    # For incomplete achievements, show progress bar
+                    # For incomplete achievements, show bold name and progress bar
                     progress = min(1, achievement["count"] / achievement["threshold"])
-                    progress_bar = f"{achievements_incomplete_emoji} **{achievement['description']}** → `{int(achievement['count'])}/{int(achievement['threshold'])}`\n`{'█' * int(progress * 20)}{' ' * (20 - int(progress * 20))}` `{progress * 100:.2f}%`"
-                    embed.add_field(name=achievement["name"], value=progress_bar, inline=False)
-
+                    progress_bar = f"**{achievement['name']}**\n{achievement['description']} → `{int(achievement['count'])}/{int(achievement['threshold'])}`\n`{'█' * int(progress * 20)}{' ' * (20 - int(progress * 20))}` `{progress * 100:.2f}%`\n"
+                    category_value += progress_bar
+            
+            # Add the field for this category without name
+            embed.add_field(name="", value=category_value.strip(), inline=False)
+        
         return embed
+
 
     async def format_page_monthly(self, date):
         year, month = date.split("-")
