@@ -497,3 +497,25 @@ class TicketsNewDatabaseManager:
         except Exception as e:
             logging.error(f"Error updating ticket message ID: {e}")
             return False
+
+    async def update_ticket_thread_id(self, old_thread_id: int, new_thread_id: int) -> bool:
+        """Update the thread ID for a ticket during migration."""
+        try:
+            async with aiosqlite.connect(self.db_path) as db:
+                # Update tickets_new table
+                await db.execute(
+                    "UPDATE tickets_new SET thread_id = ? WHERE thread_id = ?",
+                    (new_thread_id, old_thread_id)
+                )
+                
+                # Update ticket_new_members table
+                await db.execute(
+                    "UPDATE ticket_new_members SET thread_id = ? WHERE thread_id = ?",
+                    (new_thread_id, old_thread_id)
+                )
+                
+                await db.commit()
+                return True
+        except Exception as e:
+            logging.error(f"Error updating ticket thread ID: {e}")
+            return False

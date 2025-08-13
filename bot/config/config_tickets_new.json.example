@@ -3,6 +3,8 @@
   "_comment2": "====FOR Thread-based Ticket System (New)==========================",
   "_comment3": "频道配置通过 /tickets_new_setup 命令自动创建并存储在数据库中",
   "admin_roles": [
+    1145141919810,
+    1145141919810
   ],
   "admin_users": [],
   "ticket_types": {
@@ -236,5 +238,26 @@
     "ticket_already_closed": "❌ 该工单已经关闭",
     "ticket_close_stats_error": "❌ 关闭工单时发生错误",
     "ticket_close_error": "❌ 关闭工单失败"
+  },
+  "migration": {
+    "archive_suffix": " 已归档",
+    "migration_message_template": "🔄 正在搬运消息到私密子区...",
+    "migration_complete_template": "✅ 消息已搬运完成，原子区将被删除",
+    "migrate_admin_only": "❌ 此命令只能在管理频道中使用",
+    "migrate_invalid_thread_id": "❌ 无效的子区ID",
+    "migrate_thread_not_found": "❌ 找不到指定的子区",
+    "migrate_already_private": "❌ 这个工单已经是私密子区了",
+    "migrate_success": "✅ 工单已成功迁移到私密子区: {thread}\n搬运了 {count} 条消息",
+    "migrate_error": "❌ 迁移失败: {error}",
+    "migrate_attachment_info": "📎 原消息附件: {filenames}",
+    "migrate_embed_fallback": "📋 原消息包含嵌入内容（无法复制）",
+    "migrate_empty_message": "*(空消息)*",
+    "migrate_continuation": "*(续上)* {content}",
+    "migrate_delete_failed": "⚠️ 无法删除原子区，请手动删除",
+    "migrate_completion_status": "{completion_message}\n搬运了 {count} 条消息",
+    "migrate_reclose_message": "🔒 工单已重新关闭（保持原状态）",
+    "migrate_attachment_label": "📎 **[附件]** {filename}",
+    "migrate_attachment_failed": "📎 附件处理失败: {filename}",
+    "migrate_attachment_download_failed": "{attachment_info} (下载失败: {error})"
   }
 }

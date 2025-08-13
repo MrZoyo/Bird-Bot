@@ -79,28 +79,17 @@ class TicketsCog(commands.Cog):
 
     @app_commands.command(
         name="tickets_archive",
-        description="强制归档当前分类中的所有工单（包括活跃和已关闭的工单）"
+        description="强制归档指定分类中的所有工单（包括活跃和已关闭的工单）"
     )
-    async def archive_tickets(self, interaction: discord.Interaction):
+    @app_commands.describe(category="要归档的分类频道")
+    async def archive_tickets(self, interaction: discord.Interaction, category: discord.CategoryChannel):
         """Archive ALL tickets to files."""
-        if not await self.check_ticket_channel(interaction):
-            return
-
         await interaction.response.defer()
 
         try:
-            # Get current channel's category
-            current_channel = interaction.channel
-            if not current_channel.category:
-                await interaction.followup.send(
-                    "当前频道不在任何分类中，无法确定要归档的工单范围。",
-                    ephemeral=True
-                )
-                return
+            # Use the provided category parameter
             
-            category = current_channel.category
-            
-            # Get all channels in the current category
+            # Get all channels in the specified category
             category_channel_ids = [channel.id for channel in category.channels if isinstance(channel, discord.TextChannel)]
             
             # Get ALL tickets in this category (closed and active)

@@ -1,6 +1,6 @@
 # Bird Bot 
 
-`Version: 1.6.3b`
+`Version: 1.6.4b`
 
 ---
 
@@ -519,6 +519,13 @@ Media processing module with validation and security features.
 ---
 
 ## Update Log
+### V1.6.4b - 2025-08-13
+#### 🐛 Critical Bug Fixes
+- Fixed an issue with ticket permissions, which now correctly uses private tickets.
+- Fixed the archiving function for old tickets. Now you can conveniently archive old tickets with one click.
+- Added a temporary command to convert non-private tickets in the new version to private tickets.
+
+---
 ### V1.6.3b - 2025-07-08
 #### 🐛 Critical Bug Fixes
 - Quick fix for the achievement check crash when there are too many achievements.
