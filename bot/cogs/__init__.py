@@ -12,7 +12,6 @@ from .notebook_cog import NotebookCog
 from .role_cog import RoleCog
 from .voice_channel_cog import VoiceStateCog
 from .welcome_cog import WelcomeCog
-from .tickets_cog import TicketsCog
 from .tickets_new_cog import TicketsNewCog
 from .shop_cog import ShopCog
 from .privateroom_cog import PrivateRoomCog

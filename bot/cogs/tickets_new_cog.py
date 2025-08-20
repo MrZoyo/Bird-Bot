@@ -483,6 +483,9 @@ class TicketsNewCog(commands.Cog):
         if fixed_count > 0:
             logging.info(f"Fixed {fixed_count} tickets with NULL ticket_number")
         
+        # Check and close tickets for missing channels
+        await self.check_and_close_missing_tickets()
+        
         logging.info("TicketsNewCog loaded successfully")
 
     @commands.Cog.listener()
@@ -1819,272 +1822,69 @@ class TicketsNewCog(commands.Cog):
             ephemeral=True
         )
 
-    @app_commands.command(name="migrate_ticket", description="将指定工单从公共子区迁移到私密子区")
-    @app_commands.describe(thread_id="要迁移的工单子区ID")
-    async def migrate_ticket_command(self, interaction: discord.Interaction, thread_id: str):
-        """Migrate specified public thread to private thread"""
-        # Check if command is used in admin channel
-        admin_channel_id = self.main_conf.get('admin_channel_id')
-        if admin_channel_id and interaction.channel_id != admin_channel_id:
-            await interaction.response.send_message(
-                self.conf['migration']['migrate_admin_only'],
-                ephemeral=True
-            )
-            return
-        
-        # Check admin permissions
-        if not await self.is_admin_for_type(interaction.user):
-            await interaction.response.send_message(
-                self.conf['messages']['admin_no_permission'],
-                ephemeral=True
-            )
-            return
-        
-        # Get thread by ID
+    async def check_and_close_missing_tickets(self):
+        """检查并关闭频道已消失的工单"""
         try:
-            thread_id_int = int(thread_id)
-        except ValueError:
-            await interaction.response.send_message(
-                self.conf['migration']['migrate_invalid_thread_id'],
-                ephemeral=True
-            )
-            return
-        
-        # Get ticket channel from config to search for the thread
-        config_data = await self.db_manager.get_config()
-        if not config_data or not config_data['ticket_channel_id']:
-            await interaction.response.send_message(
-                self.conf['messages']['old_system_no_new_channel'],
-                ephemeral=True
-            )
-            return
-        
-        ticket_channel = interaction.guild.get_channel(config_data['ticket_channel_id'])
-        if not ticket_channel:
-            await interaction.response.send_message(
-                self.conf['messages']['ticket_thread_not_found'],
-                ephemeral=True
-            )
-            return
-        
-        # Find the thread in the ticket channel
-        old_thread = None
-        for thread in ticket_channel.threads:
-            if thread.id == thread_id_int:
-                old_thread = thread
-                break
-        
-        # If not found in active threads, try archived threads
-        if not old_thread:
-            try:
-                async for thread in ticket_channel.archived_threads(limit=None):
-                    if thread.id == thread_id_int:
-                        old_thread = thread
-                        break
-            except discord.HTTPException:
-                pass
-        
-        if not old_thread:
-            await interaction.response.send_message(
-                self.conf['migration']['migrate_thread_not_found'],
-                ephemeral=True
-            )
-            return
-        
-        # Check if thread is already private
-        if old_thread.type == discord.ChannelType.private_thread:
-            await interaction.response.send_message(
-                self.conf['migration']['migrate_already_private'],
-                ephemeral=True
-            )
-            return
-        
-        await interaction.response.defer(ephemeral=True)
-        
-        try:
-            parent_channel = old_thread.parent
+            # 获取所有活跃工单
+            active_tickets = await self.db_manager.get_active_tickets()
+            if not active_tickets:
+                return
             
-            # Get all messages from old thread
-            messages = []
-            async for message in old_thread.history(limit=None, oldest_first=True):
-                messages.append(message)
+            guild_id = self.main_conf['guild_id']
+            guild = self.bot.get_guild(guild_id)
+            if not guild:
+                logging.error(f"Could not find guild {guild_id} for ticket cleanup")
+                return
             
-            # Create new private thread
-            archive_suffix = self.conf.get('migration', {}).get('archive_suffix', ' 已归档')
-            new_thread_name = f"{old_thread.name}{archive_suffix}"
-            
-            new_thread = await parent_channel.create_thread(
-                name=new_thread_name,
-                type=discord.ChannelType.private_thread,
-                invitable=False,
-                auto_archive_duration=old_thread.auto_archive_duration
-            )
-            
-            # Add all members from old thread to new thread
-            try:
-                members = await old_thread.fetch_members()
-                for member in members:
-                    try:
-                        await new_thread.add_user(member)
-                    except discord.HTTPException:
-                        pass  # Ignore if member can't be added
-            except discord.HTTPException:
-                pass  # Ignore if can't fetch members
-            
-            # Send migration start message
-            migration_message = self.conf['migration']['migration_message_template']
-            await new_thread.send(migration_message)
-            
-            # Migrate all messages
-            migrated_count = 0
-            for message in messages:
-                try:
-                    # Skip system messages and bot setup messages that have no meaningful content
-                    if message.type != discord.MessageType.default and not message.content and not message.embeds:
-                        continue
-                    
-                    # Format message with original author info
-                    content_parts = []
-                    
-                    # Add author and timestamp info
-                    timestamp = int(message.created_at.timestamp())
-                    
-                    # Handle different message types
-                    if message.type == discord.MessageType.default:
-                        author_info = f"**[原消息] {message.author.display_name}** (<t:{timestamp}:f>)"
-                    else:
-                        # System message
-                        author_info = f"**[系统消息]** (<t:{timestamp}:f>)"
-                    
-                    content_parts.append(author_info)
-                    
-                    # Add message content if it exists
-                    if message.content:
-                        content_parts.append(message.content)
-                    elif message.type != discord.MessageType.default:
-                        # For system messages without content, try to describe the action
-                        if message.type == discord.MessageType.thread_starter_message:
-                            content_parts.append("子区启动消息")
-                        elif hasattr(message.type, 'name'):
-                            content_parts.append(f"系统操作: {message.type.name}")
-                        else:
-                            content_parts.append("系统操作")
-                    
-                    # Combine content
-                    final_content = "\n".join(content_parts) if content_parts else self.conf['migration']['migrate_empty_message']
-                    
-                    # Handle message length limit
-                    if len(final_content) > 2000:
-                        # Split long messages
-                        chunks = [final_content[i:i+1900] for i in range(0, len(final_content), 1900)]
-                        for i, chunk in enumerate(chunks):
-                            if i > 0:
-                                chunk = self.conf['migration']['migrate_continuation'].format(content=chunk)
-                            await new_thread.send(chunk)
-                    else:
-                        await new_thread.send(final_content)
-                    
-                    # Handle attachments
-                    if message.attachments:
-                        for attachment in message.attachments:
-                            try:
-                                # Download and re-upload attachment
-                                file_data = await attachment.read()
-                                discord_file = discord.File(
-                                    io.BytesIO(file_data),
-                                    filename=attachment.filename
-                                )
-                                # Send with original filename as message
-                                attachment_label = self.conf['migration']['migrate_attachment_label'].format(
-                                    filename=attachment.filename
-                                )
-                                await new_thread.send(attachment_label, file=discord_file)
-                            except discord.HTTPException as e:
-                                # If file is too large or failed to download
-                                logging.error(f"Failed to transfer attachment {attachment.filename}: {e}")
-                                fallback_info = self.conf['migration']['migrate_attachment_info'].format(
-                                    filenames=attachment.filename
-                                )
-                                error_message = self.conf['migration']['migrate_attachment_download_failed'].format(
-                                    attachment_info=fallback_info,
-                                    error=str(e)
-                                )
-                                await new_thread.send(error_message)
-                            except Exception as e:
-                                logging.error(f"Error processing attachment {attachment.filename}: {e}")
-                                failed_message = self.conf['migration']['migrate_attachment_failed'].format(
-                                    filename=attachment.filename
-                                )
-                                await new_thread.send(failed_message)
-                    
-                    # Handle embeds
-                    if message.embeds:
-                        for embed in message.embeds:
-                            try:
-                                await new_thread.send(embed=embed)
-                            except discord.HTTPException:
-                                await new_thread.send(self.conf['migration']['migrate_embed_fallback'])
-                    
-                    migrated_count += 1
-                    
-                    # Add small delay to avoid rate limiting
-                    if migrated_count % 10 == 0:
-                        await asyncio.sleep(1)
-                        
-                except discord.HTTPException as e:
-                    logging.error(f"Error migrating message: {e}")
+            closed_count = 0
+            for ticket in active_tickets:
+                if ticket['is_closed']:
                     continue
+                
+                thread_id = ticket['thread_id']
+                thread_found = False
+                
+                # 检查线程是否存在于任何频道中
+                for channel in guild.text_channels:
+                    try:
+                        # 检查活跃线程
+                        for thread in channel.threads:
+                            if thread.id == thread_id:
+                                thread_found = True
+                                break
+                        
+                        if thread_found:
+                            break
+                        
+                        # 检查归档线程
+                        async for thread in channel.archived_threads(limit=None):
+                            if thread.id == thread_id:
+                                thread_found = True
+                                break
+                        
+                        if thread_found:
+                            break
+                    except Exception:
+                        # 如果一个频道失败，继续检查其他频道
+                        continue
+                
+                # 如果找不到线程，在数据库中关闭工单
+                if not thread_found:
+                    success = await self.db_manager.close_ticket(
+                        thread_id, 
+                        self.bot.user.id, 
+                        "工单频道已被删除或不存在"
+                    )
+                    if success:
+                        closed_count += 1
+                        logging.info(f"Closed missing ticket {thread_id}")
             
-            # Send completion message
-            completion_message = self.conf['migration']['migration_complete_template']
-            final_message = self.conf['migration']['migrate_completion_status'].format(
-                completion_message=completion_message,
-                count=migrated_count
-            )
-            await new_thread.send(final_message)
-            
-            # Update database if this was a tracked ticket
-            ticket_data = None
-            try:
-                # Check if old thread was in database
-                ticket_data = await self.db_manager.get_ticket_by_thread(old_thread.id)
-                if ticket_data:
-                    # Update thread ID in database
-                    await self.db_manager.update_ticket_thread_id(old_thread.id, new_thread.id)
-            except Exception as e:
-                logging.error(f"Error updating ticket in database during migration: {e}")
-            
-            # Check if old thread was closed/archived and close the new thread accordingly
-            should_close_new_thread = old_thread.archived
-            
-            # Delete old thread
-            try:
-                await old_thread.delete()
-            except discord.HTTPException as e:
-                logging.error(f"Error deleting old thread during migration: {e}")
-                await new_thread.send(self.conf['migration']['migrate_delete_failed'])
-            
-            # If the original thread was closed, close the new thread as well
-            if should_close_new_thread:
-                try:
-                    # Send close message before archiving
-                    await new_thread.send(self.conf['migration']['migrate_reclose_message'])
-                    # Then close the thread
-                    await new_thread.edit(locked=True, archived=True)
-                except discord.HTTPException as e:
-                    logging.error(f"Error closing migrated thread: {e}")
-            
-            # Notify user about completion
-            success_message = self.conf['migration']['migrate_success'].format(
-                thread=new_thread.mention,
-                count=migrated_count
-            )
-            await interaction.followup.send(success_message, ephemeral=True)
-            
+            if closed_count > 0:
+                logging.info(f"Automatically closed {closed_count} tickets with missing channels")
+                
         except Exception as e:
-            logging.error(f"Error during ticket migration: {e}")
-            error_message = self.conf['migration']['migrate_error'].format(error=str(e))
-            await interaction.followup.send(error_message, ephemeral=True)
+            logging.error(f"Error checking and closing missing tickets: {e}")
+
 
     # Helper methods for admin management
     async def format_admin_list(self) -> discord.Embed:

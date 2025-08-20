@@ -725,16 +725,6 @@ class AchievementCog(commands.Cog):
         message = await interaction.edit_original_response(embeds=[embed], view=view)
         view.message = message
 
-    @app_commands.command(
-        name="fix_achievements",
-        description="If you have run this bot before version 0.7.0, use this command to repair the database."
-    )
-    async def fix_achievements(self, interaction: discord.Interaction):
-        # Add giveaway_count column to tables if they don't exist
-        await self.db.add_column_if_not_exists('achievements', 'giveaway_count', 'INTEGER DEFAULT 0')
-        await self.db.add_column_if_not_exists('achievement_operation', 'giveaway_count', 'INTEGER DEFAULT 0')
-        
-        await interaction.response.send_message("The database has been repaired.")
 
     async def fetch_extended_rankings(self, year=None, month=None):
         """Fetch top 40 users for each achievement type using database manager"""

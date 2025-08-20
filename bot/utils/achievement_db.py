@@ -474,28 +474,6 @@ class AchievementDatabaseManager:
             result[achievement_type] = await self.get_extended_monthly_leaderboard(year, month, achievement_type, limit)
         return result
 
-    async def check_column_exists(self, table_name: str, column_name: str) -> bool:
-        """Check if a column exists in a table."""
-        async with aiosqlite.connect(self.db_path) as db:
-            try:
-                cursor = await db.execute(f"PRAGMA table_info({table_name})")
-                columns = await cursor.fetchall()
-                return any(column[1] == column_name for column in columns)
-            except Exception as e:
-                logging.error(f"Error checking column existence: {e}")
-                return False
-
-    async def add_column_if_not_exists(self, table_name: str, column_name: str, column_type: str = "INTEGER DEFAULT 0") -> bool:
-        """Add a column to a table if it doesn't exist."""
-        async with aiosqlite.connect(self.db_path) as db:
-            try:
-                if not await self.check_column_exists(table_name, column_name):
-                    await db.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
-                    await db.commit()
-                return True
-            except Exception as e:
-                logging.error(f"Error adding column {column_name} to {table_name}: {e}")
-                return False
 
     async def get_user_checkin_data(self, user_id: int) -> Dict[str, int]:
         """Get user's checkin data from shop tables."""

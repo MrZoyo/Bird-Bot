@@ -1,6 +1,6 @@
 # Bird Bot 
 
-`Version: 1.6.4b`
+`Version: 1.6.5b`
 
 ---
 
@@ -260,6 +260,7 @@ Real-time teamup information display system for organizing team activities.
 - **Automatic admin notifications** via DM with jump buttons
 - **Persistent state management** surviving bot restarts
 - **Statistics and analytics** for ticket system monitoring
+- **Automatic cleanup** for tickets with missing channels on startup
 
 **Admin Management:**
 - **Type-specific permissions** allowing different admins for different ticket types
@@ -518,7 +519,31 @@ Media processing module with validation and security features.
 
 ---
 
+## Development Guidelines
+
+### Code Organization
+- **Main functionality** should be placed in the `bot/` directory
+- **Deprecated or removed code** should be moved to the `old_function/` directory instead of being deleted
+- This approach allows for:
+  - Code version control and recovery if needed
+  - Historical reference for development decisions
+  - Clean separation between active and inactive features
+
+### File Management Rules
+- Use `mv` instead of `rm` when removing functionality
+- Preserve code structure and dependencies when moving files
+- Update documentation to reflect code organization changes
+
+---
+
 ## Update Log
+### V1.6.5b - 2025-08-20
+#### 🐛 Critical Bug Fixes
+- Fixed an issue where room creation failed due to user IDs being blocked by Discord.
+#### 🧽 System Cleanup
+- Completely removed old ticket system (`tickets_cog.py`) and migration functionality
+- Added automatic cleanup of tickets with missing channels
+
 ### V1.6.4b - 2025-08-13
 #### 🐛 Critical Bug Fixes
 - Fixed an issue with ticket permissions, which now correctly uses private tickets.

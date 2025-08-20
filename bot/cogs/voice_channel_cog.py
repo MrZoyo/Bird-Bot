@@ -224,6 +224,7 @@ class VoiceStateCog(commands.Cog):
     async def handle_channel(self, member, after, conf, public=True):
         guild = after.channel.guild
         temp_channel_name = f"{conf['name_prefix']}-{member.display_name}"
+        fallback_channel_name = f"{conf['name_prefix']}-id被discord屏蔽请及时修改"
         overwrites = {
             member.guild.default_role: discord.PermissionOverwrite(view_channel=True, connect=public),
             member: discord.PermissionOverwrite(manage_channels=True, view_channel=True, connect=True, speak=True,
@@ -236,13 +237,26 @@ class VoiceStateCog(commands.Cog):
         # Sort the categories by position
         categories.sort(key=lambda category: category.position)
 
+        temp_channel = None
         for category in categories:
             try:
+                # First try with the original name
                 temp_channel = await guild.create_voice_channel(name=temp_channel_name, category=category,
                                                                 overwrites=overwrites)
                 break  # If the channel creation is successful, break the loop
             except discord.errors.HTTPException as e:
-                if e.code == 50035:  # Maximum number of channels in category reached
+                if e.code == 50035 and "Contains words not allowed" in str(e):
+                    # If the error is about inappropriate words, try with fallback name
+                    try:
+                        temp_channel = await guild.create_voice_channel(name=fallback_channel_name, category=category,
+                                                                        overwrites=overwrites)
+                        break
+                    except discord.errors.HTTPException as e2:
+                        if e2.code == 50035 and "Maximum number of channels" in str(e2):
+                            continue  # Category is full, try next one
+                        else:
+                            raise e2
+                elif e.code == 50035 and "Maximum number of channels" in str(e):
                     continue  # If the category is full, continue to the next one
                 else:
                     raise e  # If it's another error, raise it
@@ -254,8 +268,16 @@ class VoiceStateCog(commands.Cog):
 
             new_category = await guild.create_category(name=after.channel.category.name,
                                                        position=new_category_position)
-            temp_channel = await guild.create_voice_channel(name=temp_channel_name, category=new_category,
-                                                            overwrites=overwrites)
+            try:
+                temp_channel = await guild.create_voice_channel(name=temp_channel_name, category=new_category,
+                                                                overwrites=overwrites)
+            except discord.errors.HTTPException as e:
+                if e.code == 50035 and "Contains words not allowed" in str(e):
+                    # If the error is about inappropriate words, use fallback name
+                    temp_channel = await guild.create_voice_channel(name=fallback_channel_name, category=new_category,
+                                                                    overwrites=overwrites)
+                else:
+                    raise e
 
         # Move the member and handle exceptions if the member is no longer connected
         try:

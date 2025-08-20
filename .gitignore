@@ -47,6 +47,7 @@ backup/db_backup_manual/*
 !backup/db_backup/.gitkeep
 !backup/db_backup_manual/.gitkeep
 old_test/
+!archives/*
 
 # Configuration and sensitive data
 bot/config/*.json
@@ -90,4 +91,6 @@ Desktop.ini
 # Optional: Add if using Jupyter notebooks
 .ipynb_checkpoints
 *.ipynb
-bot/cogs/tickets_cog.old
+/archives
+/.claude
+CLAUDE.md
