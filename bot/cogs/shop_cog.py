@@ -745,35 +745,49 @@ class ShopCog(commands.Cog):
             current_date = datetime.now().strftime('%Y-%m-%d')
             active_embeds = await self.db.get_active_checkin_embeds()
             
+            # Pre-create the file object once to avoid path issues
+            image_path = os.path.join(os.path.dirname(__file__), '..', '..', 'resources', 'images', 'checkin.png')
+            
             for embed_data in active_embeds:
                 try:
                     channel = self.bot.get_channel(embed_data['channel_id'])
-                    if channel:
-                        message = await channel.fetch_message(embed_data['message_id'])
-                        if message:
-                            # Update embed with new statistics
-                            new_embed = await self.create_daily_checkin_embed(current_date)
-                            
-                            # For updating existing embed, we need to create file again
-                            image_path = os.path.join(os.path.dirname(__file__), '..', '..', 'resources', 'images', 'checkin.png')
-                            file = discord.File(image_path, filename="checkin.png")
-                            
-                            await message.edit(embed=new_embed, attachments=[file])
-                        else:
-                            # Message not found, deactivate
-                            await self.db.deactivate_checkin_embed(embed_data['id'])
-                    else:
-                        # Channel not found, deactivate
+                    if not channel:
                         await self.db.deactivate_checkin_embed(embed_data['id'])
+                        continue
+                    
+                    try:
+                        message = await channel.fetch_message(embed_data['message_id'])
+                    except discord.NotFound:
+                        await self.db.deactivate_checkin_embed(embed_data['id'])
+                        continue
+                    except discord.Forbidden:
+                        logging.error(f"No permission to fetch message in channel {channel.name}")
+                        continue
+                    
+                    # Update embed with new statistics
+                    new_embed = await self.create_daily_checkin_embed(current_date)
+                    
+                    # Create fresh file object for each message
+                    file = discord.File(image_path, filename="checkin.png")
+                    
+                    try:
+                        await message.edit(embed=new_embed, attachments=[file])
+                    except discord.HTTPException as e:
+                        logging.error(f"Failed to update embed in channel {channel.name}: {e}")
+                    except discord.Forbidden:
+                        logging.error(f"No permission to edit message in channel {channel.name}")
+                        
                 except Exception as e:
-                    logging.error(f"Error updating embed {embed_data['id']}: {e}")
-                    # If update fails, try to deactivate
+                    logging.error(f"Error processing embed {embed_data.get('id', 'unknown')}: {e}")
                     try:
                         await self.db.deactivate_checkin_embed(embed_data['id'])
                     except:
                         pass
+                        
         except Exception as e:
-            logging.error(f"Error in update_checkin_embeds_after_checkin: {e}")
+            logging.error(f"Critical error in update_checkin_embeds_after_checkin: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
 
     @app_commands.command(name="create_checkin_embed", description="创建签到面板(管理员)")
     @app_commands.describe(channel="选择要创建签到面板的频道")
