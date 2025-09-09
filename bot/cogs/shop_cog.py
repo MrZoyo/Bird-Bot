@@ -101,8 +101,9 @@ class CheckinMakeupModal(discord.ui.Modal):
 
 
 class CheckinEmbedView(discord.ui.View):
-    def __init__(self, bot, db, conf):
+    def __init__(self, cog, bot, db, conf):
         super().__init__(timeout=None)
+        self.cog = cog
         self.bot = bot
         self.db = db
         self.conf = conf
@@ -147,7 +148,7 @@ class CheckinEmbedView(discord.ui.View):
             )
             
             # Update embed statistics and refresh all embed panels
-            await self.update_checkin_embeds_after_checkin(user_id)
+            await self.cog.update_checkin_embeds_after_checkin(user_id)
             
             # Create private embed response
             embed = self.create_private_checkin_embed(
@@ -635,7 +636,7 @@ class ShopCog(commands.Cog):
         await self.db.initialize_database()
         
         # Set up checkin embed view
-        self.checkin_view = CheckinEmbedView(self.bot, self.db, self.conf)
+        self.checkin_view = CheckinEmbedView(self, self.bot, self.db, self.conf)
         self.bot.add_view(self.checkin_view)
         
         # Start daily embed update task
