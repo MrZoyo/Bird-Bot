@@ -277,8 +277,8 @@ class TeamupDisplayCog(commands.Cog):
         name="teamup_init",
         description="Create teamup display board in specified channel"
     )
-    @app_commands.describe(channel_id="Channel ID where to create the display board")
-    async def teamup_init(self, interaction: discord.Interaction, channel_id: str):
+    @app_commands.describe(channel="Channel where to create the display board")
+    async def teamup_init(self, interaction: discord.Interaction, channel: discord.TextChannel):
         """Initialize teamup display board"""
         if not await check_channel_validity(interaction):
             return
@@ -286,13 +286,6 @@ class TeamupDisplayCog(commands.Cog):
         await interaction.response.defer()
         
         try:
-            channel_id = int(channel_id)
-            channel = self.bot.get_channel(channel_id)
-            
-            if not channel:
-                await interaction.followup.send(self.messages['channel_not_found'], ephemeral=True)
-                return
-            
             # Check permissions
             if not channel.permissions_for(interaction.guild.me).send_messages:
                 await interaction.followup.send(self.messages['permission_error'], ephemeral=True)
@@ -305,7 +298,7 @@ class TeamupDisplayCog(commands.Cog):
             message = await channel.send(embed=embed)
             
             # Save to database
-            success = await self.db_manager.save_display_board(channel_id, message.id)
+            success = await self.db_manager.save_display_board(channel.id, message.id)
             
             if success:
                 await interaction.followup.send(
@@ -315,8 +308,6 @@ class TeamupDisplayCog(commands.Cog):
             else:
                 await interaction.followup.send(self.messages['init_error'], ephemeral=True)
             
-        except ValueError:
-            await interaction.followup.send(self.messages['invalid_channel'], ephemeral=True)
         except Exception as e:
             logging.error(f"Failed to create display board: {e}")
             await interaction.followup.send(self.messages['init_error'], ephemeral=True)
@@ -326,10 +317,10 @@ class TeamupDisplayCog(commands.Cog):
         description="Add game type with corresponding channel"
     )
     @app_commands.describe(
-        channel_id="Channel ID for sending teamup messages",
+        channel="Channel for sending teamup messages",
         game_type="Game type name"
     )
-    async def teamup_type_add(self, interaction: discord.Interaction, channel_id: str, game_type: str):
+    async def teamup_type_add(self, interaction: discord.Interaction, channel: discord.TextChannel, game_type: str):
         """Add game type configuration"""
         if not await check_channel_validity(interaction):
             return
@@ -337,14 +328,7 @@ class TeamupDisplayCog(commands.Cog):
         await interaction.response.defer()
         
         try:
-            channel_id = int(channel_id)
-            channel = self.bot.get_channel(channel_id)
-            
-            if not channel:
-                await interaction.followup.send(self.messages['channel_not_found'], ephemeral=True)
-                return
-            
-            success = await self.db_manager.add_game_type(channel_id, game_type)
+            success = await self.db_manager.add_game_type(channel.id, game_type)
             
             if success:
                 embed = await self.create_game_types_embed()
@@ -356,8 +340,6 @@ class TeamupDisplayCog(commands.Cog):
             else:
                 await interaction.followup.send(self.messages['type_add_error'], ephemeral=True)
             
-        except ValueError:
-            await interaction.followup.send(self.messages['invalid_channel'], ephemeral=True)
         except Exception as e:
             logging.error(f"Failed to add game type: {e}")
             await interaction.followup.send(self.messages['type_add_error'], ephemeral=True)
@@ -366,30 +348,57 @@ class TeamupDisplayCog(commands.Cog):
         name="teamup_type_delete",
         description="Delete game type configuration"
     )
-    @app_commands.describe(channel_id="Channel ID to delete configuration for")
-    async def teamup_type_delete(self, interaction: discord.Interaction, channel_id: str):
+    @app_commands.describe(
+        channel="Select channel to delete configuration for (if channel still exists)",
+        channel_id="Enter channel ID manually (if channel was deleted)"
+    )
+    async def teamup_type_delete(
+        self, 
+        interaction: discord.Interaction, 
+        channel: discord.TextChannel = None,
+        channel_id: str = None
+    ):
         """Delete game type configuration"""
         if not await check_channel_validity(interaction):
+            return
+        
+        # Parameter validation: at least one must be provided
+        if not channel and not channel_id:
+            await interaction.response.send_message(
+                "Please provide either a channel selection or channel ID.", 
+                ephemeral=True
+            )
             return
         
         await interaction.response.defer()
         
         try:
-            channel_id = int(channel_id)
-            success = await self.db_manager.remove_game_type(channel_id)
+            # Determine target channel ID (prioritize channel_id if both provided)
+            if channel_id:
+                try:
+                    target_channel_id = int(channel_id)
+                except ValueError:
+                    await interaction.followup.send(self.messages['invalid_channel'], ephemeral=True)
+                    return
+                
+                # Get channel object for display (might be None if channel was deleted)
+                target_channel = self.bot.get_channel(target_channel_id)
+            else:
+                target_channel_id = channel.id
+                target_channel = channel
+            
+            success = await self.db_manager.remove_game_type(target_channel_id)
             
             if success:
                 embed = await self.create_game_types_embed()
                 embed.title = self.messages['type_delete_success']
                 embed.description = self.messages['channel_type_deleted'].format(
-                    channel_id=channel_id
+                    channel_id=target_channel_id
                 ) + "\n\n" + (embed.description or "")
                 await interaction.followup.send(embed=embed)
             else:
                 await interaction.followup.send(self.messages['type_delete_error'], ephemeral=True)
             
-        except ValueError:
-            await interaction.followup.send(self.messages['invalid_channel'], ephemeral=True)
         except Exception as e:
             logging.error(f"Failed to delete game type: {e}")
             await interaction.followup.send(self.messages['type_delete_error'], ephemeral=True)

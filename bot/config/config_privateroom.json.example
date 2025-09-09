@@ -24,7 +24,7 @@
     "setup_already": "⚠️ 商店已存在，请先使用 /privateroom_reset 重置系统。",
 
     "shop_title": "🏠 私人房间商店",
-    "shop_description": "在这里你可以购买私人房间，享受你专属的语音空间！\n 每日使用`/checkin`签到可以获得10积分。\n\n💰 价格: **{points_cost}** 积分\n⏰ 有效期: **{duration}** 天\n\n**老\uD83D\uDC26福利:** 上个月__语音时长__满 **{hours_threshold}** 小时即可免费获得！可按比例抵扣积分~\n\n🏠 当前可用: **{available_rooms}/{max_rooms}**",
+    "shop_description": "在这里你可以购买私人房间，享受你专属的语音空间！\n 每日在签到面板中点击签到按钮可以获得10积分。\n\n💰 价格: **{points_cost}** 积分\n⏰ 有效期: **{duration}** 天\n\n**老\uD83D\uDC26福利:** 上个月__语音时长__满 **{hours_threshold}** 小时即可免费获得！可按比例抵扣积分~\n\n🏠 当前可用: **{available_rooms}/{max_rooms}**",
     "shop_button_label": "🛍️ 购买私人房间",
     "shop_footer": "私人房间到期后将自动删除，包括所有聊天记录。",
 

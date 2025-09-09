@@ -1,6 +1,6 @@
 # Bird Bot 
 
-`Version: 1.6.5b`
+`Version: 1.7.0b`
 
 ---
 
@@ -76,8 +76,8 @@ When a user enters a specific channel, the bot creates a new channel of the corr
 Similarly, if the channel was created by the bot, the bot will delete the channel when the last user leaves the channel.
 - `/check_temp_channel_records`: Query the temporary voice channel records of the current server. This command is mainly used to check that the robot's mechanism of automatically deleting rooms that no longer exist every hour is working properly.
 - `/set_soundboard`: Change the soundboard status of the channel between `on` and `off`. Only the owner of the channel can use this command.
-- `/vc_add`: Add a voice channel that automatically creates new voice channels.
-- `/vc_remove`: Remove a voice channel that automatically creates new voice channels.
+- `/vc_add <channel>`: Add a voice channel that automatically creates new voice channels.
+- `/vc_remove [channel] [channel_id]`: Remove a voice channel that automatically creates new voice channels. Use channel selection or channel ID (for deleted channels).
 - `/vc_list`: List all voice channels that automatically create new voice channels.
 
 ### Create_Invitation_Cog
@@ -93,8 +93,8 @@ If the user is not currently on a channel, bot will prompt the user to create a 
 **Commands:**
 - `/invt <title>`: Create an invitation with a specified title(optional).
 - `/invt_checkignorelist`: Check the current server's invitation channel ignore list.
-- `/invt_addignorelist <channel_id>`: Add a channel to the invitation channel ignore list.
-- `/invt_removeignorelist <channel_id>`: Remove a channel from the invitation channel ignore list.
+- `/invt_addignorelist <channel>`: Add a channel to the invitation channel ignore list.
+- `/invt_removeignorelist [channel] [channel_id]`: Remove a channel from the invitation channel ignore list. Use channel selection or channel ID (for deleted channels).
 
 ### Welcome_Cog
 When a new user joins the server, the bot sends a welcome message to the user in the welcome channel with enhanced features:
@@ -160,11 +160,11 @@ Comprehensive role assignment system with multiple assignment categories.
 - **User signature system** with permission management and voice time requirements
 
 **Commands:**
-- `/create_role_pickup <channel_id>`: Create achievement role selection interface
-- `/create_starsign_pickup <channel_id>`: Create star sign role selection interface
-- `/create_mbti_pickup <channel_id>`: Create MBTI role selection interface
-- `/create_gender_pickup <channel_id>`: Create gender role selection interface
-- `/create_signature_pickup <channel_id>`: Create signature management interface
+- `/create_role_pickup <channel>`: Create achievement role selection interface
+- `/create_starsign_pickup <channel>`: Create star sign role selection interface
+- `/create_mbti_pickup <channel>`: Create MBTI role selection interface
+- `/create_gender_pickup <channel>`: Create gender role selection interface
+- `/create_signature_pickup <channel>`: Create signature management interface
 - `/signature_permission_toggle <user_id> <disable>`: Toggle user's signature permissions
 - `/signature_clear <user_id>`: Clear user's signature and history
 - `/signature_set_requirement <minutes>`: Set voice time requirement for signatures
@@ -244,9 +244,9 @@ Real-time teamup information display system for organizing team activities.
 - **Discord integration** with native time formatting and channel links
 
 **Commands:**
-- `/teamup_init <channel_id>`: Create teamup display board in specified channel
-- `/teamup_type_add <channel_id> <game_type>`: Add game type configuration
-- `/teamup_type_delete <channel_id>`: Delete game type configuration
+- `/teamup_init <channel>`: Create teamup display board in specified channel
+- `/teamup_type_add <channel> <game_type>`: Add game type configuration
+- `/teamup_type_delete [channel] [channel_id]`: Delete game type configuration. Use channel selection or channel ID (for deleted channels).
 - `/teamup_type_list`: View all game type configurations
 
 ### Tickets_New_Cog
@@ -315,11 +315,15 @@ Real-time teamup information display system for organizing team activities.
 - **Automatic streak recalculation** ensuring accurate statistics after makeup
 - **Comprehensive UI** showing remaining quotas and streak information
 
+**Interactive Check-in System:**
+The new check-in system is completely interface-based using interactive embeds with buttons:
+- **✅ Daily Check-in Button**: Perform daily check-in to earn points (must be in voice channel)
+- **⏰ Makeup Check-in Button**: Make up for missed check-in days (costs 20 points, 3 times per month)
+- **🔍 Query Button**: View personal check-in status and history
+
 **Commands:**
-- `/checkin`: Perform daily check-in to earn points (must be in voice channel)
-- `/checkin_makeup`: **NEW** - Make up for missed check-in days (costs 20 points)
-- `/checkin_check [user]`: View check-in status with enhanced interface
-- `/checkin_history [user]`: View complete check-in history including makeup records
+- `/create_checkin_embed <channel>`: (Admin) Create interactive check-in panel in specified channel
+- `/checkin_history <user>`: (Admin) View comprehensive check-in details for a specific user
 - `/balance_change <user>`: (Admin) Modify user balance with detailed forms
 - `/balance_history [user]`: View transaction history with pagination
 
@@ -349,7 +353,7 @@ Real-time teamup information display system for organizing team activities.
 
 **Commands:**
 - `/privateroom_init`: (Admin) Initialize private room system with settings table
-- `/privateroom_setup`: (Admin) Configure private room shop interface
+- `/privateroom_setup <channel>`: (Admin) Configure private room shop interface
 - `/privateroom_reset`: (Admin) Reset entire private room system
 - `/privateroom_list`: List all active private rooms with pagination
 - `/privateroom_ban <user>`: (Admin) Ban user from private room system
@@ -537,6 +541,15 @@ Media processing module with validation and security features.
 ---
 
 ## Update Log
+### V1.7.0b - 2025-09-09
+#### 🆕 Major New Features
+- New check-in system
+  - Embed interface based system, easier to use
+  - Daily check-in automatic refresh
+- All commands related to channel selection have been reworked, replacing channel IDs with a more modern and user-friendly selection list.
+  - Improved user experience with Discord's native channel selection interface
+  - Enhanced remove/delete commands with hybrid parameters (channel selection + manual ID for deleted channels)
+---
 ### V1.6.5b - 2025-08-20
 #### 🐛 Critical Bug Fixes
 - Fixed an issue where room creation failed due to user IDs being blocked by Discord.
@@ -544,6 +557,7 @@ Media processing module with validation and security features.
 - Completely removed old ticket system (`tickets_cog.py`) and migration functionality
 - Added automatic cleanup of tickets with missing channels
 
+---
 ### V1.6.4b - 2025-08-13
 #### 🐛 Critical Bug Fixes
 - Fixed an issue with ticket permissions, which now correctly uses private tickets.

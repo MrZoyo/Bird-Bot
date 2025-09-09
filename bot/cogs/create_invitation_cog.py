@@ -410,8 +410,8 @@ class CreateInvitationCog(commands.Cog):
         return embed
 
     @app_commands.command(name="invt_addignorelist")
-    @app_commands.describe(channel_id="The ID of the channel to add to the ignore list")
-    async def add_ignore_list(self, interaction: discord.Interaction, channel_id: str):
+    @app_commands.describe(channel="The channel to add to the ignore list")
+    async def add_ignore_list(self, interaction: discord.Interaction, channel: discord.TextChannel):
         """Add a channel to the ignore list."""
         if not await check_channel_validity(interaction):
             return
@@ -419,19 +419,12 @@ class CreateInvitationCog(commands.Cog):
         await interaction.response.defer()
 
         try:
-            channel_id = int(channel_id)
-            channel = self.bot.get_channel(channel_id)
-
-            if not channel:
-                await interaction.followup.send("Invalid channel ID.", ephemeral=True)
-                return
-
-            if channel_id in self.conf['ignore_channel_ids']:
+            if channel.id in self.conf['ignore_channel_ids']:
                 await interaction.followup.send(f"Channel {channel.mention} is already in the ignore list.",
                                                 ephemeral=True)
                 return
 
-            self.conf['ignore_channel_ids'].append(channel_id)
+            self.conf['ignore_channel_ids'].append(channel.id)
             await self.save_config()
 
             embed = await self.format_ignore_list_embed(
@@ -440,37 +433,68 @@ class CreateInvitationCog(commands.Cog):
             )
             await interaction.followup.send(embed=embed)
 
-        except ValueError:
-            await interaction.followup.send("Invalid channel ID format.", ephemeral=True)
+        except Exception as e:
+            logging.error(f"Error adding channel to ignore list: {e}")
+            await interaction.followup.send("Failed to add channel to ignore list.", ephemeral=True)
 
     @app_commands.command(name="invt_removeignorelist")
-    @app_commands.describe(channel_id="The ID of the channel to remove from the ignore list")
-    async def remove_ignore_list(self, interaction: discord.Interaction, channel_id: str):
+    @app_commands.describe(
+        channel="Select channel to remove from ignore list (if channel still exists)",
+        channel_id="Enter channel ID manually (if channel was deleted)"
+    )
+    async def remove_ignore_list(
+        self, 
+        interaction: discord.Interaction, 
+        channel: discord.TextChannel = None,
+        channel_id: str = None
+    ):
         """Remove a channel from the ignore list."""
         if not await check_channel_validity(interaction):
             return
 
+        # Parameter validation: at least one must be provided
+        if not channel and not channel_id:
+            await interaction.response.send_message(
+                "Please provide either a channel selection or channel ID.", 
+                ephemeral=True
+            )
+            return
+        
         await interaction.response.defer()
 
         try:
-            channel_id = int(channel_id)
-            channel = self.bot.get_channel(channel_id)
+            # Determine target channel ID (prioritize channel_id if both provided)
+            if channel_id:
+                try:
+                    target_channel_id = int(channel_id)
+                except ValueError:
+                    await interaction.followup.send("Invalid channel ID format.", ephemeral=True)
+                    return
+                
+                # Get channel object for display (might be None if channel was deleted)
+                target_channel = self.bot.get_channel(target_channel_id)
+            else:
+                target_channel_id = channel.id
+                target_channel = channel
 
-            if channel_id not in self.conf['ignore_channel_ids']:
+            if target_channel_id not in self.conf['ignore_channel_ids']:
+                channel_mention = target_channel.mention if target_channel else f"Channel ID: {target_channel_id} (deleted)"
                 await interaction.followup.send(
-                    f"Channel {channel.mention if channel else f'ID: {channel_id}'} is not in the ignore list.",
+                    f"Channel {channel_mention} is not in the ignore list.",
                     ephemeral=True
                 )
                 return
 
-            self.conf['ignore_channel_ids'].remove(channel_id)
+            self.conf['ignore_channel_ids'].remove(target_channel_id)
             await self.save_config()
 
+            channel_mention = target_channel.mention if target_channel else f"Channel ID: {target_channel_id} (deleted)"
             embed = await self.format_ignore_list_embed(
                 "Channel Removed from Ignore List",
-                f"Successfully removed {channel.mention if channel else f'ID: {channel_id}'} from the ignore list."
+                f"Successfully removed {channel_mention} from the ignore list."
             )
             await interaction.followup.send(embed=embed)
 
-        except ValueError:
-            await interaction.followup.send("Invalid channel ID format. Please provide a valid number.", ephemeral=True)
+        except Exception as e:
+            logging.error(f"Error removing channel from ignore list: {e}")
+            await interaction.followup.send("Failed to remove channel from ignore list.", ephemeral=True)

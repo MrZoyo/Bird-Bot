@@ -1,6 +1,6 @@
 # bot/cogs/shop_cog.py
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord import app_commands
 import logging
 import os
@@ -8,9 +8,408 @@ import tempfile
 from datetime import datetime, timedelta
 import re
 from collections import defaultdict
+from typing import Optional
 
 from bot.utils import config, check_channel_validity, check_voice_state
 from bot.utils.shop_db import ShopDatabaseManager
+
+
+class CheckinMakeupModal(discord.ui.Modal):
+    def __init__(self, db, user_id, conf, remaining_count, balance, cost, missed_date):
+        super().__init__(title=conf['makeup_modal_title'])
+        self.db = db
+        self.user_id = user_id
+        self.conf = conf
+        self.remaining_count = remaining_count
+        self.balance = balance
+        self.cost = cost
+        self.missed_date = missed_date
+        
+        self.info_field = discord.ui.TextInput(
+            label=conf['makeup_modal_info_label'],
+            default=conf['makeup_modal_info_format'].format(
+                remaining=remaining_count,
+                total=conf['makeup_checkin_limit_per_month'],
+                cost=cost,
+                balance=balance
+            ),
+            style=discord.TextStyle.paragraph,
+            required=False
+        )
+        
+        self.confirm_field = discord.ui.TextInput(
+            label=conf['makeup_modal_confirm_label'],
+            placeholder=conf['makeup_modal_confirm_placeholder'],
+            required=True,
+            max_length=10,
+            style=discord.TextStyle.short
+        )
+        
+        self.add_item(self.info_field)
+        self.add_item(self.confirm_field)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        
+        confirm_text = self.confirm_field.value.strip().lower()
+        if confirm_text not in ['yes', 'y']:
+            await interaction.followup.send(
+                self.conf['makeup_modal_invalid_confirm'], 
+                ephemeral=True
+            )
+            return
+        
+        # Check balance again
+        current_balance = await self.db.get_user_balance(self.user_id)
+        if current_balance < self.cost:
+            await interaction.followup.send(
+                self.conf['makeup_checkin_insufficient_balance_description'].format(
+                    cost=self.cost, 
+                    balance=current_balance
+                ),
+                ephemeral=True
+            )
+            return
+        
+        # Perform makeup checkin
+        success = await self.db.add_makeup_record(self.user_id, self.missed_date)
+        if not success:
+            await interaction.followup.send(
+                self.conf['makeup_checkin_no_quota_description'].format(
+                    limit=self.conf['makeup_checkin_limit_per_month']
+                ),
+                ephemeral=True
+            )
+            return
+        
+        # Deduct balance
+        new_balance = await self.db.update_user_balance_with_record(
+            self.user_id,
+            -self.cost,
+            "makeup_checkin",
+            self.user_id,
+            f"Makeup check-in for {self.missed_date}"
+        )
+        
+        await interaction.followup.send(
+            self.conf['makeup_modal_success_private'].format(
+                date=self.missed_date,
+                cost=self.cost
+            ),
+            ephemeral=True
+        )
+
+
+class CheckinEmbedView(discord.ui.View):
+    def __init__(self, bot, db, conf):
+        super().__init__(timeout=None)
+        self.bot = bot
+        self.db = db
+        self.conf = conf
+        
+        # Update button labels from config
+        for item in self.children:
+            if hasattr(item, 'custom_id'):
+                if item.custom_id == "checkin_daily":
+                    item.label = conf['checkin_button_daily_text']
+                elif item.custom_id == "checkin_makeup":
+                    item.label = conf['checkin_button_makeup_text']
+                elif item.custom_id == "checkin_query":
+                    item.label = conf['checkin_button_query_text']
+    
+    @discord.ui.button(
+        label="✅ 每日签到",
+        style=discord.ButtonStyle.primary,
+        custom_id="checkin_daily"
+    )
+    async def daily_checkin_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        
+        # Check if user is in voice channel
+        if not interaction.user.voice or not interaction.user.voice.channel:
+            await interaction.response.send_message(
+                self.conf['checkin_daily_not_in_voice_private'],
+                ephemeral=True
+            )
+            return
+        
+        user_id = interaction.user.id
+        checkin_result = await self.db.record_checkin(user_id)
+        
+        if not checkin_result["already_checked_in"]:
+            # Successful checkin
+            reward = self.conf['checkin_daily_reward']
+            new_balance = await self.db.update_user_balance_with_record(
+                user_id,
+                reward,
+                "checkin",
+                user_id,
+                f"Daily check-in (streak: {checkin_result['streak']})"
+            )
+            
+            # Update embed statistics and refresh all embed panels
+            await self.update_checkin_embeds_after_checkin(user_id)
+            
+            # Create private embed response
+            embed = self.create_private_checkin_embed(
+                interaction.user,
+                new_balance,
+                checkin_result["streak"],
+                checkin_result["max_streak"],
+                False
+            )
+            
+            await interaction.response.send_message(
+                self.conf['checkin_daily_success_private'].format(reward=reward),
+                embed=embed,
+                ephemeral=True
+            )
+        else:
+            # Already checked in
+            balance = await self.db.get_user_balance(user_id)
+            checkin_status = await self.db.get_checkin_status(user_id)
+            
+            # Create private embed with last checkin date
+            embed = self.create_private_checkin_embed(
+                interaction.user,
+                balance,
+                checkin_status["streak"],
+                checkin_status["max_streak"],
+                True,
+                checkin_status["last_checkin"]
+            )
+            
+            await interaction.response.send_message(
+                self.conf['checkin_daily_already_private'],
+                embed=embed,
+                ephemeral=True
+            )
+    
+    @discord.ui.button(
+        label="⏰ 补签",
+        style=discord.ButtonStyle.success,
+        custom_id="checkin_makeup"
+    )
+    async def makeup_checkin_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        
+        user_id = interaction.user.id
+        
+        # Check remaining makeup count
+        remaining_count = await self.db.get_remaining_makeup_count(user_id)
+        if remaining_count <= 0:
+            await interaction.response.send_message(
+                self.conf['makeup_checkin_no_quota_description'].format(
+                    limit=self.conf['makeup_checkin_limit_per_month']
+                ),
+                ephemeral=True
+            )
+            return
+        
+        # Find missed date
+        missed_date = await self.db.find_latest_missed_checkin(user_id)
+        if not missed_date:
+            await interaction.response.send_message(
+                self.conf['makeup_checkin_no_missed_days_description'],
+                ephemeral=True
+            )
+            return
+        
+        # Check balance
+        balance = await self.db.get_user_balance(user_id)
+        cost = self.conf['makeup_checkin_cost']
+        
+        if balance < cost:
+            await interaction.response.send_message(
+                self.conf['makeup_checkin_insufficient_balance_description'].format(
+                    cost=cost,
+                    balance=balance
+                ),
+                ephemeral=True
+            )
+            return
+        
+        # Show modal
+        modal = CheckinMakeupModal(
+            self.db, user_id, self.conf, 
+            remaining_count, balance, cost, missed_date
+        )
+        await interaction.response.send_modal(modal)
+    
+    @discord.ui.button(
+        label="🔍 签到查询",
+        style=discord.ButtonStyle.secondary,
+        custom_id="checkin_query"
+    )
+    async def query_checkin_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        
+        await interaction.response.defer(ephemeral=True)
+        
+        user = interaction.user
+        balance = await self.db.get_user_balance(user.id)
+        checkin_status = await self.db.get_checkin_status(user.id)
+        
+        # Create status embed
+        embed = self.create_query_embed(user, balance, checkin_status)
+        
+        # Get checkin history file
+        checkin_history = await self.db.get_checkin_history_by_month(user.id)
+        if checkin_history:
+            formatted_history = self.format_checkin_history_file(checkin_history)
+            
+            with tempfile.NamedTemporaryFile('w+', encoding='utf-8', suffix='.txt', delete=False) as temp_file:
+                temp_file.write(formatted_history)
+                temp_file_path = temp_file.name
+            
+            try:
+                file = discord.File(
+                    temp_file_path, 
+                    filename=self.conf['query_button_file_name'].format(user_name=user.name)
+                )
+                await interaction.followup.send(
+                    embed=embed,
+                    file=file,
+                    ephemeral=True
+                )
+            finally:
+                try:
+                    os.unlink(temp_file_path)
+                except:
+                    pass
+        else:
+            await interaction.followup.send(embed=embed, ephemeral=True)
+    
+    def create_private_checkin_embed(self, user, balance, streak, max_streak, already_checked_in=False, last_checkin=None):
+        """Create private embed for checkin response."""
+        embed = discord.Embed(
+            title=self.conf['checkin_private_embed_title'].format(user_name=user.display_name),
+            color=discord.Color.gold()
+        )
+        
+        if user.avatar:
+            embed.set_thumbnail(url=user.avatar.url)
+        elif self.bot.user.avatar:
+            embed.set_thumbnail(url=self.bot.user.avatar.url)
+        
+        embed.add_field(
+            name="",
+            value=self.conf['checkin_embed_balance'].format(balance=balance),
+            inline=False
+        )
+        
+        embed.add_field(
+            name="",
+            value=self.conf['checkin_embed_streak'].format(streak=streak),
+            inline=True
+        )
+        
+        embed.add_field(
+            name="",
+            value=self.conf['checkin_embed_max_streak'].format(max_streak=max_streak),
+            inline=True
+        )
+        
+        if already_checked_in and last_checkin:
+            last_date = datetime.fromisoformat(last_checkin).strftime('%Y-%m-%d')
+            embed.add_field(
+                name="📅 最后签到",
+                value=last_date,
+                inline=False
+            )
+        
+        embed.set_footer(
+            text=self.conf['checkin_footer'].format(reward=self.conf['checkin_daily_reward'])
+        )
+        
+        return embed
+    
+    def create_query_embed(self, user, balance, checkin_status):
+        """Create embed for query response."""
+        embed = discord.Embed(
+            title=self.conf['query_button_response_title'],
+            color=discord.Color.blue()
+        )
+        
+        if user.avatar:
+            embed.set_thumbnail(url=user.avatar.url)
+        elif self.bot.user.avatar:
+            embed.set_thumbnail(url=self.bot.user.avatar.url)
+        
+        embed.add_field(
+            name="👤 用户",
+            value=user.display_name,
+            inline=False
+        )
+        
+        embed.add_field(
+            name="💰 当前积分",
+            value=f"{balance}",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="🔥 连续签到",
+            value=f"{checkin_status['streak']}天",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="⭐ 最大连续签到",
+            value=f"{checkin_status['max_streak']}天",
+            inline=True
+        )
+        
+        if checkin_status["last_checkin"]:
+            last_date = datetime.fromisoformat(checkin_status["last_checkin"]).strftime('%Y-%m-%d')
+            embed.add_field(
+                name="📅 最后签到",
+                value=last_date,
+                inline=False
+            )
+        
+        return embed
+    
+    def format_checkin_history_file(self, checkin_history):
+        """Format checkin history for file output."""
+        month_width = 9
+        count_width = 9
+        
+        header = self.conf['checkin_history_header']
+        formatted_text = header + "\n"
+        formatted_text += "-" * (month_width + count_width + 40) + "\n"
+        
+        for month_data in checkin_history:
+            year_month, days = month_data
+            day_count = len(days)
+            compressed_days = self.compress_day_ranges(days)
+            formatted_text += f"{year_month:^{month_width}}|{day_count:^{count_width}}| {compressed_days}\n"
+        
+        return formatted_text
+    
+    def compress_day_ranges(self, days):
+        """Compress days into ranges."""
+        if not days:
+            return ""
+        
+        days = sorted(int(day) for day in days)
+        ranges = []
+        range_start = days[0]
+        range_end = days[0]
+        
+        for day in days[1:]:
+            if day == range_end + 1:
+                range_end = day
+            else:
+                if range_start == range_end:
+                    ranges.append(str(range_start))
+                else:
+                    ranges.append(f"{range_start}-{range_end}")
+                range_start = range_end = day
+        
+        if range_start == range_end:
+            ranges.append(str(range_start))
+        else:
+            ranges.append(f"{range_start}-{range_end}")
+        
+        return ", ".join(ranges)
 
 
 class BalanceModifyModal(discord.ui.Modal):
@@ -234,161 +633,197 @@ class ShopCog(commands.Cog):
     async def cog_load(self):
         """Initialize database when cog loads."""
         await self.db.initialize_database()
+        
+        # Set up checkin embed view
+        self.checkin_view = CheckinEmbedView(self.bot, self.db, self.conf)
+        self.bot.add_view(self.checkin_view)
+        
+        # Start daily embed update task
+        if not self.update_daily_embeds.is_running():
+            self.update_daily_embeds.start()
+        
+        # Recover existing embed views on bot restart
+        await self.recover_embed_views()
 
-    @app_commands.command(name="checkin", description="每日签到！")
-    async def checkin(self, interaction: discord.Interaction):
-        """Daily check-in command to earn points."""
-        # Check if user is in a voice channel
-        if not await check_voice_state(interaction):
-            await interaction.response.send_message(
-                self.conf['checkin_not_in_voice_message'],
-                ephemeral=True
-            )
-            return
+    @tasks.loop(minutes=30)
+    async def update_daily_embeds(self):
+        """Check and update daily embeds every 30 minutes."""
+        try:
+            current_date = datetime.now().strftime('%Y-%m-%d')
+            active_embeds = await self.db.get_active_checkin_embeds()
+            
+            for embed_data in active_embeds:
+                # Check if embed needs daily update
+                if embed_data['created_date'] != current_date:
+                    # Reset daily stats in database
+                    await self.db.reset_daily_embed_stats(current_date)
+                    
+                    # Update the actual embed message
+                    try:
+                        channel = self.bot.get_channel(embed_data['channel_id'])
+                        if channel:
+                            message = await channel.fetch_message(embed_data['message_id'])
+                            if message:
+                                new_embed = await self.create_daily_checkin_embed(current_date)
+                                await message.edit(embed=new_embed, view=self.checkin_view)
+                    except:
+                        # If embed message no longer exists, deactivate it
+                        await self.db.deactivate_checkin_embed(embed_data['id'])
+        except Exception as e:
+            logging.error(f"Error in daily embed update: {e}")
 
-        # Attempt to check in
-        user_id = interaction.user.id
-        checkin_result = await self.db.record_checkin(user_id)
+    async def recover_embed_views(self):
+        """Recover embed views after bot restart."""
+        try:
+            active_embeds = await self.db.get_active_checkin_embeds()
+            for embed_data in active_embeds:
+                try:
+                    channel = self.bot.get_channel(embed_data['channel_id'])
+                    if channel:
+                        message = await channel.fetch_message(embed_data['message_id'])
+                        if message:
+                            # Re-add the view to existing embed
+                            await message.edit(view=self.checkin_view)
+                        else:
+                            # Message not found, deactivate
+                            await self.db.deactivate_checkin_embed(embed_data['id'])
+                except:
+                    # Channel or message not accessible, deactivate
+                    await self.db.deactivate_checkin_embed(embed_data['id'])
+        except Exception as e:
+            logging.error(f"Error recovering embed views: {e}")
 
-        if not checkin_result["already_checked_in"]:
-            # Successful new check-in
-            reward = self.conf['checkin_daily_reward']
-
-            # Update balance and record transaction
-            new_balance = await self.db.update_user_balance_with_record(
-                user_id,
-                reward,
-                "checkin",
-                user_id,
-                f"Daily check-in (streak: {checkin_result['streak']})"
-            )
-
-            response_message = self.conf['checkin_success_message'].format(reward=reward)
+    async def create_daily_checkin_embed(self, date_str: str) -> discord.Embed:
+        """Create the daily checkin embed."""
+        # Get today's statistics
+        today_count = await self.db.get_today_checkin_count(date_str)
+        first_user_id = await self.db.get_today_first_checkin_user(date_str)
+        
+        # Create embed with date in title
+        embed = discord.Embed(
+            title=self.conf['checkin_embed_title'].format(date=date_str),
+            description=self.conf['checkin_embed_description'],
+            color=int(self.conf['checkin_embed_color'], 16)
+        )
+        
+        # Add checkin count field
+        count_text = str(today_count) if today_count > 0 else self.conf['checkin_embed_no_checkin']
+        embed.add_field(
+            name=self.conf['checkin_embed_count_field'],
+            value=count_text,
+            inline=True
+        )
+        
+        # Add first checkin user field
+        if first_user_id:
+            first_user = self.bot.get_user(first_user_id)
+            first_user_text = first_user.mention if first_user else f"<@{first_user_id}>"
         else:
-            # Already checked in today
-            new_balance = await self.db.get_user_balance(user_id)
-            response_message = self.conf['checkin_already_message']
-
-        # Create embed with check-in information
-        embed = self.create_checkin_embed(
-            interaction.user,
-            new_balance,
-            checkin_result["streak"],
-            checkin_result["max_streak"]
-        )
-
-        # Send response (visible to everyone)
-        await interaction.response.send_message(response_message, embed=embed)
-
-    def create_checkin_embed(self, user, balance, streak, max_streak):
-        """Create an embed showing check-in information."""
-        embed = discord.Embed(
-            title=self.conf['checkin_embed_title'].format(user_name=user.display_name),
-            color=discord.Color.gold()
-        )
-
-        # Add user avatar as thumbnail
-        if user.avatar:
-            embed.set_thumbnail(url=user.avatar.url)
-        # else use bot avatar instead
-        elif self.bot.user.avatar:
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
-
-        # Add fields with check-in information
+            first_user_text = self.conf['checkin_embed_no_checkin']
+        
         embed.add_field(
-            name="",
-            value=self.conf['checkin_embed_balance'].format(balance=balance),
-            inline=False
-        )
-
-        embed.add_field(
-            name="",
-            value=self.conf['checkin_embed_streak'].format(streak=streak),
+            name=self.conf['checkin_embed_first_field'],
+            value=first_user_text,
             inline=True
         )
-
-        embed.add_field(
-            name="",
-            value=self.conf['checkin_embed_max_streak'].format(max_streak=max_streak),
-            inline=True
-        )
-
-        # Add footer with reward info
-        embed.set_footer(
-            text=self.conf['checkin_footer'].format(reward=self.conf['checkin_daily_reward'])
-        )
-
+        
+        # Set footer with bot avatar
+        footer_text = self.conf['checkin_embed_footer']
+        if self.bot.user.avatar:
+            embed.set_footer(text=footer_text, icon_url=self.bot.user.avatar.url)
+        else:
+            embed.set_footer(text=footer_text)
+        
+        # Set checkin image
+        embed.set_image(url="attachment://checkin.png")
+        
         return embed
 
-    def create_checkin_status_embed(self, user, balance, streak, max_streak):
-        """Create an embed showing check-in status information (different from actual check-in)."""
-        embed = discord.Embed(
-            title=self.conf['checkin_check_embed_title'],
-            description=self.conf['checkin_check_embed_description'],
-            color=discord.Color.blue()
-        )
+    async def update_checkin_embeds_after_checkin(self, user_id: int):
+        """Update all active checkin embeds after someone checks in."""
+        try:
+            current_date = datetime.now().strftime('%Y-%m-%d')
+            active_embeds = await self.db.get_active_checkin_embeds()
+            
+            for embed_data in active_embeds:
+                try:
+                    channel = self.bot.get_channel(embed_data['channel_id'])
+                    if channel:
+                        message = await channel.fetch_message(embed_data['message_id'])
+                        if message:
+                            # Update embed with new statistics
+                            new_embed = await self.create_daily_checkin_embed(current_date)
+                            
+                            # For updating existing embed, we need to create file again
+                            image_path = os.path.join(os.path.dirname(__file__), '..', '..', 'resources', 'images', 'checkin.png')
+                            file = discord.File(image_path, filename="checkin.png")
+                            
+                            await message.edit(embed=new_embed, attachments=[file])
+                        else:
+                            # Message not found, deactivate
+                            await self.db.deactivate_checkin_embed(embed_data['id'])
+                    else:
+                        # Channel not found, deactivate
+                        await self.db.deactivate_checkin_embed(embed_data['id'])
+                except Exception as e:
+                    logging.error(f"Error updating embed {embed_data['id']}: {e}")
+                    # If update fails, try to deactivate
+                    try:
+                        await self.db.deactivate_checkin_embed(embed_data['id'])
+                    except:
+                        pass
+        except Exception as e:
+            logging.error(f"Error in update_checkin_embeds_after_checkin: {e}")
 
-        # Add user avatar as thumbnail
-        if user.avatar:
-            embed.set_thumbnail(url=user.avatar.url)
-        elif self.bot.user.avatar:
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
-
-        # Add fields with check-in information
-        embed.add_field(
-            name="👤 用户",
-            value=user.display_name,
-            inline=False
-        )
-
-        embed.add_field(
-            name="💰 当前积分",
-            value=f"{balance}",
-            inline=True
-        )
-
-        embed.add_field(
-            name="🔥 连续签到",
-            value=f"{streak}天",
-            inline=True
-        )
-
-        embed.add_field(
-            name="⭐ 最大连续签到",
-            value=f"{max_streak}天",
-            inline=True
-        )
-
-        return embed
-
-    @app_commands.command(name="checkin_check", description="查看签到与余额信息")
-    @app_commands.describe(user="要查看的用户 (默认为自己)")
-    async def checkin_check(self, interaction: discord.Interaction, user: discord.User = None):
-        """Check balance and check-in status for any user."""
-        target_user = user or interaction.user
-
-        # Get user balance and check-in status
-        balance = await self.db.get_user_balance(target_user.id)
-        checkin_status = await self.db.get_checkin_status(target_user.id)
-
-        # Create an embed with the information
-        embed = self.create_checkin_status_embed(
-            target_user,
-            balance,
-            checkin_status["streak"],
-            checkin_status["max_streak"]
-        )
-
-        # Add last check-in date if available
-        if checkin_status["last_checkin"]:
-            last_date = datetime.fromisoformat(checkin_status["last_checkin"]).strftime('%Y-%m-%d')
-            embed.add_field(
-                name="📅 最后签到",
-                value=last_date,
-                inline=False
+    @app_commands.command(name="create_checkin_embed", description="创建签到面板(管理员)")
+    @app_commands.describe(channel="选择要创建签到面板的频道")
+    async def create_checkin_embed(self, interaction: discord.Interaction, channel: discord.TextChannel):
+        """Create a checkin embed panel in the specified channel."""
+        if not await check_channel_validity(interaction):
+            return
+        
+        await interaction.response.defer()
+        
+        try:
+            current_date = datetime.now().strftime('%Y-%m-%d')
+            
+            # Create embed
+            embed = await self.create_daily_checkin_embed(current_date)
+            
+            # Read checkin image file
+            image_path = os.path.join(os.path.dirname(__file__), '..', '..', 'resources', 'images', 'checkin.png')
+            file = discord.File(image_path, filename="checkin.png")
+            
+            # Send embed with view
+            message = await channel.send(
+                embed=embed, 
+                file=file, 
+                view=self.checkin_view
+            )
+            
+            # Save to database (will automatically deactivate any existing embed)
+            success = await self.db.create_checkin_embed_record(
+                channel.id, 
+                message.id, 
+                current_date
+            )
+            
+            if success:
+                await interaction.followup.send(
+                    self.conf['create_embed_success'].format(channel=channel.mention) + 
+                    "\n💡 如果该频道之前有签到面板，旧的已自动停用"
+                )
+            else:
+                await interaction.followup.send(
+                    self.conf['create_embed_error'].format(error="数据库保存失败")
+                )
+                
+        except Exception as e:
+            logging.error(f"Error creating checkin embed: {e}")
+            await interaction.followup.send(
+                self.conf['create_embed_error'].format(error=str(e))
             )
 
-        await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="balance_change", description="修改用户余额(仅管理员)")
     @app_commands.describe(user="要修改余额的用户")
@@ -439,52 +874,102 @@ class ShopCog(commands.Cog):
         )
         view.message = message
 
-    @app_commands.command(name="checkin_history", description="查看签到历史记录")
-    @app_commands.describe(user="指定用户(仅管理员)")
-    async def checkin_history(self, interaction: discord.Interaction, user: discord.User = None):
-        """View check-in history by month."""
-        target_user = user or interaction.user
-
-        # If checking another user's history, verify admin channel
-        if user and user.id != interaction.user.id:
-            if not await check_channel_validity(interaction):
-                return
+    @app_commands.command(name="checkin_history", description="查看用户签到详情(管理员)")
+    @app_commands.describe(user="必须选择用户")
+    async def checkin_history(self, interaction: discord.Interaction, user: discord.User):
+        """Admin-only command to view comprehensive checkin details for a user."""
+        # Admin channel validation
+        if not await check_channel_validity(interaction):
+            return
 
         # Defer response as this might take time
         await interaction.response.defer(ephemeral=True)
 
+        # Get user balance and checkin status
+        balance = await self.db.get_user_balance(user.id)
+        checkin_status = await self.db.get_checkin_status(user.id)
+        
+        # Create comprehensive admin embed
+        embed = discord.Embed(
+            title=self.conf['admin_history_title'].format(user_name=user.display_name),
+            color=discord.Color.blue()
+        )
+        
+        # Add user avatar
+        if user.avatar:
+            embed.set_thumbnail(url=user.avatar.url)
+        elif self.bot.user.avatar:
+            embed.set_thumbnail(url=self.bot.user.avatar.url)
+        
+        # Add comprehensive information fields
+        embed.add_field(
+            name=self.conf['admin_history_balance_field'],
+            value=str(balance),
+            inline=True
+        )
+        
+        embed.add_field(
+            name=self.conf['admin_history_current_streak_field'],
+            value=f"{checkin_status['streak']}天",
+            inline=True
+        )
+        
+        embed.add_field(
+            name=self.conf['admin_history_max_streak_field'],
+            value=f"{checkin_status['max_streak']}天",
+            inline=True
+        )
+        
+        # Last checkin date
+        if checkin_status["last_checkin"]:
+            last_date = datetime.fromisoformat(checkin_status["last_checkin"]).strftime('%Y-%m-%d')
+        else:
+            last_date = self.conf['admin_history_no_last_checkin']
+            
+        embed.add_field(
+            name=self.conf['admin_history_last_checkin_field'],
+            value=last_date,
+            inline=False
+        )
+
         # Get monthly check-in history
-        checkin_history = await self.db.get_checkin_history_by_month(target_user.id)
+        checkin_history = await self.db.get_checkin_history_by_month(user.id)
+        
+        logging.info(f"Checkin history for user {user.id}: {checkin_history}")
 
-        if not checkin_history:
-            await interaction.followup.send(
-                self.conf['checkin_history_no_data'],
-                ephemeral=True
-            )
-            return
+        if checkin_history:
+            # Format check-in history for the temporary file
+            formatted_history = self.format_checkin_history(checkin_history)
+            logging.info(f"Formatted history length: {len(formatted_history)}")
 
-        # Format check-in history for the temporary file
-        formatted_history = self.format_checkin_history(checkin_history)
+            # Create a temporary file
+            with tempfile.NamedTemporaryFile('w+', encoding='utf-8', suffix='.txt', delete=False) as temp_file:
+                temp_file.write(formatted_history)
+                temp_file_path = temp_file.name
 
-        # Create a temporary file
-        with tempfile.NamedTemporaryFile('w+', encoding='utf-8', suffix='.txt', delete=False) as temp_file:
-            temp_file.write(formatted_history)
-            temp_file_path = temp_file.name
-
-        try:
-            # Send the file
-            file = discord.File(temp_file_path, filename=f"checkin_history_{target_user.name}.txt")
-            await interaction.followup.send(
-                self.conf['checkin_history_message'].format(user_name=target_user.display_name),
-                file=file,
-                ephemeral=True
-            )
-        finally:
-            # Clean up
             try:
-                os.unlink(temp_file_path)
-            except:
-                pass
+                # Send embed with file (public response)
+                file = discord.File(temp_file_path, filename=f"checkin_history_{user.name}.txt")
+                await interaction.followup.send(
+                    embed=embed,
+                    file=file,
+                    ephemeral=False
+                )
+                logging.info(f"Sent checkin history file for user {user.id}")
+            except Exception as e:
+                logging.error(f"Error sending checkin history file: {e}")
+                # Send embed without file if file sending fails
+                await interaction.followup.send(embed=embed, ephemeral=False)
+            finally:
+                # Clean up
+                try:
+                    os.unlink(temp_file_path)
+                except:
+                    pass
+        else:
+            # Send just the embed if no history (public response)
+            logging.info(f"No checkin history found for user {user.id}")
+            await interaction.followup.send(embed=embed, ephemeral=False)
 
     def format_checkin_history(self, checkin_history):
         """Format check-in history into a readable text format."""
@@ -547,145 +1032,3 @@ class ShopCog(commands.Cog):
         # Join all ranges with commas
         return ", ".join(ranges)
 
-    @app_commands.command(name="checkin_makeup", description="补签功能，消耗积分补签漏签日期")
-    async def checkin_makeup(self, interaction: discord.Interaction):
-        """Makeup check-in command to make up for missed days."""
-        user_id = interaction.user.id
-        
-        # Check remaining makeup count
-        remaining_count = await self.db.get_remaining_makeup_count(user_id)
-        if remaining_count <= 0:
-            embed = discord.Embed(
-                title=self.conf['makeup_checkin_no_quota_title'],
-                description=self.conf['makeup_checkin_no_quota_description'].format(
-                    limit=self.conf['makeup_checkin_limit_per_month']
-                ),
-                color=discord.Color.red()
-            )
-            embed.set_thumbnail(url=interaction.user.avatar.url if interaction.user.avatar else None)
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            return
-        
-        # Check if user has any manual check-ins first
-        first_checkin = await self.db.get_first_checkin_date(user_id)
-        if not first_checkin:
-            embed = discord.Embed(
-                title=self.conf['makeup_checkin_no_manual_checkin_title'],
-                description=self.conf['makeup_checkin_no_manual_checkin_description'],
-                color=discord.Color.orange()
-            )
-            embed.set_thumbnail(url=interaction.user.avatar.url if interaction.user.avatar else None)
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            return
-        
-        # Find the latest missed check-in date
-        missed_date = await self.db.find_latest_missed_checkin(user_id)
-        if not missed_date:
-            embed = discord.Embed(
-                title=self.conf['makeup_checkin_no_missed_days_title'],
-                description=self.conf['makeup_checkin_no_missed_days_description'],
-                color=discord.Color.blue()
-            )
-            embed.set_thumbnail(url=interaction.user.avatar.url if interaction.user.avatar else None)
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            return
-        
-        # Check user balance
-        current_balance = await self.db.get_user_balance(user_id)
-        makeup_cost = self.conf['makeup_checkin_cost']
-        
-        if current_balance < makeup_cost:
-            embed = discord.Embed(
-                title=self.conf['makeup_checkin_insufficient_balance_title'],
-                description=self.conf['makeup_checkin_insufficient_balance_description'].format(
-                    cost=makeup_cost,
-                    balance=current_balance
-                ),
-                color=discord.Color.red()
-            )
-            embed.set_thumbnail(url=interaction.user.avatar.url if interaction.user.avatar else None)
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            return
-        
-        # Perform makeup check-in
-        success = await self.db.add_makeup_record(user_id, missed_date)
-        if not success:
-            embed = discord.Embed(
-                title=self.conf['makeup_checkin_no_quota_title'],
-                description=self.conf['makeup_checkin_no_quota_description'].format(
-                    limit=self.conf['makeup_checkin_limit_per_month']
-                ),
-                color=discord.Color.red()
-            )
-            embed.set_thumbnail(url=interaction.user.avatar.url if interaction.user.avatar else None)
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            return
-        
-        # Deduct balance and record transaction
-        new_balance = await self.db.update_user_balance_with_record(
-            user_id,
-            -makeup_cost,
-            "makeup_checkin",
-            user_id,
-            f"Makeup check-in for {missed_date}"
-        )
-        
-        # Get updated remaining count
-        new_remaining_count = await self.db.get_remaining_makeup_count(user_id)
-        
-        # Get updated check-in status for streak information
-        updated_checkin_status = await self.db.get_checkin_status(user_id)
-        
-        # Create success embed
-        embed = discord.Embed(
-            title=self.conf['makeup_checkin_success_title'],
-            description=self.conf['makeup_checkin_success_description'].format(cost=makeup_cost),
-            color=discord.Color.green()
-        )
-        
-        # Add user avatar as thumbnail
-        if interaction.user.avatar:
-            embed.set_thumbnail(url=interaction.user.avatar.url)
-        elif self.bot.user.avatar:
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
-        
-        # Add fields
-        embed.add_field(
-            name="📅 补签日期",
-            value=missed_date,
-            inline=True
-        )
-        
-        embed.add_field(
-            name="💰 当前积分",
-            value=f"{new_balance}",
-            inline=True
-        )
-        
-        embed.add_field(
-            name=self.conf['makeup_checkin_remaining_field'],
-            value=f"{new_remaining_count}/{self.conf['makeup_checkin_limit_per_month']}",
-            inline=True
-        )
-        
-        # Add streak information
-        embed.add_field(
-            name="🔥 连续签到",
-            value=f"{updated_checkin_status['streak']}天",
-            inline=True
-        )
-        
-        embed.add_field(
-            name="⭐ 最大连续签到",
-            value=f"{updated_checkin_status['max_streak']}天",
-            inline=True
-        )
-        
-        # Add footer
-        embed.set_footer(text=f"💸 补签消耗 {makeup_cost} 积分")
-        
-        await interaction.response.send_message(embed=embed)
-
-
-async def setup(bot):
-    await bot.add_cog(ShopCog(bot))

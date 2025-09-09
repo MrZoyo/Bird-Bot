@@ -14,14 +14,7 @@ from pathlib import Path
 from bot.utils import config, check_channel_validity
 
 
-class AddChannelForm(ui.Modal, title='Add Voice Channel Configuration'):
-    channel_id = ui.TextInput(
-        label='Channel ID',
-        placeholder='Enter the voice channel ID',
-        required=True,
-        min_length=17,
-        max_length=20
-    )
+class AddChannelForm(ui.Modal):
     name_prefix = ui.TextInput(
         label='Room Name Prefix',
         placeholder='Enter the prefix for created rooms (e.g., "游戏房")',
@@ -36,23 +29,13 @@ class AddChannelForm(ui.Modal, title='Add Voice Channel Configuration'):
         default="public"
     )
 
-    def __init__(self, cog):
-        super().__init__()
+    def __init__(self, cog, channel):
+        super().__init__(title=f'Configure Voice Channel: {channel.name}')
         self.cog = cog
+        self.channel = channel
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer()
-
-        # Validate channel ID
-        try:
-            channel_id = int(self.channel_id.value)
-            channel = interaction.guild.get_channel(channel_id)
-            if not channel or not isinstance(channel, discord.VoiceChannel):
-                await interaction.followup.send("Invalid channel ID or channel is not a voice channel.", ephemeral=True)
-                return
-        except ValueError:
-            await interaction.followup.send("Invalid channel ID format.", ephemeral=True)
-            return
 
         # Validate channel type
         if self.channel_type.value.lower() not in ['public', 'private']:
@@ -66,7 +49,7 @@ class AddChannelForm(ui.Modal, title='Add Voice Channel Configuration'):
         }
 
         # Update the cog's channel_configs
-        self.cog.channel_configs[channel_id] = config_data
+        self.cog.channel_configs[self.channel.id] = config_data
 
         # Save to file
         await self.cog.save_channel_configs()
@@ -74,7 +57,7 @@ class AddChannelForm(ui.Modal, title='Add Voice Channel Configuration'):
         # Create and send embed with all configurations
         embed = await self.cog.format_channel_configs_embed(
             title="Voice Channel Configuration Added",
-            description=f"Successfully added configuration for {channel.mention}",
+            description=f"Successfully added configuration for {self.channel.mention}",
             color=discord.Color.green()
         )
         await interaction.followup.send(embed=embed)
@@ -390,12 +373,12 @@ class VoiceStateCog(commands.Cog):
             await interaction.response.send_message(self.soundboard_enabled_message,
                                                     ephemeral=True)
 
-    async def format_channel_configs_embed(self, title=None, description=None):
+    async def format_channel_configs_embed(self, title=None, description=None, color=None):
         """Helper method to create an embed showing all voice channel configurations."""
         embed = discord.Embed(
             title=title or "Voice Channel Configurations",
             description=description,
-            color=discord.Color.blue()
+            color=color or discord.Color.blue()
         )
 
         config_list = []
@@ -439,60 +422,90 @@ class VoiceStateCog(commands.Cog):
         name="vc_add",
         description="Add a new voice channel for room creation"
     )
-    async def add_voice_channel(self, interaction: discord.Interaction):
+    @app_commands.describe(channel="Select the voice channel to configure")
+    async def add_voice_channel(self, interaction: discord.Interaction, channel: discord.VoiceChannel):
         """Add a new voice channel configuration for room creation."""
         if not await check_channel_validity(interaction):
             return
 
-        # Show the modal
-        await interaction.response.send_modal(AddChannelForm(self))
+        # Check if channel already has configuration
+        if channel.id in self.channel_configs:
+            await interaction.response.send_message(
+                f"Channel {channel.mention} already has a configuration.", 
+                ephemeral=True
+            )
+            return
+
+        # Show the modal with channel info
+        await interaction.response.send_modal(AddChannelForm(self, channel))
 
     @app_commands.command(
         name="vc_remove",
         description="Remove a voice channel from room creation"
     )
-    @app_commands.describe(channel_id="The ID of the voice channel to remove")
-    async def remove_voice_channel(self, interaction: discord.Interaction, channel_id: str):
+    @app_commands.describe(
+        channel="Select voice channel to remove (if channel still exists)",
+        channel_id="Enter channel ID manually (if channel was deleted)"
+    )
+    async def remove_voice_channel(
+        self, 
+        interaction: discord.Interaction, 
+        channel: discord.VoiceChannel = None,
+        channel_id: str = None
+    ):
         """Remove a voice channel configuration."""
         if not await check_channel_validity(interaction):
             return
 
+        # Parameter validation: at least one must be provided
+        if not channel and not channel_id:
+            await interaction.response.send_message(
+                "Please provide either a channel selection or channel ID.", 
+                ephemeral=True
+            )
+            return
+        
         await interaction.response.defer()
 
-        try:
-            channel_id = int(channel_id)
-        except ValueError:
-            await interaction.followup.send("Invalid channel ID format.", ephemeral=True)
-            return
+        # Determine target channel ID (prioritize channel_id if both provided)
+        if channel_id:
+            try:
+                target_channel_id = int(channel_id)
+            except ValueError:
+                await interaction.followup.send("Invalid channel ID format.", ephemeral=True)
+                return
+            
+            # Get channel object for display (might be None if channel was deleted)
+            target_channel = self.bot.get_channel(target_channel_id)
+        else:
+            target_channel_id = channel.id
+            target_channel = channel
 
-        # Check if channel exists and has configuration
-        channel = interaction.guild.get_channel(channel_id)
-        if not channel:
-            await interaction.followup.send("Channel not found.", ephemeral=True)
-            return
-
-        if channel_id not in self.channel_configs:
+        # Check if channel has configuration
+        if target_channel_id not in self.channel_configs:
             await interaction.followup.send("No configuration found for this channel.", ephemeral=True)
             return
 
         # Create confirmation embed and view
+        channel_mention = target_channel.mention if target_channel else f"Channel ID: {target_channel_id} (deleted)"
         embed = discord.Embed(
             title="Confirm Channel Removal",
-            description=f"Are you sure you want to remove the configuration for {channel.mention}?",
+            description=f"Are you sure you want to remove the configuration for {channel_mention}?",
             color=discord.Color.yellow()
         )
         embed.add_field(
             name="Current Configuration",
-            value=f"Name Prefix: {self.channel_configs[channel_id]['name_prefix']}\n"
-                  f"Type: {self.channel_configs[channel_id]['type'].capitalize()}",
+            value=f"Name Prefix: {self.channel_configs[target_channel_id]['name_prefix']}\n"
+                  f"Type: {self.channel_configs[target_channel_id]['type'].capitalize()}",
             inline=False
         )
 
         class DeleteChannelConfirmView(discord.ui.View):
-            def __init__(self, cog, channel_id):
+            def __init__(self, cog, channel_id, channel_obj=None):
                 super().__init__(timeout=60)
                 self.cog = cog
                 self.channel_id = channel_id
+                self.channel = channel_obj
 
             @discord.ui.button(label="Confirm", style=discord.ButtonStyle.danger)
             async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -502,15 +515,17 @@ class VoiceStateCog(commands.Cog):
                     await self.cog.save_channel_configs()
 
                     # Create embed with updated configurations
+                    channel_mention = self.channel.mention if self.channel else f"Channel ID: {self.channel_id} (deleted)"
                     embed = await self.cog.format_channel_configs_embed(
                         title="Voice Channel Configuration Removed",
-                        description=f"Configuration for {channel.mention} has been removed.",
+                        description=f"Configuration for {channel_mention} has been removed.",
                         color=discord.Color.green()
                     )
                 else:
+                    channel_mention = self.channel.mention if self.channel else f"Channel ID: {self.channel_id} (deleted)"
                     embed = discord.Embed(
                         title="Error",
-                        description=f"No configuration found for channel {channel.mention}",
+                        description=f"No configuration found for channel {channel_mention}",
                         color=discord.Color.red()
                     )
 
@@ -532,7 +547,7 @@ class VoiceStateCog(commands.Cog):
                     if isinstance(child, discord.ui.Button):
                         child.disabled = True
 
-        view = DeleteChannelConfirmView(self, channel_id)
+        view = DeleteChannelConfirmView(self, target_channel_id, target_channel)
         await interaction.followup.send(embed=embed, view=view)
 
     async def save_channel_configs(self):

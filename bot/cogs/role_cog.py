@@ -510,17 +510,12 @@ class RoleCog(commands.Cog):
         name="create_role_pickup",
         description="Creates a message on a specific channel for role pickup."
     )
-    @app_commands.describe(channel_id="The channel where the message will be created.")
-    async def create_role_pickup(self, interaction: discord.Interaction, channel_id: str):
+    @app_commands.describe(channel="The channel where the message will be created.")
+    async def create_role_pickup(self, interaction: discord.Interaction, channel: discord.TextChannel):
         if not await check_channel_validity(interaction):
             return
 
         await interaction.response.defer()
-
-        channel = self.bot.get_channel(int(channel_id))
-        if not channel:
-            await interaction.followup.send("Channel not found.", ephemeral=True)
-            return
 
         # Create the role pickup message with the AchievementRoleView as its view
         view = AchievementRoleView(self.bot)
@@ -549,17 +544,12 @@ class RoleCog(commands.Cog):
         name="create_starsign_pickup",
         description="Creates a message on a specific channel for star sign pickup."
     )
-    @app_commands.describe(channel_id="The channel where the message will be created.")
-    async def create_starsign_pickup(self, interaction: discord.Interaction, channel_id: str):
+    @app_commands.describe(channel="The channel where the message will be created.")
+    async def create_starsign_pickup(self, interaction: discord.Interaction, channel: discord.TextChannel):
         if not await check_channel_validity(interaction):
             return
 
         await interaction.response.defer()
-
-        channel = self.bot.get_channel(int(channel_id))
-        if not channel:
-            await interaction.response.send_message("Channel not found.", ephemeral=True)
-            return
 
         # Create the role pickup message with the AchievementRoleView as its view
         view = StarSignView(self.bot)
@@ -588,17 +578,12 @@ class RoleCog(commands.Cog):
         name="create_mbti_pickup",
         description="Creates a message on a specific channel for MBTI pickup."
     )
-    @app_commands.describe(channel_id="The channel where the message will be created.")
-    async def create_mbti_pickup(self, interaction: discord.Interaction, channel_id: str):
+    @app_commands.describe(channel="The channel where the message will be created.")
+    async def create_mbti_pickup(self, interaction: discord.Interaction, channel: discord.TextChannel):
         if not await check_channel_validity(interaction):
             return
 
         await interaction.response.defer()
-
-        channel = self.bot.get_channel(int(channel_id))
-        if not channel:
-            await interaction.response.send_message("Channel not found.", ephemeral=True)
-            return
 
         # Create the role pickup message with the AchievementRoleView as its view
         view = MBTIView(self.bot)
@@ -629,17 +614,12 @@ class RoleCog(commands.Cog):
         name="create_gender_pickup",
         description="Creates a message on a specific channel for gender pickup."
     )
-    @app_commands.describe(channel_id="The channel where the message will be created.")
-    async def create_gender_pickup(self, interaction: discord.Interaction, channel_id: str):
+    @app_commands.describe(channel="The channel where the message will be created.")
+    async def create_gender_pickup(self, interaction: discord.Interaction, channel: discord.TextChannel):
         if not await check_channel_validity(interaction):
             return
 
         await interaction.response.defer()
-
-        channel = self.bot.get_channel(int(channel_id))
-        if not channel:
-            await interaction.response.send_message("Channel not found.", ephemeral=True)
-            return
 
         view = GenderView(self.bot)
 
@@ -665,17 +645,12 @@ class RoleCog(commands.Cog):
         name="create_signature_pickup",
         description="Creates a message for signature settings."
     )
-    @app_commands.describe(channel_id="The channel where the message will be created.")
-    async def create_signature_pickup(self, interaction: discord.Interaction, channel_id: str):
+    @app_commands.describe(channel="The channel where the message will be created.")
+    async def create_signature_pickup(self, interaction: discord.Interaction, channel: discord.TextChannel):
         if not await check_channel_validity(interaction):
             return
 
         await interaction.response.defer()
-
-        channel = self.bot.get_channel(int(channel_id))
-        if not channel:
-            await interaction.followup.send("Channel not found.", ephemeral=True)
-            return
 
         view = SignatureView(self.bot)
         embed = discord.Embed(

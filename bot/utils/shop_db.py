@@ -95,6 +95,21 @@ class ShopDatabaseManager:
                 # Column already exists
                 pass
 
+            # Checkin embeds table for managing daily embed panels
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS shop_checkin_embeds (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    channel_id INTEGER NOT NULL,
+                    message_id INTEGER NOT NULL,
+                    created_date TEXT NOT NULL,
+                    is_active INTEGER DEFAULT 1,
+                    today_checkin_count INTEGER DEFAULT 0,
+                    today_first_checkin_user_id INTEGER,
+                    UNIQUE (channel_id, created_date)
+                )
+            ''')
+            await db.commit()
+
     async def get_user_balance(self, user_id: int) -> int:
         """Get a user's current balance."""
         async with aiosqlite.connect(self.db_path) as db:
@@ -514,4 +529,145 @@ class ShopDatabaseManager:
                   latest_checkin, current_streak, max_streak))
             
             await db.commit()
+
+    # === Checkin Embed Management Methods ===
+    
+    async def create_checkin_embed_record(self, channel_id: int, message_id: int, date_str: str) -> bool:
+        """Create a new checkin embed record. If one exists for this channel and date, replace it."""
+        async with aiosqlite.connect(self.db_path) as db:
+            try:
+                # First, delete any existing embed record for this channel and date
+                await db.execute('''
+                    DELETE FROM shop_checkin_embeds 
+                    WHERE channel_id = ? AND created_date = ?
+                ''', (channel_id, date_str))
+                
+                # Then create the new embed record
+                await db.execute('''
+                    INSERT INTO shop_checkin_embeds (channel_id, message_id, created_date, is_active, today_checkin_count)
+                    VALUES (?, ?, ?, 1, 0)
+                ''', (channel_id, message_id, date_str))
+                await db.commit()
+                return True
+            except Exception as e:
+                logging.error(f"Error creating checkin embed record: {e}")
+                return False
+
+    async def get_active_checkin_embeds(self) -> List[Dict[str, Any]]:
+        """Get all active checkin embeds."""
+        async with aiosqlite.connect(self.db_path) as db:
+            try:
+                cursor = await db.execute('''
+                    SELECT id, channel_id, message_id, created_date, today_checkin_count, today_first_checkin_user_id
+                    FROM shop_checkin_embeds 
+                    WHERE is_active = 1
+                ''')
+                rows = await cursor.fetchall()
+                
+                result = []
+                for row in rows:
+                    result.append({
+                        'id': row[0],
+                        'channel_id': row[1],
+                        'message_id': row[2],
+                        'created_date': row[3],
+                        'today_checkin_count': row[4],
+                        'today_first_checkin_user_id': row[5]
+                    })
+                return result
+            except Exception as e:
+                logging.error(f"Error getting active checkin embeds: {e}")
+                return []
+
+    async def deactivate_checkin_embed(self, embed_id: int) -> bool:
+        """Deactivate a checkin embed."""
+        async with aiosqlite.connect(self.db_path) as db:
+            try:
+                await db.execute('''
+                    UPDATE shop_checkin_embeds 
+                    SET is_active = 0 
+                    WHERE id = ?
+                ''', (embed_id,))
+                await db.commit()
+                return True
+            except Exception as e:
+                logging.error(f"Error deactivating checkin embed: {e}")
+                return False
+
+    async def update_embed_checkin_stats(self, embed_id: int, user_id: int) -> bool:
+        """Update embed checkin statistics when someone checks in."""
+        async with aiosqlite.connect(self.db_path) as db:
+            try:
+                # Get current stats
+                cursor = await db.execute('''
+                    SELECT today_checkin_count, today_first_checkin_user_id
+                    FROM shop_checkin_embeds 
+                    WHERE id = ?
+                ''', (embed_id,))
+                result = await cursor.fetchone()
+                
+                if result:
+                    current_count, first_user = result
+                    new_count = current_count + 1
+                    first_checkin_user = first_user or user_id
+                    
+                    await db.execute('''
+                        UPDATE shop_checkin_embeds 
+                        SET today_checkin_count = ?,
+                            today_first_checkin_user_id = ?
+                        WHERE id = ?
+                    ''', (new_count, first_checkin_user, embed_id))
+                    await db.commit()
+                    return True
+            except Exception as e:
+                logging.error(f"Error updating embed checkin stats: {e}")
+            return False
+
+    async def reset_daily_embed_stats(self, date_str: str) -> bool:
+        """Reset daily statistics for all embeds on date change."""
+        async with aiosqlite.connect(self.db_path) as db:
+            try:
+                # Update created_date and reset stats for all active embeds
+                await db.execute('''
+                    UPDATE shop_checkin_embeds 
+                    SET created_date = ?,
+                        today_checkin_count = 0,
+                        today_first_checkin_user_id = NULL
+                    WHERE is_active = 1
+                ''', (date_str,))
+                await db.commit()
+                return True
+            except Exception as e:
+                logging.error(f"Error resetting daily embed stats: {e}")
+                return False
+
+    async def get_today_checkin_count(self, date_str: str) -> int:
+        """Get total checkin count for today across all users."""
+        async with aiosqlite.connect(self.db_path) as db:
+            try:
+                cursor = await db.execute('''
+                    SELECT COUNT(*) FROM shop_checkin_records
+                    WHERE checkin_date = ?
+                ''', (date_str,))
+                result = await cursor.fetchone()
+                return result[0] if result else 0
+            except Exception as e:
+                logging.error(f"Error getting today checkin count: {e}")
+                return 0
+
+    async def get_today_first_checkin_user(self, date_str: str) -> Optional[int]:
+        """Get the first user who checked in today."""
+        async with aiosqlite.connect(self.db_path) as db:
+            try:
+                cursor = await db.execute('''
+                    SELECT user_id FROM shop_checkin_records
+                    WHERE checkin_date = ?
+                    ORDER BY checkin_timestamp ASC
+                    LIMIT 1
+                ''', (date_str,))
+                result = await cursor.fetchone()
+                return result[0] if result else None
+            except Exception as e:
+                logging.error(f"Error getting today first checkin user: {e}")
+                return None
 

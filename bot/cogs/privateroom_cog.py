@@ -591,8 +591,8 @@ class PrivateRoomCog(commands.Cog):
         name="privateroom_setup",
         description="设置私人房间商店（仅限管理员）"
     )
-    @app_commands.describe(channel_id="要设置商店的频道ID")
-    async def setup_shop(self, interaction: discord.Interaction, channel_id: str):
+    @app_commands.describe(channel="要设置商店的频道")
+    async def setup_shop(self, interaction: discord.Interaction, channel: discord.TextChannel):
         """设置私人房间商店"""
         # 验证管理员权限
         if not await check_channel_validity(interaction):
@@ -610,13 +610,8 @@ class PrivateRoomCog(commands.Cog):
             # 首先验证并清理不存在的旧商店消息
             cleaned_count = await self.verify_shop_messages()
 
-            # 将channel_id转换为整数
-            target_channel_id = int(channel_id)
-            target_channel = self.bot.get_channel(target_channel_id)
-
-            if not target_channel:
-                await interaction.followup.send(f"未找到ID为 {channel_id} 的频道。", ephemeral=True)
-                return
+            # 直接使用传入的频道
+            target_channel = channel
 
             # 检查频道类型
             if not isinstance(target_channel, discord.TextChannel):
@@ -659,8 +654,6 @@ class PrivateRoomCog(commands.Cog):
 
             await interaction.followup.send(response_message, ephemeral=True)
 
-        except ValueError:
-            await interaction.followup.send("无效的频道ID。请提供一个有效的数字ID。", ephemeral=True)
         except Exception as e:
             logging.error(f"Failed to setup private room shop: {e}")
             await interaction.followup.send(
