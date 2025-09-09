@@ -147,9 +147,6 @@ class CheckinEmbedView(discord.ui.View):
                 f"Daily check-in (streak: {checkin_result['streak']})"
             )
             
-            # Update embed statistics and refresh all embed panels
-            await self.cog.update_checkin_embeds_after_checkin(user_id)
-            
             # Create private embed response
             embed = self.create_private_checkin_embed(
                 interaction.user,
@@ -159,11 +156,18 @@ class CheckinEmbedView(discord.ui.View):
                 False
             )
             
+            # IMPORTANT: Respond to interaction first to avoid timeout
             await interaction.response.send_message(
                 self.conf['checkin_daily_success_private'].format(reward=reward),
                 embed=embed,
                 ephemeral=True
             )
+            
+            # Update embed statistics and refresh all embed panels (async, non-blocking)
+            try:
+                await self.cog.update_checkin_embeds_after_checkin(user_id)
+            except Exception as e:
+                logging.error(f"Error updating embeds after checkin: {e}")
         else:
             # Already checked in
             balance = await self.db.get_user_balance(user_id)
