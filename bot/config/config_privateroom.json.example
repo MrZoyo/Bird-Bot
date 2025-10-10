@@ -1,7 +1,8 @@
 {
   "_comment": "====FOR PrivateRoom_Cog=============================================",
-  "points_cost": 900,
-  "voice_hours_threshold": 180,
+  "points_cost": 600,
+  "voice_hours_threshold": 150,
+  "booster_discount_hours": 20,
   "check_time_hour": 8,
   "check_time_minute": 10,
   "room_duration_days": 31,
@@ -24,12 +25,12 @@
     "setup_already": "⚠️ 商店已存在，请先使用 /privateroom_reset 重置系统。",
 
     "shop_title": "🏠 私人房间商店",
-    "shop_description": "在这里你可以购买私人房间，享受你专属的语音空间！\n 每日在签到面板中点击签到按钮可以获得10积分。\n\n💰 价格: **{points_cost}** 积分\n⏰ 有效期: **{duration}** 天\n\n**老\uD83D\uDC26福利:** 上个月__语音时长__满 **{hours_threshold}** 小时即可免费获得！可按比例抵扣积分~\n\n🏠 当前可用: **{available_rooms}/{max_rooms}**",
+    "shop_description": "在这里你可以购买私人房间，享受你专属的语音空间！\n 每日在签到面板中点击签到按钮可以获得10积分。\n\n💰 价格: **{points_cost}** 积分\n⏰ 有效期: **{duration}** 天\n\n**老\uD83D\uDC26福利:** 上个月__语音时长__满 **{hours_threshold}** 小时即可免费获得！可按比例抵扣积分~\n🚀 **助力用户福利:** 额外享受 **{booster_hours}** 小时语音时长加成！\n\n🏠 当前可用: **{available_rooms}/{max_rooms}**",
     "shop_button_label": "🛍️ 购买私人房间",
     "shop_footer": "私人房间到期后将自动删除，包括所有聊天记录。",
 
     "confirm_title": "确认购买私人房间",
-    "confirm_last_month": "📊 上个月语音时长: **{hours}** 小时 ({percentage}%)",
+    "confirm_last_month": "📊 上个月语音时长: **{hours}** 小时",
     "confirm_discount": "💯 享受折扣: **{discount}%** 折扣",
     "confirm_cost": "💰 需支付: **{cost}** 积分",
     "confirm_balance": "💳 当前余额: **{balance}** 积分",
@@ -129,7 +130,10 @@
     "error_room_not_found": "❌ 您的私人房间未找到，请联系管理员。",
     "error_renewal_too_early": "❌ 私人房间剩余时间还有 **{days_remaining}** 天，至少要少于 **{threshold}** 天才能续费。",
     "error_renewal_insufficient_balance_description": "您的积分不足以续费私人房间",
-    "error_renewal_failed": "❌ 续费失败，请联系管理员。"
+    "error_renewal_failed": "❌ 续费失败，请联系管理员。",
+
+    "confirm_booster_bonus": "🚀 助力用户加成: **+{bonus_hours}** 小时",
+    "error_insufficient_balance_booster_info": "💡 成为助力用户可额外获得 {booster_hours} 小时时长加成！"
 
   }
 }

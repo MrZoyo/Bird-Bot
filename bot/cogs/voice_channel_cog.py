@@ -1,4 +1,5 @@
 # bot/cogs/voice_channel_cog.py
+import asyncio
 from asyncio import sleep
 
 import aiosqlite
@@ -176,6 +177,376 @@ class CheckTempChannelView(discord.ui.View):
         await interaction.response.edit_message(embed=embed, view=self)
 
 
+class RoomControlPanelView(discord.ui.View):
+    """房间控制面板View - 包含解锁、上锁、满员、声音板四个按钮"""
+
+    def __init__(self, bot, voice_channel, creator, soundboard_enabled=True, room_type="public"):
+        super().__init__(timeout=None)  # 永久有效
+        self.bot = bot
+        self.voice_channel = voice_channel
+        self.voice_channel_id = voice_channel.id
+        self.creator = creator
+        self.creator_id = creator.id
+        self.soundboard_enabled = soundboard_enabled
+        self.room_type = room_type
+
+        # 加载配置
+        self.conf = config.get_config('voicechannel')
+        self.control_panel_conf = self.conf['control_panel']
+        self.messages = self.control_panel_conf['messages']
+        self.button_labels = self.control_panel_conf['buttons']
+
+        # 添加四个按钮
+        self.unlock_button = discord.ui.Button(
+            style=discord.ButtonStyle.success,
+            label=self.button_labels['unlock_label'],
+            custom_id=f"unlock_{voice_channel.id}"
+        )
+        self.unlock_button.callback = self.unlock_callback
+
+        self.lock_button = discord.ui.Button(
+            style=discord.ButtonStyle.primary,
+            label=self.button_labels['lock_label'],
+            custom_id=f"lock_{voice_channel.id}"
+        )
+        self.lock_button.callback = self.lock_callback
+
+        self.full_button = discord.ui.Button(
+            style=discord.ButtonStyle.danger,
+            label=self.button_labels['full_label'],
+            custom_id=f"full_{voice_channel.id}"
+        )
+        self.full_button.callback = self.full_callback
+
+        self.soundboard_button = discord.ui.Button(
+            style=discord.ButtonStyle.secondary,
+            label=self.button_labels['soundboard_label'],
+            custom_id=f"soundboard_{voice_channel.id}"
+        )
+        self.soundboard_button.callback = self.soundboard_callback
+
+        self.add_item(self.unlock_button)
+        self.add_item(self.lock_button)
+        self.add_item(self.full_button)
+        self.add_item(self.soundboard_button)
+
+    async def unlock_callback(self, interaction: discord.Interaction):
+        """解锁按钮 - 设置房间为公开"""
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            # 检查用户是否在语音频道内
+            if not interaction.user.voice or interaction.user.voice.channel.id != self.voice_channel_id:
+                await interaction.followup.send(self.messages['not_in_voice'], ephemeral=True)
+                return
+
+            # 获取语音频道
+            voice_channel = self.bot.get_channel(self.voice_channel_id)
+            if not voice_channel:
+                await interaction.followup.send(self.messages['channel_not_found'], ephemeral=True)
+                return
+
+            # 设置权限
+            try:
+                await voice_channel.set_permissions(
+                    voice_channel.guild.default_role,
+                    connect=True
+                )
+            except discord.Forbidden:
+                await interaction.followup.send(self.messages['permission_error'], ephemeral=True)
+                return
+            except discord.HTTPException:
+                await interaction.followup.send(self.messages['http_error'], ephemeral=True)
+                return
+
+            # 更新数据库
+            main_config = config.get_config('main')
+            async with aiosqlite.connect(main_config['db_path']) as db:
+                await db.execute('''
+                    UPDATE temp_channels
+                    SET current_room_type = 'public'
+                    WHERE channel_id = ?
+                ''', (self.voice_channel_id,))
+                await db.commit()
+
+            # 更新room_type并刷新embed
+            self.room_type = "public"
+            await self.update_panel_embed(interaction.message)
+
+            await interaction.followup.send(self.messages['unlock_success'], ephemeral=True)
+
+        except Exception as e:
+            logging.error(f"Error in unlock_callback: {e}", exc_info=True)
+            await interaction.followup.send(self.messages['unknown_error'], ephemeral=True)
+
+    async def lock_callback(self, interaction: discord.Interaction):
+        """上锁按钮 - 设置房间为私密"""
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            # 检查用户是否在语音频道内
+            if not interaction.user.voice or interaction.user.voice.channel.id != self.voice_channel_id:
+                await interaction.followup.send(self.messages['not_in_voice'], ephemeral=True)
+                return
+
+            # 获取语音频道
+            voice_channel = self.bot.get_channel(self.voice_channel_id)
+            if not voice_channel:
+                await interaction.followup.send(self.messages['channel_not_found'], ephemeral=True)
+                return
+
+            # 设置权限
+            try:
+                await voice_channel.set_permissions(
+                    voice_channel.guild.default_role,
+                    connect=False
+                )
+            except discord.Forbidden:
+                await interaction.followup.send(self.messages['permission_error'], ephemeral=True)
+                return
+            except discord.HTTPException:
+                await interaction.followup.send(self.messages['http_error'], ephemeral=True)
+                return
+
+            # 更新数据库
+            main_config = config.get_config('main')
+            async with aiosqlite.connect(main_config['db_path']) as db:
+                await db.execute('''
+                    UPDATE temp_channels
+                    SET current_room_type = 'private'
+                    WHERE channel_id = ?
+                ''', (self.voice_channel_id,))
+                await db.commit()
+
+            # 更新room_type并刷新embed
+            self.room_type = "private"
+            await self.update_panel_embed(interaction.message)
+
+            await interaction.followup.send(self.messages['lock_success'], ephemeral=True)
+
+        except Exception as e:
+            logging.error(f"Error in lock_callback: {e}", exc_info=True)
+            await interaction.followup.send(self.messages['unknown_error'], ephemeral=True)
+
+    async def full_callback(self, interaction: discord.Interaction):
+        """满员按钮 - 标记房间满员并从展示板移除"""
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            # 检查用户是否在语音频道内
+            if not interaction.user.voice or interaction.user.voice.channel.id != self.voice_channel_id:
+                await interaction.followup.send(self.messages['not_in_voice'], ephemeral=True)
+                return
+
+            # 获取TeamupDisplayCog
+            teamup_cog = self.bot.get_cog('TeamupDisplayCog')
+            if not teamup_cog:
+                await interaction.followup.send(self.messages['full_error'], ephemeral=True)
+                return
+
+            # 查询该房间最后一条组队信息
+            last_invitation = await teamup_cog.db_manager.get_last_invitation_by_voice_channel(self.voice_channel_id)
+
+            if not last_invitation:
+                await interaction.followup.send(self.messages['full_no_invitation'], ephemeral=True)
+                return
+
+            # 获取消息
+            try:
+                text_channel = self.bot.get_channel(last_invitation['invitation_channel_id'])
+                if not text_channel:
+                    logging.warning(f"Text channel {last_invitation['invitation_channel_id']} not found")
+                    await interaction.followup.send(self.messages['full_channel_not_found'], ephemeral=True)
+                    return
+
+                message = await text_channel.fetch_message(last_invitation['invitation_message_id'])
+            except discord.NotFound:
+                logging.warning(f"Invitation message {last_invitation['invitation_message_id']} not found")
+                # 清理数据库中的无效记录
+                await teamup_cog.db_manager.remove_invalid_invitation(self.voice_channel_id)
+                await interaction.followup.send(self.messages['full_message_deleted'], ephemeral=True)
+                return
+            except discord.Forbidden:
+                logging.error(f"No permission to fetch message {last_invitation['invitation_message_id']}")
+                await interaction.followup.send(self.messages['full_no_permission'], ephemeral=True)
+                return
+
+            # 更新消息为满员状态
+            await self.update_message_to_full(message)
+
+            # 从展示板移除
+            await teamup_cog.remove_teamup_from_display(interaction.user.id, self.voice_channel_id)
+
+            await interaction.followup.send(self.messages['full_success'], ephemeral=True)
+
+        except Exception as e:
+            logging.error(f"Error in full_callback: {e}", exc_info=True)
+            await interaction.followup.send(self.messages['full_error'], ephemeral=True)
+
+    async def soundboard_callback(self, interaction: discord.Interaction):
+        """声音板按钮 - 切换声音板功能"""
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            # 检查是否是房主
+            if interaction.user.id != self.creator_id:
+                await interaction.followup.send(self.messages['not_room_owner'], ephemeral=True)
+                return
+
+            # 获取语音频道
+            voice_channel = self.bot.get_channel(self.voice_channel_id)
+            if not voice_channel:
+                await interaction.followup.send(self.messages['channel_not_found'], ephemeral=True)
+                return
+
+            # 切换声音板权限
+            try:
+                current_overwrites = voice_channel.overwrites_for(voice_channel.guild.default_role)
+                new_soundboard_state = not self.soundboard_enabled
+
+                current_overwrites.update(use_soundboard=new_soundboard_state)
+                await voice_channel.set_permissions(voice_channel.guild.default_role, overwrite=current_overwrites)
+
+            except discord.Forbidden:
+                await interaction.followup.send(self.messages['permission_error'], ephemeral=True)
+                return
+            except discord.HTTPException:
+                await interaction.followup.send(self.messages['http_error'], ephemeral=True)
+                return
+
+            # 更新数据库
+            main_config = config.get_config('main')
+            async with aiosqlite.connect(main_config['db_path']) as db:
+                await db.execute('''
+                    UPDATE temp_channels
+                    SET is_soundboard_enabled = ?
+                    WHERE channel_id = ?
+                ''', (1 if new_soundboard_state else 0, self.voice_channel_id))
+                await db.commit()
+
+            # 更新状态并刷新embed
+            self.soundboard_enabled = new_soundboard_state
+            await self.update_panel_embed(interaction.message)
+
+            message = self.messages['soundboard_enabled'] if new_soundboard_state else self.messages['soundboard_disabled']
+            await interaction.followup.send(message, ephemeral=True)
+
+        except Exception as e:
+            logging.error(f"Error in soundboard_callback: {e}", exc_info=True)
+            await interaction.followup.send(self.messages['unknown_error'], ephemeral=True)
+
+    async def update_panel_embed(self, message):
+        """更新控制面板的embed"""
+        try:
+            embed = self.create_panel_embed()
+            await message.edit(embed=embed, view=self)
+        except Exception as e:
+            logging.error(f"Error updating panel embed: {e}", exc_info=True)
+
+    def create_panel_embed(self):
+        """创建控制面板embed"""
+        soundboard_status = "开启" if self.soundboard_enabled else "关闭"
+        description = self.control_panel_conf['description_template'].format(
+            owner_mention=self.creator.mention,
+            soundboard_status=soundboard_status
+        )
+
+        color = self.control_panel_conf['colors'][self.room_type]
+
+        embed = discord.Embed(
+            title=self.control_panel_conf['title'],
+            description=description,
+            color=color
+        )
+
+        # 设置缩略图为bot头像
+        if self.bot.user.avatar:
+            embed.set_thumbnail(url=self.bot.user.avatar.url)
+
+        embed.set_footer(text=self.control_panel_conf['footer'])
+
+        return embed
+
+    async def update_message_to_full(self, message):
+        """将组队消息更新为满员状态"""
+        try:
+            if not message.embeds:
+                return
+
+            # 获取create_invitation_cog的配置
+            invitation_conf = config.get_config('invitation')
+            roomfull_title = invitation_conf.get('roomfull_title', '【已满员】')
+            invite_embed_content_edited = invitation_conf.get('invite_embed_content_edited', '')
+
+            embed = message.embeds[0]
+
+            # 从原embed的description中提取语音频道信息
+            # 原格式可能是：- 📢 语音频道: ...
+            # 需要从中提取URL和其他信息
+            # 尝试从description中提取voice channel URL
+            import re
+            voice_channel_match = re.search(r'https://discord\.com/channels/\d+/(\d+)', embed.description)
+
+            if voice_channel_match:
+                # 提取必要信息
+                voice_channel_id = voice_channel_match.group(1)
+                guild_id_match = re.search(r'https://discord\.com/channels/(\d+)/\d+', embed.description)
+                guild_id = guild_id_match.group(1) if guild_id_match else ""
+                url = f"https://discord.com/channels/{guild_id}/{voice_channel_id}"
+
+                # 提取mention和time
+                mention_match = re.search(r'<@\d+>', embed.description)
+                mention = mention_match.group(0) if mention_match else ""
+
+                # 提取时间（相对时间格式）
+                time_match = re.search(r'<t:\d+:R>', embed.description)
+                time = time_match.group(0) if time_match else ""
+
+                # 从voice_channel获取name
+                voice_channel = self.bot.get_channel(int(voice_channel_id))
+                channel_name = voice_channel.name if voice_channel else "未知频道"
+
+                # 使用配置的格式创建新description
+                new_description = invite_embed_content_edited.format(
+                    name=channel_name,
+                    url=url,
+                    mention=mention,
+                    time=time
+                )
+            else:
+                # 如果无法提取，保持原description
+                new_description = embed.description
+
+            # 创建新embed
+            new_embed = discord.Embed(
+                title=f"{roomfull_title} ~~{embed.title}~~",
+                description=new_description,
+                color=discord.Color.red()
+            )
+
+            # 保留原有字段
+            for field in embed.fields:
+                new_embed.add_field(name=field.name, value=field.value, inline=field.inline)
+
+            # 保留缩略图和footer
+            if embed.thumbnail:
+                new_embed.set_thumbnail(url=embed.thumbnail.url)
+            if embed.footer:
+                new_embed.set_footer(text=embed.footer.text)
+            if embed.timestamp:
+                new_embed.timestamp = embed.timestamp
+
+            # 移除所有按钮（统一格式：满员后按钮全部消失）
+            await message.edit(embed=new_embed, view=None)
+
+        except discord.Forbidden:
+            logging.error(f"No permission to edit message {message.id}")
+        except discord.NotFound:
+            logging.warning(f"Message {message.id} not found when trying to update to full")
+        except Exception as e:
+            logging.error(f"Error updating message to full: {e}", exc_info=True)
+
+
 class VoiceStateCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -185,11 +556,6 @@ class VoiceStateCog(commands.Cog):
 
         self.conf = config.get_config('voicechannel')
         self.channel_configs = {int(channel_id): c for channel_id, c in self.conf['channel_configs'].items()}
-
-        self.soundboard_not_in_vc_message = self.conf['soundboard_not_in_vc_message']
-        self.soundboard_no_permission_message = self.conf['soundboard_no_permission_message']
-        self.soundboard_disabled_message = self.conf['soundboard_disabled_message']
-        self.soundboard_enabled_message = self.conf['soundboard_enabled_message']
 
         # Start the cleanup task
         self.cleanup_task.start()
@@ -274,13 +640,54 @@ class VoiceStateCog(commands.Cog):
                 await temp_channel.delete(reason="Cleanup unused channel due to user disconnect")
                 if not temp_channel.category.channels:
                     await temp_channel.category.delete(reason="Cleanup unused category")
-                # return
+                return  # 直接返回，不创建控制面板
+
+        # Determine initial room type (default to public unless explicitly set to private)
+        initial_room_type = "private" if conf["type"] == "private" else "public"
 
         # Record the temporary channel in the database
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute('INSERT INTO temp_channels (channel_id, creator_id) VALUES (?, ?)',
-                             (temp_channel.id, member.id))
+            await db.execute('''
+                INSERT INTO temp_channels
+                (channel_id, creator_id, is_soundboard_enabled, current_room_type)
+                VALUES (?, ?, ?, ?)
+            ''', (temp_channel.id, member.id, 1, initial_room_type))
             await db.commit()
+
+        # Send control panel in the voice channel's text chat after a small delay
+        await asyncio.sleep(0.5)
+        await self.send_control_panel(temp_channel, member, initial_room_type)
+
+    async def send_control_panel(self, voice_channel, creator, room_type):
+        """发送房间控制面板到语音频道的文字聊天"""
+        try:
+            # 创建控制面板View和Embed
+            view = RoomControlPanelView(
+                self.bot,
+                voice_channel,
+                creator,
+                soundboard_enabled=True,
+                room_type=room_type
+            )
+
+            embed = view.create_panel_embed()
+
+            # 直接在语音频道的文字聊天中发送消息
+            message = await voice_channel.send(embed=embed, view=view)
+
+            # 保存控制面板消息ID到数据库
+            async with aiosqlite.connect(self.db_path) as db:
+                await db.execute('''
+                    UPDATE temp_channels
+                    SET control_panel_message_id = ?, control_panel_channel_id = ?
+                    WHERE channel_id = ?
+                ''', (message.id, voice_channel.id, voice_channel.id))
+                await db.commit()
+
+            logging.info(f"Control panel sent for room {voice_channel.id}")
+
+        except Exception as e:
+            logging.error(f"Error sending control panel: {e}", exc_info=True)
 
     async def cleanup_channel(self, channel_id):
         channel = self.bot.get_channel(channel_id)
@@ -337,41 +744,6 @@ class VoiceStateCog(commands.Cog):
         message = await interaction.edit_original_response(embeds=[embed], view=view)
         view.message = message
 
-    @app_commands.command(
-        name="set_soundboard",
-        description="Toggle the soundboard functionality for the creator's voice channel"
-    )
-    async def set_soundboard(self, interaction: discord.Interaction):
-        member = interaction.user
-        voice_state = member.voice
-
-        if not voice_state or not voice_state.channel:
-            await interaction.response.send_message(self.soundboard_not_in_vc_message, ephemeral=True)
-            return
-
-        channel = voice_state.channel
-
-        # Check if the user is the creator of the channel
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.execute('SELECT creator_id FROM temp_channels WHERE channel_id = ?', (channel.id,))
-            record = await cursor.fetchone()
-
-        if not record or record[0] != member.id:
-            await interaction.response.send_message(self.soundboard_no_permission_message, ephemeral=True)
-            return
-
-        # Toggle soundboard functionality
-        current_overwrites = channel.overwrites_for(channel.guild.default_role)
-        if current_overwrites.use_soundboard is None or current_overwrites.use_soundboard:
-            current_overwrites.update(use_soundboard=False)
-            await channel.set_permissions(channel.guild.default_role, overwrite=current_overwrites)
-            await interaction.response.send_message(self.soundboard_disabled_message,
-                                                    ephemeral=True)
-        else:
-            current_overwrites.update(use_soundboard=True)
-            await channel.set_permissions(channel.guild.default_role, overwrite=current_overwrites)
-            await interaction.response.send_message(self.soundboard_enabled_message,
-                                                    ephemeral=True)
 
     async def format_channel_configs_embed(self, title=None, description=None, color=None):
         """Helper method to create an embed showing all voice channel configurations."""
@@ -550,6 +922,90 @@ class VoiceStateCog(commands.Cog):
         view = DeleteChannelConfirmView(self, target_channel_id, target_channel)
         await interaction.followup.send(embed=embed, view=view)
 
+    async def restore_control_panels(self):
+        """恢复所有房间控制面板（Bot重启后调用）"""
+        try:
+            async with aiosqlite.connect(self.db_path) as db:
+                cursor = await db.execute('''
+                    SELECT channel_id, creator_id, control_panel_message_id,
+                           is_soundboard_enabled, current_room_type
+                    FROM temp_channels
+                    WHERE control_panel_message_id IS NOT NULL
+                ''')
+                records = await cursor.fetchall()
+
+            restored_count = 0
+            failed_count = 0
+            cleaned_count = 0
+
+            for record in records:
+                try:
+                    voice_channel_id, creator_id, message_id, soundboard, room_type = record
+
+                    # 检查语音频道（语音频道本身就是文字聊天的位置）
+                    voice_channel = self.bot.get_channel(voice_channel_id)
+                    if not voice_channel:
+                        logging.warning(f"Voice channel {voice_channel_id} not found during restore")
+                        failed_count += 1
+                        continue
+
+                    # 获取消息（从语音频道的文字聊天中）
+                    try:
+                        message = await voice_channel.fetch_message(message_id)
+                    except discord.NotFound:
+                        logging.warning(f"Control panel message {message_id} not found")
+                        # 清理数据库
+                        await self.clear_control_panel_data(voice_channel_id)
+                        cleaned_count += 1
+                        failed_count += 1
+                        continue
+                    except discord.Forbidden:
+                        logging.error(f"No permission to fetch message {message_id}")
+                        failed_count += 1
+                        continue
+
+                    # 获取创建者
+                    try:
+                        creator = await self.bot.fetch_user(creator_id)
+                    except:
+                        creator = None
+                        logging.warning(f"Creator {creator_id} not found")
+
+                    # 重新附加View
+                    view = RoomControlPanelView(
+                        self.bot,
+                        voice_channel,
+                        creator,
+                        soundboard_enabled=bool(soundboard),
+                        room_type=room_type or "public"
+                    )
+
+                    await message.edit(view=view)
+                    restored_count += 1
+
+                except Exception as e:
+                    logging.error(f"Error restoring control panel for record {record}: {e}", exc_info=True)
+                    failed_count += 1
+                    continue
+
+            logging.info(f"Control panels restored: {restored_count} success, {failed_count} failed, {cleaned_count} cleaned")
+
+        except Exception as e:
+            logging.error(f"Critical error in restore_control_panels: {e}", exc_info=True)
+
+    async def clear_control_panel_data(self, voice_channel_id: int):
+        """清理控制面板数据"""
+        try:
+            async with aiosqlite.connect(self.db_path) as db:
+                await db.execute('''
+                    UPDATE temp_channels
+                    SET control_panel_message_id = NULL, control_panel_channel_id = NULL
+                    WHERE channel_id = ?
+                ''', (voice_channel_id,))
+                await db.commit()
+        except Exception as e:
+            logging.error(f"Error clearing control panel data: {e}", exc_info=True)
+
     async def save_channel_configs(self):
         """Save the channel configurations to the JSON file."""
         config_path = Path('./bot/config/config_voicechannel.json')
@@ -570,15 +1026,39 @@ class VoiceStateCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        # Ensure the table exists
+        # Ensure the table exists and migrate existing tables
         async with aiosqlite.connect(self.db_path) as db:
+            # Create table if not exists (for new installations)
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS temp_channels (
                     channel_id INTEGER PRIMARY KEY,
                     creator_id INTEGER NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    control_panel_message_id INTEGER,
+                    control_panel_channel_id INTEGER,
+                    is_soundboard_enabled BOOLEAN DEFAULT 1,
+                    current_room_type TEXT DEFAULT 'public'
                 );
             ''')
+
+            # ===== AUTO MIGRATION (v1.7.1+) - Can be removed after a few versions =====
+            # Check and add missing columns for existing installations
+            cursor = await db.execute("PRAGMA table_info(temp_channels)")
+            existing_columns = {row[1] for row in await cursor.fetchall()}
+
+            columns_to_add = [
+                ("control_panel_message_id", "INTEGER"),
+                ("control_panel_channel_id", "INTEGER"),
+                ("is_soundboard_enabled", "BOOLEAN DEFAULT 1"),
+                ("current_room_type", "TEXT DEFAULT 'public'")
+            ]
+
+            for col_name, col_type in columns_to_add:
+                if col_name not in existing_columns:
+                    logging.info(f"[MIGRATION] Adding column {col_name} to temp_channels")
+                    await db.execute(f"ALTER TABLE temp_channels ADD COLUMN {col_name} {col_type}")
+            # ===== END AUTO MIGRATION =====
+
             await db.commit()
 
             # Check for empty channels on startup
@@ -603,3 +1083,6 @@ class VoiceStateCog(commands.Cog):
                 for category in guild.categories:
                     if not category.channels and category.name in category_names:
                         await category.delete(reason="Temporary category cleanup")
+
+            # Restore control panels for existing rooms
+            await self.restore_control_panels()

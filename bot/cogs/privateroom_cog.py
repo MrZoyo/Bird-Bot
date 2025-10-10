@@ -368,6 +368,7 @@ class PrivateRoomCog(commands.Cog):
         self.main_config = config.get_config('main')
         self.db_path = self.main_config['db_path']
         self.conf = config.get_config('privateroom')
+        self.role_config = config.get_config('role')  # 加载role配置以获取助力用户身份组ID
 
         # 初始化数据库管理器
         self.db = PrivateRoomDatabaseManager(self.db_path)
@@ -625,6 +626,7 @@ class PrivateRoomCog(commands.Cog):
                     points_cost=self.conf['points_cost'],
                     duration=self.conf['room_duration_days'],
                     hours_threshold=self.conf['voice_hours_threshold'],
+                    booster_hours=self.conf.get('booster_discount_hours', 0),
                     available_rooms=self.conf['max_rooms'] - await self.db.get_active_rooms_count(),
                     max_rooms=self.conf['max_rooms']
                 ),
@@ -694,23 +696,74 @@ class PrivateRoomCog(commands.Cog):
             logging.error(f"Error getting last month voice hours: {e}")
             return 0
 
+    async def is_booster(self, user_id: int) -> bool:
+        """检查用户是否为助力用户（通过身份组判断）
+
+        Args:
+            user_id: 用户ID
+
+        Returns:
+            bool: 是否拥有助力用户身份组
+        """
+        try:
+            # 从role配置中获取助力用户身份组ID
+            helper_role_id = self.role_config.get('signature', {}).get('helper_role_id')
+            if not helper_role_id:
+                logging.warning("helper_role_id not configured in role config")
+                return False
+
+            # 获取guild和member
+            guild = self.bot.get_guild(self.main_config['guild_id'])
+            if not guild:
+                return False
+
+            member = guild.get_member(user_id)
+            if not member:
+                return False
+
+            # 检查用户是否拥有助力身份组（与role_cog保持一致的检测方式）
+            return any(role.id == helper_role_id for role in member.roles)
+
+        except Exception as e:
+            logging.error(f"Error checking booster status for user {user_id}: {e}")
+            return False
+
+    async def get_booster_bonus_hours(self) -> float:
+        """获取助力用户优惠时长（小时）
+
+        Returns:
+            float: 优惠小时数
+        """
+        return float(self.conf.get('booster_discount_hours', 0))
+
     async def calculate_discount(self, user_id: int) -> tuple:
-        """计算用户的折扣率和需要支付的积分"""
+        """计算用户的折扣率和需要支付的积分
+
+        Returns:
+            tuple: (actual_hours, percentage, discount, final_cost, is_booster, bonus_hours)
+        """
         # 获取语音时长要求和积分成本
         voice_threshold = self.conf['voice_hours_threshold']
         points_cost = self.conf['points_cost']
 
         # 获取用户上个月语音时长
-        hours = await self.get_last_month_voice_hours(user_id)
+        actual_hours = await self.get_last_month_voice_hours(user_id)
 
-        # 计算百分比
-        percentage = min(100, (hours / voice_threshold) * 100)
+        # 检查是否为助力用户并获取加成时长
+        is_booster = await self.is_booster(user_id)
+        bonus_hours = await self.get_booster_bonus_hours() if is_booster else 0
+
+        # 计算等效时长（实际时长 + 助力加成）
+        effective_hours = actual_hours + bonus_hours
+
+        # 计算百分比（基于等效时长）
+        percentage = min(100, (effective_hours / voice_threshold) * 100)
 
         # 计算折扣和最终成本
         discount = min(100, percentage)
         final_cost = int(points_cost * (1 - discount / 100))
 
-        return hours, percentage, discount, final_cost
+        return actual_hours, percentage, discount, final_cost, is_booster, bonus_hours
 
     async def handle_purchase_request(self, interaction: discord.Interaction):
         """处理购买私人房间的请求"""
@@ -748,7 +801,7 @@ class PrivateRoomCog(commands.Cog):
 
         # 常规购买流程
         # 计算折扣和最终成本
-        hours, percentage, discount, cost = await self.calculate_discount(user_id)
+        actual_hours, percentage, discount, cost, is_booster, bonus_hours = await self.calculate_discount(user_id)
 
         # 检查余额是否足够支付购买成本
         if cost > 0 and balance < cost:
@@ -774,12 +827,20 @@ class PrivateRoomCog(commands.Cog):
             embed.add_field(
                 name=self.conf['messages']['error_insufficient_balance_voice_time'],
                 value=self.conf['messages']['error_insufficient_balance_voice_format'].format(
-                    hours=round(hours, 1),
-                    minutes=int(hours * 60),
+                    hours=round(actual_hours, 1),
+                    minutes=int(actual_hours * 60),
                     discount=discount_amount
                 ),
                 inline=False
             )
+
+            # 如果是助力用户，显示加成信息
+            if is_booster and bonus_hours > 0:
+                embed.add_field(
+                    name="🚀 助力用户加成",
+                    value=f"**+{round(bonus_hours, 1)}** 小时",
+                    inline=False
+                )
 
             embed.add_field(
                 name=self.conf['messages']['error_insufficient_balance_after_discount'],
@@ -796,8 +857,16 @@ class PrivateRoomCog(commands.Cog):
                 inline=False
             )
 
-            # Set footer with suggestion
-            embed.set_footer(text=self.conf['messages']['error_insufficient_balance_footer'])
+            # Set footer with suggestion (添加助力用户提示)
+            footer_text = self.conf['messages']['error_insufficient_balance_footer']
+            if not is_booster:
+                booster_hours_config = await self.get_booster_bonus_hours()
+                if booster_hours_config > 0:
+                    footer_text += "\n" + self.conf['messages'].get(
+                        'error_insufficient_balance_booster_info',
+                        "💡 成为助力用户可额外获得 {booster_hours} 小时时长加成！"
+                    ).format(booster_hours=round(booster_hours_config, 1))
+            embed.set_footer(text=footer_text)
 
             await interaction.followup.send(embed=embed, ephemeral=True)
             return
@@ -811,11 +880,20 @@ class PrivateRoomCog(commands.Cog):
         embed.add_field(
             name="",
             value=self.conf['messages']['confirm_last_month'].format(
-                hours=round(hours, 1),
-                percentage=round(percentage, 1)
+                hours=round(actual_hours, 1)
             ),
             inline=False
         )
+
+        # 如果是助力用户，显示加成信息
+        if is_booster and bonus_hours > 0:
+            embed.add_field(
+                name="",
+                value=self.conf['messages']['confirm_booster_bonus'].format(
+                    bonus_hours=round(bonus_hours, 1)
+                ),
+                inline=False
+            )
 
         embed.add_field(
             name="",
@@ -838,7 +916,7 @@ class PrivateRoomCog(commands.Cog):
         )
 
         # 创建确认视图
-        view = ConfirmPurchaseView(self, user, hours, percentage, cost, balance)
+        view = ConfirmPurchaseView(self, user, actual_hours, percentage, cost, balance)
         await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
     async def handle_advance_renewal_request(self, interaction: discord.Interaction):
@@ -886,7 +964,7 @@ class PrivateRoomCog(commands.Cog):
         balance = await self.shop_db.get_user_balance(user_id)
 
         # 计算续费折扣和最终成本
-        hours, percentage, discount, cost = await self.calculate_discount(user_id)
+        actual_hours, percentage, discount, cost, is_booster, bonus_hours = await self.calculate_discount(user_id)
 
         # 检查余额是否足够支付续费成本
         if cost > 0 and balance < cost:
@@ -912,12 +990,20 @@ class PrivateRoomCog(commands.Cog):
             embed.add_field(
                 name=self.conf['messages']['error_insufficient_balance_voice_time'],
                 value=self.conf['messages']['error_insufficient_balance_voice_format'].format(
-                    hours=round(hours, 1),
-                    minutes=int(hours * 60),
+                    hours=round(actual_hours, 1),
+                    minutes=int(actual_hours * 60),
                     discount=discount_amount
                 ),
                 inline=False
             )
+
+            # 如果是助力用户，显示加成信息
+            if is_booster and bonus_hours > 0:
+                embed.add_field(
+                    name="🚀 助力用户加成",
+                    value=f"**+{round(bonus_hours, 1)}** 小时",
+                    inline=False
+                )
 
             embed.add_field(
                 name=self.conf['messages']['error_insufficient_balance_after_discount'],
@@ -934,8 +1020,16 @@ class PrivateRoomCog(commands.Cog):
                 inline=False
             )
 
-            # 设置页脚
-            embed.set_footer(text=self.conf['messages']['error_insufficient_balance_footer'])
+            # 设置页脚（添加助力用户提示）
+            footer_text = self.conf['messages']['error_insufficient_balance_footer']
+            if not is_booster:
+                booster_hours_config = await self.get_booster_bonus_hours()
+                if booster_hours_config > 0:
+                    footer_text += "\n" + self.conf['messages'].get(
+                        'error_insufficient_balance_booster_info',
+                        "💡 成为助力用户可额外获得 {booster_hours} 小时时长加成！"
+                    ).format(booster_hours=round(booster_hours_config, 1))
+            embed.set_footer(text=footer_text)
 
             await interaction.followup.send(embed=embed, ephemeral=True)
             return
@@ -967,11 +1061,20 @@ class PrivateRoomCog(commands.Cog):
         embed.add_field(
             name="",
             value=self.conf['messages']['confirm_last_month'].format(
-                hours=round(hours, 1),
-                percentage=round(percentage, 1)
+                hours=round(actual_hours, 1)
             ),
             inline=False
         )
+
+        # 如果是助力用户，显示加成信息
+        if is_booster and bonus_hours > 0:
+            embed.add_field(
+                name="",
+                value=self.conf['messages']['confirm_booster_bonus'].format(
+                    bonus_hours=round(bonus_hours, 1)
+                ),
+                inline=False
+            )
 
         embed.add_field(
             name="",
@@ -994,7 +1097,7 @@ class PrivateRoomCog(commands.Cog):
         )
 
         # 创建确认视图
-        view = ConfirmPurchaseView(self, user, hours, percentage, cost, balance, is_renewal=True)
+        view = ConfirmPurchaseView(self, user, actual_hours, percentage, cost, balance, is_renewal=True)
         await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
     async def handle_restore_request(self, interaction: discord.Interaction):
@@ -1630,6 +1733,7 @@ class PrivateRoomCog(commands.Cog):
                         points_cost=self.conf['points_cost'],
                         duration=self.conf['room_duration_days'],
                         hours_threshold=self.conf['voice_hours_threshold'],
+                        booster_hours=self.conf.get('booster_discount_hours', 0),
                         available_rooms=available_count,
                         max_rooms=self.conf.get('max_rooms', 40)
                     )

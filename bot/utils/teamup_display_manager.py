@@ -25,7 +25,7 @@ class TeamupDisplayManager:
                     updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))
                 )
             ''')
-            
+
             # Game type and channel association table
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS teamup_game_types (
@@ -36,7 +36,7 @@ class TeamupDisplayManager:
                     created_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))
                 )
             ''')
-            
+
             # Teamup invitation table (for display board)
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS teamup_invitations (
@@ -48,10 +48,12 @@ class TeamupDisplayManager:
                     player_count INTEGER DEFAULT 1,
                     game_type TEXT,
                     created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
-                    expires_at TIMESTAMP NOT NULL
+                    expires_at TIMESTAMP NOT NULL,
+                    invitation_message_id INTEGER,
+                    invitation_channel_id INTEGER
                 )
             ''')
-            
+
             # User teamup statistics table
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS user_teamup_stats (
@@ -60,7 +62,23 @@ class TeamupDisplayManager:
                     last_teamup_at TIMESTAMP
                 )
             ''')
-            
+
+            # ===== AUTO MIGRATION (v1.7.1+) - Can be removed after a few versions =====
+            # Check and add missing columns for existing installations
+            cursor = await db.execute("PRAGMA table_info(teamup_invitations)")
+            existing_columns = {row[1] for row in await cursor.fetchall()}
+
+            columns_to_add = [
+                ("invitation_message_id", "INTEGER"),
+                ("invitation_channel_id", "INTEGER")
+            ]
+
+            for col_name, col_type in columns_to_add:
+                if col_name not in existing_columns:
+                    logging.info(f"[MIGRATION] Adding column {col_name} to teamup_invitations")
+                    await db.execute(f"ALTER TABLE teamup_invitations ADD COLUMN {col_name} {col_type}")
+            # ===== END AUTO MIGRATION =====
+
             await db.commit()
     
     async def save_display_board(self, channel_id: int, message_id: int) -> bool:
@@ -294,3 +312,63 @@ class TeamupDisplayManager:
             cursor = await db.execute('SELECT channel_id, message_id FROM teamup_displays')
             results = await cursor.fetchall()
             return results
+
+    async def save_invitation_message(self, voice_channel_id: int, message_id: int, channel_id: int) -> bool:
+        """Save invitation message ID for a voice channel"""
+        try:
+            async with aiosqlite.connect(self.db_path) as db:
+                # Use subquery to get the latest invitation ID (SQLite UPDATE doesn't support ORDER BY directly)
+                await db.execute('''
+                    UPDATE teamup_invitations
+                    SET invitation_message_id = ?, invitation_channel_id = ?
+                    WHERE id = (
+                        SELECT id FROM teamup_invitations
+                        WHERE voice_channel_id = ?
+                        AND expires_at > datetime('now', 'localtime')
+                        ORDER BY created_at DESC
+                        LIMIT 1
+                    )
+                ''', (message_id, channel_id, voice_channel_id))
+                await db.commit()
+
+                # Verify update was successful
+                if db.total_changes == 0:
+                    logging.warning(f"No invitation found for voice channel {voice_channel_id} to update message ID")
+                    return False
+                return True
+
+        except aiosqlite.Error as e:
+            logging.error(f"Database error saving invitation message: {e}", exc_info=True)
+            return False
+        except Exception as e:
+            logging.error(f"Unexpected error saving invitation message: {e}", exc_info=True)
+            return False
+
+    async def get_last_invitation_by_voice_channel(self, voice_channel_id: int) -> Optional[Dict]:
+        """Get the last invitation for a specific voice channel"""
+        try:
+            async with aiosqlite.connect(self.db_path) as db:
+                cursor = await db.execute('''
+                    SELECT invitation_message_id, invitation_channel_id, user_id
+                    FROM teamup_invitations
+                    WHERE voice_channel_id = ?
+                    AND invitation_message_id IS NOT NULL
+                    AND expires_at > datetime('now', 'localtime')
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                ''', (voice_channel_id,))
+                result = await cursor.fetchone()
+
+                if not result:
+                    return None
+
+                return {
+                    'invitation_message_id': result[0],
+                    'invitation_channel_id': result[1],
+                    'user_id': result[2],
+                    'voice_channel_id': voice_channel_id
+                }
+
+        except Exception as e:
+            logging.error(f"Error getting last invitation: {e}", exc_info=True)
+            return None

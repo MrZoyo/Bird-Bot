@@ -6,6 +6,7 @@ import re
 import logging
 import datetime
 import json
+import asyncio
 from discord.utils import format_dt
 from pathlib import Path
 import aiofiles
@@ -31,8 +32,6 @@ class TeamInvitationView(discord.ui.View):
         self.invite_embed_content = self.conf['invite_embed_content']
         self.invite_embed_footer = self.conf['invite_embed_footer']
         self.interaction_target_error_message = self.conf['interaction_target_error_message']
-        self.roomfull_title = self.conf['roomfull_title']
-        self.invite_embed_content_edited = self.conf['invite_embed_content_edited']
         self.roomfull_set_message = self.conf['roomfull_set_message']
         self.not_in_vc_message = self.conf['not_in_vc_message']
         self.extract_channel_id_error = self.conf['extract_channel_id_error']
@@ -40,9 +39,12 @@ class TeamInvitationView(discord.ui.View):
         # Adding the join room button
         self.add_item(discord.ui.Button(style=discord.ButtonStyle.link, label=self.invite_button_label, url=self.url))
 
-        # Adding the room full button
-        self.room_full_button = discord.ui.Button(style=discord.ButtonStyle.danger, label=self.roomfull_button_label,
-                                                  custom_id="room_full_button")
+        # Adding the room full button (for rooms without control panel, like private rooms)
+        self.room_full_button = discord.ui.Button(
+            style=discord.ButtonStyle.danger,
+            label=self.roomfull_button_label,
+            custom_id="room_full_button"
+        )
         self.room_full_button.callback = self.room_full_button_callback
         self.add_item(self.room_full_button)
 
@@ -109,9 +111,11 @@ class TeamInvitationView(discord.ui.View):
         return embed
 
     async def room_full_button_callback(self, interaction: discord.Interaction):
+        """房间满员按钮回调 - 使用抽象出来的满员逻辑"""
         # Defer the response
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
+        # 检查是否是按钮的拥有者
         if interaction.user != self.user:
             await interaction.followup.send(self.interaction_target_error_message, ephemeral=True)
             return
@@ -122,7 +126,7 @@ class TeamInvitationView(discord.ui.View):
         if not match:
             await interaction.followup.send(self.extract_channel_id_error, ephemeral=True)
             return
-        
+
         original_channel_id = int(match.group(1))
 
         # 检查用户是否在语音频道
@@ -130,61 +134,23 @@ class TeamInvitationView(discord.ui.View):
             await interaction.followup.send(self.not_in_vc_message, ephemeral=True)
             return
 
-        # Get user's signature if exists
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute(
-                'SELECT signature, is_disabled FROM user_signatures WHERE user_id = ?',
-                (self.user.id,)
-            )
-            result = await cursor.fetchone()
-            signature = result[0] if result and not result[1] else None
+        # 获取CreateInvitationCog实例来调用抽象的方法
+        invitation_cog = self.bot.get_cog('CreateInvitationCog')
+        if invitation_cog:
+            # 调用抽象出来的满员方法
+            await invitation_cog.update_message_to_full(interaction.message)
+        else:
+            # 如果cog不存在，直接处理（不应该发生）
+            logging.error("CreateInvitationCog not found")
+            await interaction.followup.send("❌ 内部错误，请联系管理员", ephemeral=True)
+            return
 
-        # Create new embed
-        new_embed = discord.Embed(
-            title=f"{self.roomfull_title} ~~{embed.title}~~",
-            color=discord.Color.red()
-        )
-
-        # Get original timestamp
-        original_timestamp = embed.timestamp
-
-        # Build new description
-        new_embed.description = self.invite_embed_content_edited.format(
-            name=self.user.voice.channel.name,
-            url=self.url,
-            mention=self.user.mention,
-            time=discord.utils.format_dt(original_timestamp, style='R')
-        )
-
-        # Add signature field if exists
-        if signature:
-            new_embed.add_field(name="", value=signature, inline=False)
-
-        # Keep original thumbnail
-        if embed.thumbnail:
-            new_embed.set_thumbnail(url=embed.thumbnail.url)
-
-        # Keep original footer and timestamp
-        if embed.footer:
-            new_embed.set_footer(text=embed.footer.text)
-        new_embed.timestamp = original_timestamp
-
-        # 禁用所有按钮
-        self.children[0].disabled = True  # Join Room button
-        self.room_full_button.disabled = True
-
-        # 更新消息
-        await interaction.message.edit(embed=new_embed, view=self)
-        await interaction.followup.send(self.roomfull_set_message, ephemeral=True)
-        
         # 从展示板移除组队信息
         teamup_cog = self.bot.get_cog('TeamupDisplayCog')
         if teamup_cog:
             await teamup_cog.remove_teamup_from_display(self.user.id, original_channel_id)
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        return interaction.user == self.user
+        await interaction.followup.send(self.roomfull_set_message, ephemeral=True)
 
 
 class DefaultRoomView(discord.ui.View):
@@ -211,6 +177,103 @@ class CreateInvitationCog(commands.Cog):
         self.failed_invite_responses = self.conf['failed_invite_responses']
         self.ignore_user_ids = self.conf['ignore_user_ids']
         self.ignore_channel_ids = self.conf['ignore_channel_ids']
+        self.roomfull_title = self.conf.get('roomfull_title', '【已满员】')
+
+    async def update_message_to_full(self, message):
+        """将组队消息更新为满员状态（可复用方法）"""
+        try:
+            if not message.embeds:
+                return
+
+            embed = message.embeds[0]
+            invite_embed_content_edited = self.conf.get('invite_embed_content_edited', '')
+
+            # 从原embed的description中提取语音频道信息
+            voice_channel_match = re.search(r'https://discord\.com/channels/\d+/(\d+)', embed.description)
+
+            if voice_channel_match:
+                # 提取必要信息
+                voice_channel_id = voice_channel_match.group(1)
+                guild_id_match = re.search(r'https://discord\.com/channels/(\d+)/\d+', embed.description)
+                guild_id = guild_id_match.group(1) if guild_id_match else ""
+                url = f"https://discord.com/channels/{guild_id}/{voice_channel_id}"
+
+                # 提取mention和time
+                mention_match = re.search(r'<@\d+>', embed.description)
+                mention = mention_match.group(0) if mention_match else ""
+
+                # 提取时间（相对时间格式）
+                time_match = re.search(r'<t:\d+:R>', embed.description)
+                time = time_match.group(0) if time_match else ""
+
+                # 从voice_channel获取name
+                voice_channel = self.bot.get_channel(int(voice_channel_id))
+                channel_name = voice_channel.name if voice_channel else "未知频道"
+
+                # 使用配置的格式创建新description（带"偷看一眼"链接）
+                new_description = invite_embed_content_edited.format(
+                    name=channel_name,
+                    url=url,
+                    mention=mention,
+                    time=time
+                )
+            else:
+                # 如果无法提取，保持原description
+                new_description = embed.description
+
+            # 创建新embed
+            new_embed = discord.Embed(
+                title=f"{self.roomfull_title} ~~{embed.title}~~",
+                description=new_description,
+                color=discord.Color.red()
+            )
+
+            # 保留原有字段
+            for field in embed.fields:
+                new_embed.add_field(name=field.name, value=field.value, inline=field.inline)
+
+            # 保留缩略图和footer
+            if embed.thumbnail:
+                new_embed.set_thumbnail(url=embed.thumbnail.url)
+            if embed.footer:
+                new_embed.set_footer(text=embed.footer.text)
+            if embed.timestamp:
+                new_embed.timestamp = embed.timestamp
+
+            # 移除所有按钮（Link按钮无法disabled，所以直接移除）
+            await message.edit(embed=new_embed, view=None)
+
+        except discord.Forbidden:
+            logging.error(f"No permission to edit message {message.id}")
+        except discord.NotFound:
+            logging.warning(f"Message {message.id} not found when trying to update to full")
+        except Exception as e:
+            logging.error(f"Error updating message to full: {e}", exc_info=True)
+
+    async def mark_old_invitation_full(self, old_invitation):
+        """异步将旧的组队消息设置为满员"""
+        try:
+            # 1. 获取消息
+            text_channel = self.bot.get_channel(old_invitation['invitation_channel_id'])
+            if not text_channel:
+                logging.warning(f"Old invitation channel {old_invitation['invitation_channel_id']} not found")
+                return
+
+            try:
+                old_message = await text_channel.fetch_message(old_invitation['invitation_message_id'])
+            except discord.NotFound:
+                logging.warning(f"Old invitation message {old_invitation['invitation_message_id']} not found, already deleted")
+                return
+            except discord.Forbidden:
+                logging.error(f"No permission to fetch old invitation message")
+                return
+
+            # 2. 更新为满员状态
+            await self.update_message_to_full(old_message)
+
+        except Exception as e:
+            logging.error(f"Error marking old invitation as full: {e}", exc_info=True)
+            # 不向用户抛出错误，静默处理
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -266,19 +329,41 @@ class CreateInvitationCog(commands.Cog):
             if message.author.voice and message.author.voice.channel:
                 try:
                     channel = message.author.voice.channel
-                    view = TeamInvitationView(self.bot, channel, message.author)
-                    
-                    # 添加到展示板
+
+                    # ===== 步骤1: 获取旧的组队消息ID（如果存在）=====
+                    old_invitation = None
                     teamup_cog = self.bot.get_cog('TeamupDisplayCog')
+
                     if teamup_cog:
+                        old_invitation = await teamup_cog.db_manager.get_last_invitation_by_voice_channel(channel.id)
+
+                    # ===== 步骤2: 立即创建并发送新的组队消息 =====
+                    view = TeamInvitationView(self.bot, channel, message.author)
+                    embed = await view.create_embed(message)
+                    new_message = await message.reply(embed=embed, view=view)
+
+                    # ===== 步骤3: 添加到展示板并保存新消息ID =====
+                    if teamup_cog:
+                        # 添加到展示板（这会替换旧的记录）
                         await teamup_cog.add_teamup_to_display(
-                            message.author.id, 
-                            message.channel.id, 
-                            channel.id, 
+                            message.author.id,
+                            message.channel.id,
+                            channel.id,
                             message.content
                         )
-                    embed = await view.create_embed(message)
-                    await message.reply(embed=embed, view=view)
+
+                        # 保存新消息ID
+                        await teamup_cog.db_manager.save_invitation_message(
+                            channel.id,
+                            new_message.id,
+                            message.channel.id
+                        )
+
+                    # ===== 步骤4: 异步处理旧消息（设置为满员）=====
+                    if old_invitation:
+                        # 使用 asyncio.create_task 异步执行，不阻塞
+                        asyncio.create_task(self.mark_old_invitation_full(old_invitation))
+
                 except Exception as e:
                     reply_message = self.failed_invite_responses + str(e)
 
@@ -307,24 +392,48 @@ class CreateInvitationCog(commands.Cog):
         if interaction.user.voice and interaction.user.voice.channel:
             try:
                 channel = interaction.user.voice.channel
+
+                # ===== 步骤1: 获取旧的组队消息ID（如果存在）=====
+                old_invitation = None
+                teamup_cog = self.bot.get_cog('TeamupDisplayCog')
+
+                if teamup_cog:
+                    old_invitation = await teamup_cog.db_manager.get_last_invitation_by_voice_channel(channel.id)
+
+                # ===== 步骤2: 立即创建并发送新的组队消息 =====
                 view = TeamInvitationView(self.bot, channel, interaction.user)
                 embed = await view.create_embed(interaction)
                 embed.title = title or self.default_invite_embed_title
-                
-                # 添加到展示板
-                teamup_cog = self.bot.get_cog('TeamupDisplayCog')
-                if teamup_cog:
-                    content = title or self.default_invite_embed_title
-                    await teamup_cog.add_teamup_to_display(
-                        interaction.user.id, 
-                        interaction.channel.id, 
-                        channel.id, 
-                        content
-                    )
+
                 # Truncate the content to 256 characters if longer
                 if len(embed.title) > 256:
                     embed.title = embed.title[:253] + "..."
-                await interaction.followup.send(embed=embed, view=view)
+
+                new_message = await interaction.followup.send(embed=embed, view=view)
+
+                # ===== 步骤3: 添加到展示板并保存新消息ID =====
+                if teamup_cog:
+                    content = title or self.default_invite_embed_title
+                    # 添加到展示板（这会替换旧的记录）
+                    await teamup_cog.add_teamup_to_display(
+                        interaction.user.id,
+                        interaction.channel.id,
+                        channel.id,
+                        content
+                    )
+
+                    # 保存新消息ID
+                    await teamup_cog.db_manager.save_invitation_message(
+                        channel.id,
+                        new_message.id,
+                        interaction.channel.id
+                    )
+
+                # ===== 步骤4: 异步处理旧消息（设置为满员）=====
+                if old_invitation:
+                    # 使用 asyncio.create_task 异步执行，不阻塞
+                    asyncio.create_task(self.mark_old_invitation_full(old_invitation))
+
             except Exception as e:
                 await interaction.followup.send(f"Failed to create an invitation: {str(e)}")
         else:

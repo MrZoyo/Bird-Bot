@@ -33,7 +33,7 @@ def create_bot():
                 logging.info(f"\n机器人已连接到服务器 {guild.name}\n")
                 print(f"\n机器人已连接到服务器 {guild.name}\n")
                 await bot.change_presence(activity=discord.Game(name=f"在 {guild.name} 上搬砖"))
-                await bot.tree.sync()
+                await bot.tree.sync(guild=guild)
                 print("Commands Synced.")
             else:
                 logging.info(f"Bot not allowed to connect to {guild.name}")
@@ -42,7 +42,9 @@ def create_bot():
     @bot.command()
     async def synccommands(ctx):
         try:
-            await bot.tree.sync()
+            guild_id = config.get_config()['guild_id']
+            guild = discord.Object(id=guild_id)
+            await bot.tree.sync(guild=guild)
             await ctx.send("Commands Synced!")
             logging.info("Commands successfully synced.")
             print("Commands Synced!")
