@@ -1,6 +1,6 @@
 # Bird Bot 
 
-`Version: 1.7.0b`
+`Version: 1.8.0b`
 
 ---
 
@@ -74,8 +74,15 @@ aiosqlite, matplotlib, aiohttp, pillow, discord.py, aiofiles
 ### Voice_Channel_Cog
 When a user enters a specific channel, the bot creates a new channel of the corresponding type and moves the user to the new channel.
 Similarly, if the channel was created by the bot, the bot will delete the channel when the last user leaves the channel.
+
+**Enhanced Features:**
+- **Interactive control panel** with 4-button interface in voice channel text chat
+- **Room management buttons**: Unlock (public), Lock (private), Full (mark teamup as full), Soundboard (toggle)
+- **Dynamic panel appearance** with color-coded embeds based on room type
+- **Auto-recovery system** restoring control panels after bot restart
+
+**Commands:**
 - `/check_temp_channel_records`: Query the temporary voice channel records of the current server. This command is mainly used to check that the robot's mechanism of automatically deleting rooms that no longer exist every hour is working properly.
-- `/set_soundboard`: Change the soundboard status of the channel between `on` and `off`. Only the owner of the channel can use this command.
 - `/vc_add <channel>`: Add a voice channel that automatically creates new voice channels.
 - `/vc_remove [channel] [channel_id]`: Remove a voice channel that automatically creates new voice channels. Use channel selection or channel ID (for deleted channels).
 - `/vc_list`: List all voice channels that automatically create new voice channels.
@@ -541,6 +548,18 @@ Media processing module with validation and security features.
 ---
 
 ## Update Log
+### V1.8.0b - 2025-10-10
+#### 🆕 Major New Features
+- **Voice Room Control Panel**: Interactive control panel in voice channels
+  - 4-button interface for room management (unlock, lock, full, soundboard)
+  - Direct room type switching without commands
+  - Dynamic color-coded embeds based on room type
+  - Auto-recovery system after bot restart
+- **Teamup Auto-Full System**: Automatic marking of previous teamup messages as full when new messages are sent
+  - Database tracking of teamup message IDs
+  - Non-blocking async processing for smooth user experience
+
+---
 ### V1.7.0b - 2025-09-09
 #### 🆕 Major New Features
 - New check-in system
