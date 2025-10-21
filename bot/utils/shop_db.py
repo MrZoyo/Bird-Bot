@@ -72,29 +72,6 @@ class ShopDatabaseManager:
             ''')
             await db.commit()
 
-            # Add is_makeup column to existing records if not exists
-            try:
-                await db.execute('ALTER TABLE shop_checkin_records ADD COLUMN is_makeup INTEGER DEFAULT 0')
-                await db.commit()
-            except:
-                # Column already exists
-                pass
-                
-            # Add makeup_4 and makeup_5 columns to existing makeup table if not exists
-            try:
-                await db.execute('ALTER TABLE shop_makeup_checkin ADD COLUMN makeup_4 TEXT')
-                await db.commit()
-            except:
-                # Column already exists
-                pass
-                
-            try:
-                await db.execute('ALTER TABLE shop_makeup_checkin ADD COLUMN makeup_5 TEXT')
-                await db.commit()
-            except:
-                # Column already exists
-                pass
-
             # Checkin embeds table for managing daily embed panels
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS shop_checkin_embeds (

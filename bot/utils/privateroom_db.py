@@ -29,7 +29,8 @@ class PrivateRoomDatabaseManager:
                     user_id INTEGER NOT NULL,
                     start_date TEXT NOT NULL,
                     end_date TEXT NOT NULL,
-                    is_active BOOLEAN DEFAULT 1
+                    is_active BOOLEAN DEFAULT 1,
+                    renewal_reminder_sent INTEGER DEFAULT 0
                 )
             ''')
 
@@ -54,6 +55,14 @@ class PrivateRoomDatabaseManager:
                     expires_at TEXT
                 )
             ''')
+
+            # Add renewal_reminder_sent column to existing privateroom_rooms table if not exists
+            try:
+                await db.execute('ALTER TABLE privateroom_rooms ADD COLUMN renewal_reminder_sent INTEGER DEFAULT 0')
+                await db.commit()
+            except:
+                # Column already exists
+                pass
 
             await db.commit()
 
@@ -406,16 +415,78 @@ class PrivateRoomDatabaseManager:
             return count
 
     async def extend_room_validity(self, room_id: int, new_end_date: datetime) -> None:
-        """延长房间的有效期
-        
+        """延长房间的有效期，并重置续费提醒标志
+
         Args:
             room_id: 房间ID
             new_end_date: 新的结束日期
         """
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute('''
-                UPDATE privateroom_rooms 
-                SET end_date = ?
+                UPDATE privateroom_rooms
+                SET end_date = ?, renewal_reminder_sent = 0
                 WHERE room_id = ?
             ''', (new_end_date.isoformat(), room_id))
             await db.commit()
+
+    async def get_rooms_eligible_for_renewal(self, threshold_days: int) -> List[Dict[str, Any]]:
+        """获取符合续费提醒条件的房间列表
+
+        Args:
+            threshold_days: 续费阈值天数（剩余天数小于等于此值时符合条件）
+
+        Returns:
+            符合条件的房间列表，每个房间包含: room_id, user_id, end_date, days_remaining
+        """
+        try:
+            now = datetime.now()
+            threshold_date = now + timedelta(days=threshold_days)
+
+            async with aiosqlite.connect(self.db_path) as db:
+                cursor = await db.execute('''
+                    SELECT room_id, user_id, end_date
+                    FROM privateroom_rooms
+                    WHERE is_active = 1
+                    AND datetime(end_date) <= datetime(?)
+                    AND datetime(end_date) > datetime(?)
+                    AND (renewal_reminder_sent IS NULL OR renewal_reminder_sent = 0)
+                ''', (threshold_date.isoformat(), now.isoformat()))
+
+                rows = await cursor.fetchall()
+
+                result = []
+                for row in rows:
+                    end_date = datetime.fromisoformat(row[2])
+                    days_remaining = (end_date - now).days
+
+                    result.append({
+                        'room_id': row[0],
+                        'user_id': row[1],
+                        'end_date': end_date,
+                        'days_remaining': days_remaining
+                    })
+
+                return result
+        except Exception as e:
+            logging.error(f"Error getting rooms eligible for renewal: {e}", exc_info=True)
+            return []
+
+    async def update_renewal_reminder_flag(self, room_id: int, sent: bool) -> None:
+        """更新房间的续费提醒标志
+
+        Args:
+            room_id: 房间ID
+            sent: True 表示已发送提醒，False 表示重置标志
+        """
+        try:
+            async with aiosqlite.connect(self.db_path) as db:
+                await db.execute('''
+                    UPDATE privateroom_rooms
+                    SET renewal_reminder_sent = ?
+                    WHERE room_id = ?
+                ''', (1 if sent else 0, room_id))
+                await db.commit()
+                logging.debug(f"Updated renewal_reminder_sent to {sent} for room {room_id}")
+        except Exception as e:
+            logging.error(f"Error updating renewal reminder flag for room {room_id}: {e}", exc_info=True)
+            raise

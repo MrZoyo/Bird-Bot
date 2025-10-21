@@ -55,7 +55,9 @@ class TeamupDisplayCog(commands.Cog):
             # Clean up expired invitations
             cleaned_count = await self.db_manager.cleanup_expired_invitations()
             if cleaned_count > 0:
-                logging.info(f"Cleaned up {cleaned_count} expired teamup invitations")
+                # Log to room activity log
+                room_logger = logging.getLogger('room_activity')
+                room_logger.info(f"Cleaned up {cleaned_count} expired teamup invitations")
             
             # Get all display boards and refresh them
             display_boards = await self.db_manager.get_all_display_boards()

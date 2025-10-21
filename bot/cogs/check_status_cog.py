@@ -9,6 +9,7 @@ import aiosqlite
 from datetime import datetime, timezone, timedelta
 import matplotlib.pyplot as plt
 import io
+from typing import Optional
 from bot.utils import config, check_channel_validity
 
 
@@ -167,31 +168,48 @@ class CheckStatusCog(commands.Cog):
     @discord.app_commands.command(name="check_log")
     @discord.app_commands.describe(
         x="Number of lines from the end of the log file to return.",
-        keyword_log="Whether to check keyword detection log instead of main log (default: False)"
+        log_type="选择要查看的日志类型（默认：主日志）"
     )
-    async def check_log(self, interaction: discord.Interaction, x: int, keyword_log: bool = False):
+    @discord.app_commands.choices(log_type=[
+        discord.app_commands.Choice(name="主日志", value="main"),
+        discord.app_commands.Choice(name="关键词检测日志", value="keyword"),
+        discord.app_commands.Choice(name="房间活动日志", value="room")
+    ])
+    async def check_log(self, interaction: discord.Interaction, x: int, log_type: Optional[str] = "main"):
         if not await check_channel_validity(interaction):
             return
-        
-        # Determine which log file to read
-        if keyword_log:
-            log_file = self.conf.get('keyword_log_file', './data/keyword_detection.log')
-            log_type = "关键词检测"
-        else:
-            log_file = self.logging_file
-            log_type = "主要"
-        
+
+        # Log type configuration mapping
+        log_config = {
+            "main": {
+                "file": self.logging_file,
+                "name": "主要"
+            },
+            "keyword": {
+                "file": self.conf.get('keyword_log_file', './data/keyword_detection.log'),
+                "name": "关键词检测"
+            },
+            "room": {
+                "file": self.conf.get('room_log_file', './data/room_activity.log'),
+                "name": "房间活动"
+            }
+        }
+
+        config = log_config[log_type]
+        log_file = config["file"]
+        log_type_name = config["name"]
+
         try:
             with open(log_file, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
         except FileNotFoundError:
-            await interaction.response.send_message(f"{log_type}日志文件不存在。")
+            await interaction.response.send_message(f"{log_type_name}日志文件不存在。")
             return
-        
+
         if not lines:
-            await interaction.response.send_message(f"{log_type}日志文件为空。")
+            await interaction.response.send_message(f"{log_type_name}日志文件为空。")
             return
-            
+
         last_x_lines = ''.join(lines[-x:])
         if len(last_x_lines) > 1900:
             # If the message is too long, write it to a temporary file and send the file
@@ -199,12 +217,12 @@ class CheckStatusCog(commands.Cog):
                 temp.write(last_x_lines.encode())
                 temp_file_name = temp.name
             await interaction.response.send_message(
-                f"{log_type}日志过长，以文件形式发送。",
-                file=discord.File(temp_file_name, filename=f"{log_type}_log.txt")
+                f"{log_type_name}日志过长，以文件形式发送。",
+                file=discord.File(temp_file_name, filename=f"{log_type_name}_log.txt")
             )
             os.remove(temp_file_name)  # Delete the temporary file
         else:
-            await interaction.response.send_message(f"**{log_type}日志最后 {x} 行**:\n```{last_x_lines}```")
+            await interaction.response.send_message(f"**{log_type_name}日志最后 {x} 行**:\n```{last_x_lines}```")
 
     @discord.app_commands.command(name="check_voice_status")
     async def check_voice_status(self, interaction: discord.Interaction):

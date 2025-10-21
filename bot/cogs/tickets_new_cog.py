@@ -2323,7 +2323,7 @@ class TicketTypeModal(discord.ui.Modal):
         self.type_name = discord.ui.TextInput(
             label=self.messages.get('ticket_type_name_label', '类型名称'),
             placeholder=self.messages.get('ticket_type_name_placeholder', '例如: 功能反馈'),
-            default=edit_type or "",
+            default=(edit_type or "")[:50],  # Ensure default doesn't exceed max_length
             required=True,
             max_length=50
         )
@@ -2332,7 +2332,7 @@ class TicketTypeModal(discord.ui.Modal):
         self.description = discord.ui.TextInput(
             label=self.messages.get('ticket_type_description_label', '类型说明'),
             placeholder=self.messages.get('ticket_type_description_placeholder', '在主页面显示的说明文字'),
-            default=existing_data.get('description', ''),
+            default=existing_data.get('description', '')[:100],  # Ensure default doesn't exceed max_length
             required=True,
             max_length=100
         )
@@ -2342,7 +2342,7 @@ class TicketTypeModal(discord.ui.Modal):
             label=self.messages.get('ticket_type_guide_label', '用户指引'),
             placeholder=self.messages.get('ticket_type_guide_placeholder', '用户创建工单后看到的指引文字'),
             style=discord.TextStyle.paragraph,
-            default=existing_data.get('guide', ''),
+            default=existing_data.get('guide', '')[:1000],  # Ensure default doesn't exceed max_length
             required=True,
             max_length=1000
         )
@@ -2351,7 +2351,7 @@ class TicketTypeModal(discord.ui.Modal):
         self.button_color = discord.ui.TextInput(
             label=self.messages.get('ticket_type_color_label', '按钮颜色 (R, G, B)'),
             placeholder=self.messages.get('ticket_type_color_placeholder', '例如: R, G, B 或 red, green, blue'),
-            default=existing_data.get('button_color', 'b'),
+            default=existing_data.get('button_color', 'b')[:10],  # Ensure default doesn't exceed max_length
             required=False,
             max_length=10
         )

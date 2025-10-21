@@ -383,7 +383,7 @@ class PrivateRoomCog(commands.Cog):
 
     @tasks.loop(time=time(hour=8, minute=10))  # 每天8:10检查
     async def check_expired_rooms(self):
-        """检查并删除过期的私人房间"""
+        """检查并删除过期的私人房间，并发送续费提醒"""
         logging.info("Checking for expired private rooms...")
 
         # 获取过期房间
@@ -415,6 +415,10 @@ class PrivateRoomCog(commands.Cog):
 
             # 无论房间是否存在，都标记为非活跃
             await self.db.deactivate_room(room_id)
+
+        # 检查并发送续费提醒
+        logging.info("Checking for rooms eligible for renewal reminder...")
+        await self.check_and_send_renewal_reminders()
 
     @check_expired_rooms.before_loop
     async def before_check_expired_rooms(self):
@@ -476,6 +480,156 @@ class PrivateRoomCog(commands.Cog):
 
         except discord.HTTPException as e:
             logging.error(f"Failed to send expiration notification to user {user_id}: {e}")
+
+    async def check_and_send_renewal_reminders(self):
+        """检查并发送续费提醒"""
+        try:
+            # 获取续费阈值
+            renewal_threshold = self.conf.get('renewal_days_threshold', 7)
+
+            # 获取符合续费条件的房间
+            eligible_rooms = await self.db.get_rooms_eligible_for_renewal(renewal_threshold)
+
+            if not eligible_rooms:
+                logging.info("No rooms eligible for renewal reminder")
+                return
+
+            logging.info(f"Found {len(eligible_rooms)} rooms eligible for renewal reminder")
+
+            # 为每个符合条件的房间发送提醒
+            for room_data in eligible_rooms:
+                room_id = room_data['room_id']
+                user_id = room_data['user_id']
+
+                # 获取房间对象
+                channel = self.bot.get_channel(room_id)
+                if not channel:
+                    logging.warning(f"Room {room_id} not found for renewal reminder")
+                    # 房间不存在，也标记为已发送，避免重复检查
+                    await self.db.update_renewal_reminder_flag(room_id, True)
+                    continue
+
+                # 发送续费提醒
+                success = await self.send_renewal_reminder(user_id, channel, room_data)
+
+                # 无论成功与否，都标记为已发送，避免重复发送
+                if success:
+                    await self.db.update_renewal_reminder_flag(room_id, True)
+                    logging.info(f"Sent renewal reminder for room {room_id} to user {user_id}")
+                else:
+                    # 即使发送失败（如用户关闭私信），也标记为已发送
+                    await self.db.update_renewal_reminder_flag(room_id, True)
+                    logging.warning(f"Failed to send renewal reminder for room {room_id} to user {user_id}, but marked as sent")
+
+        except Exception as e:
+            logging.error(f"Error in check_and_send_renewal_reminders: {e}", exc_info=True)
+
+    async def send_renewal_reminder(self, user_id: int, channel: discord.VoiceChannel,
+                                    room_data: Dict[str, Any]) -> bool:
+        """发送续费提醒私信
+
+        Args:
+            user_id: 用户ID
+            channel: 房间频道对象
+            room_data: 房间数据，包含 end_date, days_remaining
+
+        Returns:
+            bool: 是否成功发送
+        """
+        try:
+            # 获取用户对象
+            user = await self.bot.fetch_user(user_id)
+            if not user:
+                logging.error(f"User {user_id} not found for renewal reminder")
+                return False
+
+            # 提取房间信息
+            end_date = room_data['end_date']
+            days_remaining = room_data['days_remaining']
+            room_name = channel.name
+
+            # 创建嵌入消息
+            embed = discord.Embed(
+                title=self.conf['messages']['renewal_reminder_title'],
+                description=self.conf['messages']['renewal_reminder_description'].format(
+                    room_name=room_name,
+                    days_remaining=days_remaining
+                ),
+                color=discord.Color.orange()
+            )
+
+            # 添加房间信息字段
+            embed.add_field(
+                name="",
+                value=self.conf['messages']['renewal_reminder_room_info'].format(
+                    room_name=room_name,
+                    end_date=end_date.strftime("%Y-%m-%d %H:%M"),
+                    days_remaining=days_remaining
+                ),
+                inline=False
+            )
+
+            embed.set_footer(text=self.conf['messages']['renewal_reminder_footer'])
+
+            # 创建视图（可能包含按钮）
+            view = discord.ui.View()
+
+            # 获取商店消息，构建跳转链接
+            shop_messages = await self.db.get_shop_messages()
+            if shop_messages:
+                # 使用第一个商店消息的频道
+                channel_id, _ = shop_messages[0]
+
+                # 验证商店频道是否存在
+                shop_channel = self.bot.get_channel(channel_id)
+                if shop_channel:
+                    # 构建频道链接（不使用 message_id）
+                    guild = self.bot.get_guild(self.main_config['guild_id'])
+                    if guild:
+                        shop_url = f"https://discord.com/channels/{guild.id}/{channel_id}"
+
+                        # 创建跳转按钮
+                        button = discord.ui.Button(
+                            style=discord.ButtonStyle.link,
+                            label=self.conf['messages']['renewal_reminder_button_label'],
+                            url=shop_url
+                        )
+                        view.add_item(button)
+                else:
+                    # 商店频道不存在，添加警告信息
+                    embed.add_field(
+                        name="",
+                        value=self.conf['messages']['renewal_reminder_no_shop'],
+                        inline=False
+                    )
+            else:
+                # 没有商店消息，添加警告信息
+                embed.add_field(
+                    name="",
+                    value=self.conf['messages']['renewal_reminder_no_shop'],
+                    inline=False
+                )
+
+            # 发送私信
+            if view.children:
+                await user.send(embed=embed, view=view)
+            else:
+                await user.send(embed=embed)
+
+            return True
+
+        except discord.Forbidden:
+            # 用户关闭了私信
+            logging.warning(f"Cannot send renewal reminder to user {user_id}: DMs are disabled")
+            return False
+        except discord.HTTPException as e:
+            # 其他 Discord API 错误
+            logging.error(f"Failed to send renewal reminder to user {user_id}: {e}", exc_info=True)
+            return False
+        except Exception as e:
+            # 其他未预期的错误
+            logging.error(f"Unexpected error sending renewal reminder to user {user_id}: {e}", exc_info=True)
+            return False
 
     @app_commands.command(
         name="privateroom_init",

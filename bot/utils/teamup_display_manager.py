@@ -63,22 +63,6 @@ class TeamupDisplayManager:
                 )
             ''')
 
-            # ===== AUTO MIGRATION (v1.7.1+) - Can be removed after a few versions =====
-            # Check and add missing columns for existing installations
-            cursor = await db.execute("PRAGMA table_info(teamup_invitations)")
-            existing_columns = {row[1] for row in await cursor.fetchall()}
-
-            columns_to_add = [
-                ("invitation_message_id", "INTEGER"),
-                ("invitation_channel_id", "INTEGER")
-            ]
-
-            for col_name, col_type in columns_to_add:
-                if col_name not in existing_columns:
-                    logging.info(f"[MIGRATION] Adding column {col_name} to teamup_invitations")
-                    await db.execute(f"ALTER TABLE teamup_invitations ADD COLUMN {col_name} {col_type}")
-            # ===== END AUTO MIGRATION =====
-
             await db.commit()
     
     async def save_display_board(self, channel_id: int, message_id: int) -> bool:

@@ -5,6 +5,7 @@
 	"token": "YOUR_BOT_TOKEN",
     "logging_file": "./data/bot.log",
     "keyword_log_file": "./data/keyword_detection.log",
+    "room_log_file": "./data/room_activity.log",
 	"db_path": "./data/bot.db",
     "guild_id": 1145141919810,
 	"_comment": "=====================================================================",

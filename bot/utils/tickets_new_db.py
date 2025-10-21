@@ -33,12 +33,6 @@ class TicketsNewDatabaseManager:
                     ticket_channel_id INTEGER NOT NULL
                 )
             ''')
-            
-            # Add ticket_number column if it doesn't exist (for existing databases)
-            try:
-                await db.execute('ALTER TABLE tickets_new ADD COLUMN ticket_number INTEGER')
-            except Exception:
-                pass  # Column already exists
 
             # New ticket members table for thread-based system
             await db.execute('''

@@ -684,7 +684,9 @@ class VoiceStateCog(commands.Cog):
                 ''', (message.id, voice_channel.id, voice_channel.id))
                 await db.commit()
 
-            logging.info(f"Control panel sent for room {voice_channel.id}")
+            # Log to room activity log
+            room_logger = logging.getLogger('room_activity')
+            room_logger.info(f"Control panel sent for room {voice_channel.id}")
 
         except Exception as e:
             logging.error(f"Error sending control panel: {e}", exc_info=True)

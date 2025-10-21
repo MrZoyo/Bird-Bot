@@ -72,15 +72,28 @@ async def setup_bot(bot):
     # Configure keyword detection logging
     keyword_logger = logging.getLogger('keyword_detection')
     keyword_logger.setLevel(logging.INFO)
-    
+
     # Create separate handler for keyword detection logs
     keyword_log_file = conf.get('keyword_log_file', './data/keyword_detection.log')
     keyword_handler = logging.FileHandler(keyword_log_file, mode='a', encoding='utf-8')
     keyword_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
     keyword_logger.addHandler(keyword_handler)
-    
+
     # Prevent keyword logs from appearing in main log
     keyword_logger.propagate = False
+
+    # Configure room activity logging
+    room_logger = logging.getLogger('room_activity')
+    room_logger.setLevel(logging.INFO)
+
+    # Create separate handler for room activity logs
+    room_log_file = conf.get('room_log_file', './data/room_activity.log')
+    room_handler = logging.FileHandler(room_log_file, mode='a', encoding='utf-8')
+    room_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    room_logger.addHandler(room_handler)
+
+    # Prevent room logs from appearing in main log
+    room_logger.propagate = False
 
     # Add all cogs
     # illegal_act_cog = IllegalTeamActCog(bot)  # Moved to old_function

@@ -1,6 +1,6 @@
-# Bird Bot 
+# Bird Bot
 
-`Version: 1.8.0b`
+`Version: 1.8.1b`
 
 ---
 
@@ -121,7 +121,7 @@ When a new user joins the server, the bot sends a welcome message to the user in
 Provide enhanced monitoring and status checking functions with comprehensive data tracking.
 
 **Enhanced Logging System:**
-- **Dual log system** supporting both main application logs and keyword detection logs
+- **Triple log system** supporting main application, keyword detection, and room activity logs
 - **Log file size management** with automatic file generation for large logs
 - **Chinese interface** for better user experience
 
@@ -132,7 +132,7 @@ Provide enhanced monitoring and status checking functions with comprehensive dat
 - **Category-based tracking** of voice channel usage
 
 **Commands:**
-- `/check_log <number=x> [keyword_log=False]` - Returns the last `x` lines of the specified log file. Use `keyword_log=True` to check keyword detection logs instead of main logs.
+- `/check_log <number=x> [log_type=main]` - Returns the last `x` lines of the specified log file. Choose from main, keyword, or room activity logs.
 - `/check_voice_status` - Returns comprehensive voice channel statistics and member counts.
 - `/where_is <member>` - Returns the position of the selected member within the channel. Only visible to user.
 - `/print_voice_status` - Print the longtime server voice channel and number information.
@@ -343,6 +343,7 @@ The new check-in system is completely interface-based using interactive embeds w
 - **Activity-based discounts** rewarding active voice users (up to 100% off)
 - **Room restoration** for accidentally deleted channels within validity period
 - **Automatic cleanup** of expired rooms with smart scheduling
+- **Renewal reminder system** with automated DM notifications when rooms approach expiration
 
 **🆕 Settings Preservation System:**
 - **Automatic settings backup** when rooms expire or are deleted
@@ -548,6 +549,18 @@ Media processing module with validation and security features.
 ---
 
 ## Update Log
+### V1.8.1b - 2025-10-21
+#### 🆕 New Features
+- **Room Activity Logging System**: Separate log file for room-related activities
+  - Control panel creation and teamup cleanup events
+- **Private Room Renewal Reminders**: Automated DM notifications for expiring rooms
+#### 🔧 System Improvements
+- **Check Log Command Refactor**: Simplified parameter system
+  - Dropdown selection for log types (main/keyword/room)
+- **Database Migration Cleanup**: Removed legacy compatibility code
+  - Streamlined database initialization
+
+---
 ### V1.8.0b - 2025-10-10
 #### 🆕 Major New Features
 - **Voice Room Control Panel**: Interactive control panel in voice channels

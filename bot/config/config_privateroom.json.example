@@ -133,7 +133,14 @@
     "error_renewal_failed": "❌ 续费失败，请联系管理员。",
 
     "confirm_booster_bonus": "🚀 助力用户加成: **+{bonus_hours}** 小时",
-    "error_insufficient_balance_booster_info": "💡 成为助力用户可额外获得 {booster_hours} 小时时长加成！"
+    "error_insufficient_balance_booster_info": "💡 成为助力用户可额外获得 {booster_hours} 小时时长加成！",
+
+    "renewal_reminder_title": "⏰ 私人房间即将过期提醒",
+    "renewal_reminder_description": "您的私人房间 **{room_name}** 即将在 **{days_remaining}** 天后过期。\n\n您现在可以提前续费延长房间使用时间！",
+    "renewal_reminder_room_info": "🏠 房间名称: {room_name}\n📅 到期时间: {end_date}\n⏰ 剩余时间: {days_remaining} 天",
+    "renewal_reminder_button_label": "🛍️ 前往商店续费",
+    "renewal_reminder_footer": "提示：在商店页面点击「⏰ 提前续费」按钮即可续费您的私人房间",
+    "renewal_reminder_no_shop": "⚠️ 商店频道未找到，请联系管理员"
 
   }
 }
