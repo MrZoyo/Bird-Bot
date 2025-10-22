@@ -1571,10 +1571,6 @@ class PrivateRoomCog(commands.Cog):
                     f"{'恢复' if is_restore else '购买'}私人房间 ({duration_days}天)"
                 )
 
-            # 如果是恢复且用户有保存的设置，应用这些设置
-            if is_restore:
-                await self.apply_saved_settings(channel, user.id)
-
             # 发送房间信息
             await self.send_room_info(channel, user, start_date, end_date)
 

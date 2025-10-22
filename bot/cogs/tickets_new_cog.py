@@ -578,10 +578,6 @@ class TicketsNewCog(commands.Cog):
                 # Add delay between batches to avoid rate limits
                 if i + batch_size < len(active_tickets):
                     await asyncio.sleep(delay_between_batches)
-                    # Log progress for large numbers of tickets
-                    if len(active_tickets) > 10:
-                        progress = min(i + batch_size, len(active_tickets))
-                        logging.info(f"TicketsNewCog: Processed {progress}/{len(active_tickets)} tickets...")
             
             if restored_count > 0:
                 logging.info(f"TicketsNewCog: Restored {restored_count} active ticket thread views")

@@ -28,11 +28,26 @@ def create_bot():
         guild_id = config.get_config()['guild_id']
 
         logging.info(f'Logged in as {bot.user.name}')
+
+        # Debug: Print all commands in the tree
+        # print(f"\n=== Debug: Commands in bot.tree ===")
+        # all_commands = bot.tree.get_commands()
+        # print(f"Total commands in tree: {len(all_commands)}")
+        # for cmd in all_commands:
+        #     print(f"  - {cmd.name} (type: {type(cmd).__name__})")
+        # print("===================================\n")
+
         for guild in bot.guilds:
             if guild.id == guild_id:
                 logging.info(f"\n机器人已连接到服务器 {guild.name}\n")
                 print(f"\n机器人已连接到服务器 {guild.name}\n")
                 await bot.change_presence(activity=discord.Game(name=f"在 {guild.name} 上搬砖"))
+
+                # Ensure the global command definitions are synced so Discord sees updated parameters
+                global_synced = await bot.tree.sync()
+                print(f"Global commands synced: {len(global_synced)}")
+
+                bot.tree.copy_global_to(guild=guild)
                 await bot.tree.sync(guild=guild)
                 print("Commands Synced.")
             else:
@@ -44,14 +59,30 @@ def create_bot():
         try:
             guild_id = config.get_config()['guild_id']
             guild = discord.Object(id=guild_id)
-            await bot.tree.sync(guild=guild)
-            await ctx.send("Commands Synced!")
-            logging.info("Commands successfully synced.")
+
+            global_synced = await bot.tree.sync()
+            print(f"Global commands synced via manual sync: {len(global_synced)}")
+
+            bot.tree.copy_global_to(guild=guild)
+
+            # Print all commands in the tree before syncing
+            print(f"\n=== Commands in bot tree before sync ===")
+            for command in bot.tree.get_commands(guild=guild):
+                print(f"  - {command.name}")
+
+            synced = await bot.tree.sync(guild=guild)
+
+            print(f"\n=== Successfully synced {len(synced)} commands ===")
+            for command in synced:
+                print(f"  - {command.name}")
+
+            await ctx.send(f"Commands Synced! ({len(synced)} commands)")
+            logging.info(f"Commands successfully synced. {len(synced)} commands synced.")
             print("Commands Synced!")
         except Exception as e:
             logging.error(f"Error syncing commands: {e}")
             await ctx.send(f"Failed to sync commands: {e}")
-            print("Failed to sync commands!")
+            print(f"Failed to sync commands! Error: {e}")
 
     return bot
 
@@ -96,25 +127,33 @@ async def setup_bot(bot):
     room_logger.propagate = False
 
     # Add all cogs
-    # illegal_act_cog = IllegalTeamActCog(bot)  # Moved to old_function
-    # await bot.add_cog(illegal_act_cog)
-    await bot.add_cog(VoiceStateCog(bot))
-    await bot.add_cog(WelcomeCog(bot))
-    await bot.add_cog(CreateInvitationCog(bot))
-    await bot.add_cog(DnDCog(bot))
-    await bot.add_cog(CheckStatusCog(bot))
-    await bot.add_cog(AchievementCog(bot))
-    await bot.add_cog(NotebookCog(bot))
-    await bot.add_cog(SpyModeCog(bot))
-    await bot.add_cog(GiveawayCog(bot))
-    await bot.add_cog(RoleCog(bot))
-    await bot.add_cog(BackupCog(bot))
-    # await bot.add_cog(RatingCog(bot))
-    await bot.add_cog(TicketsNewCog(bot))
-    await bot.add_cog(ShopCog(bot))
-    await bot.add_cog(PrivateRoomCog(bot))
-    await bot.add_cog(BanCog(bot))
-    await bot.add_cog(TeamupDisplayCog(bot))
+    cogs_to_load = [
+        ("VoiceStateCog", VoiceStateCog(bot)),
+        ("WelcomeCog", WelcomeCog(bot)),
+        ("CreateInvitationCog", CreateInvitationCog(bot)),
+        ("DnDCog", DnDCog(bot)),
+        ("CheckStatusCog", CheckStatusCog(bot)),
+        ("AchievementCog", AchievementCog(bot)),
+        ("NotebookCog", NotebookCog(bot)),
+        ("SpyModeCog", SpyModeCog(bot)),
+        ("GiveawayCog", GiveawayCog(bot)),
+        ("RoleCog", RoleCog(bot)),
+        ("BackupCog", BackupCog(bot)),
+        ("TicketsNewCog", TicketsNewCog(bot)),
+        ("ShopCog", ShopCog(bot)),
+        ("PrivateRoomCog", PrivateRoomCog(bot)),
+        ("BanCog", BanCog(bot)),
+        ("TeamupDisplayCog", TeamupDisplayCog(bot)),
+    ]
+
+    for cog_name, cog_instance in cogs_to_load:
+        try:
+            await bot.add_cog(cog_instance)
+            # logging.info(f"Successfully loaded cog: {cog_name}")
+            # print(f"✓ Loaded: {cog_name}")
+        except Exception as e:
+            logging.error(f"Failed to load cog {cog_name}: {e}", exc_info=True)
+            print(f"✗ Failed to load {cog_name}: {e}")
 
     return conf['token']
 

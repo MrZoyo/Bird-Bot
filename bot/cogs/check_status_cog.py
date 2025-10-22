@@ -9,7 +9,6 @@ import aiosqlite
 from datetime import datetime, timezone, timedelta
 import matplotlib.pyplot as plt
 import io
-from typing import Optional
 from bot.utils import config, check_channel_validity
 
 
@@ -168,16 +167,24 @@ class CheckStatusCog(commands.Cog):
     @discord.app_commands.command(name="check_log")
     @discord.app_commands.describe(
         x="Number of lines from the end of the log file to return.",
-        log_type="选择要查看的日志类型（默认：主日志）"
+        log_type="日志类型：1/main(主日志)、2/keyword(关键词检测)、3/room(房间活动)，默认为main"
     )
-    @discord.app_commands.choices(log_type=[
-        discord.app_commands.Choice(name="主日志", value="main"),
-        discord.app_commands.Choice(name="关键词检测日志", value="keyword"),
-        discord.app_commands.Choice(name="房间活动日志", value="room")
-    ])
-    async def check_log(self, interaction: discord.Interaction, x: int, log_type: Optional[str] = "main"):
+    async def check_log(self, interaction: discord.Interaction, x: int, log_type: str = "main"):
         if not await check_channel_validity(interaction):
             return
+
+        # Normalize log_type: support both numbers and text
+        log_type_map = {
+            "1": "main",
+            "2": "keyword",
+            "3": "room",
+            "main": "main",
+            "keyword": "keyword",
+            "room": "room"
+        }
+
+        # Default to "main" if not provided
+        normalized_type = log_type_map.get(log_type.lower() if log_type else "main", "main")
 
         # Log type configuration mapping
         log_config = {
@@ -195,7 +202,7 @@ class CheckStatusCog(commands.Cog):
             }
         }
 
-        config = log_config[log_type]
+        config = log_config[normalized_type]
         log_file = config["file"]
         log_type_name = config["name"]
 

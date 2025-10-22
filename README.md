@@ -1,6 +1,6 @@
 # Bird Bot
 
-`Version: 1.8.1b`
+`Version: 1.8.2b`
 
 ---
 
@@ -335,7 +335,7 @@ The new check-in system is completely interface-based using interactive embeds w
 - `/balance_history [user]`: View transaction history with pagination
 
 ### PrivateRoom_Cog
-**🏠 Enhanced private voice channel system** with intelligent settings preservation and restoration capabilities.
+**🏠 Enhanced private voice channel system** with flexible purchasing and restoration capabilities.
 
 **Core Features:**
 - **Temporary ownership system** with configurable expiration periods (32 days default)
@@ -345,19 +345,11 @@ The new check-in system is completely interface-based using interactive embeds w
 - **Automatic cleanup** of expired rooms with smart scheduling
 - **Renewal reminder system** with automated DM notifications when rooms approach expiration
 
-**🆕 Settings Preservation System:**
-- **Automatic settings backup** when rooms expire or are deleted
-- **Complete permission preservation** including user-specific and role-based permissions
-- **Channel name preservation** maintaining user customizations
-- **Intelligent restoration options** when purchasing new rooms
-- **6-month storage period** for saved settings with automatic cleanup
-- **Smart UI choices** between restoring previous settings or creating fresh rooms
-
 **Enhanced User Experience:**
-- **Dual purchase options**: Restore previous settings vs create new room
-- **Settings preview interface** showing saved room name, permissions count, and save date
-- **Seamless permission restoration** automatically applying saved configurations
-- **Invalid user handling** gracefully skipping users who left the server
+- **Purchase and restoration options**: Buy new rooms or restore existing ones
+- **Seamless room creation** with proper room information messages
+- **Voice activity rewards** encouraging engagement with discount system
+- **Automatic notifications** via DM for expiration and renewal opportunities
 
 **Commands:**
 - `/privateroom_init`: (Admin) Initialize private room system with settings table
@@ -495,13 +487,12 @@ Media processing module with validation and security features.
 - **First check-in tracking** for makeup validation and user progress monitoring
 
 ### privateroom_db
-**🏠 Enhanced database manager** for the intelligent private voice channel system.
+**🏠 Enhanced database manager** for the private voice channel system.
 - **Room ownership tracking** with comprehensive expiration management
-- **Settings preservation system** with JSON-based permission storage
 - **Purchase history** with pricing calculations and discount tracking
 - **Activity-based discount** calculations for user engagement rewards
-- **Automatic cleanup** of expired room data and settings with configurable retention
-- **Permission restoration capabilities** with user/role validation and fallback handling
+- **Automatic cleanup** of expired room data with configurable retention
+- **Shop message management** for purchase interface persistence
 
 ### achievement_db
 **🏆 Comprehensive achievement tracking database manager** for user progress monitoring.
@@ -549,6 +540,13 @@ Media processing module with validation and security features.
 ---
 
 ## Update Log
+### V1.8.2b - 2025-10-23
+#### 🐛 Critical Bug Fixes
+- **Private Room System**: Fixed critical error preventing room creation
+  - Cleaned up unused database methods and tables
+- **Command Sync**: Now all commands will automatically sync with the bot
+
+---
 ### V1.8.1b - 2025-10-21
 #### 🆕 New Features
 - **Room Activity Logging System**: Separate log file for room-related activities
