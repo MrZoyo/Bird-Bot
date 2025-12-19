@@ -318,7 +318,7 @@ class ShopDatabaseManager:
             result = await cursor.fetchone()
             return result[0] if result else None
 
-    async def find_latest_missed_checkin(self, user_id: int, days_back: int = 30) -> Optional[str]:
+    async def find_latest_missed_checkin(self, user_id: int, days_back: int = 180) -> Optional[str]:
         """Find the latest missed check-in date within the specified days back.
         
         Returns:

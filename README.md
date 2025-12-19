@@ -1,6 +1,6 @@
 # Bird Bot
 
-`Version: 1.8.2b`
+`Version: 1.8.3`
 
 ---
 
