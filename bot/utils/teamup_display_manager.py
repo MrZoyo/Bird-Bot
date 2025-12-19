@@ -157,9 +157,10 @@ class TeamupDisplayManager:
                 expires_at = datetime.now(timezone.utc).replace(microsecond=0)
                 expires_at = expires_at.replace(tzinfo=None)  # Remove timezone info to match database format
                 
-                # Remove old records for the same voice channel (any user)
+                # Expire old records for the same voice channel (any user) but keep them for cleanup/lookup
                 await db.execute('''
-                    DELETE FROM teamup_invitations 
+                    UPDATE teamup_invitations
+                    SET expires_at = datetime('now', 'localtime')
                     WHERE voice_channel_id = ?
                 ''', (voice_channel_id,))
                 
@@ -337,7 +338,6 @@ class TeamupDisplayManager:
                     FROM teamup_invitations
                     WHERE voice_channel_id = ?
                     AND invitation_message_id IS NOT NULL
-                    AND expires_at > datetime('now', 'localtime')
                     ORDER BY created_at DESC
                     LIMIT 1
                 ''', (voice_channel_id,))
