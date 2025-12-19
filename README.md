@@ -540,6 +540,13 @@ Media processing module with validation and security features.
 ---
 
 ## Update Log
+### V1.8.3 - 2025-12-19
+- Extend the makeup signup application window to 180 days
+- Optimised behaviour for full party composition: Removed synchronisation buttons and bottom prompts for existing parties or when full, preventing residual information from causing disruption.
+- Enhanced `/print_voice_status`: Highlight daily/monthly peaks, display yearly data as monthly bar charts, and optimised date axis and annotation styles.
+- Slash command synchronisation fixes: Eliminated duplicate guild-level synchronisation; duplicate commands no longer appear after restarting or executing `/synccommands`.
+
+---
 ### V1.8.2b - 2025-10-23
 #### 🐛 Critical Bug Fixes
 - **Private Room System**: Fixed critical error preventing room creation
