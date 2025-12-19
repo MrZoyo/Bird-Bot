@@ -232,13 +232,10 @@ class CreateInvitationCog(commands.Cog):
             for field in embed.fields:
                 new_embed.add_field(name=field.name, value=field.value, inline=field.inline)
 
-            # 保留缩略图和footer
+            # 保留缩略图；满员时移除 footer 避免残留按钮指示
             if embed.thumbnail:
                 new_embed.set_thumbnail(url=embed.thumbnail.url)
-            if embed.footer:
-                new_embed.set_footer(text=embed.footer.text)
-            if embed.timestamp:
-                new_embed.timestamp = embed.timestamp
+            # 不保留时间戳，避免右下角显示旧的时间
 
             # 移除所有按钮（Link按钮无法disabled，所以直接移除）
             await message.edit(embed=new_embed, view=None)

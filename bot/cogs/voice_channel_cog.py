@@ -528,13 +528,10 @@ class RoomControlPanelView(discord.ui.View):
             for field in embed.fields:
                 new_embed.add_field(name=field.name, value=field.value, inline=field.inline)
 
-            # 保留缩略图和footer
+            # 保留缩略图；满员后移除 footer 避免残留按钮提示
             if embed.thumbnail:
                 new_embed.set_thumbnail(url=embed.thumbnail.url)
-            if embed.footer:
-                new_embed.set_footer(text=embed.footer.text)
-            if embed.timestamp:
-                new_embed.timestamp = embed.timestamp
+            # 不保留时间戳，避免右下角显示旧时间
 
             # 移除所有按钮（统一格式：满员后按钮全部消失）
             await message.edit(embed=new_embed, view=None)

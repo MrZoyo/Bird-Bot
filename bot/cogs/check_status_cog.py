@@ -9,6 +9,8 @@ import aiosqlite
 from datetime import datetime, timezone, timedelta
 import matplotlib.pyplot as plt
 import io
+import re
+from collections import defaultdict
 from bot.utils import config, check_channel_validity
 
 
@@ -98,6 +100,17 @@ class CheckStatusCog(commands.Cog):
         """Generates line graphs for the number of people and channels on a specific date, month, or year."""
         await interaction.response.defer()
         try:
+            # 判断日期模式
+            if re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+                mode = "day"
+            elif re.fullmatch(r"\d{4}-\d{2}", date):
+                mode = "month"
+            elif re.fullmatch(r"\d{4}", date):
+                mode = "year"
+            else:
+                await interaction.followup.send("日期格式不支持，请使用 YYYY-MM-DD / YYYY-MM / YYYY。", ephemeral=True)
+                return
+
             async with aiosqlite.connect(self.db_path) as db:
                 cursor = await db.execute('''
                         SELECT timestamp, people, channels FROM status
@@ -114,49 +127,136 @@ class CheckStatusCog(commands.Cog):
             people_counts = [row[1] for row in rows]
             channel_counts = [row[2] for row in rows]
 
-            max_people = max(people_counts)
-            max_channels = max(channel_counts)
-            max_people_time = timestamps[people_counts.index(max_people)]
-            max_channels_time = timestamps[channel_counts.index(max_channels)]
+            def save_fig():
+                buf = io.BytesIO()
+                plt.savefig(buf, format='png', bbox_inches='tight')
+                buf.seek(0)
+                plt.close()
+                return buf
 
-            # Plot the number of people
-            plt.figure(figsize=(10, 5))
-            plt.plot(timestamps, people_counts, label='Number of People', marker='o')
-            plt.axhline(y=max_people, color='r', linestyle='--', label=f'Max People: {max_people} at {max_people_time}')
-            plt.title(f'Number of People in Voice Channels (Max: {max_people} at {max_people_time})')
-            plt.xlabel('Time')
-            plt.ylabel('Number of People')
-            plt.grid(True)
-            plt.legend()
-            plt.xticks(rotation=45)
-            plt.tight_layout()
+            def offset_y(y: float) -> float:
+                # Slight nudge upward to avoid overlap with markers
+                return y + max(0.02, y * 0.001)
 
-            # Save the plot to a BytesIO object
-            people_buf = io.BytesIO()
-            plt.savefig(people_buf, format='png')
-            people_buf.seek(0)
-            plt.close()
+            if mode == "day":
+                # 按时间序列画线，突出当日峰值
+                max_people = max(people_counts)
+                max_channels = max(channel_counts)
+                max_people_time = timestamps[people_counts.index(max_people)]
+                max_channels_time = timestamps[channel_counts.index(max_channels)]
 
-            # Plot the number of channels
-            plt.figure(figsize=(10, 5))
-            plt.plot(timestamps, channel_counts, label='Number of Channels', marker='o')
-            plt.axhline(y=max_channels, color='r', linestyle='--',
-                        label=f'Max Channels: {max_channels} at {max_channels_time}')
-            plt.title(f'Number of Channels in Voice Channels (Max: {max_channels} at {max_channels_time})')
-            plt.xlabel('Time')
-            plt.ylabel('Number of Channels')
-            plt.grid(True)
-            plt.legend()
-            plt.xticks(rotation=45)
-            plt.tight_layout()
+                plt.figure(figsize=(10, 5))
+                plt.plot(timestamps, people_counts, color='#4c78a8', alpha=0.75, linewidth=2, marker='o',
+                         markersize=4, label='People')
+                plt.scatter([max_people_time], [max_people], color='red', zorder=5, label=f'Peak {max_people}')
+                plt.text(max_people_time, offset_y(max_people), str(max_people), ha='center', va='bottom', color='red',
+                         fontsize=9)
+                plt.title(f'Voice participants (max {max_people} at {max_people_time.strftime("%H:%M")})')
+                plt.xlabel('Time')
+                plt.ylabel('People')
+                plt.grid(True, alpha=0.3)
+                plt.legend()
+                plt.xticks(rotation=45)
+                people_buf = save_fig()
 
-            # Save the plot to a BytesIO object
-            channels_buf = io.BytesIO()
-            plt.savefig(channels_buf, format='png')
-            channels_buf.seek(0)
-            plt.close()
+                plt.figure(figsize=(10, 5))
+                plt.plot(timestamps, channel_counts, color='#72b7b2', alpha=0.75, linewidth=2, marker='o',
+                         markersize=4, label='Rooms')
+                plt.scatter([max_channels_time], [max_channels], color='red', zorder=5,
+                            label=f'Peak {max_channels}')
+                plt.text(max_channels_time, offset_y(max_channels), str(max_channels), ha='center', va='bottom', color='red',
+                         fontsize=9)
+                plt.title(f'Voice rooms (max {max_channels} at {max_channels_time.strftime("%H:%M")})')
+                plt.xlabel('Time')
+                plt.ylabel('Rooms')
+                plt.grid(True, alpha=0.3)
+                plt.legend()
+                plt.xticks(rotation=45)
+                channels_buf = save_fig()
 
-            # Send the plots as images
+            elif mode == "month":
+                # 按天取峰值，红点标注每日最高
+                daily_people = defaultdict(int)
+                daily_channels = defaultdict(int)
+                for ts, p, c in zip(timestamps, people_counts, channel_counts):
+                    day_key = ts.date().isoformat()
+                    daily_people[day_key] = max(daily_people[day_key], p)
+                    daily_channels[day_key] = max(daily_channels[day_key], c)
+
+                days_sorted = sorted(daily_people.keys())
+                x_idx = list(range(len(days_sorted)))
+                day_labels = [d for d in days_sorted]  # 显示完整日期
+
+                people_series = [daily_people[d] for d in days_sorted]
+                channels_series = [daily_channels[d] for d in days_sorted]
+
+                plt.figure(figsize=(10, 5))
+                plt.plot(x_idx, people_series, color='#4c78a8', alpha=0.6, linewidth=2, marker='o',
+                         markersize=4, label='Daily peak people')
+                plt.scatter(x_idx, people_series, color='red', zorder=5)
+                for x, y in zip(x_idx, people_series):
+                    plt.text(x, offset_y(y), str(y), ha='center', va='bottom', color='red', fontsize=8)
+                plt.title(f'{date} daily voice peaks (people)')
+                plt.xlabel('Day')
+                plt.ylabel('People')
+                plt.grid(True, alpha=0.3)
+                plt.legend()
+                plt.xticks(x_idx, day_labels, rotation=45)
+                people_buf = save_fig()
+
+                plt.figure(figsize=(10, 5))
+                plt.plot(x_idx, channels_series, color='#72b7b2', alpha=0.6, linewidth=2, marker='o',
+                         markersize=4, label='Daily peak rooms')
+                plt.scatter(x_idx, channels_series, color='red', zorder=5)
+                for x, y in zip(x_idx, channels_series):
+                    plt.text(x, offset_y(y), str(y), ha='center', va='bottom', color='red', fontsize=8)
+                plt.title(f'{date} daily voice peaks (rooms)')
+                plt.xlabel('Day')
+                plt.ylabel('Rooms')
+                plt.grid(True, alpha=0.3)
+                plt.legend()
+                plt.xticks(x_idx, day_labels, rotation=45)
+                channels_buf = save_fig()
+
+            else:  # mode == "year"
+                monthly_people = defaultdict(int)
+                monthly_channels = defaultdict(int)
+                for ts, p, c in zip(timestamps, people_counts, channel_counts):
+                    month_key = ts.strftime('%Y-%m')
+                    monthly_people[month_key] = max(monthly_people[month_key], p)
+                    monthly_channels[month_key] = max(monthly_channels[month_key], c)
+
+                months_sorted = sorted(monthly_people.keys())
+                x_idx = list(range(len(months_sorted)))
+                month_labels = [m.split('-')[-1] for m in months_sorted]
+
+                people_series = [monthly_people[m] for m in months_sorted]
+                channels_series = [monthly_channels[m] for m in months_sorted]
+
+                plt.figure(figsize=(10, 5))
+                plt.bar(x_idx, people_series, color='#4c78a8', alpha=0.75, label='Monthly peak people')
+                for x, y in zip(x_idx, people_series):
+                    plt.text(x, y, str(y), ha='center', va='bottom', color='#333', fontsize=8)
+                plt.title(f'{date} monthly voice peaks (people)')
+                plt.xlabel('Month')
+                plt.ylabel('People')
+                plt.grid(axis='y', alpha=0.3)
+                plt.xticks(x_idx, month_labels, rotation=0)
+                plt.legend()
+                people_buf = save_fig()
+
+                plt.figure(figsize=(10, 5))
+                plt.bar(x_idx, channels_series, color='#72b7b2', alpha=0.75, label='Monthly peak rooms')
+                for x, y in zip(x_idx, channels_series):
+                    plt.text(x, y, str(y), ha='center', va='bottom', color='#333', fontsize=8)
+                plt.title(f'{date} monthly voice peaks (rooms)')
+                plt.xlabel('Month')
+                plt.ylabel('Rooms')
+                plt.grid(axis='y', alpha=0.3)
+                plt.xticks(x_idx, month_labels, rotation=0)
+                plt.legend()
+                channels_buf = save_fig()
+
             await interaction.followup.send(files=[
                 discord.File(people_buf, filename='people_stats.png'),
                 discord.File(channels_buf, filename='channels_stats.png')

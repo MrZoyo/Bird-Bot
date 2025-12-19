@@ -43,13 +43,13 @@ def create_bot():
                 print(f"\n机器人已连接到服务器 {guild.name}\n")
                 await bot.change_presence(activity=discord.Game(name=f"在 {guild.name} 上搬砖"))
 
-                # Ensure the global command definitions are synced so Discord sees updated parameters
+                # 清理旧的 guild 级别指令副本，避免与全局指令重复
+                bot.tree.clear_commands(guild=guild)
+                await bot.tree.sync(guild=guild)
+
+                # Sync global commands once; avoid duplicating with guild-specific copies
                 global_synced = await bot.tree.sync()
                 print(f"Global commands synced: {len(global_synced)}")
-
-                bot.tree.copy_global_to(guild=guild)
-                await bot.tree.sync(guild=guild)
-                print("Commands Synced.")
             else:
                 logging.info(f"Bot not allowed to connect to {guild.name}")
                 print(f"Bot not allowed to connect to {guild.name}")
@@ -59,25 +59,15 @@ def create_bot():
         try:
             guild_id = config.get_config()['guild_id']
             guild = discord.Object(id=guild_id)
+            # 清理 guild 级别指令副本，防止重复
+            bot.tree.clear_commands(guild=guild)
+            await bot.tree.sync(guild=guild)
 
             global_synced = await bot.tree.sync()
             print(f"Global commands synced via manual sync: {len(global_synced)}")
 
-            bot.tree.copy_global_to(guild=guild)
-
-            # Print all commands in the tree before syncing
-            print(f"\n=== Commands in bot tree before sync ===")
-            for command in bot.tree.get_commands(guild=guild):
-                print(f"  - {command.name}")
-
-            synced = await bot.tree.sync(guild=guild)
-
-            print(f"\n=== Successfully synced {len(synced)} commands ===")
-            for command in synced:
-                print(f"  - {command.name}")
-
-            await ctx.send(f"Commands Synced! ({len(synced)} commands)")
-            logging.info(f"Commands successfully synced. {len(synced)} commands synced.")
+            await ctx.send(f"Commands Synced! ({len(global_synced)} commands)")
+            logging.info(f"Commands successfully synced. {len(global_synced)} commands synced.")
             print("Commands Synced!")
         except Exception as e:
             logging.error(f"Error syncing commands: {e}")
