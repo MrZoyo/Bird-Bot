@@ -84,6 +84,10 @@
     "ban_success": "✅ 已禁止 {user_mention} 的私人房间并删除现有房间",
     "ban_no_room": "⚠️ {user_mention} 没有有效的私人房间",
     "ban_error": "❌ 删除房间失败: {error}",
+    "fix_success": "✅ 已将 {user_mention} 的私人房间有效期调整为 {days} 天（到期: {end_date}）。",
+    "fix_no_active_room": "❌ {user_mention} 没有激活且有效的私人房间。",
+    "fix_room_not_found": "❌ {user_mention} 的私人房间未找到，请先检查房间状态。",
+    "fix_invalid_days": "❌ 请输入大于 0 的天数。",
 
     "error_room_limit_reached": "❌ 私人房间名额已满",
     "error_no_category": "❌ 私人房间系统未初始化，请联系管理员。",

@@ -418,14 +418,15 @@ class CheckinEmbedView(discord.ui.View):
 
 
 class BalanceModifyModal(discord.ui.Modal):
-    def __init__(self, db, target_user, conf):
+    def __init__(self, db, target_user, conf, current_balance):
         super().__init__(title=conf['modify_balance_modal_title'].format(user_name=target_user.display_name))
         self.db = db
         self.target_user = target_user
         self.conf = conf
 
+        amount_label = f"{conf['modify_balance_amount_label']} (💰:{current_balance})"
         self.amount = discord.ui.TextInput(
-            label=conf['modify_balance_amount_label'],
+            label=amount_label,
             placeholder=conf['modify_balance_amount_placeholder'],
             required=True
         )
@@ -853,7 +854,8 @@ class ShopCog(commands.Cog):
             return
 
         # Show the modal to input amount and reason
-        modal = BalanceModifyModal(self.db, user, self.conf)
+        balance = await self.db.get_user_balance(user.id)
+        modal = BalanceModifyModal(self.db, user, self.conf, balance)
         await interaction.response.send_modal(modal)
 
     @app_commands.command(name="balance_history", description="查看余额变更历史")

@@ -122,7 +122,7 @@ class PurchaseModal(discord.ui.Modal):
         self.add_item(self.confirmation)
 
     async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=False)
 
         # 确认输入验证
         if self.confirmation.value.lower() != 'yes':
@@ -134,12 +134,7 @@ class PurchaseModal(discord.ui.Modal):
 
         # 处理续费逻辑
         if self.is_renewal:
-            success = await self.cog.process_advance_renewal(interaction, self.cost)
-            if not success:
-                await interaction.followup.send(
-                    self.messages['error_renewal_failed'],
-                    ephemeral=True
-                )
+            await self.cog.process_advance_renewal(interaction, self.cost)
             return
 
         # 最终检查用户是否已有活跃的私人房间
@@ -249,7 +244,7 @@ class ResetConfirmView(discord.ui.View):
         self.add_item(cancel_button)
 
     async def confirm_callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=False)
         await self.cog.reset_system(interaction)
 
     async def cancel_callback(self, interaction: discord.Interaction):
@@ -611,17 +606,31 @@ class PrivateRoomCog(commands.Cog):
                 )
 
             # 发送私信
-            if view.children:
-                await user.send(embed=embed, view=view)
-            else:
-                await user.send(embed=embed)
-
-            return True
-
-        except discord.Forbidden:
-            # 用户关闭了私信
-            logging.warning(f"Cannot send renewal reminder to user {user_id}: DMs are disabled")
-            return False
+            try:
+                if view.children:
+                    await user.send(embed=embed, view=view)
+                else:
+                    await user.send(embed=embed)
+                return True
+            except discord.Forbidden:
+                # 用户关闭了私信，改为在私房内提醒
+                logging.warning(
+                    f"Cannot send renewal reminder to user {user_id}: DMs are disabled, sending to room"
+                )
+                if not channel:
+                    return False
+                try:
+                    if view.children:
+                        await channel.send(content=user.mention, embed=embed, view=view)
+                    else:
+                        await channel.send(content=user.mention, embed=embed)
+                    return True
+                except (discord.Forbidden, discord.HTTPException) as e:
+                    logging.error(
+                        f"Failed to send renewal reminder in room {channel.id} for user {user_id}: {e}",
+                        exc_info=True
+                    )
+                    return False
         except discord.HTTPException as e:
             # 其他 Discord API 错误
             logging.error(f"Failed to send renewal reminder to user {user_id}: {e}", exc_info=True)
@@ -1365,6 +1374,20 @@ class PrivateRoomCog(commands.Cog):
                 )
                 return False
 
+            # 再次校验续费窗口，避免重复续费叠加
+            now = datetime.now()
+            days_remaining = (active_room['end_date'] - now).days
+            renewal_threshold = self.conf.get('renewal_days_threshold', 7)
+            if days_remaining > renewal_threshold:
+                await interaction.followup.send(
+                    self.conf['messages']['error_renewal_too_early'].format(
+                        days_remaining=days_remaining,
+                        threshold=renewal_threshold
+                    ),
+                    ephemeral=True
+                )
+                return False
+
             # 计算新的结束时间
             current_end_date = active_room['end_date']
             extend_days = self.conf.get('renewal_extend_days', 31)
@@ -1409,6 +1432,68 @@ class PrivateRoomCog(commands.Cog):
                 ephemeral=True
             )
             return False
+
+    @app_commands.command(
+        name="privateroom_fix",
+        description="调整用户私人房间有效期（仅限管理员）"
+    )
+    @app_commands.describe(user="要调整的用户", days="剩余有效天数")
+    async def fix_private_room(self, interaction: discord.Interaction, user: discord.User, days: int):
+        """调整指定用户的私人房间有效期"""
+        if not await check_channel_validity(interaction):
+            return
+
+        await interaction.response.defer(ephemeral=False)
+
+        if days <= 0:
+            await interaction.followup.send(
+                self.conf['messages']['fix_invalid_days'],
+                ephemeral=False
+            )
+            return
+
+        active_room = await self.db.get_active_room_by_user(user.id)
+        if not active_room:
+            await interaction.followup.send(
+                self.conf['messages']['fix_no_active_room'].format(user_mention=user.mention),
+                ephemeral=False
+            )
+            return
+
+        now = datetime.now()
+        if active_room['end_date'] <= now:
+            await interaction.followup.send(
+                self.conf['messages']['fix_no_active_room'].format(user_mention=user.mention),
+                ephemeral=False
+            )
+            return
+
+        channel = self.bot.get_channel(active_room['room_id'])
+        if not channel:
+            await interaction.followup.send(
+                self.conf['messages']['fix_room_not_found'].format(user_mention=user.mention),
+                ephemeral=False
+            )
+            return
+
+        new_end_date = now + timedelta(days=days)
+        new_end_date = new_end_date.replace(
+            hour=self.conf['check_time_hour'],
+            minute=0,
+            second=0,
+            microsecond=0
+        )
+
+        await self.db.extend_room_validity(active_room['room_id'], new_end_date)
+
+        await interaction.followup.send(
+            self.conf['messages']['fix_success'].format(
+                user_mention=user.mention,
+                days=days,
+                end_date=new_end_date.strftime("%Y-%m-%d %H:%M")
+            ),
+            ephemeral=False
+        )
 
     async def create_private_room(self, interaction: discord.Interaction, cost: int) -> bool:
         """创建新的私人房间"""

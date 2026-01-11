@@ -1,6 +1,6 @@
 # Bird Bot
 
-`Version: 1.8.3`
+`Version: 1.8.4`
 
 ---
 
@@ -539,7 +539,20 @@ Media processing module with validation and security features.
 
 ---
 
-## Update Log
+## Update Log Latest
+### V1.8.4 - 2026-1-11
+#### 🐛 Critical Bug Fixes
+- **Private Room System**: 
+  - Fixed an issue that previously allowed users to infinitely renew private rooms under specific conditions.
+  - If the user has disabled DMs, the bot will now send a reminder in the private room that could be renewed.
+
+---
+
+
+## Update Log Archive
+<details>
+<summary><strong>From V1.4.0b</strong></summary>
+
 ### V1.8.3 - 2025-12-19
 - Extend the makeup signup application window to 180 days
 - Optimised behaviour for full party composition: Removed synchronisation buttons and bottom prompts for existing parties or when full, preventing residual information from causing disruption.
@@ -700,3 +713,4 @@ Media processing module with validation and security features.
   - Enhanced `/check_log` command with `keyword_log` parameter
   - UTF-8 encoding support and configurable log paths
 ---
+</details>
