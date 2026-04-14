@@ -37,7 +37,6 @@ class CheckStatusCog(commands.Cog):
             name='Where Is',
             callback=self.where_is_context_menu,
         )
-        self.bot.tree.add_command(self.where_is_menu)
 
         self.main_config = config.get_config('main')
         self.db_path = self.main_config['db_path']
@@ -52,7 +51,12 @@ class CheckStatusCog(commands.Cog):
         self.current_channel_name_message = self.conf['current_channel_name_message']
         self.current_channel_members_message = self.conf['current_channel_members_message']
 
+        self.bot.tree.add_command(self.where_is_menu)
         self.check_voice_status_task.start()
+
+    def cog_unload(self):
+        self.check_voice_status_task.cancel()
+        self.bot.tree.remove_command(self.where_is_menu.name, type=self.where_is_menu.type)
 
     @tasks.loop(minutes=10)
     async def check_voice_status_task(self):

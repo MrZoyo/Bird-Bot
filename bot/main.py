@@ -1,18 +1,144 @@
-# bot/main.py
+import logging
+from importlib import import_module
+
 import discord
 from discord.ext import commands
-import logging
-from pathlib import Path
 
 from bot.utils import config
-from bot.cogs import (
-    AchievementCog, BackupCog, CheckStatusCog,
-    CreateInvitationCog, DnDCog, SpyModeCog, GiveawayCog,
-    # IllegalTeamActCog,  # Moved to old_function
-    NotebookCog, # RatingCog, 
-    RoleCog, VoiceStateCog, WelcomeCog,
-    ShopCog, PrivateRoomCog, TicketsNewCog, BanCog, TeamupDisplayCog
-)
+
+
+COG_SPECS = [
+    {
+        "feature": "voicechannel",
+        "cog_name": "VoiceStateCog",
+        "module_path": "bot.cogs.voice_channel_cog",
+        "class_name": "VoiceStateCog",
+        "required_configs": ["voicechannel"],
+    },
+    {
+        "feature": "welcome",
+        "cog_name": "WelcomeCog",
+        "module_path": "bot.cogs.welcome_cog",
+        "class_name": "WelcomeCog",
+        "required_configs": ["welcome"],
+    },
+    {
+        "feature": "invitation",
+        "cog_name": "CreateInvitationCog",
+        "module_path": "bot.cogs.create_invitation_cog",
+        "class_name": "CreateInvitationCog",
+        "required_configs": ["invitation"],
+    },
+    {
+        "feature": "dnd",
+        "cog_name": "DnDCog",
+        "module_path": "bot.cogs.game_dnd_cog",
+        "class_name": "DnDCog",
+        "required_configs": [],
+    },
+    {
+        "feature": "checkstatus",
+        "cog_name": "CheckStatusCog",
+        "module_path": "bot.cogs.check_status_cog",
+        "class_name": "CheckStatusCog",
+        "required_configs": ["checkstatus"],
+    },
+    {
+        "feature": "achievements",
+        "cog_name": "AchievementCog",
+        "module_path": "bot.cogs.achievement_cog",
+        "class_name": "AchievementCog",
+        "required_configs": ["achievements"],
+    },
+    {
+        "feature": "notebook",
+        "cog_name": "NotebookCog",
+        "module_path": "bot.cogs.notebook_cog",
+        "class_name": "NotebookCog",
+        "required_configs": [],
+    },
+    {
+        "feature": "spymode",
+        "cog_name": "SpyModeCog",
+        "module_path": "bot.cogs.game_spymode_cog",
+        "class_name": "SpyModeCog",
+        "required_configs": ["spymode"],
+    },
+    {
+        "feature": "giveaway",
+        "cog_name": "GiveawayCog",
+        "module_path": "bot.cogs.giveaway_cog",
+        "class_name": "GiveawayCog",
+        "required_configs": ["giveaway"],
+    },
+    {
+        "feature": "role",
+        "cog_name": "RoleCog",
+        "module_path": "bot.cogs.role_cog",
+        "class_name": "RoleCog",
+        "required_configs": ["role", "achievements"],
+    },
+    {
+        "feature": "backup",
+        "cog_name": "BackupCog",
+        "module_path": "bot.cogs.backup_cog",
+        "class_name": "BackupCog",
+        "required_configs": [],
+    },
+    {
+        "feature": "tickets_new",
+        "cog_name": "TicketsNewCog",
+        "module_path": "bot.cogs.tickets_new_cog",
+        "class_name": "TicketsNewCog",
+        "required_configs": ["tickets_new"],
+    },
+    {
+        "feature": "shop",
+        "cog_name": "ShopCog",
+        "module_path": "bot.cogs.shop_cog",
+        "class_name": "ShopCog",
+        "required_configs": ["shop"],
+    },
+    {
+        "feature": "privateroom",
+        "cog_name": "PrivateRoomCog",
+        "module_path": "bot.cogs.privateroom_cog",
+        "class_name": "PrivateRoomCog",
+        "required_configs": ["privateroom", "role"],
+    },
+    {
+        "feature": "ban",
+        "cog_name": "BanCog",
+        "module_path": "bot.cogs.ban_cog",
+        "class_name": "BanCog",
+        "required_configs": ["ban"],
+    },
+    {
+        "feature": "teamup_display",
+        "cog_name": "TeamupDisplayCog",
+        "module_path": "bot.cogs.teamup_display_cog",
+        "class_name": "TeamupDisplayCog",
+        "required_configs": ["teamup_display"],
+    },
+]
+
+
+def _get_missing_configs(config_names):
+    missing_configs = []
+    for config_name in config_names:
+        if not config.config_exists(config_name):
+            missing_configs.append(config_name)
+            continue
+
+        if not config.reload_config(config_name, silent=True):
+            missing_configs.append(config_name)
+
+    return missing_configs
+
+
+def _load_cog_class(module_path, class_name):
+    module = import_module(module_path)
+    return getattr(module, class_name)
 
 
 def create_bot():
@@ -28,14 +154,6 @@ def create_bot():
         guild_id = config.get_config()['guild_id']
 
         logging.info(f'Logged in as {bot.user.name}')
-
-        # Debug: Print all commands in the tree
-        # print(f"\n=== Debug: Commands in bot.tree ===")
-        # all_commands = bot.tree.get_commands()
-        # print(f"Total commands in tree: {len(all_commands)}")
-        # for cmd in all_commands:
-        #     print(f"  - {cmd.name} (type: {type(cmd).__name__})")
-        # print("===================================\n")
 
         for guild in bot.guilds:
             if guild.id == guild_id:
@@ -89,7 +207,7 @@ async def setup_bot(bot):
         format='%(asctime)s - %(levelname)s - %(message)s',
         encoding='utf-8'
     )
-    
+
     # Configure keyword detection logging
     keyword_logger = logging.getLogger('keyword_detection')
     keyword_logger.setLevel(logging.INFO)
@@ -116,34 +234,35 @@ async def setup_bot(bot):
     # Prevent room logs from appearing in main log
     room_logger.propagate = False
 
-    # Add all cogs
-    cogs_to_load = [
-        ("VoiceStateCog", VoiceStateCog(bot)),
-        ("WelcomeCog", WelcomeCog(bot)),
-        ("CreateInvitationCog", CreateInvitationCog(bot)),
-        ("DnDCog", DnDCog(bot)),
-        ("CheckStatusCog", CheckStatusCog(bot)),
-        ("AchievementCog", AchievementCog(bot)),
-        ("NotebookCog", NotebookCog(bot)),
-        ("SpyModeCog", SpyModeCog(bot)),
-        ("GiveawayCog", GiveawayCog(bot)),
-        ("RoleCog", RoleCog(bot)),
-        ("BackupCog", BackupCog(bot)),
-        ("TicketsNewCog", TicketsNewCog(bot)),
-        ("ShopCog", ShopCog(bot)),
-        ("PrivateRoomCog", PrivateRoomCog(bot)),
-        ("BanCog", BanCog(bot)),
-        ("TeamupDisplayCog", TeamupDisplayCog(bot)),
-    ]
+    loaded_cogs = []
 
-    for cog_name, cog_instance in cogs_to_load:
+    for spec in COG_SPECS:
+        feature_name = spec['feature']
+        cog_name = spec['cog_name']
+
+        if not config.is_feature_enabled(feature_name):
+            logging.info(f"Skip loading {cog_name}: feature '{feature_name}' is disabled.")
+            print(f"- Skipped {cog_name}: feature '{feature_name}' is disabled.")
+            continue
+
+        missing_configs = _get_missing_configs(spec['required_configs'])
+        if missing_configs:
+            missing_text = ', '.join(missing_configs)
+            logging.info(f"Skip loading {cog_name}: missing or empty configs: {missing_text}.")
+            print(f"- Skipped {cog_name}: missing or empty configs: {missing_text}.")
+            continue
+
         try:
-            await bot.add_cog(cog_instance)
-            # logging.info(f"Successfully loaded cog: {cog_name}")
-            # print(f"✓ Loaded: {cog_name}")
+            cog_class = _load_cog_class(spec['module_path'], spec['class_name'])
+            await bot.add_cog(cog_class(bot))
+            loaded_cogs.append(cog_name)
+            logging.info(f"Loaded cog: {cog_name}")
         except Exception as e:
             logging.error(f"Failed to load cog {cog_name}: {e}", exc_info=True)
             print(f"✗ Failed to load {cog_name}: {e}")
+
+    logging.info(f"Loaded {len(loaded_cogs)} cogs: {', '.join(loaded_cogs)}")
+    print(f"Loaded {len(loaded_cogs)} cogs: {', '.join(loaded_cogs)}")
 
     return conf['token']
 

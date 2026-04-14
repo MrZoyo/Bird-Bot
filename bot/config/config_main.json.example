@@ -11,5 +11,24 @@
 	"_comment": "=====================================================================",
 	"_comment": "====FOR Channel Validator=========================================",
 	"admin_channel_id": 1145141919810,
+    "_comment_features": "====FOR Feature Toggle=============================================",
+    "features": {
+        "voicechannel": true,
+        "welcome": true,
+        "invitation": true,
+        "dnd": true,
+        "checkstatus": true,
+        "achievements": true,
+        "notebook": true,
+        "spymode": true,
+        "giveaway": true,
+        "role": true,
+        "backup": true,
+        "tickets_new": true,
+        "shop": true,
+        "privateroom": true,
+        "ban": true,
+        "teamup_display": true
+    },
 	"_comment": "====================================================================="
 }

@@ -1,6 +1,6 @@
 # Bird Bot
 
-`Version: 1.8.4`
+`Version: 1.9.0`
 
 ---
 
@@ -63,11 +63,13 @@ aiosqlite, matplotlib, aiohttp, pillow, discord.py, aiofiles
 ## Setup
 0. Clone the repository and enter the directory.
 1. `pip3 install -r requirements.txt`
-2. Modify __all the config.example files__ in the `.bot\config\` and delete `.example`.
-3. Run `run.py`. If you are using a Linux server, you can use `nohup python3 run.py &` to run the bot in the background.
-4. Invite the bot to your server and give it the necessary permissions.(Required permissions: bot, application command, administrator)
-5. For updating the bot, you can use the `git pull` command to update the bot to the latest version.
-6. For some cogs like `tickets_new_cog`, you need to use command `/tickets_setup` to initialize the ticket system. Please check function introduction for more details.
+2. Copy only the required `config_*.json.example` files in `bot/config/`, rename them to `config_*.json`, and fill in the values.
+3. In `config_main.json`, use `features` to enable only the modules you need.
+4. Disabled modules, or modules without a valid config file, will be skipped during startup and their commands will not be registered.
+5. Run `run.py`. If you are using a Linux server, you can use `nohup python3 run.py &` to run the bot in the background.
+6. Invite the bot to your server and give it the necessary permissions.(Required permissions: bot, application command, administrator)
+7. For updating the bot, you can use the `git pull` command to update the bot to the latest version.
+8. For some cogs like `tickets_new_cog`, you need to use command `/tickets_setup` to initialize the ticket system. Please check function introduction for more details.
 
 ---
 ## Function Introduction
@@ -540,11 +542,10 @@ Media processing module with validation and security features.
 ---
 
 ## Update Log Latest
-### V1.8.4 - 2026-1-11
-#### 🐛 Critical Bug Fixes
-- **Private Room System**: 
-  - Fixed an issue that previously allowed users to infinitely renew private rooms under specific conditions.
-  - If the user has disabled DMs, the bot will now send a reminder in the private room that could be renewed.
+### V1.9.0 - 2026-04-14
+- Added feature toggles in `config_main.json` for per-module loading.
+- Disabled modules, or modules without config, are now skipped cleanly without startup errors.
+- Commands for skipped modules are no longer registered.
 
 ---
 
@@ -552,6 +553,14 @@ Media processing module with validation and security features.
 ## Update Log Archive
 <details>
 <summary><strong>From V1.4.0b</strong></summary>
+
+### V1.8.4 - 2026-1-11
+#### 🐛 Critical Bug Fixes
+- **Private Room System**: 
+  - Fixed an issue that previously allowed users to infinitely renew private rooms under specific conditions.
+  - If the user has disabled DMs, the bot will now send a reminder in the private room that could be renewed.
+
+---
 
 ### V1.8.3 - 2025-12-19
 - Extend the makeup signup application window to 180 days
