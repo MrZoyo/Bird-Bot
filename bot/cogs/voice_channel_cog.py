@@ -554,8 +554,46 @@ class VoiceStateCog(commands.Cog):
         self.conf = config.get_config('voicechannel')
         self.channel_configs = {int(channel_id): c for channel_id, c in self.conf['channel_configs'].items()}
 
-        # Start the cleanup task
-        self.cleanup_task.start()
+    async def cog_load(self):
+        await self.ensure_temp_channels_table()
+        if not self.cleanup_task.is_running():
+            self.cleanup_task.start()
+
+    def cog_unload(self):
+        if self.cleanup_task.is_running():
+            self.cleanup_task.cancel()
+
+    async def ensure_temp_channels_table(self):
+        """Create/migrate temp channel table before any background task touches it."""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS temp_channels (
+                    channel_id INTEGER PRIMARY KEY,
+                    creator_id INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    control_panel_message_id INTEGER,
+                    control_panel_channel_id INTEGER,
+                    is_soundboard_enabled BOOLEAN DEFAULT 1,
+                    current_room_type TEXT DEFAULT 'public'
+                );
+            ''')
+
+            cursor = await db.execute("PRAGMA table_info(temp_channels)")
+            existing_columns = {row[1] for row in await cursor.fetchall()}
+
+            columns_to_add = [
+                ("control_panel_message_id", "INTEGER"),
+                ("control_panel_channel_id", "INTEGER"),
+                ("is_soundboard_enabled", "BOOLEAN DEFAULT 1"),
+                ("current_room_type", "TEXT DEFAULT 'public'")
+            ]
+
+            for col_name, col_type in columns_to_add:
+                if col_name not in existing_columns:
+                    logging.info(f"[MIGRATION] Adding column {col_name} to temp_channels")
+                    await db.execute(f"ALTER TABLE temp_channels ADD COLUMN {col_name} {col_type}")
+
+            await db.commit()
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
@@ -1025,40 +1063,9 @@ class VoiceStateCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        # Ensure the table exists and migrate existing tables
+        await self.ensure_temp_channels_table()
+
         async with aiosqlite.connect(self.db_path) as db:
-            # Create table if not exists (for new installations)
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS temp_channels (
-                    channel_id INTEGER PRIMARY KEY,
-                    creator_id INTEGER NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    control_panel_message_id INTEGER,
-                    control_panel_channel_id INTEGER,
-                    is_soundboard_enabled BOOLEAN DEFAULT 1,
-                    current_room_type TEXT DEFAULT 'public'
-                );
-            ''')
-
-            # ===== AUTO MIGRATION (v1.7.1+) - Can be removed after a few versions =====
-            # Check and add missing columns for existing installations
-            cursor = await db.execute("PRAGMA table_info(temp_channels)")
-            existing_columns = {row[1] for row in await cursor.fetchall()}
-
-            columns_to_add = [
-                ("control_panel_message_id", "INTEGER"),
-                ("control_panel_channel_id", "INTEGER"),
-                ("is_soundboard_enabled", "BOOLEAN DEFAULT 1"),
-                ("current_room_type", "TEXT DEFAULT 'public'")
-            ]
-
-            for col_name, col_type in columns_to_add:
-                if col_name not in existing_columns:
-                    logging.info(f"[MIGRATION] Adding column {col_name} to temp_channels")
-                    await db.execute(f"ALTER TABLE temp_channels ADD COLUMN {col_name} {col_type}")
-            # ===== END AUTO MIGRATION =====
-
-            await db.commit()
 
             # Check for empty channels on startup
             cursor = await db.execute('SELECT channel_id FROM temp_channels')

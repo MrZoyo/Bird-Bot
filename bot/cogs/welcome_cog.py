@@ -21,7 +21,7 @@ class WelcomeDMView(discord.ui.View):
         # Add the member count button
         button = discord.ui.Button(
             style=discord.ButtonStyle.gray,
-            label=self.conf.get('member_count_button').format(member_count=member_count) if self.conf.get('member_count_button') else f"你是小鸟的第 {member_count} 名成员",
+            label=self.conf.get('member_count_button').format(member_count=member_count) if self.conf.get('member_count_button') else f"你是アルタ的第 {member_count} 名成员",
             disabled=True  # Make it non-clickable
         )
         self.add_item(button)

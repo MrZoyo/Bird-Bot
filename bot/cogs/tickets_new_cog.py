@@ -939,14 +939,13 @@ class TicketsNewCog(commands.Cog):
         """Initialize the ticket system with optional channel parameters"""
         if not await self.is_admin_for_type(interaction.user):
             await interaction.response.send_message(
-                self.conf['messages']['admin_no_permission'], 
-                ephemeral=True
+                self.conf['messages']['admin_no_permission']
             )
             return
         
         try:
             # Defer response since channel creation might take time
-            await interaction.response.defer(ephemeral=True)
+            await interaction.response.defer()
             
             # Check if system is already set up
             existing_config = await self.db_manager.get_config()
@@ -959,8 +958,7 @@ class TicketsNewCog(commands.Cog):
                         self.conf['messages']['init_already_configured'].format(
                             ticket_channel=existing_ticket_channel.mention,
                             info_channel=existing_info_channel.mention
-                        ),
-                        ephemeral=True
+                        )
                     )
                     return
             
@@ -968,16 +966,14 @@ class TicketsNewCog(commands.Cog):
             if ticket_channel:
                 if not await self._validate_channel_permissions(ticket_channel):
                     await interaction.followup.send(
-                        self.conf['messages']['init_channel_permission_error'],
-                        ephemeral=True
+                        self.conf['messages']['init_channel_permission_error']
                     )
                     return
             
             if info_channel:
                 if not await self._validate_channel_permissions(info_channel):
                     await interaction.followup.send(
-                        self.conf['messages']['init_channel_permission_error'],
-                        ephemeral=True
+                        self.conf['messages']['init_channel_permission_error']
                     )
                     return
             
@@ -1093,20 +1089,17 @@ class TicketsNewCog(commands.Cog):
                     await info_channel.delete(reason=self.conf['messages']['cleanup_reason'])
                 
                 await interaction.followup.send(
-                    self.conf['messages']['init_db_error'],
-                    ephemeral=True
+                    self.conf['messages']['init_db_error']
                 )
             
         except discord.Forbidden:
             await interaction.followup.send(
-                self.conf['messages']['init_permission_error'],
-                ephemeral=True
+                self.conf['messages']['init_permission_error']
             )
         except Exception as e:
             logging.error(f"Error initializing ticket system: {e}")
             await interaction.followup.send(
-                self.conf['messages']['init_error'].format(error=str(e)), 
-                ephemeral=True
+                self.conf['messages']['init_error'].format(error=str(e))
             )
 
     async def _validate_channel_permissions(self, channel: discord.TextChannel) -> bool:
@@ -2534,4 +2527,3 @@ class DeleteConfirmView(discord.ui.View):
     @discord.ui.button(label="取消", style=discord.ButtonStyle.secondary, emoji="❌")
     async def cancel_delete(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("已取消删除操作", ephemeral=True)
-

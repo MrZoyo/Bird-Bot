@@ -10,6 +10,27 @@ from bot.utils import config, check_channel_validity
 from bot.utils.role_db import RoleDatabaseManager
 
 
+async def ensure_optional_role(member: discord.Member, role_id: int | None, reason: str) -> None:
+    """Add an optional starter role when configured and present in the guild."""
+    if not role_id:
+        return
+
+    if discord.utils.get(member.roles, id=role_id) is not None:
+        return
+
+    role = discord.utils.get(member.guild.roles, id=role_id)
+    if role is None:
+        logging.warning("Configured starter role %s not found in guild %s", role_id, member.guild.id)
+        return
+
+    await member.add_roles(role, reason=reason)
+
+
+def _escape_markdown_table_cell(value: object) -> str:
+    """Keep markdown tables readable when names contain special characters."""
+    return str(value).replace("|", "\\|").replace("\n", " ")
+
+
 class AchievementRoleView(View):
     def __init__(self, bot):
         super().__init__(timeout=None)  # No interaction time limit
@@ -48,11 +69,11 @@ class AchievementRoleView(View):
         # Get the user's id
         user_id = interaction.user.id
 
-        # Check if the user has the achievement start role
-        if discord.utils.get(interaction.user.roles, id=self.achievement_start_role_id) is None:
-            # add the achievement start role to the user
-            start_role = discord.utils.get(interaction.guild.roles, id=self.achievement_start_role_id)
-            await interaction.user.add_roles(start_role, reason="Adding achievement start role")
+        await ensure_optional_role(
+            interaction.user,
+            self.achievement_start_role_id,
+            "Adding achievement start role"
+        )
 
         # Get the user's progress for the achievement type
         user_progress = await self.role_db.get_user_achievement_progress(user_id, achievement_type)
@@ -165,11 +186,11 @@ class StarSignView(View):
             logging.info(f"User {interaction.user.id} has removed the {star_sign_role.name} role")
             return
 
-        # Check if the user has the social start role
-        if discord.utils.get(interaction.user.roles, id=self.social_start_role_id) is None:
-            # add the social start role to the user
-            start_role = discord.utils.get(interaction.guild.roles, id=self.social_start_role_id)
-            await interaction.user.add_roles(start_role, reason="Adding social start role")
+        await ensure_optional_role(
+            interaction.user,
+            self.social_start_role_id,
+            "Adding social start role"
+        )
 
         # Remove other star sign roles from the user
         other_roles = [discord.utils.get(interaction.guild.roles, id=star_sign['role_id']) for star_sign in
@@ -226,9 +247,11 @@ class MBTIView(View):
             logging.info(f"User {interaction.user.id} has removed the {mbti_role.name} role")
             return
 
-        if discord.utils.get(interaction.user.roles, id=self.social_start_role_id) is None:
-            start_role = discord.utils.get(interaction.guild.roles, id=self.social_start_role_id)
-            await interaction.user.add_roles(start_role, reason="Adding social start role")
+        await ensure_optional_role(
+            interaction.user,
+            self.social_start_role_id,
+            "Adding social start role"
+        )
 
         # Remove other MBTI roles from the user
         other_roles = [discord.utils.get(interaction.guild.roles, id=mbti['role_id']) for mbti in
@@ -381,7 +404,7 @@ class SignatureView(View):
         required_time = config['time_requirement']
         helper_role_id = config['helper_role_id']
 
-        # 检查是否是助力服务器成员
+        # 检查是否是服务器助力成员
         for guild in self.bot.guilds:
             member = guild.get_member(user_id)
             if member and any(role.id == helper_role_id for role in member.roles):
@@ -506,6 +529,102 @@ class RoleCog(commands.Cog):
 
         self.signature_config = self.role_config['signature']
 
+    def _get_panel_role_targets(self, panel_type: str) -> list[dict[str, object]]:
+        if panel_type == 'role':
+            enabled_types = {role_type['type'] for role_type in self.role_type_name}
+            return [
+                {
+                    'label': achievement['name'],
+                    'role_id': achievement.get('role_id'),
+                }
+                for achievement in self.achievements
+                if achievement.get('type') in enabled_types
+            ]
+
+        if panel_type == 'starsign':
+            return [
+                {
+                    'label': star_sign['name'],
+                    'role_id': star_sign.get('role_id'),
+                }
+                for star_sign in self.starsign_name
+            ]
+
+        if panel_type == 'mbti':
+            return [
+                {
+                    'label': mbti['name'],
+                    'role_id': mbti.get('role_id'),
+                }
+                for mbti in self.mbti_name
+            ]
+
+        if panel_type == 'gender':
+            return [
+                {
+                    'label': gender['name'],
+                    'role_id': gender.get('role_id'),
+                }
+                for gender in self.gender_name
+            ]
+
+        return []
+
+    def _build_role_check_report(self, guild: discord.Guild, panel_name: str, panel_type: str) -> tuple[bool, str]:
+        targets = self._get_panel_role_targets(panel_type)
+        passed_count = 0
+        lines = [
+            f"**{panel_name} 关联身份组校验**",
+        ]
+
+        if not targets:
+            lines.append("")
+            lines.append("没有找到任何可校验的 `role_id`，未创建领取面板。")
+            return False, "\n".join(lines)
+
+        table_lines = [
+            "| 项目 | Role ID | 结果 | 服务器身份组 |",
+            "| --- | --- | --- | --- |",
+        ]
+
+        all_passed = True
+        for target in targets:
+            label = _escape_markdown_table_cell(target.get('label', '未命名'))
+            role_id = target.get('role_id')
+
+            if not isinstance(role_id, int) or role_id <= 0:
+                status = "未配置"
+                role_name = "-"
+                role_id_display = "未配置"
+                all_passed = False
+            else:
+                role = guild.get_role(role_id)
+                role_id_display = str(role_id)
+                if role is None:
+                    status = "未找到"
+                    role_name = "-"
+                    all_passed = False
+                else:
+                    status = "通过"
+                    role_name = _escape_markdown_table_cell(role.name)
+                    passed_count += 1
+
+            table_lines.append(
+                f"| {label} | {role_id_display} | {status} | {role_name} |"
+            )
+
+        lines.append(f"通过：**{passed_count}/{len(targets)}**")
+        lines.append("")
+        lines.append("```md")
+        lines.extend(table_lines)
+        lines.append("```")
+
+        if not all_passed:
+            lines.append("")
+            lines.append("校验未全部通过，已阻止创建该领取面板。")
+
+        return all_passed, "\n".join(lines)
+
     @app_commands.command(
         name="create_role_pickup",
         description="Creates a message on a specific channel for role pickup."
@@ -516,6 +635,11 @@ class RoleCog(commands.Cog):
             return
 
         await interaction.response.defer()
+
+        all_passed, report = self._build_role_check_report(interaction.guild, "成就面板", "role")
+        if not all_passed:
+            await interaction.followup.send(report, ephemeral=True)
+            return
 
         # Create the role pickup message with the AchievementRoleView as its view
         view = AchievementRoleView(self.bot)
@@ -538,7 +662,10 @@ class RoleCog(commands.Cog):
         # Save the view to the database
         await self.role_db.save_role_view(message.id, channel.id, table='role_views')
 
-        await interaction.followup.send(f"Role pickup message created in {channel.mention}.")
+        await interaction.followup.send(
+            f"{report}\n\n校验通过，已在 {channel.mention} 创建成就领取面板。",
+            ephemeral=True
+        )
 
     @app_commands.command(
         name="create_starsign_pickup",
@@ -550,6 +677,11 @@ class RoleCog(commands.Cog):
             return
 
         await interaction.response.defer()
+
+        all_passed, report = self._build_role_check_report(interaction.guild, "星座面板", "starsign")
+        if not all_passed:
+            await interaction.followup.send(report, ephemeral=True)
+            return
 
         # Create the role pickup message with the AchievementRoleView as its view
         view = StarSignView(self.bot)
@@ -572,7 +704,10 @@ class RoleCog(commands.Cog):
         # Save the view to the database
         await self.role_db.save_role_view(message.id, channel.id, table='starsign_views')
 
-        await interaction.followup.send(f"Star sign pickup message created in {channel.mention}.")
+        await interaction.followup.send(
+            f"{report}\n\n校验通过，已在 {channel.mention} 创建星座领取面板。",
+            ephemeral=True
+        )
 
     @app_commands.command(
         name="create_mbti_pickup",
@@ -584,6 +719,11 @@ class RoleCog(commands.Cog):
             return
 
         await interaction.response.defer()
+
+        all_passed, report = self._build_role_check_report(interaction.guild, "MBTI 面板", "mbti")
+        if not all_passed:
+            await interaction.followup.send(report, ephemeral=True)
+            return
 
         # Create the role pickup message with the AchievementRoleView as its view
         view = MBTIView(self.bot)
@@ -608,7 +748,10 @@ class RoleCog(commands.Cog):
         # Save the view to the database
         await self.role_db.save_role_view(message.id, channel.id, table='mbti_views')
 
-        await interaction.followup.send(f"MBTI pickup message created in {channel.mention}.")
+        await interaction.followup.send(
+            f"{report}\n\n校验通过，已在 {channel.mention} 创建 MBTI 领取面板。",
+            ephemeral=True
+        )
 
     @app_commands.command(
         name="create_gender_pickup",
@@ -620,6 +763,11 @@ class RoleCog(commands.Cog):
             return
 
         await interaction.response.defer()
+
+        all_passed, report = self._build_role_check_report(interaction.guild, "性别面板", "gender")
+        if not all_passed:
+            await interaction.followup.send(report, ephemeral=True)
+            return
 
         view = GenderView(self.bot)
 
@@ -639,7 +787,10 @@ class RoleCog(commands.Cog):
         # Save the view to the database
         await self.role_db.save_role_view(message.id, channel.id, table='gender_views')
 
-        await interaction.followup.send(f"Gender pickup message created in {channel.mention}.")
+        await interaction.followup.send(
+            f"{report}\n\n校验通过，已在 {channel.mention} 创建性别领取面板。",
+            ephemeral=True
+        )
 
     @app_commands.command(
         name="create_signature_pickup",

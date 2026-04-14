@@ -9,6 +9,12 @@ from discord.ui import Button, View
 from bot.utils import config, check_channel_validity, AchievementDatabaseManager
 
 
+FEATURE_LINKED_ACHIEVEMENT_TYPES = {
+    'giveaway': {'giveaway'},
+    'shop': {'checkin_sum', 'checkin_combo'},
+}
+
+
 class AchievementRefreshView(View):
     def __init__(self, bot, user_id, db_manager):
         super().__init__(timeout=180.0)
@@ -25,42 +31,21 @@ class AchievementRefreshView(View):
     async def format_page(self):
         # Get user achievements using database manager
         user_achievements = await self.db.get_user_achievements(self.user_id)
-        message_count = user_achievements['message_count']
-        reaction_count = user_achievements['reaction_count']
-        time_spent = user_achievements['time_spent']
-        giveaway_count = user_achievements['giveaway_count']
+        achievement_cog = self.bot.get_cog('AchievementCog')
 
         # Load the achievements from the config.json file
-        achievements = self.bot.get_cog('AchievementCog').achievements
+        achievements = achievement_cog.get_visible_achievements()
 
         # Add the count for each achievement
         for achievement in achievements:
-            if achievement['type'] == 'reaction':
-                achievement['count'] = reaction_count
-            elif achievement['type'] == 'message':
-                achievement['count'] = message_count
-            elif achievement['type'] == 'time_spent':
-                achievement['count'] = time_spent / 60  # Convert seconds to minutes
-            elif achievement['type'] == 'giveaway':
-                achievement['count'] = giveaway_count
-            elif achievement['type'] == 'checkin_sum':
-                achievement['count'] = user_achievements['checkin_sum']
-            elif achievement['type'] == 'checkin_combo':
-                achievement['count'] = user_achievements['checkin_combo']
+            achievement['count'] = achievement_cog.get_achievement_count_value(
+                user_achievements, achievement['type']
+            )
 
         # Group all achievements by type
-        achievement_groups = {
-            'reaction': [],
-            'message': [],
-            'time_spent': [],
-            'giveaway': [],
-            'checkin_sum': [],
-            'checkin_combo': []
-        }
-        
+        achievement_groups = {}
         for achievement in achievements:
-            if achievement['type'] in achievement_groups:
-                achievement_groups[achievement['type']].append(achievement)
+            achievement_groups.setdefault(achievement['type'], []).append(achievement)
 
         # Count the number of completed achievements
         completed_achievements = sum(1 for a in achievements if a["count"] >= a["threshold"])
@@ -76,25 +61,13 @@ class AchievementRefreshView(View):
                                                                           completed_achievements=completed_achievements,
                                                                           total_achievements=len(achievements))
         achievements_finish_emoji = self.achievement_config['achievements_finish_emoji']
-        achievements_incomplete_emoji = self.achievement_config['achievements_incomplete_emoji']
-
         embed = discord.Embed(title=title, description=description, color=discord.Color.blue())
         
         # Add user avatar to embed
         embed.set_author(name=user_name, icon_url=user.display_avatar.url)
 
-        # Add achievements grouped by type
-        type_names = {
-            'reaction': '表达情绪',
-            'message': '消息发送',
-            'time_spent': '在线时长',
-            'giveaway': '抽奖参与',
-            'checkin_sum': '签到累计',
-            'checkin_combo': '签到连击'
-        }
-        
         first_group = True
-        for type_key, achievements_list in achievement_groups.items():
+        for _, achievements_list in achievement_groups.items():
             if not achievements_list:
                 continue
                 
@@ -127,10 +100,7 @@ class AchievementRefreshView(View):
         year, month = date.split("-")
         # Get user monthly achievements using database manager
         user_achievements = await self.db.get_monthly_achievements(self.user_id, int(year), int(month))
-        message_count = user_achievements['message_count']
-        reaction_count = user_achievements['reaction_count']
-        time_spent = user_achievements['time_spent']
-        giveaway_count = user_achievements['giveaway_count']
+        achievement_cog = self.bot.get_cog('AchievementCog')
 
         # Get the user's mention and name
         user = await self.bot.fetch_user(self.user_id)
@@ -139,15 +109,13 @@ class AchievementRefreshView(View):
 
         # Create an embed with the user's achievements progress
         title = self.achievement_config['achievements_progress_title'].format(date=date)
-        type_names = self.achievement_config['achievements_type_name']
+        type_names = achievement_cog.get_visible_achievement_type_names()
 
         embed = discord.Embed(title=title, color=discord.Color.blue())
         embed.set_author(icon_url=user.display_avatar.url, name=user.name)
 
-        embed.add_field(name=type_names['reaction'], value=reaction_count, inline=False)
-        embed.add_field(name=type_names['message'], value=message_count, inline=False)
-        embed.add_field(name=type_names['time_spent'], value=int(time_spent / 60), inline=False)
-        embed.add_field(name=type_names['giveaway'], value=giveaway_count, inline=False)
+        for type_name, value in achievement_cog.get_monthly_progress_items(user_achievements):
+            embed.add_field(name=type_names[type_name], value=value, inline=False)
 
         return embed
 
@@ -182,8 +150,9 @@ class ConfirmationView(View):
             'message_count': self.messages,
             'reaction_count': self.reactions,
             'time_spent': self.time_spent,
-            'giveaway_count': self.giveaways
         }
+        if self.bot.get_cog('AchievementCog').is_achievement_type_visible('giveaway'):
+            changes['giveaway_count'] = self.giveaways
         
         # Apply the changes
         success = await self.db.apply_manual_changes(self.member_id, changes, self.operation)
@@ -211,39 +180,27 @@ class AchievementRankingView(View):
         self.achievement_config = config.get_config('achievements')
 
     async def format_page(self):
-        # Fetch leaderboards using database manager
-        if self.year is None and self.month is None:
-            # Get all-time leaderboards
-            top_reactions = await self.db.get_leaderboard("reaction", 10)
-            top_messages = await self.db.get_leaderboard("message", 10)
-            top_time_spent = await self.db.get_leaderboard("time_spent", 10)
-            top_giveaways = await self.db.get_leaderboard("giveaway", 10)
-            top_checkin_sum = await self.db.get_leaderboard("checkin_sum", 10)
-            top_checkin_combo = await self.db.get_leaderboard("checkin_combo", 10)
-        else:
-            # Get monthly leaderboards
-            top_reactions = await self.db.get_monthly_leaderboard(self.year, self.month, "reaction", 10)
-            top_messages = await self.db.get_monthly_leaderboard(self.year, self.month, "message", 10)
-            top_time_spent = await self.db.get_monthly_leaderboard(self.year, self.month, "time_spent", 10)
-            top_giveaways = await self.db.get_monthly_leaderboard(self.year, self.month, "giveaway", 10)
-            top_checkin_sum = await self.db.get_monthly_leaderboard(self.year, self.month, "checkin_sum", 10)
-            top_checkin_combo = await self.db.get_monthly_leaderboard(self.year, self.month, "checkin_combo", 10)
+        achievement_cog = self.bot.get_cog('AchievementCog')
+        ranking_configs = achievement_cog.get_visible_achievement_rankings()
 
-        # Map the types to the corresponding SQL query results
-        top_users = {
-            "reaction": top_reactions,
-            "message": top_messages,
-            "time_spent": top_time_spent,
-            "giveaway": top_giveaways,
-            "checkin_sum": top_checkin_sum,
-            "checkin_combo": top_checkin_combo
-        }
+        # Fetch leaderboards using database manager
+        top_users = {}
+        if self.year is None and self.month is None:
+            for ranking in ranking_configs:
+                achievement_type = ranking["type"]
+                top_users[achievement_type] = await self.db.get_leaderboard(achievement_type, 10)
+        else:
+            for ranking in ranking_configs:
+                achievement_type = ranking["type"]
+                top_users[achievement_type] = await self.db.get_monthly_leaderboard(
+                    self.year, self.month, achievement_type, 10
+                )
 
         # Define the emojis for the ranks
         rank_emojis = self.achievement_config['achievements_ranking_emoji']
 
         # Load the achievement_ranking
-        achievements_ranking = self.achievement_config['achievements_ranking']
+        achievements_ranking = ranking_configs
 
         # Create an embed with the rankings
         title = self.achievement_config['achievements_ranking_title']
@@ -314,12 +271,17 @@ class AchievementOperationView(discord.ui.View):
             timestamp = record[6]
             giveaway_count = record[7]
 
+            operation_lines = [
+                f"Operation: {operation}",
+                f"Reactions: {reaction_count}",
+                f"Messages: {message_count}",
+                f"Time Spent: {time_spent}",
+            ]
+            if self.bot.get_cog('AchievementCog').is_achievement_type_visible('giveaway'):
+                operation_lines.append(f"Giveaways: {giveaway_count}")
+
             embed.add_field(name=f"{timestamp} - {user.name} -> {target_user.name}",
-                            value=f"Operation: {operation}\n"
-                                  f"Reactions: {reaction_count}\n"
-                                  f"Messages: {message_count}\n"
-                                  f"Time Spent: {time_spent}\n"
-                                  f"Giveaways: {giveaway_count}",
+                            value="\n".join(operation_lines),
                             inline=False)
 
         # Add the page information to the embed
@@ -351,6 +313,9 @@ class RankView(discord.ui.View):
 
         self.achievement_config = config.get_config('achievements')
         self.rank_config = self.achievement_config.get('rank', {})
+        self.achievement_cog = bot.get_cog('AchievementCog')
+        self.visible_rankings = self.achievement_cog.get_visible_achievement_rankings()
+        self.visible_type_names = self.achievement_cog.get_visible_achievement_type_names()
 
         # Add buttons for category selection
         self.all_button = discord.ui.Button(
@@ -362,7 +327,7 @@ class RankView(discord.ui.View):
 
         # Create a button for each achievement type
         self.type_buttons = []
-        for achievement in self.achievement_config.get('achievements_ranking', []):
+        for achievement in self.visible_rankings:
             type_name = achievement.get('type')  # This is exactly "time_spent" for the time button
             button_label = self.rank_config.get('type_button_labels', {}).get(type_name, type_name)
             button = discord.ui.Button(
@@ -421,7 +386,7 @@ class RankView(discord.ui.View):
         rank_emojis = self.achievement_config['achievements_ranking_emoji']
 
         # Add each achievement type as a field
-        for achievement in self.achievement_config.get('achievements_ranking', []):
+        for achievement in self.visible_rankings:
             type_name = achievement.get('type')
             display_name = achievement.get('name', type_name)
 
@@ -449,12 +414,12 @@ class RankView(discord.ui.View):
         """Format embed showing extended rankings (up to 40) for a single type"""
         # Find the achievement ranking configuration for this type
         achievement_info = next(
-            (a for a in self.achievement_config.get('achievements_ranking', []) if a.get('type') == type_name),
+            (a for a in self.visible_rankings if a.get('type') == type_name),
             {}
         )
 
         display_name = achievement_info.get('name', type_name)
-        type_display_name = self.achievement_config.get('achievements_type_name', {}).get(type_name, type_name)
+        type_display_name = self.visible_type_names.get(type_name, type_name)
 
         # Create the embed title
         title = self.rank_config.get('embed_title_single', "🏆 {type_name}排行榜 🏆").format(
@@ -524,10 +489,70 @@ class AchievementCog(commands.Cog):
         self.db_path = self.main_config['db_path']
 
         self.achievement_config = config.get_config('achievements')
-        self.achievements = self.achievement_config['achievements']
+        self.hidden_achievement_types = self._resolve_hidden_achievement_types()
+        self.achievements = self.get_visible_achievements()
         
         # Initialize database manager
         self.db = AchievementDatabaseManager(self.db_path, self.achievement_config)
+
+    def _resolve_hidden_achievement_types(self) -> set[str]:
+        hidden_types = set()
+        for feature_name, achievement_types in FEATURE_LINKED_ACHIEVEMENT_TYPES.items():
+            if not config.is_feature_enabled(feature_name):
+                hidden_types.update(achievement_types)
+        return hidden_types
+
+    def is_achievement_type_visible(self, achievement_type: str) -> bool:
+        return achievement_type not in self.hidden_achievement_types
+
+    def get_visible_achievements(self) -> list[dict]:
+        return [
+            achievement.copy()
+            for achievement in self.achievement_config.get('achievements', [])
+            if self.is_achievement_type_visible(achievement.get('type'))
+        ]
+
+    def get_visible_achievement_rankings(self) -> list[dict]:
+        return [
+            ranking.copy()
+            for ranking in self.achievement_config.get('achievements_ranking', [])
+            if self.is_achievement_type_visible(ranking.get('type'))
+        ]
+
+    def get_visible_achievement_type_names(self) -> dict[str, str]:
+        return {
+            achievement_type: label
+            for achievement_type, label in self.achievement_config.get('achievements_type_name', {}).items()
+            if self.is_achievement_type_visible(achievement_type)
+        }
+
+    def get_achievement_count_value(self, user_achievements: dict, achievement_type: str) -> int | float:
+        if achievement_type == 'reaction':
+            return user_achievements['reaction_count']
+        if achievement_type == 'message':
+            return user_achievements['message_count']
+        if achievement_type == 'time_spent':
+            return user_achievements['time_spent'] / 60
+        if achievement_type == 'giveaway':
+            return user_achievements['giveaway_count']
+        if achievement_type == 'checkin_sum':
+            return user_achievements['checkin_sum']
+        if achievement_type == 'checkin_combo':
+            return user_achievements['checkin_combo']
+        return 0
+
+    def get_monthly_progress_items(self, user_achievements: dict) -> list[tuple[str, int]]:
+        items = [
+            ('reaction', user_achievements['reaction_count']),
+            ('message', user_achievements['message_count']),
+            ('time_spent', int(user_achievements['time_spent'] / 60)),
+            ('giveaway', user_achievements['giveaway_count']),
+        ]
+        return [
+            (achievement_type, value)
+            for achievement_type, value in items
+            if self.is_achievement_type_visible(achievement_type)
+        ]
 
     async def cog_load(self):
         await self.db.initialize_database()
@@ -631,6 +656,9 @@ class AchievementCog(commands.Cog):
         # Ensure user exists in database
         await self.db.create_user_if_not_exists(member.id)
 
+        if not self.is_achievement_type_visible('giveaway'):
+            giveaways = 0
+
         # Create a confirmation view and send it with an embed
         view = ConfirmationView(self.bot, member.id, reactions, messages, time_spent, giveaways, 'increase', self.db)
         embed = discord.Embed(title="Increase Achievement Progress",
@@ -640,7 +668,8 @@ class AchievementCog(commands.Cog):
         embed.add_field(name="Messages to Add", value=str(messages), inline=True)
         embed.add_field(name="", value="\u200b", inline=False)
         embed.add_field(name="Time to Add (seconds)", value=str(time_spent), inline=True)
-        embed.add_field(name="Giveaways to Add", value=str(giveaways), inline=True)
+        if self.is_achievement_type_visible('giveaway'):
+            embed.add_field(name="Giveaways to Add", value=str(giveaways), inline=True)
         await interaction.edit_original_response(embed=embed, view=view)
 
     @app_commands.command(
@@ -667,6 +696,9 @@ class AchievementCog(commands.Cog):
         # Ensure user exists in database
         await self.db.create_user_if_not_exists(member.id)
 
+        if not self.is_achievement_type_visible('giveaway'):
+            giveaways = 0
+
         # Create a confirmation view and send it with an embed
         view = ConfirmationView(self.bot, member.id, reactions, messages, time_spent, giveaways, 'decrease', self.db)
         embed = discord.Embed(title="Decrease Achievement Progress",
@@ -676,7 +708,8 @@ class AchievementCog(commands.Cog):
         embed.add_field(name="Messages to Subtract", value=str(messages), inline=True)
         embed.add_field(name="", value="\u200b", inline=False)
         embed.add_field(name="Time to Subtract (seconds)", value=str(time_spent), inline=True)
-        embed.add_field(name="Giveaways to Subtract", value=str(giveaways), inline=True)
+        if self.is_achievement_type_visible('giveaway'):
+            embed.add_field(name="Giveaways to Subtract", value=str(giveaways), inline=True)
         await interaction.edit_original_response(embed=embed, view=view)
 
     @app_commands.command(
@@ -730,7 +763,7 @@ class AchievementCog(commands.Cog):
         """Fetch top 40 users for each achievement type using database manager"""
         # Define result structure based on achievement_ranking config
         achievement_types = []
-        for achievement in self.achievement_config.get('achievements_ranking', []):
+        for achievement in self.get_visible_achievement_rankings():
             achievement_types.append(achievement.get('type'))
 
         if year is None and month is None:
@@ -778,7 +811,7 @@ class AchievementCog(commands.Cog):
         all_button_text = self.achievement_config.get('rank', {}).get('intro_all_button',
                                                                       "查看所有类型的成就排行（每类显示前10名）")
 
-        type_name = self.achievement_config['achievements_type_name']
+        type_name = self.get_visible_achievement_type_names()
 
         intro_embed.add_field(name=view.all_button.label, value=all_button_text, inline=False)
 
