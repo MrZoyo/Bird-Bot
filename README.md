@@ -560,6 +560,7 @@ Media processing module with validation and security features.
 - Hid feature-linked achievement content when the related module is disabled, including giveaway and shop-linked categories.
 - Changed `/tickets_init` follow-up messages to public responses instead of only-visible-to-user replies.
 - Fixed `VoiceStateCog` startup ordering so `temp_channels` is created or migrated before cleanup tasks run.
+- Updated `BanCog` task creation to `asyncio.create_task(...)` for current runtime compatibility and cleaner task cleanup.
 
 ---
 

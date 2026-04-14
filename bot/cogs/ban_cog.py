@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import re
@@ -29,13 +30,15 @@ class BanCog(commands.Cog):
         self.config_data = config.get_config('ban')
         self.db = BanDatabaseManager(config.get_config()['db_path'])
         self.tempban_tasks = {}
-        self.bot.loop.create_task(self.initialize_db())
+        self.init_task = asyncio.create_task(self.initialize_db())
         self.cleanup_tempbans.start()
         self.check_expired_tempbans.start()
 
     def cog_unload(self):
         self.cleanup_tempbans.cancel()
         self.check_expired_tempbans.cancel()
+        if not self.init_task.done():
+            self.init_task.cancel()
         for task in self.tempban_tasks.values():
             task.cancel()
 
@@ -531,7 +534,7 @@ class BanCog(commands.Cog):
             self.tempban_tasks[user.id].cancel()
         
         # Create new task
-        task = self.bot.loop.create_task(unban_task())
+        task = asyncio.create_task(unban_task())
         self.tempban_tasks[user.id] = task
 
     @tasks.loop(minutes=5)
