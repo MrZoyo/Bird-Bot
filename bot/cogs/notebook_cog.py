@@ -3,9 +3,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from discord.ui import Button, View
-import aiosqlite
-from datetime import datetime
-from bot.utils import config, check_channel_validity
+from bot.utils import config, check_channel_validity, NotebookDatabaseManager
 
 
 class ConfirmationView(View):
@@ -148,6 +146,10 @@ class NotebookCog(commands.Cog):
 
         self.conf = config.get_config()
         self.db_path = self.conf['db_path']
+        self.db = NotebookDatabaseManager(self.db_path)
+
+    async def cog_load(self):
+        await self.db.initialize_database()
 
     @app_commands.command(name="notebook_log")
     @app_commands.describe(event_object="The member to log",
@@ -168,33 +170,7 @@ class NotebookCog(commands.Cog):
         await interaction.edit_original_response(embed=embed, view=view)
 
     async def add_event_to_db(self, user_id, event_object, event_description):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            add_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')  # Using microseconds
-
-            # Fetch the maximum count for the given event_member
-            await cursor.execute('SELECT MAX(count) FROM event_logs WHERE event_member = ?', (event_object,))
-            max_count = await cursor.fetchone()
-            if max_count[0] is None:
-                # If there are no records for the event_member, set the count to 1
-                count = 1
-            else:
-                # If there are records, increment the maximum count by 1
-                count = max_count[0] + 1
-
-            # Insert a new record with the calculated count
-            await cursor.execute(
-                'INSERT INTO event_logs (add_time, operator, event_member, event_description, count) VALUES (?, ?, ?, ?, ?)',
-                (add_time, user_id, event_object, event_description, count))
-
-            # Check if the user is already in the admins table
-            await cursor.execute('SELECT * FROM admins WHERE user_id = ?', (user_id,))
-            if await cursor.fetchone() is None:
-                # If the user is not in the admins table, insert them
-                await cursor.execute('INSERT INTO admins (user_id) VALUES (?)', (user_id,))
-
-            await db.commit()
-            await cursor.close()
+        await self.db.insert_event_and_ensure_admin(user_id, event_object, event_description)
 
     @app_commands.command(name="notebook_member")
     @app_commands.describe(member="The member to fetch event logs for")
@@ -221,22 +197,10 @@ class NotebookCog(commands.Cog):
             await interaction.followup.send(f"An error occurred: {str(e)}", ephemeral=True)
 
     async def is_user_admin(self, user_id):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute('SELECT * FROM admins WHERE user_id = ?', (user_id,))
-            admin = await cursor.fetchone()
-            await cursor.close()
-            return admin is not None
+        return await self.db.is_admin(user_id)
 
     async def fetch_events_for_user(self, event_member):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute(
-                'SELECT add_time, operator, event_member, event_description, count FROM event_logs WHERE event_member = ? ORDER BY add_time DESC',
-                (event_member,))
-            records = await cursor.fetchall()
-            await cursor.close()
-            return records
+        return await self.db.fetch_events_for_member(event_member)
 
     @app_commands.command(name="notebook_all")
     async def check_all_event(self, interaction: discord.Interaction):
@@ -262,13 +226,7 @@ class NotebookCog(commands.Cog):
             await interaction.followup.send(f"An error occurred: {str(e)}", ephemeral=True)
 
     async def fetch_all_events(self):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute(
-                'SELECT MAX(add_time) as latest_time, event_member, COUNT(event_member) FROM event_logs GROUP BY event_member ORDER BY latest_time DESC')
-            records = await cursor.fetchall()
-            await cursor.close()
-            return records
+        return await self.db.fetch_event_summary_all()
 
     @app_commands.command(name="notebook_delete")
     @app_commands.describe(member="The member whose event is to be deleted",
@@ -303,40 +261,7 @@ class NotebookCog(commands.Cog):
             await interaction.followup.send(f"An error occurred: {str(e)}", ephemeral=True)
 
     async def fetch_event_details(self, event_member, event_serial_number):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute(
-                'SELECT add_time, operator, event_member, event_description FROM event_logs WHERE event_member = ? AND count = ?',
-                (event_member, event_serial_number))
-            record = await cursor.fetchone()
-            await cursor.close()
-            return record
+        return await self.db.fetch_event_details(event_member, event_serial_number)
 
     async def delete_event_from_db(self, event_member, event_serial_number):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute(
-                'DELETE FROM event_logs WHERE event_member = ? AND count = ?',
-                (event_member, event_serial_number))
-            await db.commit()
-            await cursor.close()
-
-    @commands.Cog.listener()
-    async def on_ready(self):
-        # Ensure the table exists
-        async with aiosqlite.connect(self.db_path) as db:
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS event_logs (
-                    add_time TEXT NOT NULL,
-                    operator TEXT NOT NULL,
-                    event_member TEXT NOT NULL,
-                    event_description TEXT NOT NULL,
-                    count INTEGER DEFAULT 1
-                )
-            ''')
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS admins (
-                    user_id TEXT NOT NULL
-                )
-            ''')
-            await db.commit()
+        await self.db.delete_event(event_member, event_serial_number)

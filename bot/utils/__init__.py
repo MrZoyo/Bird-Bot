@@ -11,6 +11,7 @@ from .role_db import RoleDatabaseManager
 from .achievement_db import AchievementDatabaseManager
 from .giveaway_db import GiveawayDatabaseManager
 from .check_status_db import CheckStatusDatabaseManager
+from .notebook_db import NotebookDatabaseManager
 
 __all__ = [
     'config',
@@ -27,4 +28,5 @@ __all__ = [
     'AchievementDatabaseManager',
     'GiveawayDatabaseManager',
     'CheckStatusDatabaseManager',
+    'NotebookDatabaseManager',
 ]
