@@ -15,8 +15,8 @@
 | 阶段 | 任务 | 状态 | 备注 |
 |---|---|---|---|
 | P0 | P0-4 裸 except 治理 | ✅ | 21 处清零 |
-| P0 | P0-1 giveaway 抽 db | ⬜ | 下一步 |
-| P0 | P0-2 privateroom 直连规范化 | ⬜ | |
+| P0 | P0-1 giveaway 抽 db | ✅ | 21 处清零 + 修 update_giveaway_description commit bug |
+| P0 | P0-2 privateroom 直连规范化 | ⬜ | 下一步 |
 | P0 | P0-3a check_status 补 db manager（含建表竞态修复） | ⬜ | 内部最优先 |
 | P0 | P0-3b notebook 补 db manager | ⬜ | |
 | P0 | P0-3c create_invitation 补 db manager | ⬜ | |
@@ -68,29 +68,56 @@
 
 ---
 
-## P0-1 ⬜ giveaway 抽 db
+## P0-1 ✅ giveaway 抽 db（2026-04-23）
 
-**状态**：待开工（下一步）
+**Commit grep**: `git log --grep='(P0-1)'`
 
-**目标**：把 `bot/cogs/giveaway_cog.py` 里所有 `aiosqlite.connect(self.db_path)` 直连迁到新建的 `bot/utils/giveaway_db.py` 的 `GiveawayDatabaseManager`。
+**验收**：`grep -n "aiosqlite" bot/cogs/giveaway_cog.py` 清零（21 → 0）；`python3 -m py_compile` 通过；manager 直接 import / 实例化 OK。功能层（创建 / 参与 / 退出 / 开奖 / 超时）**待用户在测试服验证**。
 
-**关键风险点**（REFACTORING_PLAN.md P0-1 已列）：
-1. 20+ 处直连散布在 **cog 本体 + 辅助类（Modal/View/Form）**。
-2. 辅助类获取 manager 的方式必须**全文件一致**——推荐显式 `db=` 构造参数传入（依赖显式、易测试），另一个选项是 `bot.get_cog('GiveawayCog').db`。
-3. 参考现有 manager 风格：`ShopDatabaseManager`、`BanDatabaseManager`。
+**迁移映射表**（供未来审查）：
 
-**开工步骤**：
-1. `grep -n "aiosqlite" bot/cogs/giveaway_cog.py` 导出完整清单，逐行标记"cog 方法 / 辅助类"，建迁移映射表。
-2. 确定辅助类获取 manager 的方式（推荐 `db=` 构造参数）。
-3. 新建 `bot/utils/giveaway_db.py` + `GiveawayDatabaseManager`，迁 SQL。
-4. `bot/utils/__init__.py` 导出 `GiveawayDatabaseManager`。
-5. cog 里 `self.db = GiveawayDatabaseManager(...)`；所有 Modal/View 实例化点加 `db=self.db`。
-6. 验收：`grep -n "aiosqlite" bot/cogs/giveaway_cog.py` 为空（含 import）。
-7. 测试服跑一遍：创建 / 参与 / 退出 / 开奖 / 超时。
+| 原 cog 方法 | 新 manager 方法 | 处理方式 |
+|---|---|---|
+| `fetch_all_giveaways(is_end)` | `fetch_all_giveaways(include_ended)` | thin wrapper |
+| `update_giveaway(id, winners)` | `update_giveaway_winners(id, winners)` | 保留 cog 方法（需连锁 `cleanup_ended_giveaways`） |
+| `mark_giveaway_as_ended` | 同名 | 保留 cog 方法（需连锁 cleanup） |
+| `add_participant_to_giveaway(id, pid, interaction)` | `add_participant(id, pid)` | 保留 cog 方法（签名带 interaction，实际未用） |
+| `remove_participant_from_giveaway` | `remove_participant` | thin wrapper |
+| `check_participant_eligibility` | `fetch_giveaway_requirements` + `fetch_user_achievements` | 保留 cog 方法（含 interaction 响应） |
+| `fetch_participant_ids / fetch_winner_ids / is_participant / fetch_giveaway` | 同名 | thin wrapper |
+| `update_giveaway_description / update_giveaway_duration / cleanup_ended_giveaways / save_giveaways` | 对应 manager 方法 | thin wrapper |
+| `load_giveaways` | 用 `load_giveaway_views` 拿 SQL | 保留 cog 方法（含 Discord `fetch_message`/`edit`） |
+| `update_participant_achievements` | `increment_giveaway_achievements` | 薄化为 "fetch ids + manager 调用" |
+| `on_ready` 里的两段建表 | `initialize_database()` | on_ready 只调一行 |
+| `GiveawayForm.insert_giveaway / fetch_all_giveaway_ids` | `db.*` 直接调 | **删 form 方法**，调用点改 `self.db.xxx()` |
+| `GiveawayForm.fetch_giveaway` | — | **删（零调用死代码）** |
+
+**辅助类获取 db 的方式**：`GiveawayForm.__init__` 加 `db` 参数（显式），实例化点 `cog:654` 传 `db=self.db`。`GiveawayParticipationView` / `GiveawayConfirmationView` / `GiveawayCheckParticipantView` **不传 db** —— 它们原本就通过 `bot.get_cog('GiveawayCog').xxx()` 调 cog 上的 thin wrapper，cog wrapper 在，View 调用链无需改动。
+
+**顺手修的真实 bug**：
+- `update_giveaway_description` 原本缺 `await db.commit()`（`giveaway_cog.py:1082-1086` 旧代码），意味着 `/ga_description` 命令**实际不生效**（事务回滚）。迁到 manager 后补了 commit。这个 bug 不在文档里列出，是迁移路上发现的。
+
+**顺手清理的死代码**：
+- `GiveawayParticipationView.__init__` / `GiveawayConfirmationView.__init__` 里 `self.main_config` / `self.db_path`（仅赋值不使用）。
+- `GiveawayForm.fetch_giveaway`（方法本体无调用点）。
+
+**未做（留给其他任务）**：
+- `tickets_new_cog.py:14 import aiosqlite` 是死 import（该 cog 没直连），但不在 P0-1 范围，留给后续清理（顺便 P1-3 拆包时也会处理）。
+- 建表从 `on_ready` 迁到 `cog_load` 是 P1-2 工作，本轮只迁到 manager 的 `initialize_database()`，调用点仍在 `on_ready`。
+
+**未来类似迁移的模板**（下一个 P0-2/P0-3 直接套）：
+1. grep 列出所有 `aiosqlite.connect` 调用点，按所属类归类。
+2. 决定辅助类拿 db 的方式（推荐 `db=` 构造参数）。
+3. 设计 manager：纯 SQL 方法返回 dict/list；夹 Discord 交互的保留在 cog。
+4. 新建 manager 类 → `bot/utils/__init__.py` 导出 → cog `__init__` 实例化 → 替换直连。
+5. 建表从 `on_ready` 挪到 `manager.initialize_database()`，`on_ready` 调一行。
+6. `grep "aiosqlite"` 该文件为空即验收；`python3 -m py_compile` 过一遍。
 
 ---
 
 ## P0-2 ⬜ privateroom 直连规范化
+
+**状态**：下一步
 
 **目标**：`bot/cogs/privateroom_cog.py` 里仍直连 `aiosqlite.connect` 的点，改走已存在的 `PrivateRoomDatabaseManager`；manager 缺的方法就补。
 
