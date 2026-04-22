@@ -1,5 +1,4 @@
 # bot/cogs/privateroom_cog.py
-import aiosqlite
 import discord
 from discord.ext import commands, tasks
 from discord import app_commands
@@ -829,10 +828,7 @@ class PrivateRoomCog(commands.Cog):
     async def get_last_month_voice_hours(self, user_id: int) -> float:
         """计算用户上个月的语音时长（小时）"""
         try:
-            # 获取当前月份和年份
             now = datetime.now()
-
-            # 计算上个月
             if now.month == 1:
                 last_month = 12
                 last_year = now.year - 1
@@ -840,21 +836,8 @@ class PrivateRoomCog(commands.Cog):
                 last_month = now.month - 1
                 last_year = now.year
 
-            # 查询上个月的语音时长记录
-            async with aiosqlite.connect(self.db_path) as db:
-                cursor = await db.execute('''
-                    SELECT time_spent FROM monthly_achievements 
-                    WHERE user_id = ? AND year = ? AND month = ?
-                ''', (user_id, last_year, last_month))
-
-                result = await cursor.fetchone()
-
-                if result and result[0]:
-                    # 将秒转换为小时
-                    return float(result[0]) / 3600
-
-                return 0
-
+            seconds = await self.db.get_user_monthly_voice_seconds(user_id, last_year, last_month)
+            return seconds / 3600
         except Exception as e:
             logging.error(f"Error getting last month voice hours: {e}")
             return 0

@@ -401,3 +401,22 @@ class PrivateRoomDatabaseManager:
         except Exception as e:
             logging.error(f"Error updating renewal reminder flag for room {room_id}: {e}", exc_info=True)
             raise
+
+    async def get_user_monthly_voice_seconds(self, user_id: int, year: int, month: int) -> float:
+        """Return ``monthly_achievements.time_spent`` (seconds) for a user / month, or 0.
+
+        The achievements schema is owned by AchievementDatabaseManager; this method
+        is here so private-room eligibility checks can stay within a single manager
+        dependency. Revisit if cross-manager access grows.
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute('''
+                SELECT time_spent FROM monthly_achievements
+                WHERE user_id = ? AND year = ? AND month = ?
+            ''', (user_id, year, month))
+            result = await cursor.fetchone()
+            await cursor.close()
+
+        if result and result[0]:
+            return float(result[0])
+        return 0.0
