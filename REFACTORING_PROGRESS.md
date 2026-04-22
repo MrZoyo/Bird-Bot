@@ -17,8 +17,8 @@
 | P0 | P0-4 裸 except 治理 | ✅ | 21 处清零 |
 | P0 | P0-1 giveaway 抽 db | ✅ | 21 处清零 + 修 update_giveaway_description commit bug |
 | P0 | P0-2 privateroom 直连规范化 | ✅ | 1 处清零 |
-| P0 | P0-3a check_status 补 db manager（含建表竞态修复） | ⬜ | 下一步（内部最优先） |
-| P0 | P0-3b notebook 补 db manager | ⬜ | |
+| P0 | P0-3a check_status 补 db manager（含建表竞态修复） | ✅ | 3 处清零 + 竞态修复 |
+| P0 | P0-3b notebook 补 db manager | ⬜ | 下一步 |
 | P0 | P0-3c create_invitation 补 db manager | ⬜ | |
 | P0 | P0-3d voice_channel 补 db manager | ⬜ | 最重，放最后 |
 | P1 | P1-5 日志 rotation | ⬜ | 下一轮 |
@@ -133,16 +133,40 @@
 
 ---
 
-## P0-3 ⬜ 其余 cog 补 db manager
+## P0-3 其余 cog 补 db manager
 
 **内部顺序（按文档风险排序）**：
 
-1. **P0-3a check_status**：最高优先。`__init__:55` 启动 10min 循环任务、`status` 表的 `CREATE TABLE IF NOT EXISTS` 在 `on_ready:428-437` 才执行 —— 存在"任务先于建表"竞态。抽 manager 时把建表迁到 `cog_load`，顺手修掉竞态。
-2. **P0-3b notebook**（342 行，小，练手）。
-3. **P0-3c create_invitation**（606 行）。
-4. **P0-3d voice_channel**（1094 行，最大，需评估新 `voice_channel_db.py` 还是扩展既有 manager）。
+1. ✅ **P0-3a check_status** — 完成（2026-04-23）
+2. ⬜ **P0-3b notebook**（342 行，小，练手）— 下一步
+3. ⬜ **P0-3c create_invitation**（606 行）
+4. ⬜ **P0-3d voice_channel**（1094 行，最大，需评估新 `voice_channel_db.py` 还是扩展既有 manager）
 
 **终局验收**：`grep -rn "aiosqlite.connect" bot/cogs/` 为空。
+
+---
+
+### P0-3a ✅ check_status（2026-04-23）
+
+**Commit grep**: `git log --grep='(P0-3a)'`
+
+**做的事**：
+- 新建 `bot/utils/check_status_db.py` + `CheckStatusDatabaseManager`（3 方法：`initialize_database` / `record_status` / `fetch_status_by_date_prefix`）。
+- cog `__init__` 加 `self.db = CheckStatusDatabaseManager(self.db_path)`。
+- 新增 `async def cog_load(self): await self.db.initialize_database()` —— **建表迁到 cog_load**。
+- 删除 `on_ready` listener（它本来只做建表）。
+- 替换 `check_voice_status_task` 的 INSERT 和 `print_voice_status` 的 SELECT 为 manager 调用。
+- 删除 `import aiosqlite`。
+
+**竞态 bug 说明（供回溯）**：
+- `__init__` 里 `self.check_voice_status_task.start()` 启动 10 分钟后台循环；`before_loop` 做 sleep + `wait_until_ready()`。
+- 旧的建表在 `@Cog.listener() on_ready` 里；`before_loop` 的 `wait_until_ready()` 和 `on_ready` listener 都在 READY 后并发放行，**顺序不保证**。
+- task 首次跑到 INSERT 时如果建表 listener 还没完成 → `sqlite3.OperationalError: no such table: status`，被 `except Exception` 静默吞为一行 log。
+- 迁到 `cog_load` 后：cog 加载完成（bot 起步期）就已经建表 → **永远早于** task 的任何执行。
+
+**未做（留给 P1-2）**：后台任务 `start()` 仍在 `__init__`，没动（P1-2 专门治理此类 pattern）。本轮只修竞态。
+
+---
 
 ---
 
