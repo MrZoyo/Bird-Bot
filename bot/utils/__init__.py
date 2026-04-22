@@ -9,6 +9,7 @@ from .channel_validator import check_channel_validity, check_voice_state
 from .ban_db import BanDatabaseManager
 from .role_db import RoleDatabaseManager
 from .achievement_db import AchievementDatabaseManager
+from .giveaway_db import GiveawayDatabaseManager
 
 __all__ = [
     'config',
@@ -22,5 +23,6 @@ __all__ = [
     'PrivateRoomDatabaseManager',
     'BanDatabaseManager',
     'RoleDatabaseManager',
-    'AchievementDatabaseManager'
+    'AchievementDatabaseManager',
+    'GiveawayDatabaseManager',
 ]

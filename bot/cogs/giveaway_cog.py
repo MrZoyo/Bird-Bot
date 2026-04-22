@@ -6,13 +6,12 @@ from discord.utils import format_dt
 from discord.ui import Button, View
 import random
 import string
-import aiosqlite
 import re
 import datetime
 import tempfile
 import logging
 
-from bot.utils import config, check_channel_validity
+from bot.utils import config, check_channel_validity, GiveawayDatabaseManager
 
 
 class GiveawayParticipationView(ui.View):
@@ -22,9 +21,6 @@ class GiveawayParticipationView(ui.View):
         self.giveaway_id = giveaway_id
         self.giveaway_channel_id = int(giveaway_channel_id)
         self.message_id = None
-
-        self.main_config = config.get_config('main')
-        self.db_path = self.main_config['db_path']
 
         self.conf = config.get_config('giveaway')
         self.giveaway_join_button_label = self.conf['giveaway_join_button_label']
@@ -158,9 +154,6 @@ class GiveawayConfirmationView(View):
         super().__init__()
         self.bot = bot
 
-        self.main_config = config.get_config('main')
-        self.db_path = self.main_config['db_path']
-
         self.conf = config.get_config('giveaway')
         self.giveaway_embed_title_open = self.conf['giveaway_embed_title_open']
         self.giveaway_embed_provider_title = self.conf['giveaway_embed_provider_title']
@@ -212,13 +205,11 @@ class GiveawayForm(ui.Modal, title='Create Giveaway'):
                                default="No Limit", max_length=500)
     providers = ui.TextInput(label='Providers', placeholder='Leave blank as default', required=False)
 
-    def __init__(self, bot, reaction_limit=0, message_limit=0, timespent_limit=0):
+    def __init__(self, bot, db, reaction_limit=0, message_limit=0, timespent_limit=0):
         super().__init__()
         self.bot = bot
+        self.db = db
         self.giveaways = {}
-
-        self.main_config = config.get_config('main')
-        self.db_path = self.main_config['db_path']
 
         self.conf = config.get_config('giveaway')
         self.giveaway_channel_id = self.conf['giveaway_channel_id']
@@ -294,9 +285,9 @@ class GiveawayForm(ui.Modal, title='Create Giveaway'):
         message = await giveaway_channel.send(embed=embed, view=giveaway_view)
 
         # Insert the giveaway into the database
-        await self.insert_giveaway(
+        await self.db.insert_giveaway(
             giveaway_id,
-            message.id,  # Add this line
+            message.id,
             datetime.datetime.now().isoformat(),
             duration_in_minutes,
             int(self.winners.value),
@@ -306,7 +297,7 @@ class GiveawayForm(ui.Modal, title='Create Giveaway'):
             None,  # winner_ids will be None initially
             self.reaction_limit,
             self.message_limit,
-            self.timespent_limit
+            self.timespent_limit,
         )
 
         # Store the message ID in the view
@@ -319,13 +310,9 @@ class GiveawayForm(ui.Modal, title='Create Giveaway'):
         await self.bot.get_cog('GiveawayCog').save_giveaways(giveaway_id, giveaway_view)
 
     async def generate_giveaway_id(self):
-        # Fetch all existing giveaway IDs
-        existing_ids = await self.fetch_all_giveaway_ids()
-
-        # Generate a unique giveaway id
+        existing_ids = await self.db.fetch_all_giveaway_ids()
         while True:
             giveaway_id = ''.join(random.choices(string.digits, k=10))
-            # Check if the giveaway_id already exists in the fetched list
             if giveaway_id not in existing_ids:
                 return giveaway_id
 
@@ -344,33 +331,6 @@ class GiveawayForm(ui.Modal, title='Create Giveaway'):
             return False
 
         return True
-
-    async def insert_giveaway(self, giveaway_id, message_id, starttime, duration, winner_number, prizes, description,
-                              creator_id, winner_ids, reaction_req, message_req, timespent_req):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute(
-                'INSERT INTO giveaway (giveaway_id, message_id, starttime, duration, winner_number, prizes, description, creator_id, winner_ids, reaction_req, message_req, timespent_req) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                (giveaway_id, message_id, starttime, duration, winner_number, prizes, description, creator_id,
-                 winner_ids, reaction_req, message_req, timespent_req))
-            await db.commit()
-            await cursor.close()
-
-    async def fetch_giveaway(self, giveaway_id):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute(
-                'SELECT * FROM giveaway WHERE giveaway_id = ?',
-                (giveaway_id,))
-            record = await cursor.fetchone()
-            await cursor.close()
-            return record
-
-    async def fetch_all_giveaway_ids(self):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.execute("SELECT giveaway_id FROM giveaway")
-            rows = await cursor.fetchall()
-            return [row[0] for row in rows]
 
 
 class GiveawayCheckParticipantView(ui.View):
@@ -452,6 +412,7 @@ class GiveawayCog(commands.Cog):
 
         self.main_config = config.get_config('main')
         self.db_path = self.main_config['db_path']
+        self.db = GiveawayDatabaseManager(self.db_path)
 
         self.conf = config.get_config('giveaway')
         self.giveaway_channel_id = self.conf['giveaway_channel_id']
@@ -597,43 +558,16 @@ class GiveawayCog(commands.Cog):
         await self.bot.wait_until_ready()
 
     async def fetch_all_giveaways(self, is_end=True):
-        if not is_end:
-            async with aiosqlite.connect(self.db_path) as db:
-                cursor = await db.cursor()
-                await cursor.execute('SELECT * FROM giveaway WHERE is_end = 0')
-                records = await cursor.fetchall()
-                await cursor.close()
-                return records
-        else:
-            async with aiosqlite.connect(self.db_path) as db:
-                cursor = await db.cursor()
-                await cursor.execute('SELECT * FROM giveaway')
-                records = await cursor.fetchall()
-                await cursor.close()
-                return records
+        return await self.db.fetch_all_giveaways(include_ended=is_end)
 
     async def update_giveaway(self, giveaway_id, winners):
         logging.info(f"Updating giveaway {giveaway_id} with winners {winners}")
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute(
-                'UPDATE giveaway SET winner_ids = ?, is_end = 1 WHERE giveaway_id = ?',
-                (",".join(str(winner_id) for winner_id in winners), giveaway_id))
-            await db.commit()
-            await cursor.close()
-
+        await self.db.update_giveaway_winners(giveaway_id, winners)
         await self.cleanup_ended_giveaways()
 
     async def mark_giveaway_as_ended(self, giveaway_id):
         logging.info(f"Marking giveaway {giveaway_id} as ended")
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute(
-                'UPDATE giveaway SET is_end = 1 WHERE giveaway_id = ?',
-                (giveaway_id,))
-            await db.commit()
-            await cursor.close()
-
+        await self.db.mark_giveaway_as_ended(giveaway_id)
         await self.cleanup_ended_giveaways()
 
     @app_commands.command(name="ga_create",
@@ -651,7 +585,7 @@ class GiveawayCog(commands.Cog):
         if not await check_channel_validity(interaction):
             return
 
-        form = GiveawayForm(self.bot, reaction_req, message_req, timespent_req)
+        form = GiveawayForm(self.bot, self.db, reaction_req, message_req, timespent_req)
         await interaction.response.send_modal(form)
 
     @app_commands.command(name="check_giveaway",
@@ -675,170 +609,46 @@ class GiveawayCog(commands.Cog):
         # File will be automatically deleted when exiting the with block
 
     async def add_participant_to_giveaway(self, giveaway_id, participant_id, interaction):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-
-            # Fetch the current participant_ids from the giveaway
-            await cursor.execute('SELECT participant_ids FROM giveaway WHERE giveaway_id = ?',
-                                 (giveaway_id,))
-            record = await cursor.fetchone()
-            current_participant_ids = record[0]
-
-            # Add the new participant_id to the current participant_ids
-            if current_participant_ids is None:
-                new_participant_ids = str(participant_id)
-            else:
-                new_participant_ids = current_participant_ids + ',' + str(participant_id)
-
-            # Update the participant_ids in the giveaway
-            await cursor.execute('UPDATE giveaway SET participant_ids = ? WHERE giveaway_id = ?',
-                                 (new_participant_ids, giveaway_id))
-            await db.commit()
-            await cursor.close()
+        await self.db.add_participant(giveaway_id, participant_id)
 
     async def remove_participant_from_giveaway(self, giveaway_id, participant_id):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-
-            # Fetch the current participant_ids from the database
-            await cursor.execute('SELECT participant_ids FROM giveaway WHERE giveaway_id = ?', (giveaway_id,))
-            record = await cursor.fetchone()
-            if record[0] is not None:
-                current_participant_ids = record[0].split(',')
-
-                # Remove the participant_id from the current participant_ids
-                if str(participant_id) in current_participant_ids:
-                    current_participant_ids.remove(str(participant_id))
-
-                # Update the participant_ids in the database
-                await cursor.execute('UPDATE giveaway SET participant_ids = ? WHERE giveaway_id = ?',
-                                     (','.join(current_participant_ids), giveaway_id))
-            else:
-                logging.error(f"No participant_ids found for giveaway_id {giveaway_id}")
-            await db.commit()
-            await cursor.close()
+        await self.db.remove_participant(giveaway_id, participant_id)
 
     async def check_participant_eligibility(self, giveaway_id, participant_id, interaction):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
+        giveaway_record = await self.db.fetch_giveaway_requirements(giveaway_id)
+        if giveaway_record is None:
+            await interaction.response.send_message(
+                f"Giveaway {giveaway_id} does not exist in the giveaway table", ephemeral=True)
+            return False
 
-            # Fetch the giveaway's requirements from the giveaway table
-            await cursor.execute("SELECT reaction_req, message_req, timespent_req FROM giveaway WHERE giveaway_id = ?",
-                                 (giveaway_id,))
-            giveaway_record = await cursor.fetchone()
+        reaction_req, message_req, timespent_req = giveaway_record
 
-            if giveaway_record is not None:
-                # The giveaway exists in the giveaway table
-                reaction_req, message_req, timespent_req = giveaway_record
+        record = await self.db.fetch_user_achievements(participant_id)
+        if record is None:
+            await interaction.response.send_message(
+                f"User {participant_id} does not exist in the achievements table", ephemeral=True)
+            return False
 
-                # Fetch the participant's record from the achievements table
-                await cursor.execute("SELECT * FROM achievements WHERE user_id = ?", (participant_id,))
-                record = await cursor.fetchone()
-
-                if record is not None:
-                    # The participant exists in the achievements table
-                    _, message_count, reaction_count, time_spent, giveaway_count = record
-
-                    # Check if the participant meets the requirements
-                    if message_count >= message_req and reaction_count >= reaction_req and time_spent >= timespent_req:
-                        # The participant meets the requirements
-                        return True
-                    else:
-                        # The participant does not meet the requirements
-                        return False
-                else:
-                    # The participant does not exist in the achievements table
-                    await interaction.response.send_message(
-                        f"User {participant_id} does not exist in the achievements table", ephemeral=True)
-                    return False
-            else:
-                # The giveaway does not exist in the giveaway table
-                await interaction.response.send_message(
-                    f"Giveaway {giveaway_id} does not exist in the giveaway table", ephemeral=True)
-                return False
+        _, message_count, reaction_count, time_spent, _giveaway_count = record
+        return (message_count >= message_req
+                and reaction_count >= reaction_req
+                and time_spent >= timespent_req)
 
     async def fetch_participant_ids(self, giveaway_id):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-
-            # Fetch the current participant_ids from the giveaway
-            await cursor.execute('SELECT participant_ids FROM giveaway WHERE giveaway_id = ?',
-                                 (giveaway_id,))
-            record = await cursor.fetchone()
-            current_participant_ids = record[0]
-
-            if current_participant_ids is not None:
-                # Split the string into a list and filter out any empty strings
-                return [id for id in current_participant_ids.split(',') if id]
-            else:
-                return []
+        return await self.db.fetch_participant_ids(giveaway_id)
 
     async def fetch_winner_ids(self, giveaway_id):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-
-            # Fetch the winner_ids from the giveaway
-            await cursor.execute('SELECT winner_ids FROM giveaway WHERE giveaway_id = ?', (giveaway_id,))
-            record = await cursor.fetchone()
-            await cursor.close()
-
-            if record[0] is not None:
-                # Extract the user IDs from the Discord mentions, convert them into integers, and ignore empty strings
-                winner_ids = [int(mention.strip('<@>')) for mention in record[0].split(',') if mention]
-            else:
-                winner_ids = []
-
-        return winner_ids
+        return await self.db.fetch_winner_ids(giveaway_id)
 
     async def is_participant(self, giveaway_id, participant_id):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-
-            # Fetch the current participant_ids from the giveaway
-            await cursor.execute('SELECT participant_ids FROM giveaway WHERE giveaway_id = ?',
-                                 (giveaway_id,))
-            record = await cursor.fetchone()
-            current_participant_ids = record[0]
-
-            if current_participant_ids is not None:
-                current_participant_ids = current_participant_ids.split(',')
-                return str(participant_id) in current_participant_ids
-            else:
-                return False
+        return await self.db.is_participant(giveaway_id, participant_id)
 
     async def get_participant_count(self, giveaway_id):
         participant_ids = await self.fetch_participant_ids(giveaway_id)
         return len(participant_ids)
 
     async def fetch_giveaway(self, giveaway_id):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-
-            # Fetch the giveaway details from the database
-            await cursor.execute('SELECT * FROM giveaway WHERE giveaway_id = ?',
-                                 (giveaway_id,))
-            record = await cursor.fetchone()
-            await cursor.close()
-
-            # Convert the record to a dictionary
-            giveaway_details = {
-                'giveaway_id': record[0],
-                'message_id': record[1],
-                'starttime': record[2],
-                'duration': record[3],
-                'winner_number': record[4],
-                'prizes': record[5],
-                'description': record[6],
-                'creator_id': record[7],
-                'reaction_req': record[8],
-                'message_req': record[9],
-                'timespent_req': record[10],
-                'participant_ids': record[11],
-                'winner_ids': record[12],
-                'is_end': record[13],
-            }
-
-            return giveaway_details
+        return await self.db.fetch_giveaway(giveaway_id)
 
     @app_commands.command(name="ga_cancel",
                           description="Cancel a giveaway without selecting winners")
@@ -1080,66 +890,35 @@ class GiveawayCog(commands.Cog):
                 await interaction.response.send_message(f"Message sent to all winners of giveaway {giveaway_id}. Message: {message}")
 
     async def update_giveaway_description(self, giveaway_id, new_description):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute('UPDATE giveaway SET description = ? WHERE giveaway_id = ?',
-                                 (new_description, giveaway_id))
+        await self.db.update_giveaway_description(giveaway_id, new_description)
 
     async def update_giveaway_duration(self, giveaway_id, new_duration):
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute(
-                'UPDATE giveaway SET duration = ? WHERE giveaway_id = ?',
-                (new_duration, giveaway_id)
-            )
-            await db.commit()
-            await cursor.close()
+        await self.db.update_giveaway_duration(giveaway_id, new_duration)
 
     async def cleanup_ended_giveaways(self):
         logging.info("Cleaning up ended giveaways...")
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute('''
-                DELETE FROM giveaway_views
-                WHERE giveaway_id IN (
-                    SELECT giveaway_id FROM giveaway WHERE is_end = 1
-                )
-            ''')
-            await db.commit()
-            await cursor.close()
+        await self.db.cleanup_ended_giveaway_views()
 
     async def save_giveaways(self, giveaway_id, view):
-        # print("Saving giveaways...")
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute(
-                'REPLACE INTO giveaway_views (giveaway_id, giveaway_channel_id, message_id) VALUES (?, ?, ?)',
-                (giveaway_id, view.giveaway_channel_id, view.message_id))
-            await db.commit()
-            await cursor.close()
+        await self.db.save_giveaway_view(giveaway_id, view.giveaway_channel_id, view.message_id)
 
     async def load_giveaways(self):
-        # print("Loading giveaways...")
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute('SELECT giveaway_id, giveaway_channel_id, message_id FROM giveaway_views')
-            records = await cursor.fetchall()
-            await cursor.close()
-            for giveaway_id, giveaway_channel_id, message_id in records:
-                view = GiveawayParticipationView(self.bot, giveaway_id, giveaway_channel_id)
-                view.message_id = message_id
-                self.giveaways[giveaway_id] = view
+        records = await self.db.load_giveaway_views()
+        for giveaway_id, giveaway_channel_id, message_id in records:
+            view = GiveawayParticipationView(self.bot, giveaway_id, giveaway_channel_id)
+            view.message_id = message_id
+            self.giveaways[giveaway_id] = view
 
-                # Fetch the giveaway message from Discord
-                channel = self.bot.get_channel(int(giveaway_channel_id))
-                if channel is None:
-                    logging.error(f"Error: Channel {giveaway_channel_id} not found")
-                    continue
+            # Fetch the giveaway message from Discord
+            channel = self.bot.get_channel(int(giveaway_channel_id))
+            if channel is None:
+                logging.error(f"Error: Channel {giveaway_channel_id} not found")
+                continue
 
-                message = await channel.fetch_message(message_id)
+            message = await channel.fetch_message(message_id)
 
-                # Add the view to the message
-                await message.edit(view=view)
+            # Add the view to the message
+            await message.edit(view=view)
 
     async def notify_winners(self, winners, prizes, giveaway_id):
         giveaway_channel = self.bot.get_channel(self.giveaway_channel_id)
@@ -1184,89 +963,10 @@ class GiveawayCog(commands.Cog):
             await giveaway_channel.send(self.giveaway_fail_message.format(prizes=prizes))
 
     async def update_participant_achievements(self, giveaway_id):
-        # Fetch all participant IDs for the giveaway
         participant_ids = await self.fetch_participant_ids(giveaway_id)
-        current_year, current_month = datetime.datetime.now().year, datetime.datetime.now().month
-
-        # Connect to the database
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-
-            # For each participant ID
-            for participant_id in participant_ids:
-                # Update lifetime achievements
-                await cursor.execute('SELECT giveaway_count FROM achievements WHERE user_id = ?', (participant_id,))
-                record = await cursor.fetchone()
-
-                if record is None:
-                    # If the user doesn't have an entry in the achievement table, create a new entry
-                    await cursor.execute('INSERT INTO achievements (user_id, giveaway_count) VALUES (?, ?)',
-                                         (participant_id, 1))
-                else:
-                    # If the user has an entry, increase the giveaway_count
-                    current_giveaway_count = record[0]
-                    new_giveaway_count = current_giveaway_count + 1
-                    await cursor.execute('UPDATE achievements SET giveaway_count = ? WHERE user_id = ?',
-                                         (new_giveaway_count, participant_id))
-
-                # Update monthly achievements
-                await cursor.execute('''
-                    SELECT giveaway_count 
-                    FROM monthly_achievements 
-                    WHERE user_id = ? AND year = ? AND month = ?
-                ''', (participant_id, current_year, current_month))
-                monthly_record = await cursor.fetchone()
-
-                if monthly_record is None:
-                    # If no monthly record exists, create one
-                    await cursor.execute('''
-                        INSERT INTO monthly_achievements 
-                        (user_id, year, month, giveaway_count) 
-                        VALUES (?, ?, ?, ?)
-                    ''', (participant_id, current_year, current_month, 1))
-                else:
-                    # If a monthly record exists, update it
-                    current_monthly_count = monthly_record[0] if monthly_record[0] is not None else 0
-                    new_monthly_count = current_monthly_count + 1
-                    await cursor.execute('''
-                        UPDATE monthly_achievements 
-                        SET giveaway_count = ? 
-                        WHERE user_id = ? AND year = ? AND month = ?
-                    ''', (new_monthly_count, participant_id, current_year, current_month))
-
-            # Commit the changes and close the cursor
-            await db.commit()
+        await self.db.increment_giveaway_achievements(participant_ids)
 
     @commands.Cog.listener()
     async def on_ready(self):
-        # Ensure the table exists
-        async with aiosqlite.connect(self.db_path) as db:
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS giveaway (
-                    giveaway_id INTEGER NOT NULL,
-                    message_id TEXT NOT NULL,
-                    starttime TEXT NOT NULL,
-                    duration INTEGER NOT NULL,
-                    winner_number INTEGER NOT NULL,
-                    prizes TEXT NOT NULL,
-                    description TEXT,
-                    creator_id TEXT NOT NULL,
-                    reaction_req INTEGER DEFAULT 0,
-                    message_req INTEGER DEFAULT 0,
-                    timespent_req INTEGER DEFAULT 0,
-                    participant_ids TEXT,
-                    winner_ids TEXT,
-                    is_end BOOLEAN DEFAULT 0
-                )
-            ''')
-
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS giveaway_views (
-                    giveaway_id TEXT PRIMARY KEY,
-                    giveaway_channel_id TEXT,
-                    message_id TEXT
-                )
-            ''')
-            await db.commit()
-
-            await self.load_giveaways()
+        await self.db.initialize_database()
+        await self.load_giveaways()
