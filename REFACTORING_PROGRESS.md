@@ -16,8 +16,8 @@
 |---|---|---|---|
 | P0 | P0-4 裸 except 治理 | ✅ | 21 处清零 |
 | P0 | P0-1 giveaway 抽 db | ✅ | 21 处清零 + 修 update_giveaway_description commit bug |
-| P0 | P0-2 privateroom 直连规范化 | ⬜ | 下一步 |
-| P0 | P0-3a check_status 补 db manager（含建表竞态修复） | ⬜ | 内部最优先 |
+| P0 | P0-2 privateroom 直连规范化 | ✅ | 1 处清零 |
+| P0 | P0-3a check_status 补 db manager（含建表竞态修复） | ⬜ | 下一步（内部最优先） |
 | P0 | P0-3b notebook 补 db manager | ⬜ | |
 | P0 | P0-3c create_invitation 补 db manager | ⬜ | |
 | P0 | P0-3d voice_channel 补 db manager | ⬜ | 最重，放最后 |
@@ -115,9 +115,17 @@
 
 ---
 
-## P0-2 ⬜ privateroom 直连规范化
+## P0-2 ✅ privateroom 直连规范化（2026-04-23）
 
-**状态**：下一步
+**Commit grep**: `git log --grep='(P0-2)'`
+
+**范围**：`bot/cogs/privateroom_cog.py` 仅有 1 处直连（`get_last_month_voice_hours`，查 `monthly_achievements.time_spent`）。
+
+**做法**：`PrivateRoomDatabaseManager` 新增 `get_user_monthly_voice_seconds(user_id, year, month) -> float`，cog 只保留时间窗口（上月）计算 + 秒→小时换算。
+
+**跨表访问处理**：`monthly_achievements` 表归属 achievement 领域，但 privateroom_cog 只依赖 `PrivateRoomDatabaseManager`；为保持单 manager 依赖、避免无谓引入 `AchievementDatabaseManager`，该方法先放在 privateroom 侧。同 P0-1 的 `increment_giveaway_achievements` 策略，未来跨 manager 引用成常态时再统一梳理。
+
+**验收**：`grep -n "aiosqlite" bot/cogs/privateroom_cog.py` 清零（含 import）；`py_compile` 通过。功能层需用户在测试服验证购买/续费路径（涉及 voice hour 门槛的逻辑才会触发这个方法）。
 
 **目标**：`bot/cogs/privateroom_cog.py` 里仍直连 `aiosqlite.connect` 的点，改走已存在的 `PrivateRoomDatabaseManager`；manager 缺的方法就补。
 
