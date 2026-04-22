@@ -277,7 +277,7 @@ class CheckinEmbedView(discord.ui.View):
             finally:
                 try:
                     os.unlink(temp_file_path)
-                except:
+                except OSError:
                     pass
         else:
             await interaction.followup.send(embed=embed, ephemeral=True)
@@ -672,7 +672,7 @@ class ShopCog(commands.Cog):
                             if message:
                                 new_embed = await self.create_daily_checkin_embed(current_date)
                                 await message.edit(embed=new_embed, view=self.checkin_view)
-                    except:
+                    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                         # If embed message no longer exists, deactivate it
                         await self.db.deactivate_checkin_embed(embed_data['id'])
         except Exception as e:
@@ -693,7 +693,7 @@ class ShopCog(commands.Cog):
                         else:
                             # Message not found, deactivate
                             await self.db.deactivate_checkin_embed(embed_data['id'])
-                except:
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                     # Channel or message not accessible, deactivate
                     await self.db.deactivate_checkin_embed(embed_data['id'])
         except Exception as e:
@@ -787,8 +787,8 @@ class ShopCog(commands.Cog):
                     logging.error(f"Error processing embed {embed_data.get('id', 'unknown')}: {e}")
                     try:
                         await self.db.deactivate_checkin_embed(embed_data['id'])
-                    except:
-                        pass
+                    except Exception:
+                        logging.exception(f"Failed to deactivate checkin embed {embed_data.get('id', 'unknown')}")
                         
         except Exception as e:
             logging.error(f"Critical error in update_checkin_embeds_after_checkin: {e}")
@@ -985,7 +985,7 @@ class ShopCog(commands.Cog):
                 # Clean up
                 try:
                     os.unlink(temp_file_path)
-                except:
+                except OSError:
                     pass
         else:
             # Send just the embed if no history (public response)

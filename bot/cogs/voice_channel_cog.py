@@ -1004,7 +1004,7 @@ class VoiceStateCog(commands.Cog):
                     # 获取创建者
                     try:
                         creator = await self.bot.fetch_user(creator_id)
-                    except:
+                    except (discord.NotFound, discord.HTTPException):
                         creator = None
                         logging.warning(f"Creator {creator_id} not found")
 

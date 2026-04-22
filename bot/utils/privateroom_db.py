@@ -47,8 +47,8 @@ class PrivateRoomDatabaseManager:
             try:
                 await db.execute('ALTER TABLE privateroom_rooms ADD COLUMN renewal_reminder_sent INTEGER DEFAULT 0')
                 await db.commit()
-            except:
-                # Column already exists
+            except aiosqlite.OperationalError:
+                # Column already exists (duplicate column name)
                 pass
 
             await db.commit()

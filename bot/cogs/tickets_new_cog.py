@@ -214,9 +214,9 @@ class TicketThreadView(discord.ui.View):
                         dm_view.add_item(jump_button)
                         
                         await creator.send(embed=dm_embed, view=dm_view)
-                    except:
+                    except (discord.Forbidden, discord.HTTPException):
                         pass  # DM failed, continue
-                        
+
         except Exception as e:
             logging.error(f"Error in accept_callback: {e}")
             await interaction.response.send_message(
@@ -321,9 +321,9 @@ class AddUserModal(discord.ui.Modal):
                 dm_view.add_item(jump_button)
                 
                 await user.send(embed=dm_embed, view=dm_view)
-            except:
+            except (discord.Forbidden, discord.HTTPException):
                 pass  # DM failed
-                
+
         except ValueError:
             await interaction.response.send_message(
                 self.messages['add_user_invalid_id'], 
@@ -445,9 +445,9 @@ class CloseTicketModal(discord.ui.Modal):
                         dm_view.add_item(jump_button)
                         
                         await creator.send(embed=dm_embed, view=dm_view)
-                    except:
+                    except (discord.Forbidden, discord.HTTPException):
                         pass  # DM failed
-                        
+
         except Exception as e:
             logging.error(f"Error in CloseTicketModal: {e}")
             # Try to respond if we haven't already
@@ -459,10 +459,10 @@ class CloseTicketModal(discord.ui.Modal):
                     )
                 else:
                     await interaction.followup.send(
-                        self.messages['ticket_close_error'], 
+                        self.messages['ticket_close_error'],
                         ephemeral=True
                     )
-            except:
+            except discord.HTTPException:
                 pass  # Give up if both fail
 
 
@@ -811,24 +811,24 @@ class TicketsNewCog(commands.Cog):
                 dm_view.add_item(jump_button)
                 
                 await interaction.user.send(embed=dm_embed, view=dm_view)
-            except:
+            except (discord.Forbidden, discord.HTTPException):
                 pass  # DM failed
-                
+
         except Exception as e:
             logging.error(f"Error creating ticket thread: {e}")
             try:
                 await interaction.followup.send(
-                    self.conf['messages']['ticket_thread_create_error'], 
+                    self.conf['messages']['ticket_thread_create_error'],
                     ephemeral=True
                 )
-            except:
+            except discord.HTTPException:
                 # If interaction has already been responded to, try response instead
                 try:
                     await interaction.response.send_message(
-                        self.conf['messages']['ticket_thread_create_error'], 
+                        self.conf['messages']['ticket_thread_create_error'],
                         ephemeral=True
                     )
-                except:
+                except discord.HTTPException:
                     pass  # Give up if both fail
 
     async def log_ticket_action(self, action: str, thread_id: int, user: discord.Member, 
@@ -1118,7 +1118,8 @@ class TicketsNewCog(commands.Cog):
             ]
             
             return all(required_perms)
-        except:
+        except Exception:
+            logging.exception("_validate_channel_permissions failed")
             return False
 
     @app_commands.command(name="tickets_add_user", description="添加用户到工单")
@@ -1412,7 +1413,7 @@ class TicketsNewCog(commands.Cog):
                         description=self.conf['messages']['ticket_accepted_dm_content'].format(user=interaction.user.mention),
                         color=EmbedColors.ACCEPT
                     )
-                    
+
                     # Create jump button view
                     dm_view = discord.ui.View()
                     jump_button = discord.ui.Button(
@@ -1421,9 +1422,9 @@ class TicketsNewCog(commands.Cog):
                         url=f"https://discord.com/channels/{interaction.guild.id}/{thread_id}"
                     )
                     dm_view.add_item(jump_button)
-                    
+
                     await creator.send(embed=dm_embed, view=dm_view)
-                except:
+                except (discord.Forbidden, discord.HTTPException):
                     pass  # DM failed
 
     @app_commands.command(name="tickets_close", description="手动关闭当前工单")
@@ -1542,7 +1543,7 @@ class TicketsNewCog(commands.Cog):
                         ),
                         color=EmbedColors.CLOSE
                     )
-                    
+
                     # Create jump button view
                     dm_view = discord.ui.View()
                     jump_button = discord.ui.Button(
@@ -1551,9 +1552,9 @@ class TicketsNewCog(commands.Cog):
                         url=f"https://discord.com/channels/{interaction.guild.id}/{thread_id}"
                     )
                     dm_view.add_item(jump_button)
-                    
+
                     await creator.send(embed=dm_embed, view=dm_view)
-                except:
+                except (discord.Forbidden, discord.HTTPException):
                     pass  # DM failed
 
     @app_commands.command(name="tickets_refresh_buttons", description="刷新所有工单的按钮状态")
@@ -1588,7 +1589,7 @@ class TicketsNewCog(commands.Cog):
                     await interaction.edit_original_response(
                         content=self.conf['messages']['refresh_buttons_starting'].format(total=total_tickets)
                     )
-                except:
+                except discord.HTTPException:
                     pass
             
             for i in range(0, len(all_tickets), batch_size):
@@ -1644,7 +1645,7 @@ class TicketsNewCog(commands.Cog):
                                 errors=error_count
                             )
                         )
-                    except:
+                    except discord.HTTPException:
                         pass  # Ignore edit failures
                 
                 # Add delay between batches to avoid rate limits

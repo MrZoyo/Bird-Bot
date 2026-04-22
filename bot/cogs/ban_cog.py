@@ -878,7 +878,7 @@ class BanCog(commands.Cog):
                 try:
                     user = await self.bot.fetch_user(user_id)
                     user_mentions.append(f"{user.mention} ({user.display_name})")
-                except:
+                except (discord.NotFound, discord.HTTPException):
                     user_mentions.append(f"<@{user_id}> (不存在)")
             
             embed.add_field(
@@ -1279,7 +1279,7 @@ class BanCog(commands.Cog):
                         value=f"**ID:** {user_id}\n**原因:** {reason}\n**管理员:** {banned_by_user.display_name}\n**解封时间:** <t:{int(unban_time.timestamp())}:R>",
                         inline=False
                     )
-                except:
+                except (discord.NotFound, discord.HTTPException):
                     embed.add_field(
                         name=f"👤 用户 {user_id}",
                         value=f"**原因:** {reason}\n**解封时间:** <t:{int(unban_time.timestamp())}:R>",
