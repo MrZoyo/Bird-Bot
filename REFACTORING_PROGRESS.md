@@ -18,8 +18,8 @@
 | P0 | P0-1 giveaway 抽 db | ✅ | 21 处清零 + 修 update_giveaway_description commit bug |
 | P0 | P0-2 privateroom 直连规范化 | ✅ | 1 处清零 |
 | P0 | P0-3a check_status 补 db manager（含建表竞态修复） | ✅ | 3 处清零 + 竞态修复 |
-| P0 | P0-3b notebook 补 db manager | ⬜ | 下一步 |
-| P0 | P0-3c create_invitation 补 db manager | ⬜ | |
+| P0 | P0-3b notebook 补 db manager | ✅ | 7 处清零 |
+| P0 | P0-3c create_invitation 补 db manager | ⬜ | 下一步 |
 | P0 | P0-3d voice_channel 补 db manager | ⬜ | 最重，放最后 |
 | P1 | P1-5 日志 rotation | ⬜ | 下一轮 |
 | P1 | P1-2 ban_cog 迁 cog_load | ⬜ | 下一轮 |
@@ -165,6 +165,21 @@
 - 迁到 `cog_load` 后：cog 加载完成（bot 起步期）就已经建表 → **永远早于** task 的任何执行。
 
 **未做（留给 P1-2）**：后台任务 `start()` 仍在 `__init__`，没动（P1-2 专门治理此类 pattern）。本轮只修竞态。
+
+---
+
+### P0-3b ✅ notebook（2026-04-23）
+
+**Commit grep**: `git log --grep='(P0-3b)'`
+
+**做的事**：
+- 新建 `bot/utils/notebook_db.py` + `NotebookDatabaseManager`（7 方法）。
+- `insert_event_and_ensure_admin` 保留**单连接组合事务**语义（MAX(count) → INSERT event → SELECT admin → INSERT admin if missing），和原 cog 行为一致。
+- 所有 cog 方法改为 thin wrapper（`ConfirmationView` 通过 `bot.get_cog('NotebookCog').xxx()` 调用链不变）。
+- 建表迁 `cog_load`，`on_ready` listener 删除（与 P0-3a 对齐；此 cog 无后台任务，动作纯属一致性）。
+- 清掉冗余的 `datetime` import（时间戳生成下沉 manager）。
+
+**无竞态修复**（这个 cog 没有后台任务在 `__init__` 启动）。
 
 ---
 
