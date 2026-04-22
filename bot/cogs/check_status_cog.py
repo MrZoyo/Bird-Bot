@@ -5,13 +5,12 @@ from discord.ext import commands, tasks
 import os
 import tempfile
 import logging
-import aiosqlite
 from datetime import datetime, timezone, timedelta
 import matplotlib.pyplot as plt
 import io
 import re
 from collections import defaultdict
-from bot.utils import config, check_channel_validity
+from bot.utils import config, check_channel_validity, CheckStatusDatabaseManager
 
 
 class MemberPositionView(discord.ui.View):
@@ -40,6 +39,7 @@ class CheckStatusCog(commands.Cog):
 
         self.main_config = config.get_config('main')
         self.db_path = self.main_config['db_path']
+        self.db = CheckStatusDatabaseManager(self.db_path)
         self.logging_file = self.main_config['logging_file']
 
         self.conf = config.get_config('checkstatus')
@@ -53,6 +53,11 @@ class CheckStatusCog(commands.Cog):
 
         self.bot.tree.add_command(self.where_is_menu)
         self.check_voice_status_task.start()
+
+    async def cog_load(self):
+        # 建表必须先于 check_voice_status_task 首次执行, 否则 INSERT 会打到不存在的表。
+        # 之前建表在 on_ready listener 里, 与 before_loop 的 wait_until_ready 并发, 存在竞态。
+        await self.db.initialize_database()
 
     def cog_unload(self):
         self.check_voice_status_task.cancel()
@@ -79,12 +84,11 @@ class CheckStatusCog(commands.Cog):
             category_counts = {k: v for k, v in category_counts.items() if v['people'] > 0 or v['channels'] > 0}
 
             # Record the data in the database
-            async with aiosqlite.connect(self.db_path) as db:
-                await db.execute('''
-                    INSERT INTO status (timestamp, people, channels)
-                    VALUES (?, ?, ?)
-                ''', (datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'), total_people, total_channels))
-                await db.commit()
+            await self.db.record_status(
+                datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
+                total_people,
+                total_channels,
+            )
 
             logging.info(f"Voice status checked at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
@@ -115,13 +119,7 @@ class CheckStatusCog(commands.Cog):
                 await interaction.followup.send("日期格式不支持，请使用 YYYY-MM-DD / YYYY-MM / YYYY。", ephemeral=True)
                 return
 
-            async with aiosqlite.connect(self.db_path) as db:
-                cursor = await db.execute('''
-                        SELECT timestamp, people, channels FROM status
-                        WHERE timestamp LIKE ?
-                        ORDER BY timestamp
-                    ''', (f'{date}%',))
-                rows = await cursor.fetchall()
+            rows = await self.db.fetch_status_by_date_prefix(date)
 
             if not rows:
                 await interaction.followup.send(f"No data found for the specified date: {date}", ephemeral=True)
@@ -425,13 +423,3 @@ class CheckStatusCog(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"An error occurred: {str(e)}", ephemeral=True)
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        async with aiosqlite.connect(self.db_path) as db:
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS status (
-                    timestamp TEXT NOT NULL,
-                    people INTEGER DEFAULT 0,
-                    channels INTEGER DEFAULT 0
-                )
-            ''')

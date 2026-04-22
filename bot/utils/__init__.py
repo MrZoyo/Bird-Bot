@@ -10,6 +10,7 @@ from .ban_db import BanDatabaseManager
 from .role_db import RoleDatabaseManager
 from .achievement_db import AchievementDatabaseManager
 from .giveaway_db import GiveawayDatabaseManager
+from .check_status_db import CheckStatusDatabaseManager
 
 __all__ = [
     'config',
@@ -25,4 +26,5 @@ __all__ = [
     'RoleDatabaseManager',
     'AchievementDatabaseManager',
     'GiveawayDatabaseManager',
+    'CheckStatusDatabaseManager',
 ]
