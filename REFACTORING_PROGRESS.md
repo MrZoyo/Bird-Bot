@@ -19,8 +19,8 @@
 | P0 | P0-2 privateroom 直连规范化 | ✅ | 1 处清零 |
 | P0 | P0-3a check_status 补 db manager（含建表竞态修复） | ✅ | 3 处清零 + 竞态修复 |
 | P0 | P0-3b notebook 补 db manager | ✅ | 7 处清零 |
-| P0 | P0-3c create_invitation 补 db manager | ⬜ | 下一步 |
-| P0 | P0-3d voice_channel 补 db manager | ⬜ | 最重，放最后 |
+| P0 | P0-3c create_invitation 补 db manager | ✅ | 1 处清零（复用 RoleDatabaseManager） |
+| P0 | P0-3d voice_channel 补 db manager | ⬜ | 下一步；最重，放最后 |
 | P1 | P1-5 日志 rotation | ⬜ | 下一轮 |
 | P1 | P1-2 ban_cog 迁 cog_load | ⬜ | 下一轮 |
 | P1 | P1-1 命令同步逻辑 | ⬜ | 下一轮 |
@@ -180,6 +180,22 @@
 - 清掉冗余的 `datetime` import（时间戳生成下沉 manager）。
 
 **无竞态修复**（这个 cog 没有后台任务在 `__init__` 启动）。
+
+---
+
+### P0-3c ✅ create_invitation（2026-04-23）
+
+**Commit grep**: `git log --grep='(P0-3c)'`
+
+**做的事**：仅 1 处直连（`TeamInvitationView.create_embed` 读 `user_signatures`）。`user_signatures` 归 role 域，`RoleDatabaseManager.get_user_signature(user_id) -> Optional[Dict]` 已存在，直接复用。
+
+**不建 InvitationDatabaseManager 的理由**：此 cog 本身没有持久化状态表，若仅为一次跨域读而新建空 manager，是为形式而形式。跨 manager 复用是更轻的方案（manager 只持 `db_path`，无状态，共享安全）。
+
+**做法**：
+- `CreateInvitationCog.__init__` 加 `self.role_db = RoleDatabaseManager(db_path)`。
+- `TeamInvitationView.__init__` 加 `role_db` 参数；两处实例化点（`on_message` 路由 + `/invitation`）传入。
+- `create_embed` 的 SQL 改为 `await self.role_db.get_user_signature(author.id)`，`is_disabled=True` 时 signature 视为 None（语义保留）。
+- 顺手清 View 里的 `main_config` / `db_path` 死属性；删 `import aiosqlite`。
 
 ---
 
