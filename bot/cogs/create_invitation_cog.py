@@ -10,21 +10,17 @@ import asyncio
 from discord.utils import format_dt
 from pathlib import Path
 import aiofiles
-from bot.utils import config, check_channel_validity
-import aiosqlite
+from bot.utils import config, check_channel_validity, RoleDatabaseManager
 
 
 class TeamInvitationView(discord.ui.View):
-    def __init__(self, bot, channel, user):
+    def __init__(self, bot, channel, user, role_db):
         super().__init__(timeout=600)
         self.bot = bot
         self.user = user
         self.channel = channel
+        self.role_db = role_db
         self.url = f"https://discord.com/channels/{channel.guild.id}/{channel.id}"
-
-        # Get main config for db_path
-        self.main_config = config.get_config('main')
-        self.db_path = self.main_config['db_path']
 
         self.conf = config.get_config('invitation')
         self.roomfull_button_label = self.conf['roomfull_button_label']
@@ -65,15 +61,9 @@ class TeamInvitationView(discord.ui.View):
         else:
             raise ValueError("The passed object must be a discord.Message or a discord.Interaction.")
 
-        # Get user's signature if exists
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.cursor()
-            await cursor.execute(
-                'SELECT signature, is_disabled FROM user_signatures WHERE user_id = ?',
-                (author.id,)
-            )
-            result = await cursor.fetchone()
-            signature = result[0] if result and not result[1] else None
+        # Get user's signature if exists (owned by role_db)
+        sig = await self.role_db.get_user_signature(author.id)
+        signature = sig['signature'] if sig and not sig['is_disabled'] else None
 
         guild_id = author.guild.id
         channel_id = author.voice.channel.id
@@ -168,6 +158,10 @@ class DefaultRoomView(discord.ui.View):
 class CreateInvitationCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+
+        # user_signatures 表归 role 领域, 这里跨域只读, 复用 RoleDatabaseManager。
+        self.main_config = config.get_config('main')
+        self.role_db = RoleDatabaseManager(self.main_config['db_path'])
 
         self.conf = config.get_config('invitation')
         self.illegal_team_response = self.conf['illegal_team_response']
@@ -335,7 +329,7 @@ class CreateInvitationCog(commands.Cog):
                         old_invitation = await teamup_cog.db_manager.get_last_invitation_by_voice_channel(channel.id)
 
                     # ===== 步骤2: 立即创建并发送新的组队消息 =====
-                    view = TeamInvitationView(self.bot, channel, message.author)
+                    view = TeamInvitationView(self.bot, channel, message.author, self.role_db)
                     embed = await view.create_embed(message)
                     new_message = await message.reply(embed=embed, view=view)
 
@@ -398,7 +392,7 @@ class CreateInvitationCog(commands.Cog):
                     old_invitation = await teamup_cog.db_manager.get_last_invitation_by_voice_channel(channel.id)
 
                 # ===== 步骤2: 立即创建并发送新的组队消息 =====
-                view = TeamInvitationView(self.bot, channel, interaction.user)
+                view = TeamInvitationView(self.bot, channel, interaction.user, self.role_db)
                 embed = await view.create_embed(interaction)
                 embed.title = title or self.default_invite_embed_title
 
