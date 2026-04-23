@@ -80,22 +80,14 @@ class Config:
         return self._configs[config_name]
 
     def _verify_main_config(self) -> None:
-        required_keys = ['token', 'logging_file', 'db_path', 'guild_id']
-        main = self._configs['main']
-        for key in required_keys:
-            if key not in main:
-                print(
-                    f"Missing required key '{key}' in main configuration. "
-                    "Please add it."
-                )
-                main[key] = None
+        # Schema-driven validation lives in bot.utils.config_schema (P1-4).
+        # The schema function applies defaults in-place and returns a list
+        # of warnings; we keep the pre-schema ``print`` path so operators
+        # reading stdout / bot.log notice misconfigurations on boot.
+        from bot.utils.config_schema import validate_main_config
 
-        # Defaulted keys (minimal P1-4 schema): operators who migrate from
-        # a pre-P1-6 JSON main.config won't have these keys. We add them
-        # with sane defaults rather than hard-failing, so existing deploys
-        # keep working and only break on fields we genuinely need.
-        main.setdefault('locale', 'zh_CN')
-        main.setdefault('log_backup_count', 14)
+        for warning in validate_main_config(self._configs['main']):
+            print(warning)
 
     def get_config(
         self,
