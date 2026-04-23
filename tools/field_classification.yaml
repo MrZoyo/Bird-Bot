@@ -1,0 +1,158 @@
+# tools/field_classification.yaml
+#
+# Routing overrides for tools/migrate_config_to_yaml.py.
+# The script classifies *top-level* keys of each config_<name>.json into
+# `yaml` / `locale` / `db`; nested restructuring (e.g. splitting
+# `role.starsign_name[*].name` out to locale) is left as a follow-up
+# hand edit during each cog's step-7 refactor.
+#
+# Keys not listed here fall back to heuristics:
+#   - key name `messages` (dict) → entire subtree → locale
+#   - ends with `_message / _title / _description / _footer / _label /
+#     _text / _button / _placeholder / _hint / _notice` → locale
+#   - scalar non-string (int, bool, float, list-of-int) → yaml
+#   - string value the heuristic cannot place → flagged `unclassified`
+#     in tools/migration_report.md for manual review
+#
+# Unclassified entries stay out of both yaml and locale outputs until
+# the operator reruns the script with an updated classification.
+
+main:
+  yaml:
+    - token
+    - logging_file
+    - keyword_log_file
+    - room_log_file
+    - log_backup_count
+    - db_path
+    - guild_id
+    - admin_channel_id
+    - features
+    - locale  # default zh_CN; set by operator
+
+ban:
+  yaml:
+    - admin_roles
+    - admin_users
+    - ban_notification_channel_id
+    - invite_link
+  # messages subtree → locale via heuristic
+
+checkstatus:
+  locale:
+    - where_is_not_found_message
+    - where_is_title_message
+    - current_channel_name_message
+    - current_channel_members_message
+    - where_is_join_button_label
+
+invitation:
+  yaml:
+    - ignore_user_ids
+    - ignore_channel_ids
+    - default_create_room_channel_id
+  # remaining flat string keys → locale via heuristic
+
+welcome:
+  yaml:
+    - welcome_channel_id
+    - text_color
+    - font_path
+    - font_size
+    - avatar_size
+    - welcome_text_1_distance
+    - welcome_text_2_distance
+    - background_image
+  locale:
+    - welcome_text_picture_1
+    - welcome_text_picture_2
+    - welcome_text
+  # `dm` subtree mixes ids/colors/images (yaml) with titles/descriptions
+  # (locale). The script keeps `dm` as a single subtree in yaml; the
+  # step-7 welcome_cog refactor splits the user-visible dm strings into
+  # locales/zh_CN/welcome.yaml by hand.
+  dm_subtree_target: yaml
+
+privateroom:
+  yaml:
+    - points_cost
+    - voice_hours_threshold
+    - booster_discount_hours
+    - check_time_hour
+    - check_time_minute
+    - room_duration_days
+    - max_rooms
+    - renewal_days_threshold
+    - renewal_extend_days
+  # messages subtree → locale via heuristic
+
+spymode:
+  # flat dict of button labels + localized strings — all locale
+  # listed explicitly so the heuristic doesn't guess incorrectly
+  locale:
+    - blue_team_button_label
+    - red_team_button_label
+    - random_button_label
+    - result_button_label
+    - spymode_embed_title
+    - spymode_embed_start_title
+    - spymode_embed_end_title
+    - spymode_embed_saved_title
+    - spymode_embed_footer
+    - spymode_gameinfo
+    - blue_team_name
+    - red_team_name
+    - blue_team_result
+    - red_team_result
+    - you_are_spy
+    - you_are_not_spy
+    - full_team_message
+    - spymode_not_in_channel_message
+    - spymode_wrong_channel_message
+    - spymode_wrong_user_message
+    - spymode_wrong_start_message
+    - spymode_wrong_team_size_message
+    - spymode_wrong_spy_size_message
+
+shop:
+  yaml:
+    - checkin_daily_reward
+    - makeup_checkin_cost
+    - makeup_checkin_limit_per_month
+    - checkin_embed_color       # "0x9966ff" — display colour, but it's a parseable data value
+    - history_type_emoji        # dict of short tokens; safer as data (code maps tokens to emojis)
+    - history_default_emoji
+    - history_time_format       # strftime format
+
+role:
+  yaml:
+    - achievement_start_role_id
+    - social_start_role_id
+    - role_type_name
+    - starsign_name
+    - mbti_name
+    - gender_name
+    - signature
+  # *_name arrays keep their names in yaml for this pass; the
+  # step-7 role_cog refactor splits `*_name[*].name` → locale as a
+  # targeted follow-up.
+
+tickets_new:
+  db:
+    - ticket_types              # migrated into DB (P2-5 judgment)
+  # admin roles / user / channel ids — fill after migration_report shows them
+  # messages subtree → locale via heuristic
+
+voicechannel:
+  db:
+    - channel_configs           # migrated into DB (P2-5 judgment)
+  # `control_panel` is a nested structure of user-visible text plus a
+  # `colors` dict. Script keeps it as a single subtree in yaml; the
+  # voice_channel_cog step-7 refactor splits user text out to locales.
+  control_panel_subtree_target: yaml
+
+teamup_display:
+  # fill in after inspecting .json structure
+
+achievements:
+  # large; fill in after migration_report first pass
