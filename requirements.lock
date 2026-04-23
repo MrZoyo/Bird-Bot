@@ -64,6 +64,8 @@ python-dateutil==2.9.0.post0
     # via matplotlib
 requests==2.33.1
     # via -r requirements.txt
+ruamel-yaml==0.19.1
+    # via -r requirements.txt
 six==1.17.0
     # via python-dateutil
 tqdm==4.67.3
