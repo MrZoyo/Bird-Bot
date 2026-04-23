@@ -366,16 +366,17 @@
 | Step | 做什么 | 状态 |
 |---|---|---|
 | 0 | `.gitignore` 阶段 A 规则 + 清历史泄露 | ✅ |
-| 1 | 硬编码文案清单扫描（非改码，调研） | ⬜（与 step 7 合并做） |
+| 1 | 硬编码文案清单扫描（非改码，调研） | ⬜（每 cog 迁移时就地做） |
 | 2 | `requirements.txt` + `requirements.lock` 加 `ruamel.yaml` | ✅ |
 | 3 | `bot/utils/config.py` 改造（YAML 分派 + `get_locale` + async `save_config`） | ✅ |
 | 4 | `bot/utils/i18n.py` 新建（`t()` + fallback 链） | ✅ |
-| 5 | `tools/migrate_config_to_yaml.py` + `tools/seed_db.py` + `tools/field_classification.yaml` | ⬜ |
-| 6 | DB 基础设施：`ticket_types` / `channel_configs` 表 + CRUD + 迁 `tickets_new_cog` / `voice_channel_cog` | ⬜ |
-| 7 | 试点迁移（`spymode_cog` → `welcome_cog`） | ⬜ |
-| 8 | 批量迁移（剩余 14 cog） | ⬜ |
-| 9 | 启动 schema 校验（= P1-4 合并） | ⬜ |
-| 10 | 清理（阶段 B .gitignore + 删 JSON fallback + `.json` → `old_function/`） | ⬜ |
+| 5 | `tools/migrate_config_to_yaml.py` + `tools/seed_db.py` + `tools/field_classification.yaml` | ✅ |
+| 6 (DB 基础设施) | `ticket_types` / `channel_configs` 表 + CRUD + cog 重写 | ✅ |
+| 6 (pilot) | `spymode_cog` + `checkstatus_cog` 迁 t() + locale | ✅ |
+| 7 (save_config 统一) | `ban` / `role` / `create_invitation` / `tickets_new` 四处改 `await config.save_config(...)` （P2-3） | ✅ |
+| 7 (剩余 cog 文案迁移) | welcome / shop / notebook / dnd / teamup_display / achievements / giveaway / privateroom / role / voice_channel / ban / tickets_new 的 `self.conf['messages']` → `t()` | ⬜ **跨会话接力** |
+| 8 (P1-4) | 启动 schema 校验 | 🟡 最小版本（`main.locale` / `log_backup_count` 默认 + 现有 required key 检查）；pydantic 全量校验留 follow-up |
+| 9 | 清理（阶段 B `.gitignore` + 删 JSON fallback + `.json` → `old_function/`） | ⬜ **等 step 7 剩余部分完成后再做** |
 
 ### P1-6.0 ✅ step 0: .gitignore 阶段 A + 历史泄露（2026-04-23）
 
@@ -445,3 +446,116 @@
 **smoke test**：基本查询 / format_map / 缺 key 抛 KeyError / 非法 key 被拒 / `lang='en_US'` 落回 `zh_CN` 全过。
 
 **下一步**：step 5 —— 写 `tools/migrate_config_to_yaml.py` + `tools/seed_db.py` + `tools/field_classification.yaml`。这一步是"生成迁移产物"的纯工具代码，不触碰现有 cog；写完可在本仓跑一次生成出所有 `<name>.yaml`（本地，不 commit）作为后续 step 7 试点迁移的输入。
+
+### P1-6.5 ✅ step 5: 迁移脚本 + 分类表（2026-04-23）
+
+**Commit grep**: `git log --grep='(P1-6\.5)'`
+
+**新文件**：
+- `tools/field_classification.yaml`：每 cog 的 `yaml` / `locale` / `db` 显式路径覆盖；heuristic 兜底（`messages` 子树 → locale、scalar → yaml、`_message/_title/_label/...` 后缀 → locale）。
+- `tools/migrate_config_to_yaml.py`：读 `bot/config/config_<name>.json` → 输出 `<name>.yaml` + `<name>.yaml.example`（ID 脱敏为 `1145141919810`、token 脱敏为 `YOUR_BOT_TOKEN`）+ `locales/zh_CN/<name>.yaml` + `tools/migration_db_seed.json` + `tools/migration_report.md`。支持 `--only <cog>` 单 cog 迁移。
+- `tools/seed_db.py`：读 `migration_db_seed.json`，调 `VoiceChannelDatabaseManager.upsert_channel_config` / `TicketsNewDatabaseManager.upsert_ticket_type` 做 DB 初始灌入。幂等（upsert）。
+
+**Smoke**：对 14 个 `config_*.json` 跑完无错；spymode（23 keys → locale，0 yaml）、checkstatus（5 → locale）、ban（4 yaml + messages → locale）、welcome（9 yaml + dm 子树 + 3 locale）、role（7 yaml + 43 locale）等都按 classification 分流。heuristic 兜底被标记为 `locale?` / `yaml?` 进 `migration_report.md` 供人工 review。
+
+**`tools/seed_db.py` 设计要点**：
+- 直接复用生产的 DB manager（`VoiceChannelDatabaseManager` / `TicketsNewDatabaseManager`），共享 schema 定义 & upsert CRUD。
+- 先调 `initialize_database()`（幂等）保证 fresh `bot.db` 也能 seed。
+- 不清 destination 表 —— 靠 upsert 幂等，操作员看到不在 seed 里的"旧"行可自行清理（不做自动破坏）。
+- 未知 cog name 只 warn 跳过；未来新增 DB 字段只需在 `seed_handlers` 加条目。
+
+---
+
+### P1-6.6 ✅ step 6a: DB 基础设施 + 两大 cog 重写（2026-04-23）
+
+**Commit grep**: `git log --grep='(P2-5)'`（两条 commit）
+
+**voice_channel**：
+- `VoiceChannelDatabaseManager` 加 `channel_configs` 表 + `list_channel_configs` / `upsert_channel_config` / `delete_channel_config`。
+- `voice_channel_cog.__init__` 不再读 `self.conf['channel_configs']`；`cog_load` 调 `list_channel_configs()` 填 `self.channel_configs` 内存缓存（热路径不变）。
+- 三处 `save_channel_configs()` callsite（AddChannelForm / 两个 DeleteChannelConfirmView.confirm）换 upsert / delete + 内存态同步。
+- 删 `save_channel_configs` 方法 + 不用的 `aiofiles / json / Path` import。
+
+**tickets_new**：
+- `TicketsNewDatabaseManager` 加 `ticket_types` 表（`type_name` PK + `type_data` JSON）+ `list_ticket_types` / `upsert_ticket_type` / `rename_ticket_type`（transactional DELETE+INSERT 避免半写）/ `remove_ticket_type`。
+- `tickets_new_cog.__init__` `pop('ticket_types', None)` 从 `self.conf` 挪出来，永远不让 `config.save_config('tickets_new', self.conf)` 把 DB 字段回写到 YAML。
+- `cog_load` 调 `list_ticket_types()` 填 `self.ticket_types` 缓存 + 提供 `_refresh_ticket_types()` 帮助函数。
+- 20+ 处 `self.conf['ticket_types']` / `self.conf.get('ticket_types', ...)`（cog 和 View 的读）全部改 `self.ticket_types` / `self.cog.ticket_types`。
+- TicketTypeModal add / edit / rename 路径：local `type_data` dict + `upsert_ticket_type` / `rename_ticket_type` + `_refresh_ticket_types`。**移除**原来的 `db_manager.save_config('ticket_types', ...)` bogus 调用（从没 work 过，AttributeError 静默）和 `self.cog.conf = await db_manager.get_config()` 的 clobber（会把 messages/admin 从 memory 里擦掉）。
+- DeleteConfirmView.confirm_delete 同模式。
+- `add_global_admin` / `add_type_admin` / `remove_type_admin` 的类型级 admin 增删也改走 `upsert_ticket_type`（之前只改 `self.ticket_types` 内存态 + 存 `self.conf` → 重启就丢）。
+- `save_config` 方法换成 `await config.save_config('tickets_new', self.conf)` 的 P2-3 统一写回 + 保护性 `pop('ticket_types', None)`。
+- 删不用的 json / aiofiles / Path import。
+
+**pilot spymode 完成**：23 keys → `bot/locales/zh_CN/spymode.yaml`，cog 的 24 处 `self.conf['xxx']` / `.format(...)` 全部改 `t('spymode.xxx', **kwargs)`。移除 `self.conf` 实例缓存、unused `Button/View` 导入。
+
+**pilot checkstatus 完成**：5 migration-script 生成的 keys + 15 手动抽出的硬编码（date_format_error / log_type_main/keyword/room / voice_stats_* / error_generic 等）→ `bot/locales/zh_CN/checkstatus.yaml`。cog 重写：去掉 `self.conf.update(main_config)` 的 silent-mutation hack，改为 `self.logging_file / self.keyword_log_file / self.room_log_file` 直接从 main 读；所有 `t()` 按 call site 展开；重复的 `/where_is` slash + context menu DRY 成 `_send_where_is()` 辅助方法。
+
+---
+
+### P1-6.7a ✅ step 7a: save_config 统一（P2-3）（2026-04-23）
+
+**Commit grep**: `git log --grep='(P2-3)'`（一条 commit），`git log --grep='unify save_config'`
+
+**改的 4 个 callsite**（保留在 YAML 的，按 P2-5 判定表分类）：
+- `ban_cog.save_config` → `await config.save_config('ban', self.config_data)`；删掉 aiofiles / json / Path 手动 I/O 和 `Config().reload_config(...)` 的 reload 舞蹈。
+- `create_invitation_cog.save_config` → `await config.save_config('invitation', self.conf)`。老代码只写 `ignore_channel_ids` 一个字段回 JSON，其它任何 in-memory mutation 都会被吞（现在改整体回写）。
+- `role_cog.set_signature_requirement` 的 `config.save_config('role', self.role_config)` 改 `await config.save_config(...)`。这是 PLAN 记录的 AttributeError bug：老代码调用同步形式，但 `Config.save_config` 当时根本不存在 → 每次 `/signature_set_requirement` 都 silent fail。所在函数本身是 `async def`，加 `await` 直接生效。
+- `tickets_new_cog.save_config` → `await config.save_config('tickets_new', self.conf)`（在 ticket_types DB 迁移 commit 里顺手改掉，一并清 aiofiles/json import）。
+
+**删掉的 2 处 DB-判定 writer**（见 P1-6.6）：
+- `voice_channel_cog.save_channel_configs` 方法整体删除，三处 callsite 改 DB upsert/delete。
+- `tickets_new_cog` 的两处 `db_manager.save_config('ticket_types', ...)` 整体删除，改 CRUD upsert + `_refresh_ticket_types`。
+
+---
+
+### P1-6.8 🟡 step 8: P1-4 schema 校验（最小版本）（2026-04-23）
+
+**Commit grep**: `git log --grep='P1-4 minimal'`
+
+**做了**：`bot/utils/config.py._verify_main_config` 加 defaults 兜底：
+- `main.locale` 缺失 → `zh_CN`（对齐 P1-6 决策 B2）
+- `main.log_backup_count` 缺失 → `14`（对齐 P1-5）
+必填 key（token / logging_file / db_path / guild_id）行为不变（print warning + 设 None）。
+
+**没做**（follow-up）：pydantic / dataclass 全量 schema；per-cog locale key 完整性校验；starsign / mbti / slug-mapped 字段跨 config/locale 对齐校验。理由：这些校验对"所有 cog 已迁完 locale"预设依赖强；step 7 剩余批量迁移没完成前，校验会在没有 locale 的路径上误报。
+
+---
+
+### 剩余工作（跨会话接手）
+
+**🔴 critical**（影响 config 2.0 完备性）：
+1. **剩余 11 cog 的 t() 文案迁移**（step 7 的量大部分）：
+   - `welcome`、`shop`、`notebook`、`game_dnd`、`teamup_display`、`achievement`、`giveaway`、`privateroom`、`role`、`voice_channel`、`ban`、`tickets_new`（voice_channel / tickets_new 的 DB 部分已完成，但 `messages:*` 文案 → t() 还没迁）
+   - 模板：(a) 跑 `python tools/migrate_config_to_yaml.py --only <name>`；(b) 基于 `tools/migration_report.md` review，必要时补 `field_classification.yaml`；(c) 重跑；(d) 把 `self.conf['messages']['xxx']` → `t('<name>.xxx')`，数据字段留 `config.get_config('<name>')['key']`；(e) commit `bot/locales/zh_CN/<name>.yaml` + `bot/config/<name>.yaml.example`（后者若有数据字段）+ cog 改动。
+   - pilot 参考：`spymode` / `checkstatus`（都已完成）。
+
+**🟡 important**（完成 config 2.0 sprint 才做）：
+2. step 9 清理：阶段 B `.gitignore` 拿掉 `bot/config/*.json`；`bot/utils/config.py` 删 JSON fallback 分支；`bot/config/config_*.json` + `.example` `mv` 到 `old_function/config/`；更新 `README.md` / `AGENTS.md` 的配置章节。
+3. 完整 P1-4 schema（pydantic）+ key 对齐校验。
+4. P1-7 Slash 命令元数据本地化（`bot/utils/slash_translator.py` + `setup_hook` 注册 + `locales/zh_CN/commands.yaml`）。
+
+**🟢 nice-to-have**：
+5. P1-3 大 cog 拆包（配置 2.0 完成后 PLAN 推荐顺序）。
+6. P3-5 ruff（锁 P0-4 成果 + 未来裸 except 防线）。
+
+---
+
+### Upgrade 协议（生产部署执行）
+
+老部署升级到这一组 commit 后的正确顺序（不可反过来）：
+
+```bash
+git pull
+uv pip sync requirements.lock      # 装 ruamel.yaml
+python tools/migrate_config_to_yaml.py   # 生成 yaml / locale / seed
+# → review tools/migration_report.md, 按需更新 field_classification.yaml 重跑
+python tools/seed_db.py            # channel_configs + ticket_types 灌 DB
+# 重启 bot
+```
+
+**跳过 `seed_db.py` 会发生**：auto-create 房间入口全丢（`voicechannel.channel_configs` 表空）、所有 ticket type 消失（`ticket_types` 表空）。JSON fallback 兜不了 DB-bound 字段。
+
+---
+
+**下一步**：剩余 11 cog 的 `self.conf['messages']` → `t()` 迁移（每 cog 一个 commit，按 PLAN step 7 的"use count 升序"建议顺序）。每个 cog 迁完后更新本文件 status。
