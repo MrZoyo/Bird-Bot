@@ -161,14 +161,6 @@ def create_bot():
                 logging.info(f"\n机器人已连接到服务器 {guild.name}\n")
                 print(f"\n机器人已连接到服务器 {guild.name}\n")
                 await bot.change_presence(activity=discord.Game(name=f"在 {guild.name} 上搬砖"))
-
-                # 清理旧的 guild 级别指令副本，避免与全局指令重复
-                bot.tree.clear_commands(guild=guild)
-                await bot.tree.sync(guild=guild)
-
-                # Sync global commands once; avoid duplicating with guild-specific copies
-                global_synced = await bot.tree.sync()
-                print(f"Global commands synced: {len(global_synced)}")
             else:
                 logging.info(f"Bot not allowed to connect to {guild.name}")
                 print(f"Bot not allowed to connect to {guild.name}")
@@ -265,8 +257,24 @@ async def setup_bot(bot):
     return conf['token']
 
 
+async def sync_commands_once(bot):
+    guild_id = config.get_config()['guild_id']
+    guild = discord.Object(id=guild_id)
+    try:
+        # Clear guild-scoped command copies so they don't duplicate the globals.
+        bot.tree.clear_commands(guild=guild)
+        await bot.tree.sync(guild=guild)
+        global_synced = await bot.tree.sync()
+        logging.info(f"Startup sync: {len(global_synced)} global commands synced.")
+        print(f"Global commands synced at startup: {len(global_synced)}")
+    except discord.HTTPException as e:
+        logging.error(f"Startup command sync failed: {e}", exc_info=True)
+        print(f"Startup command sync failed: {e}")
+
+
 async def setup_hook(bot):
     await setup_bot(bot)
+    await sync_commands_once(bot)
 
 
 def run_bot():
