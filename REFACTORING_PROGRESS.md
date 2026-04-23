@@ -53,8 +53,8 @@
 | P0 | P0-3d voice_channel 补 db manager | ✅ | 12 处清零 + 顺手删 tickets_new_cog 死 import |
 | **P0 整体** | **P0 系列全部完成** | ✅ | `grep -rn "aiosqlite" bot/cogs/` 整个清零 |
 | P1 | P1-5 日志 rotation | ✅ | 3 个 logger 统一 TimedRotatingFileHandler |
-| P1 | P1-2 ban_cog 迁 cog_load | ⬜ | 下一步 |
-| P1 | P1-1 命令同步逻辑 | ⬜ | 之后 |
+| P1 | P1-2 ban_cog 迁 cog_load | ✅ | 建表 → cog_load；recover_tempbans → on_ready 首次 |
+| P1 | P1-1 命令同步逻辑 | ⬜ | 下一步 |
 | P1+P2 | 配置系统 2.0（P1-6 + P1-4 + P2-3 + P2-5） | ⬜ | 绑定一次冲刺做 |
 | P1 | P1-7 Slash 元数据本地化 | ⬜ | 与配置 2.0 并行/紧接 |
 | P1 | P1-3 大 cog 拆包 | ⬜ | 配置 2.0 之后 |
@@ -291,3 +291,30 @@
 **未做（后续任务范围）**：
 - 不覆盖 discord.py / aiosqlite 自己的 logger（它们默认 propagate 到 root → 会走 main.log rotation；如要独立拆分等 P2 再说）。
 - 没给 rotation 加"按大小 + 按时间"组合（`maxBytes`）。按大小限额是另一需求；目前纯按天够用。
+
+---
+
+## P1-2 ✅ ban_cog 迁 cog_load（2026-04-23）
+
+**Commit grep**: `git log --grep='(P1-2)'`
+
+**做的事**：
+- `__init__` 删掉 `self.init_task = asyncio.create_task(self.initialize_db())`。
+- `cog_unload` 删掉 `if not self.init_task.done(): self.init_task.cancel()` 分支。
+- 新增 `async def cog_load(self): await self.db.initialize_database()` —— 建表在 cog 加载就位时同步完成，任何异常会被 discord.py 的 cog 加载错误路径冒出来（不再被 `create_task` 异步吞掉）。
+- 原 `async def initialize_db(self)` 整段删除（已 inline）。
+
+**拆分 recover_tempbans 到 on_ready 的理由（非 PLAN 字面要求，但必须）**：
+- `cog_load` 在 discord.py 的 `setup_hook` 链里执行，**早于 gateway 连接**。此时 `self.bot.get_guild(guild_id)` 永远返回 `None`。
+- `recover_tempbans` 逻辑：`guild = self.bot.get_guild(guild_id); if not guild: deactivate_tempban(...)` —— 如果把整个 `initialize_db()` 直接 `await` 在 `cog_load` 里，**每个活跃 tempban 都会被误判为"guild 不存在"而被标为 inactive**，严重 regression。
+- 原 `create_task` 版本是"可能跑早可能跑晚"的不确定竞态；naive PLAN 迁移把它变成"确定性跑早"、一定坏。
+- 解法：`cog_load` 只做表创建；`recover_tempbans` 挪到 `@commands.Cog.listener() on_ready` 下，加 `self._tempban_recovery_done` 标志位，保证**首次 READY 跑一次**（`on_ready` 因断线重连会重复 fire，没 flag 会重复 schedule unban，造成同一 tempban 被 schedule 两次的 bug）。
+
+**验收**：
+- `grep -n "init_task\|initialize_db" bot/cogs/ban_cog.py` 清零（仅剩 `self.db.initialize_database()` 这一行，是 manager 方法名，语义正确）。
+- `python3 -m py_compile bot/cogs/ban_cog.py` 过。
+- 功能验收：重启 bot → 原活跃 tempban 应被正确识别（不会被 deactivate）；过期 tempban 应被执行 unban 并 deactivate。这需要测试服或生产跑一次带活跃 tempban 记录的重启才能确认。
+
+**未动**（PLAN P1-2 明确"不扩到其他 cog"）：
+- `self.cleanup_tempbans.start()` / `self.check_expired_tempbans.start()` 仍在 `__init__` —— 后台任务启动时机是另一个模式（`tasks.loop` 本身有 `before_loop` + `wait_until_ready` 处理），不在本轮范围。
+- 其他 cog 的类似 pattern（`achievement_cog` / `shop_cog` / `tickets_new_cog` / `voice_channel_cog`）按 PLAN 说明**已经在用 `cog_load`**，本轮核查时无需改动。
