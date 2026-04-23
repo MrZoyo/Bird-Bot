@@ -55,7 +55,7 @@
 | P1 | P1-5 日志 rotation | ✅ | 3 个 logger 统一 TimedRotatingFileHandler |
 | P1 | P1-2 ban_cog 迁 cog_load | ✅ | 建表 → cog_load；recover_tempbans → on_ready 首次 |
 | P1 | P1-1 命令同步逻辑 | ✅ | sync 迁 setup_hook；on_ready 只留 presence/日志 |
-| P1+P2 | 配置系统 2.0（P1-6 + P1-4 + P2-3 + P2-5） | ⬜ | 绑定一次冲刺做 |
+| P1+P2 | 配置系统 2.0（P1-6 + P1-4 + P2-3 + P2-5） | 🔄 | step 0 完成；step 1-9 待做 |
 | P1 | P1-7 Slash 元数据本地化 | ⬜ | 与配置 2.0 并行/紧接 |
 | P1 | P1-3 大 cog 拆包 | ⬜ | 配置 2.0 之后 |
 | P2 | P2-1 数据库连接复用 | ⬜ | 需 close() 生命周期前置 |
@@ -353,3 +353,44 @@
 **未做（后续任务范围）**：
 - `synccommands` 手动命令里的 `except Exception` 仍是宽捕获（非本次 P1-1 范围 —— P0-4 已通过，这一处原本就在豁免名单外；若要收窄留 P3-5 ruff E722 / 类似 narrow exception lint 规则统一清理）。
 - 从更大的架构角度，slash command 的 sync 应该只在"命令定义确实变了"时做。缓存 command hash 比较的优化留给未来（不在 PLAN）。
+
+---
+
+## 配置系统 2.0 冲刺（P1-6 + P1-4 + P2-3 + P2-5，绑定一次做）
+
+> PLAN 参考：§P1-6、§P1-4、§P2-3、§P2-5。step 编号沿用 PLAN §P1-6 的步骤 0~9。
+> Commit 规约：`(P1-6.0)` / `(P1-6.2)` / ... 方便 `git log --grep='(P1-6\.0)'` 精确定位 sub-step。
+
+### Step 汇总表
+
+| Step | 做什么 | 状态 |
+|---|---|---|
+| 0 | `.gitignore` 阶段 A 规则 + 清历史泄露 | ✅ |
+| 1 | 硬编码文案清单扫描（非改码，调研） | ⬜（与 step 7 合并做） |
+| 2 | `requirements.txt` + `requirements.lock` 加 `ruamel.yaml` | ⬜ |
+| 3 | `bot/utils/config.py` 改造（YAML 分派 + `get_locale` + async `save_config`） | ⬜ |
+| 4 | `bot/utils/i18n.py` 新建（`t()` + fallback 链） | ⬜ |
+| 5 | `tools/migrate_config_to_yaml.py` + `tools/seed_db.py` + `tools/field_classification.yaml` | ⬜ |
+| 6 | DB 基础设施：`ticket_types` / `channel_configs` 表 + CRUD + 迁 `tickets_new_cog` / `voice_channel_cog` | ⬜ |
+| 7 | 试点迁移（`spymode_cog` → `welcome_cog`） | ⬜ |
+| 8 | 批量迁移（剩余 14 cog） | ⬜ |
+| 9 | 启动 schema 校验（= P1-4 合并） | ⬜ |
+| 10 | 清理（阶段 B .gitignore + 删 JSON fallback + `.json` → `old_function/`） | ⬜ |
+
+### P1-6.0 ✅ step 0: .gitignore 阶段 A + 历史泄露（2026-04-23）
+
+**Commit grep**: `git log --grep='(P1-6\.0)'`
+
+**动的**：
+- `.gitignore` 加 4 条：`bot/config/*.yaml`、`tools/migration_db_seed.json`、`tools/migration_report.md`、`old_function/**/*.json|*.yaml`。
+- 留 `bot/config/*.json`（阶段 A 全程保留，step 10 阶段 B 再拿掉）。
+- `.json.example` / `.yaml.example` 后缀不匹配 `*.json` / `*.yaml`，**自动**脱敏模板保持可提交，无需单独排除规则。
+- `git rm --cached` 清历史泄露：`old_function/config/config_tickets.json` + `config_rating.json`（工作树保留、仅移出 index；git 历史里的泄露不走 filter-repo 重写，按 PLAN 已拍板"认历史账"）。
+
+**AGENTS.md 状态**：line 35 "安全与配置提示" 已于之前冲刺写入 `old_function/**/*.json|*.yaml` 归档硬规则，本 step 无需再改。
+
+**验收**：
+- `git check-ignore` 探 6 种路径全部按预期（真 yaml 忽略 / `.example` 不忽略 / `locales` 不忽略 / 迁移产物忽略）。
+- `git log --oneline -1` 显示 step 0 commit 生效。
+
+**下一步**：step 2（依赖加 `ruamel.yaml`），step 1 的硬编码清单扫描合并到 step 7 per-cog 迁移时执行（PLAN step 1 是"调研清单"，实际抽文案的动作在每个 cog 迁移 PR 里）。
