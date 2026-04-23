@@ -9,6 +9,7 @@ import shutil
 import asyncio
 from discord.ext import commands, tasks
 from discord import app_commands
+from discord.app_commands import locale_str
 from datetime import datetime, timedelta
 import logging
 
@@ -65,7 +66,13 @@ class BackupCog(commands.Cog):
             next_run = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0)
         await asyncio.sleep((next_run - now).total_seconds())
 
-    @app_commands.command(name='backup_now', description='Manually create a database backup')
+    @app_commands.command(
+        name='backup_now',
+        description=locale_str(
+            'Manually create a database backup',
+            key='backup.backup_now.description',
+        ),
+    )
     async def backup_now(self, interaction: discord.Interaction):
         if not await check_channel_validity(interaction):
             return

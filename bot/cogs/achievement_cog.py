@@ -4,6 +4,7 @@ import datetime
 import re
 from discord.ext import commands
 from discord import app_commands
+from discord.app_commands import locale_str
 from datetime import datetime, timezone, timedelta
 from discord.ui import Button, View
 from bot.utils import AchievementDatabaseManager, check_channel_validity, config
@@ -611,10 +612,21 @@ class AchievementCog(commands.Cog):
 
     @app_commands.command(
         name="achievements",
-        description="Query the current progress of achievements"
+        description=locale_str(
+            "Query the current progress of achievements",
+            key="achievements.achievements.description",
+        ),
     )
-    @app_commands.describe(member="The member to query. Defaults to self if not provided",
-                           date="Optional lookup date in format YYYY-MM (eg. 2024-07)")
+    @app_commands.describe(
+        member=locale_str(
+            "The member to query. Defaults to self if not provided",
+            key="achievements.achievements.params.member",
+        ),
+        date=locale_str(
+            "Optional lookup date in format YYYY-MM (eg. 2024-07)",
+            key="achievements.achievements.params.date",
+        ),
+    )
     async def achievements(self, interaction: discord.Interaction, member: discord.Member = None, date: str = None):
         # Defer the interaction
         await interaction.response.defer()
@@ -638,14 +650,32 @@ class AchievementCog(commands.Cog):
 
     @app_commands.command(
         name="increase_achievement",
-        description="Increase the achievement progress of a member"
+        description=locale_str(
+            "Increase the achievement progress of a member",
+            key="achievements.increase_achievement.description",
+        ),
     )
     @app_commands.describe(
-        member="The member whose achievement progress to increase",
-        reactions="The number of reactions to increase",
-        messages="The number of messages to increase",
-        time_spent="The time spent on the server to increase (in seconds)",
-        giveaways="The number of giveaways to increase"
+        member=locale_str(
+            "The member whose achievement progress to increase",
+            key="achievements.increase_achievement.params.member",
+        ),
+        reactions=locale_str(
+            "The number of reactions to increase",
+            key="achievements.increase_achievement.params.reactions",
+        ),
+        messages=locale_str(
+            "The number of messages to increase",
+            key="achievements.increase_achievement.params.messages",
+        ),
+        time_spent=locale_str(
+            "The time spent on the server to increase (in seconds)",
+            key="achievements.increase_achievement.params.time_spent",
+        ),
+        giveaways=locale_str(
+            "The number of giveaways to increase",
+            key="achievements.increase_achievement.params.giveaways",
+        ),
     )
     async def increase_achievement_progress(self, interaction: discord.Interaction, member: discord.Member,
                                             reactions: int = 0,
@@ -678,14 +708,32 @@ class AchievementCog(commands.Cog):
 
     @app_commands.command(
         name="decrease_achievement",
-        description="Decrease the achievement progress of a member"
+        description=locale_str(
+            "Decrease the achievement progress of a member",
+            key="achievements.decrease_achievement.description",
+        ),
     )
     @app_commands.describe(
-        member="The member whose achievement progress to decrease",
-        reactions="The number of reactions to decrease",
-        messages="The number of messages to decrease",
-        time_spent="The time spent on the server to decrease (in seconds)",
-        giveaways="The number of giveaways to decrease"
+        member=locale_str(
+            "The member whose achievement progress to decrease",
+            key="achievements.decrease_achievement.params.member",
+        ),
+        reactions=locale_str(
+            "The number of reactions to decrease",
+            key="achievements.decrease_achievement.params.reactions",
+        ),
+        messages=locale_str(
+            "The number of messages to decrease",
+            key="achievements.decrease_achievement.params.messages",
+        ),
+        time_spent=locale_str(
+            "The time spent on the server to decrease (in seconds)",
+            key="achievements.decrease_achievement.params.time_spent",
+        ),
+        giveaways=locale_str(
+            "The number of giveaways to decrease",
+            key="achievements.decrease_achievement.params.giveaways",
+        ),
     )
     async def decrease_achievement_progress(self, interaction: discord.Interaction, member: discord.Member,
                                             reactions: int = 0,
@@ -718,9 +766,17 @@ class AchievementCog(commands.Cog):
 
     @app_commands.command(
         name="achievement_ranking",
-        description="Display the achievement rankings"
+        description=locale_str(
+            "Display the achievement rankings",
+            key="achievements.achievement_ranking.description",
+        ),
     )
-    @app_commands.describe(date="Optional lookup date in format YYYY-MM (eg. 2024-07)")
+    @app_commands.describe(
+        date=locale_str(
+            "Optional lookup date in format YYYY-MM (eg. 2024-07)",
+            key="achievements.achievement_ranking.params.date",
+        ),
+    )
     async def achievement_ranking(self, interaction: discord.Interaction, date: str = None):
         # Defer the interaction
         await interaction.response.defer()
@@ -742,7 +798,10 @@ class AchievementCog(commands.Cog):
 
     @app_commands.command(
         name="check_ach_ops",
-        description="Check the records of manual operations on achievements"
+        description=locale_str(
+            "Check the records of manual operations on achievements",
+            key="achievements.check_ach_ops.description",
+        ),
     )
     async def check_ach_ops(self, interaction: discord.Interaction):
         if not await check_channel_validity(interaction):
@@ -780,9 +839,17 @@ class AchievementCog(commands.Cog):
 
     @app_commands.command(
         name="rank",
-        description="View achievement rankings in an interactive format"
+        description=locale_str(
+            "View achievement rankings in an interactive format",
+            key="achievements.rank.description",
+        ),
     )
-    @app_commands.describe(date="Optional lookup date in format YYYY-MM (eg. 2024-07)")
+    @app_commands.describe(
+        date=locale_str(
+            "Optional lookup date in format YYYY-MM (eg. 2024-07)",
+            key="achievements.rank.params.date",
+        ),
+    )
     async def rank(self, interaction: discord.Interaction, date: str = None):
         """Interactive command to view achievement rankings with filtering options"""
         # Defer the interaction

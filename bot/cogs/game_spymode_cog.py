@@ -3,6 +3,7 @@ import random
 
 import discord
 from discord import app_commands
+from discord.app_commands import locale_str
 from discord.ext import commands
 
 from ..utils.i18n import t
@@ -258,10 +259,22 @@ class SpyModeCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="spymode")
+    @app_commands.command(
+        name="spymode",
+        description=locale_str(
+            "Initiate a spy mode game",
+            key="spymode.spymode.description",
+        ),
+    )
     @app_commands.describe(
-        team_size="Number of players per side",
-        spy="Number of spies per side",
+        team_size=locale_str(
+            "Number of players per side",
+            key="spymode.spymode.params.team_size",
+        ),
+        spy=locale_str(
+            "Number of spies per side",
+            key="spymode.spymode.params.spy",
+        ),
     )
     async def spymode(self, interaction: discord.Interaction, team_size: int = 5, spy: int = 1):
         """Initiate a spy mode game."""

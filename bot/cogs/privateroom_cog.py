@@ -2,6 +2,7 @@
 import discord
 from discord.ext import commands, tasks
 from discord import app_commands
+from discord.app_commands import locale_str
 import logging
 import asyncio
 import json
@@ -635,7 +636,10 @@ class PrivateRoomCog(commands.Cog):
 
     @app_commands.command(
         name="privateroom_init",
-        description="初始化私人房间系统（仅限管理员）"
+        description=locale_str(
+            "Initialize the private room system (admin only)",
+            key="privateroom.privateroom_init.description",
+        ),
     )
     async def initialize_system(self, interaction: discord.Interaction):
         """初始化私人房间系统"""
@@ -693,7 +697,10 @@ class PrivateRoomCog(commands.Cog):
 
     @app_commands.command(
         name="privateroom_reset",
-        description="重置私人房间系统（仅限管理员）"
+        description=locale_str(
+            "Reset the private room system (admin only)",
+            key="privateroom.privateroom_reset.description",
+        ),
     )
     async def reset_system_command(self, interaction: discord.Interaction):
         """重置私人房间系统命令"""
@@ -746,9 +753,17 @@ class PrivateRoomCog(commands.Cog):
 
     @app_commands.command(
         name="privateroom_setup",
-        description="设置私人房间商店（仅限管理员）"
+        description=locale_str(
+            "Set up the private room shop (admin only)",
+            key="privateroom.privateroom_setup.description",
+        ),
     )
-    @app_commands.describe(channel="要设置商店的频道")
+    @app_commands.describe(
+        channel=locale_str(
+            "Channel to host the shop",
+            key="privateroom.privateroom_setup.params.channel",
+        ),
+    )
     async def setup_shop(self, interaction: discord.Interaction, channel: discord.TextChannel):
         """设置私人房间商店"""
         # 验证管理员权限
@@ -1406,9 +1421,21 @@ class PrivateRoomCog(commands.Cog):
 
     @app_commands.command(
         name="privateroom_fix",
-        description="调整用户私人房间有效期（仅限管理员）"
+        description=locale_str(
+            "Adjust a user's private room validity period (admin only)",
+            key="privateroom.privateroom_fix.description",
+        ),
     )
-    @app_commands.describe(user="要调整的用户", days="剩余有效天数")
+    @app_commands.describe(
+        user=locale_str(
+            "User whose room to adjust",
+            key="privateroom.privateroom_fix.params.user",
+        ),
+        days=locale_str(
+            "Remaining validity in days",
+            key="privateroom.privateroom_fix.params.days",
+        ),
+    )
     async def fix_private_room(self, interaction: discord.Interaction, user: discord.User, days: int):
         """调整指定用户的私人房间有效期"""
         if not await check_channel_validity(interaction):
@@ -1822,7 +1849,10 @@ class PrivateRoomCog(commands.Cog):
 
     @app_commands.command(
         name="privateroom_list",
-        description="列出所有活跃的私人房间（仅限管理员）"
+        description=locale_str(
+            "List all active private rooms (admin only)",
+            key="privateroom.privateroom_list.description",
+        ),
     )
     async def list_rooms(self, interaction: discord.Interaction):
         """列出所有活跃的私人房间"""
@@ -1854,9 +1884,17 @@ class PrivateRoomCog(commands.Cog):
 
     @app_commands.command(
         name="privateroom_ban",
-        description="禁止指定用户使用私人房间（仅限管理员）"
+        description=locale_str(
+            "Ban a user from the private room system (admin only)",
+            key="privateroom.privateroom_ban.description",
+        ),
     )
-    @app_commands.describe(user="要禁止的用户")
+    @app_commands.describe(
+        user=locale_str(
+            "User to ban",
+            key="privateroom.privateroom_ban.params.user",
+        ),
+    )
     async def ban_user(self, interaction: discord.Interaction, user: discord.User):
         """删除用户的私人房间并将其标记为不活跃"""
         # Verify admin privileges

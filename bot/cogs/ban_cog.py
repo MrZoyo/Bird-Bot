@@ -6,6 +6,7 @@ from typing import Optional
 
 import discord
 from discord import app_commands
+from discord.app_commands import locale_str
 from discord.ext import commands, tasks
 
 from bot.utils import BanDatabaseManager, check_channel_validity, config
@@ -534,11 +535,26 @@ class BanCog(commands.Cog):
         for user_id in completed_tasks:
             del self.tempban_tasks[user_id]
 
-    @app_commands.command(name="ban", description="Ban a user from the server")
+    @app_commands.command(
+        name="ban",
+        description=locale_str(
+            "Ban a user from the server",
+            key="ban.ban.description",
+        ),
+    )
     @app_commands.describe(
-        user="The user to ban",
-        reason="Reason for the ban",
-        delete_message_days="Number of days of messages to delete (0-7)"
+        user=locale_str(
+            "The user to ban",
+            key="ban.ban.params.user",
+        ),
+        reason=locale_str(
+            "Reason for the ban",
+            key="ban.ban.params.reason",
+        ),
+        delete_message_days=locale_str(
+            "Number of days of messages to delete (0-7)",
+            key="ban.ban.params.delete_message_days",
+        ),
     )
     async def ban_command(
         self,
@@ -595,12 +611,30 @@ class BanCog(commands.Cog):
             )
             logging.error(f"Failed to ban user {user.id}: {e}")
 
-    @app_commands.command(name="tempban", description="Temporarily ban a user from the server")
+    @app_commands.command(
+        name="tempban",
+        description=locale_str(
+            "Temporarily ban a user from the server",
+            key="ban.tempban.description",
+        ),
+    )
     @app_commands.describe(
-        user="The user to temporarily ban",
-        duration="Duration of the ban (e.g., 1m, 1h, 1d, 1w)",
-        reason="Reason for the ban",
-        delete_message_days="Number of days of messages to delete (0-7)"
+        user=locale_str(
+            "The user to temporarily ban",
+            key="ban.tempban.params.user",
+        ),
+        duration=locale_str(
+            "Duration of the ban (e.g., 1m, 1h, 1d, 1w)",
+            key="ban.tempban.params.duration",
+        ),
+        reason=locale_str(
+            "Reason for the ban",
+            key="ban.tempban.params.reason",
+        ),
+        delete_message_days=locale_str(
+            "Number of days of messages to delete (0-7)",
+            key="ban.tempban.params.delete_message_days",
+        ),
     )
     async def tempban_command(
         self,
@@ -706,11 +740,26 @@ class BanCog(commands.Cog):
             )
             logging.error(f"Failed to temporarily ban user {user.id}: {e}")
 
-    @app_commands.command(name="mute", description="Mute a user in the server")
+    @app_commands.command(
+        name="mute",
+        description=locale_str(
+            "Mute a user in the server",
+            key="ban.mute.description",
+        ),
+    )
     @app_commands.describe(
-        user="The user to mute",
-        duration="Duration of the mute (e.g., 1m, 1h, 1d, 1w)",
-        reason="Reason for the mute"
+        user=locale_str(
+            "The user to mute",
+            key="ban.mute.params.user",
+        ),
+        duration=locale_str(
+            "Duration of the mute (e.g., 1m, 1h, 1d, 1w)",
+            key="ban.mute.params.duration",
+        ),
+        reason=locale_str(
+            "Reason for the mute",
+            key="ban.mute.params.reason",
+        ),
     )
     async def mute_command(
         self,
@@ -787,7 +836,13 @@ class BanCog(commands.Cog):
             )
             logging.error(f"Failed to mute user {user.id}: {e}")
 
-    @app_commands.command(name="ban_admin_list", description="Show current ban admin permissions")
+    @app_commands.command(
+        name="ban_admin_list",
+        description=locale_str(
+            "Show current ban admin permissions",
+            key="ban.ban_admin_list.description",
+        ),
+    )
     async def ban_admin_list(self, interaction: discord.Interaction):
         """Show current ban admin permissions"""
         # Check if user has permission
@@ -897,8 +952,19 @@ class BanCog(commands.Cog):
         
         await interaction.response.send_message(embed=embed, ephemeral=False)
 
-    @app_commands.command(name="ban_admin_add_role", description="Add a role to ban admin permissions")
-    @app_commands.describe(role="The role to add to ban admin permissions")
+    @app_commands.command(
+        name="ban_admin_add_role",
+        description=locale_str(
+            "Add a role to ban admin permissions",
+            key="ban.ban_admin_add_role.description",
+        ),
+    )
+    @app_commands.describe(
+        role=locale_str(
+            "The role to add to ban admin permissions",
+            key="ban.ban_admin_add_role.params.role",
+        ),
+    )
     async def ban_admin_add_role(self, interaction: discord.Interaction, role: discord.Role):
         """Add a role to ban admin permissions"""
         # Check if user has permission
@@ -938,8 +1004,19 @@ class BanCog(commands.Cog):
             ephemeral=False
         )
 
-    @app_commands.command(name="ban_admin_delete_role", description="Remove a role from ban admin permissions")
-    @app_commands.describe(role="The role to remove from ban admin permissions")
+    @app_commands.command(
+        name="ban_admin_delete_role",
+        description=locale_str(
+            "Remove a role from ban admin permissions",
+            key="ban.ban_admin_delete_role.description",
+        ),
+    )
+    @app_commands.describe(
+        role=locale_str(
+            "The role to remove from ban admin permissions",
+            key="ban.ban_admin_delete_role.params.role",
+        ),
+    )
     async def ban_admin_delete_role(self, interaction: discord.Interaction, role: discord.Role):
         """Remove a role from ban admin permissions"""
         # Check if user has permission
@@ -979,8 +1056,19 @@ class BanCog(commands.Cog):
             ephemeral=False
         )
 
-    @app_commands.command(name="ban_admin_add_user", description="Add a user to ban admin permissions")
-    @app_commands.describe(user="The user to add to ban admin permissions")
+    @app_commands.command(
+        name="ban_admin_add_user",
+        description=locale_str(
+            "Add a user to ban admin permissions",
+            key="ban.ban_admin_add_user.description",
+        ),
+    )
+    @app_commands.describe(
+        user=locale_str(
+            "The user to add to ban admin permissions",
+            key="ban.ban_admin_add_user.params.user",
+        ),
+    )
     async def ban_admin_add_user(self, interaction: discord.Interaction, user: discord.User):
         """Add a user to ban admin permissions"""
         # Check if user has permission
@@ -1020,8 +1108,19 @@ class BanCog(commands.Cog):
             ephemeral=False
         )
 
-    @app_commands.command(name="ban_admin_delete_user", description="Remove a user from ban admin permissions")
-    @app_commands.describe(user="The user to remove from ban admin permissions")
+    @app_commands.command(
+        name="ban_admin_delete_user",
+        description=locale_str(
+            "Remove a user from ban admin permissions",
+            key="ban.ban_admin_delete_user.description",
+        ),
+    )
+    @app_commands.describe(
+        user=locale_str(
+            "The user to remove from ban admin permissions",
+            key="ban.ban_admin_delete_user.params.user",
+        ),
+    )
     async def ban_admin_delete_user(self, interaction: discord.Interaction, user: discord.User):
         """Remove a user from ban admin permissions"""
         # Check if user has permission
@@ -1061,8 +1160,19 @@ class BanCog(commands.Cog):
             ephemeral=False
         )
 
-    @app_commands.command(name="ban_set_notification_channel", description="Set the channel for ban notifications")
-    @app_commands.describe(channel="The channel where ban notifications will be sent")
+    @app_commands.command(
+        name="ban_set_notification_channel",
+        description=locale_str(
+            "Set the channel for ban notifications",
+            key="ban.ban_set_notification_channel.description",
+        ),
+    )
+    @app_commands.describe(
+        channel=locale_str(
+            "The channel where ban notifications will be sent",
+            key="ban.ban_set_notification_channel.params.channel",
+        ),
+    )
     async def ban_set_notification_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
         """Set the ban notification channel"""
         # Check if user has permission
@@ -1092,7 +1202,13 @@ class BanCog(commands.Cog):
             ephemeral=False
         )
 
-    @app_commands.command(name="ban_remove_notification_channel", description="Remove the ban notification channel")
+    @app_commands.command(
+        name="ban_remove_notification_channel",
+        description=locale_str(
+            "Remove the ban notification channel",
+            key="ban.ban_remove_notification_channel.description",
+        ),
+    )
     async def ban_remove_notification_channel(self, interaction: discord.Interaction):
         """Remove the ban notification channel"""
         # Check if user has permission
@@ -1130,8 +1246,19 @@ class BanCog(commands.Cog):
             ephemeral=False
         )
 
-    @app_commands.command(name="ban_set_invite_link", description="Set the invite link for tempbanned users")
-    @app_commands.describe(invite_link="The permanent invite link for rejoining the server")
+    @app_commands.command(
+        name="ban_set_invite_link",
+        description=locale_str(
+            "Set the invite link for tempbanned users",
+            key="ban.ban_set_invite_link.description",
+        ),
+    )
+    @app_commands.describe(
+        invite_link=locale_str(
+            "The permanent invite link for rejoining the server",
+            key="ban.ban_set_invite_link.params.invite_link",
+        ),
+    )
     async def ban_set_invite_link(self, interaction: discord.Interaction, invite_link: str):
         """Set the invite link for tempbanned users"""
         # Check if user has permission
@@ -1171,7 +1298,13 @@ class BanCog(commands.Cog):
 
 
 
-    @app_commands.command(name="ban_list_tempbans", description="List all active temporary bans")
+    @app_commands.command(
+        name="ban_list_tempbans",
+        description=locale_str(
+            "List all active temporary bans",
+            key="ban.ban_list_tempbans.description",
+        ),
+    )
     async def ban_list_tempbans(self, interaction: discord.Interaction):
         """List all active temporary bans in the server"""
         # Check if user has permission
@@ -1236,7 +1369,13 @@ class BanCog(commands.Cog):
                 ephemeral=False
             )
 
-    @app_commands.command(name="ban_remove_invite_link", description="Remove the invite link for tempbanned users")
+    @app_commands.command(
+        name="ban_remove_invite_link",
+        description=locale_str(
+            "Remove the invite link for tempbanned users",
+            key="ban.ban_remove_invite_link.description",
+        ),
+    )
     async def ban_remove_invite_link(self, interaction: discord.Interaction):
         """Remove the invite link for tempbanned users"""
         # Check if user has permission

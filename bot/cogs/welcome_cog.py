@@ -4,6 +4,7 @@ import os
 import discord
 from discord.ext import commands
 from discord import app_commands
+from discord.app_commands import locale_str
 from PIL import Image, ImageDraw, ImageFont
 import logging
 import aiohttp
@@ -146,9 +147,23 @@ class WelcomeCog(commands.Cog):
         # Send the welcome DM
         await self.send_welcome_dm(member)
 
-    @app_commands.command(name="testwelcome")
-    @app_commands.describe(member="Select a member to test the welcome message.")
-    @app_commands.describe(member_number="Customize the 'xth member of the server' message.")
+    @app_commands.command(
+        name="testwelcome",
+        description=locale_str(
+            "Send a test welcome message for a specific member and server count",
+            key="welcome.testwelcome.description",
+        ),
+    )
+    @app_commands.describe(
+        member=locale_str(
+            "Select a member to test the welcome message.",
+            key="welcome.testwelcome.params.member",
+        ),
+        member_number=locale_str(
+            "Customize the 'xth member of the server' message.",
+            key="welcome.testwelcome.params.member_number",
+        ),
+    )
     async def test_welcome(self, interaction: discord.Interaction, member: discord.Member = None,
                            member_number: int = None):
         """Send a test welcome message using the slash command interface."""

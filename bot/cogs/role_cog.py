@@ -1,6 +1,7 @@
 # bot/cogs/role_cog.py
 import discord
 from discord import app_commands, components
+from discord.app_commands import locale_str
 from discord.ext import commands
 from discord.ui import Button, View
 import logging
@@ -694,9 +695,17 @@ class RoleCog(commands.Cog):
 
     @app_commands.command(
         name="create_role_pickup",
-        description="Creates a message on a specific channel for role pickup."
+        description=locale_str(
+            "Creates a message on a specific channel for role pickup.",
+            key="role.create_role_pickup.description",
+        ),
     )
-    @app_commands.describe(channel="The channel where the message will be created.")
+    @app_commands.describe(
+        channel=locale_str(
+            "The channel where the message will be created.",
+            key="role.create_role_pickup.params.channel",
+        ),
+    )
     async def create_role_pickup(self, interaction: discord.Interaction, channel: discord.TextChannel):
         if not await check_channel_validity(interaction):
             return
@@ -736,9 +745,17 @@ class RoleCog(commands.Cog):
 
     @app_commands.command(
         name="create_starsign_pickup",
-        description="Creates a message on a specific channel for star sign pickup."
+        description=locale_str(
+            "Creates a message on a specific channel for star sign pickup.",
+            key="role.create_starsign_pickup.description",
+        ),
     )
-    @app_commands.describe(channel="The channel where the message will be created.")
+    @app_commands.describe(
+        channel=locale_str(
+            "The channel where the message will be created.",
+            key="role.create_starsign_pickup.params.channel",
+        ),
+    )
     async def create_starsign_pickup(self, interaction: discord.Interaction, channel: discord.TextChannel):
         if not await check_channel_validity(interaction):
             return
@@ -778,9 +795,17 @@ class RoleCog(commands.Cog):
 
     @app_commands.command(
         name="create_mbti_pickup",
-        description="Creates a message on a specific channel for MBTI pickup."
+        description=locale_str(
+            "Creates a message on a specific channel for MBTI pickup.",
+            key="role.create_mbti_pickup.description",
+        ),
     )
-    @app_commands.describe(channel="The channel where the message will be created.")
+    @app_commands.describe(
+        channel=locale_str(
+            "The channel where the message will be created.",
+            key="role.create_mbti_pickup.params.channel",
+        ),
+    )
     async def create_mbti_pickup(self, interaction: discord.Interaction, channel: discord.TextChannel):
         if not await check_channel_validity(interaction):
             return
@@ -822,9 +847,17 @@ class RoleCog(commands.Cog):
 
     @app_commands.command(
         name="create_gender_pickup",
-        description="Creates a message on a specific channel for gender pickup."
+        description=locale_str(
+            "Creates a message on a specific channel for gender pickup.",
+            key="role.create_gender_pickup.description",
+        ),
     )
-    @app_commands.describe(channel="The channel where the message will be created.")
+    @app_commands.describe(
+        channel=locale_str(
+            "The channel where the message will be created.",
+            key="role.create_gender_pickup.params.channel",
+        ),
+    )
     async def create_gender_pickup(self, interaction: discord.Interaction, channel: discord.TextChannel):
         if not await check_channel_validity(interaction):
             return
@@ -861,9 +894,17 @@ class RoleCog(commands.Cog):
 
     @app_commands.command(
         name="create_signature_pickup",
-        description="Creates a message for signature settings."
+        description=locale_str(
+            "Creates a message for signature settings.",
+            key="role.create_signature_pickup.description",
+        ),
     )
-    @app_commands.describe(channel="The channel where the message will be created.")
+    @app_commands.describe(
+        channel=locale_str(
+            "The channel where the message will be created.",
+            key="role.create_signature_pickup.params.channel",
+        ),
+    )
     async def create_signature_pickup(self, interaction: discord.Interaction, channel: discord.TextChannel):
         if not await check_channel_validity(interaction):
             return
@@ -887,9 +928,21 @@ class RoleCog(commands.Cog):
 
     @app_commands.command(
         name="signature_permission_toggle",
-        description="Toggle a user's ability to set signature"
+        description=locale_str(
+            "Toggle a user's ability to set signature",
+            key="role.signature_permission_toggle.description",
+        ),
     )
-    @app_commands.describe(user_id="The user ID to toggle", disable="True to disable, False to enable")
+    @app_commands.describe(
+        user_id=locale_str(
+            "The user ID to toggle",
+            key="role.signature_permission_toggle.params.user_id",
+        ),
+        disable=locale_str(
+            "True to disable, False to enable",
+            key="role.signature_permission_toggle.params.disable",
+        ),
+    )
     async def toggle_signature(self, interaction: discord.Interaction, user_id: str, disable: bool):
         if not await check_channel_validity(interaction):
             return
@@ -913,9 +966,17 @@ class RoleCog(commands.Cog):
 
     @app_commands.command(
         name="signature_clear",
-        description="Clear a user's signature and change history"
+        description=locale_str(
+            "Clear a user's signature and change history",
+            key="role.signature_clear.description",
+        ),
     )
-    @app_commands.describe(user_id="The user ID to clear signature for")
+    @app_commands.describe(
+        user_id=locale_str(
+            "The user ID to clear signature for",
+            key="role.signature_clear.params.user_id",
+        ),
+    )
     async def clear_signature(self, interaction: discord.Interaction, user_id: str):
         if not await check_channel_validity(interaction):
             return
@@ -974,9 +1035,17 @@ class RoleCog(commands.Cog):
 
     @app_commands.command(
         name="signature_set_requirement",
-        description="Set the voice time requirement for signature feature"
+        description=locale_str(
+            "Set the voice time requirement for signature feature",
+            key="role.signature_set_requirement.description",
+        ),
     )
-    @app_commands.describe(minutes="Required voice time in minutes")
+    @app_commands.describe(
+        minutes=locale_str(
+            "Required voice time in minutes",
+            key="role.signature_set_requirement.params.minutes",
+        ),
+    )
     async def set_signature_requirement(self, interaction: discord.Interaction, minutes: int):
         if not await check_channel_validity(interaction):
             return
@@ -1000,9 +1069,17 @@ class RoleCog(commands.Cog):
 
     @app_commands.command(
         name="signature_check",
-        description="Check a user's signature information"
+        description=locale_str(
+            "Check a user's signature information",
+            key="role.signature_check.description",
+        ),
     )
-    @app_commands.describe(user_id="The user ID to check signature for")
+    @app_commands.describe(
+        user_id=locale_str(
+            "The user ID to check signature for",
+            key="role.signature_check.params.user_id",
+        ),
+    )
     async def check_signature(self, interaction: discord.Interaction, user_id: str):
         if not await check_channel_validity(interaction):
             return

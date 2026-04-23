@@ -6,6 +6,7 @@ from typing import Dict
 
 import discord
 from discord import app_commands
+from discord.app_commands import locale_str
 from discord.ext import commands, tasks
 
 from bot.utils import config
@@ -273,9 +274,17 @@ class TeamupDisplayCog(commands.Cog):
     
     @app_commands.command(
         name="teamup_init",
-        description="Create teamup display board in specified channel"
+        description=locale_str(
+            "Create teamup display board in specified channel",
+            key="teamup_display.teamup_init.description",
+        ),
     )
-    @app_commands.describe(channel="Channel where to create the display board")
+    @app_commands.describe(
+        channel=locale_str(
+            "Channel where to create the display board",
+            key="teamup_display.teamup_init.params.channel",
+        ),
+    )
     async def teamup_init(self, interaction: discord.Interaction, channel: discord.TextChannel):
         """Initialize teamup display board"""
         if not await check_channel_validity(interaction):
@@ -312,11 +321,20 @@ class TeamupDisplayCog(commands.Cog):
     
     @app_commands.command(
         name="teamup_type_add",
-        description="Add game type with corresponding channel"
+        description=locale_str(
+            "Add game type with corresponding channel",
+            key="teamup_display.teamup_type_add.description",
+        ),
     )
     @app_commands.describe(
-        channel="Channel for sending teamup messages",
-        game_type="Game type name"
+        channel=locale_str(
+            "Channel for sending teamup messages",
+            key="teamup_display.teamup_type_add.params.channel",
+        ),
+        game_type=locale_str(
+            "Game type name",
+            key="teamup_display.teamup_type_add.params.game_type",
+        ),
     )
     async def teamup_type_add(self, interaction: discord.Interaction, channel: discord.TextChannel, game_type: str):
         """Add game type configuration"""
@@ -344,11 +362,20 @@ class TeamupDisplayCog(commands.Cog):
     
     @app_commands.command(
         name="teamup_type_delete",
-        description="Delete game type configuration"
+        description=locale_str(
+            "Delete game type configuration",
+            key="teamup_display.teamup_type_delete.description",
+        ),
     )
     @app_commands.describe(
-        channel="Select channel to delete configuration for (if channel still exists)",
-        channel_id="Enter channel ID manually (if channel was deleted)"
+        channel=locale_str(
+            "Select channel to delete configuration for (if channel still exists)",
+            key="teamup_display.teamup_type_delete.params.channel",
+        ),
+        channel_id=locale_str(
+            "Enter channel ID manually (if channel was deleted)",
+            key="teamup_display.teamup_type_delete.params.channel_id",
+        ),
     )
     async def teamup_type_delete(
         self, 
@@ -403,7 +430,10 @@ class TeamupDisplayCog(commands.Cog):
     
     @app_commands.command(
         name="teamup_type_list",
-        description="View all game type configurations"
+        description=locale_str(
+            "View all game type configurations",
+            key="teamup_display.teamup_type_list.description",
+        ),
     )
     async def teamup_type_list(self, interaction: discord.Interaction):
         """List all game type configurations"""

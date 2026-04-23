@@ -5,6 +5,7 @@ from asyncio import sleep
 
 import discord
 from discord import app_commands, ui
+from discord.app_commands import locale_str
 from discord.ext import commands, tasks
 from discord.ui import Button
 
@@ -696,7 +697,10 @@ class VoiceStateCog(commands.Cog):
 
     @app_commands.command(
         name="check_temp_channel_records",
-        description="Check the records of temporary channels"
+        description=locale_str(
+            "Check the records of temporary channels",
+            key="voicechannel.check_temp_channel_records.description",
+        ),
     )
     async def check_temp_channel_records(self, interaction: discord.Interaction):
         if not await check_channel_validity(interaction):
@@ -751,7 +755,10 @@ class VoiceStateCog(commands.Cog):
 
     @app_commands.command(
         name="vc_list",
-        description="List all configured voice channels"
+        description=locale_str(
+            "List all configured voice channels",
+            key="voicechannel.vc_list.description",
+        ),
     )
     async def list_voice_channels(self, interaction: discord.Interaction):
         """List all configured voice channels."""
@@ -764,9 +771,17 @@ class VoiceStateCog(commands.Cog):
 
     @app_commands.command(
         name="vc_add",
-        description="Add a new voice channel for room creation"
+        description=locale_str(
+            "Add a new voice channel for room creation",
+            key="voicechannel.vc_add.description",
+        ),
     )
-    @app_commands.describe(channel="Select the voice channel to configure")
+    @app_commands.describe(
+        channel=locale_str(
+            "Select the voice channel to configure",
+            key="voicechannel.vc_add.params.channel",
+        ),
+    )
     async def add_voice_channel(self, interaction: discord.Interaction, channel: discord.VoiceChannel):
         """Add a new voice channel configuration for room creation."""
         if not await check_channel_validity(interaction):
@@ -785,11 +800,20 @@ class VoiceStateCog(commands.Cog):
 
     @app_commands.command(
         name="vc_remove",
-        description="Remove a voice channel from room creation"
+        description=locale_str(
+            "Remove a voice channel from room creation",
+            key="voicechannel.vc_remove.description",
+        ),
     )
     @app_commands.describe(
-        channel="Select voice channel to remove (if channel still exists)",
-        channel_id="Enter channel ID manually (if channel was deleted)"
+        channel=locale_str(
+            "Select voice channel to remove (if channel still exists)",
+            key="voicechannel.vc_remove.params.channel",
+        ),
+        channel_id=locale_str(
+            "Enter channel ID manually (if channel was deleted)",
+            key="voicechannel.vc_remove.params.channel_id",
+        ),
     )
     async def remove_voice_channel(
         self, 

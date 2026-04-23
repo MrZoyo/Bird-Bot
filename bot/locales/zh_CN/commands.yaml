@@ -11,6 +11,174 @@
 # `locale_str("...", key=...)` in each cog decorator; this file is loaded
 # only when Discord asks for the zh-CN locale (via SlashTranslator).
 
+achievements:
+  achievements:
+    description: "查询成就进度"
+    params:
+      member: "要查询的成员（默认为自己）"
+      date: "可选月份，格式 YYYY-MM（例如 2024-07）"
+  increase_achievement:
+    description: "增加成员的成就进度（管理员）"
+    params:
+      member: "要增加进度的成员"
+      reactions: "要增加的反应次数"
+      messages: "要增加的消息数"
+      time_spent: "要增加的语音时长（秒）"
+      giveaways: "要增加的抽奖次数"
+  decrease_achievement:
+    description: "减少成员的成就进度（管理员）"
+    params:
+      member: "要减少进度的成员"
+      reactions: "要减少的反应次数"
+      messages: "要减少的消息数"
+      time_spent: "要减少的语音时长（秒）"
+      giveaways: "要减少的抽奖次数"
+  achievement_ranking:
+    description: "显示成就排行榜"
+    params:
+      date: "可选月份，格式 YYYY-MM（例如 2024-07）"
+  check_ach_ops:
+    description: "查看成就手动调整的操作记录"
+  rank:
+    description: "以交互形式查看成就排行榜"
+    params:
+      date: "可选月份，格式 YYYY-MM（例如 2024-07）"
+
+backup:
+  backup_now:
+    description: "立即手动创建一次数据库备份"
+
+ban:
+  ban:
+    description: "永久封禁用户"
+    params:
+      user: "要封禁的用户"
+      reason: "封禁原因"
+      delete_message_days: "删除多少天内的消息（0-7）"
+  tempban:
+    description: "临时封禁用户"
+    params:
+      user: "要临时封禁的用户"
+      duration: "封禁时长（例如 1m、1h、1d、1w）"
+      reason: "封禁原因"
+      delete_message_days: "删除多少天内的消息（0-7）"
+  mute:
+    description: "禁言用户"
+    params:
+      user: "要禁言的用户"
+      duration: "禁言时长（例如 1m、1h、1d、1w）"
+      reason: "禁言原因"
+  ban_admin_list:
+    description: "显示当前的封禁管理员权限"
+  ban_admin_add_role:
+    description: "将身份组加入封禁管理员"
+    params:
+      role: "要加入的身份组"
+  ban_admin_delete_role:
+    description: "从封禁管理员移除身份组"
+    params:
+      role: "要移除的身份组"
+  ban_admin_add_user:
+    description: "将用户加入封禁管理员"
+    params:
+      user: "要加入的用户"
+  ban_admin_delete_user:
+    description: "从封禁管理员移除用户"
+    params:
+      user: "要移除的用户"
+  ban_set_notification_channel:
+    description: "设置封禁通知频道"
+    params:
+      channel: "接收封禁通知的频道"
+  ban_remove_notification_channel:
+    description: "取消封禁通知频道设置"
+  ban_set_invite_link:
+    description: "设置临时封禁用户重新加入的邀请链接"
+    params:
+      invite_link: "永久邀请链接"
+  ban_list_tempbans:
+    description: "列出当前所有活跃的临时封禁"
+  ban_remove_invite_link:
+    description: "取消临时封禁用户的邀请链接"
+
+checkstatus:
+  print_voice_status:
+    description: "按日期、月份或年份绘制长期语音活动曲线"
+    params:
+      date: "日期格式 YYYY-MM-DD、YYYY-MM 或 YYYY"
+  check_log:
+    description: "返回服务器日志的最后 N 行"
+    params:
+      x: "要返回的行数（从日志文件末尾起算）"
+      log_type: "日志类型：1/main（主日志）、2/keyword（关键词检测）、3/room（房间活动），默认 main"
+  check_voice_status:
+    description: "按分类返回语音频道与成员统计"
+  where_is:
+    description: "查询指定成员当前所在的语音频道"
+    params:
+      member: "要定位的成员"
+
+invitation:
+  invt:
+    description: "为当前所在语音频道创建一条邀请"
+    params:
+      title: "可选：邀请的标题"
+  invt_checkignorelist:
+    description: "查看当前被忽略的频道列表"
+  invt_addignorelist:
+    description: "把频道加入组队邀请忽略名单"
+    params:
+      channel: "要加入忽略名单的频道"
+  invt_removeignorelist:
+    description: "把频道移出组队邀请忽略名单"
+    params:
+      channel: "要移除的频道（若仍存在）"
+      channel_id: "手动输入频道 ID（若频道已删除）"
+
+spymode:
+  spymode:
+    description: "发起一局谁是卧底游戏"
+    params:
+      team_size: "每队玩家数"
+      spy: "每队卧底数量"
+
+giveaway:
+  ga_create:
+    description: "创建一个新的抽奖活动"
+    params:
+      reaction_req: "要求的表情反应数"
+      message_req: "要求的消息数"
+      timespent_req: "要求的语音时长（分钟）"
+  check_giveaway:
+    description: "查看当前所有抽奖活动"
+  ga_cancel:
+    description: "取消抽奖且不抽取中奖者"
+    params:
+      giveaway_id: "要取消的抽奖 ID"
+  ga_end:
+    description: "提前结束抽奖并抽取中奖者"
+    params:
+      giveaway_id: "要结束的抽奖 ID"
+  ga_time_extend:
+    description: "延长抽奖的剩余时间"
+    params:
+      giveaway_id: "要延长的抽奖 ID"
+      time: "要增加的时间（分钟）"
+  ga_participant:
+    description: "查看某个抽奖的全部参与者"
+    params:
+      giveaway_id: "要查看参与者的抽奖 ID"
+  ga_description:
+    description: "修改尚未结束抽奖的描述"
+    params:
+      giveaway_id: "要修改的抽奖 ID"
+      description: "新的抽奖描述"
+  ga_sendtowinner:
+    description: "向抽奖中奖者发送消息"
+    params:
+      giveaway_id: "抽奖 ID"
+      message: "要发送给中奖者的消息"
+
 notebook:
   notebook_log:
     description: "为指定成员记录一条事件日志"
@@ -28,3 +196,168 @@ notebook:
     params:
       member: "要删除事件的成员"
       event_serial_number: "要删除事件的序号"
+
+privateroom:
+  privateroom_init:
+    description: "初始化私人房间系统（仅管理员）"
+  privateroom_reset:
+    description: "重置私人房间系统（仅管理员）"
+  privateroom_setup:
+    description: "设置私人房间商店（仅管理员）"
+    params:
+      channel: "要放置商店的频道"
+  privateroom_fix:
+    description: "调整用户私人房间有效期（仅管理员）"
+    params:
+      user: "要调整的用户"
+      days: "剩余有效天数"
+  privateroom_list:
+    description: "列出所有活跃的私人房间（仅管理员）"
+  privateroom_ban:
+    description: "禁止用户使用私人房间系统（仅管理员）"
+    params:
+      user: "要禁止的用户"
+
+role:
+  create_role_pickup:
+    description: "在指定频道创建成就身份组领取面板"
+    params:
+      channel: "要创建面板的频道"
+  create_starsign_pickup:
+    description: "在指定频道创建星座身份组领取面板"
+    params:
+      channel: "要创建面板的频道"
+  create_mbti_pickup:
+    description: "在指定频道创建 MBTI 身份组领取面板"
+    params:
+      channel: "要创建面板的频道"
+  create_gender_pickup:
+    description: "在指定频道创建性别身份组领取面板"
+    params:
+      channel: "要创建面板的频道"
+  create_signature_pickup:
+    description: "创建签名设置面板"
+    params:
+      channel: "要创建面板的频道"
+  signature_permission_toggle:
+    description: "切换用户设置签名的权限"
+    params:
+      user_id: "要切换的用户 ID"
+      disable: "True 禁用、False 启用"
+  signature_clear:
+    description: "清除用户的签名与修改历史"
+    params:
+      user_id: "要清除签名的用户 ID"
+  signature_set_requirement:
+    description: "设置使用签名功能所需的语音时长"
+    params:
+      minutes: "所需的语音时长（分钟）"
+  signature_check:
+    description: "查询用户的签名信息"
+    params:
+      user_id: "要查询签名的用户 ID"
+
+shop:
+  create_checkin_embed:
+    description: "创建签到面板（仅管理员）"
+    params:
+      channel: "用于投放签到面板的频道"
+  balance_change:
+    description: "修改用户余额（仅管理员）"
+    params:
+      user: "要修改余额的用户"
+  balance_history:
+    description: "查看余额变更历史"
+    params:
+      user: "指定用户（仅管理员）"
+  checkin_history:
+    description: "查看用户签到详情（仅管理员）"
+    params:
+      user: "要查询的用户（必填）"
+
+teamup_display:
+  teamup_init:
+    description: "在指定频道创建组队展示板"
+    params:
+      channel: "要创建展示板的频道"
+  teamup_type_add:
+    description: "为组队频道绑定游戏类型"
+    params:
+      channel: "用于发送组队消息的频道"
+      game_type: "游戏类型名称"
+  teamup_type_delete:
+    description: "删除组队频道的游戏类型配置"
+    params:
+      channel: "要删除配置的频道（若仍存在）"
+      channel_id: "手动输入频道 ID（若频道已删除）"
+  teamup_type_list:
+    description: "列出所有游戏类型配置"
+
+tickets_new:
+  tickets_init:
+    description: "初始化工单系统"
+    params:
+      ticket_channel: "工单频道（留空自动创建）"
+      info_channel: "工单信息频道（留空自动创建）"
+  tickets_add_user:
+    description: "把用户加入当前工单"
+    params:
+      user: "要加入的用户"
+  tickets_stats:
+    description: "查看工单系统统计"
+  tickets_admin_list:
+    description: "显示当前的工单管理员配置"
+  tickets_admin_add_role:
+    description: "添加工单管理员身份组"
+    params:
+      role: "要添加的身份组"
+  tickets_admin_remove_role:
+    description: "移除工单管理员身份组"
+    params:
+      role: "要移除的身份组"
+  tickets_admin_add_user:
+    description: "添加工单管理员用户"
+    params:
+      user: "要添加的用户"
+  tickets_admin_remove_user:
+    description: "移除工单管理员用户"
+    params:
+      user: "要移除的用户"
+  tickets_accept:
+    description: "手动接受当前工单"
+  tickets_close:
+    description: "手动关闭当前工单"
+    params:
+      reason: "关闭工单的原因"
+  tickets_refresh_buttons:
+    description: "刷新所有工单的按钮状态"
+  tickets_refresh_main:
+    description: "刷新工单创建面板（更新头像与类型）"
+  tickets_add_type:
+    description: "添加新的工单类型"
+  tickets_edit_type:
+    description: "编辑现有的工单类型"
+  tickets_delete_type:
+    description: "删除指定的工单类型"
+
+voicechannel:
+  check_temp_channel_records:
+    description: "查看临时频道的数据库记录"
+  vc_list:
+    description: "列出所有已配置的自动建房语音频道"
+  vc_add:
+    description: "添加一个自动建房语音频道"
+    params:
+      channel: "要配置的语音频道"
+  vc_remove:
+    description: "移除一个自动建房语音频道"
+    params:
+      channel: "要移除的语音频道（若仍存在）"
+      channel_id: "手动输入频道 ID（若频道已删除）"
+
+welcome:
+  testwelcome:
+    description: "发送一条测试欢迎消息"
+    params:
+      member: "用于测试欢迎消息的成员"
+      member_number: "自定义“服务器第 X 位成员”的数字"

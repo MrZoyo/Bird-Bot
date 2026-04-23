@@ -1,6 +1,7 @@
 # bot/cogs/giveaway_cog.py
 import discord
 from discord import app_commands, ui, components
+from discord.app_commands import locale_str
 from discord.ext import commands, tasks
 from discord.utils import format_dt
 from discord.ui import Button, View
@@ -571,13 +572,27 @@ class GiveawayCog(commands.Cog):
         await self.db.mark_giveaway_as_ended(giveaway_id)
         await self.cleanup_ended_giveaways()
 
-    @app_commands.command(name="ga_create",
-                          description="Create a new giveaway"
-                          )
-    @app_commands.describe(reaction_req="Enter the reaction requirement",
-                           message_req="Enter the message requirement",
-                           timespent_req="Enter the time spent requirement(minute)"
-                           )
+    @app_commands.command(
+        name="ga_create",
+        description=locale_str(
+            "Create a new giveaway",
+            key="giveaway.ga_create.description",
+        ),
+    )
+    @app_commands.describe(
+        reaction_req=locale_str(
+            "Enter the reaction requirement",
+            key="giveaway.ga_create.params.reaction_req",
+        ),
+        message_req=locale_str(
+            "Enter the message requirement",
+            key="giveaway.ga_create.params.message_req",
+        ),
+        timespent_req=locale_str(
+            "Enter the time spent requirement(minute)",
+            key="giveaway.ga_create.params.timespent_req",
+        ),
+    )
     async def create_giveaway(self, interaction: discord.Interaction,
                               reaction_req: int = 0,
                               message_req: int = 0,
@@ -589,8 +604,13 @@ class GiveawayCog(commands.Cog):
         form = GiveawayForm(self.bot, self.db, reaction_req, message_req, timespent_req)
         await interaction.response.send_modal(form)
 
-    @app_commands.command(name="check_giveaway",
-                          description="Check all current giveaways")
+    @app_commands.command(
+        name="check_giveaway",
+        description=locale_str(
+            "Check all current giveaways",
+            key="giveaway.check_giveaway.description",
+        ),
+    )
     async def check_giveaway(self, interaction: discord.Interaction):
         if not await check_channel_validity(interaction):
             return
@@ -651,9 +671,19 @@ class GiveawayCog(commands.Cog):
     async def fetch_giveaway(self, giveaway_id):
         return await self.db.fetch_giveaway(giveaway_id)
 
-    @app_commands.command(name="ga_cancel",
-                          description="Cancel a giveaway without selecting winners")
-    @app_commands.describe(giveaway_id="Enter the giveaway ID to cancel")
+    @app_commands.command(
+        name="ga_cancel",
+        description=locale_str(
+            "Cancel a giveaway without selecting winners",
+            key="giveaway.ga_cancel.description",
+        ),
+    )
+    @app_commands.describe(
+        giveaway_id=locale_str(
+            "Enter the giveaway ID to cancel",
+            key="giveaway.ga_cancel.params.giveaway_id",
+        ),
+    )
     async def cancel_giveaway(self, interaction: discord.Interaction, giveaway_id: str):
         if not await check_channel_validity(interaction):
             return
@@ -691,9 +721,19 @@ class GiveawayCog(commands.Cog):
 
             await interaction.response.send_message(f"Giveaway {giveaway_id} has been cancelled.", ephemeral=True)
 
-    @app_commands.command(name="ga_end",
-                          description="End a giveaway early and select the winner")
-    @app_commands.describe(giveaway_id="Enter the giveaway ID to end")
+    @app_commands.command(
+        name="ga_end",
+        description=locale_str(
+            "End a giveaway early and select the winner",
+            key="giveaway.ga_end.description",
+        ),
+    )
+    @app_commands.describe(
+        giveaway_id=locale_str(
+            "Enter the giveaway ID to end",
+            key="giveaway.ga_end.params.giveaway_id",
+        ),
+    )
     async def end_giveaway(self, interaction: discord.Interaction, giveaway_id: str):
         if not await check_channel_validity(interaction):
             return
@@ -741,10 +781,23 @@ class GiveawayCog(commands.Cog):
 
             await interaction.response.send_message(f"Giveaway {giveaway_id} has been ended early.", ephemeral=True)
 
-    @app_commands.command(name="ga_time_extend",
-                          description="Extend the time of a giveaway")
-    @app_commands.describe(giveaway_id="Enter the giveaway ID to extend",
-                           time="Enter the time to extend the giveaway by (in minutes)")
+    @app_commands.command(
+        name="ga_time_extend",
+        description=locale_str(
+            "Extend the time of a giveaway",
+            key="giveaway.ga_time_extend.description",
+        ),
+    )
+    @app_commands.describe(
+        giveaway_id=locale_str(
+            "Enter the giveaway ID to extend",
+            key="giveaway.ga_time_extend.params.giveaway_id",
+        ),
+        time=locale_str(
+            "Enter the time to extend the giveaway by (in minutes)",
+            key="giveaway.ga_time_extend.params.time",
+        ),
+    )
     async def extend_giveaway(self, interaction: discord.Interaction, giveaway_id: str, time: int):
         if not await check_channel_validity(interaction):
             return
@@ -782,9 +835,19 @@ class GiveawayCog(commands.Cog):
             await interaction.response.send_message(f"Giveaway {giveaway_id} time has been extended by {time} minutes.",
                                                     ephemeral=True)
 
-    @app_commands.command(name="ga_participant",
-                          description="Fetch all participants for a giveaway")
-    @app_commands.describe(giveaway_id="Enter the giveaway ID to fetch participants for")
+    @app_commands.command(
+        name="ga_participant",
+        description=locale_str(
+            "Fetch all participants for a giveaway",
+            key="giveaway.ga_participant.description",
+        ),
+    )
+    @app_commands.describe(
+        giveaway_id=locale_str(
+            "Enter the giveaway ID to fetch participants for",
+            key="giveaway.ga_participant.params.giveaway_id",
+        ),
+    )
     async def ga_participant(self, interaction: discord.Interaction, giveaway_id: str):
         if not await check_channel_validity(interaction):
             return
@@ -816,10 +879,23 @@ class GiveawayCog(commands.Cog):
                                                               view=participant_view)
             participant_view.message = message
 
-    @app_commands.command(name="ga_description",
-                          description="Modify the description of a giveaway that is not yet finished")
-    @app_commands.describe(giveaway_id="Enter the giveaway ID to modify",
-                           description="Enter the new description for the giveaway")
+    @app_commands.command(
+        name="ga_description",
+        description=locale_str(
+            "Modify the description of a giveaway that is not yet finished",
+            key="giveaway.ga_description.description",
+        ),
+    )
+    @app_commands.describe(
+        giveaway_id=locale_str(
+            "Enter the giveaway ID to modify",
+            key="giveaway.ga_description.params.giveaway_id",
+        ),
+        description=locale_str(
+            "Enter the new description for the giveaway",
+            key="giveaway.ga_description.params.description",
+        ),
+    )
     async def ga_description(self, interaction: discord.Interaction, giveaway_id: str, description: str):
         if not await check_channel_validity(interaction):
             return
@@ -858,10 +934,23 @@ class GiveawayCog(commands.Cog):
             await interaction.response.send_message(f"Giveaway {giveaway_id} description has been updated.",
                                                     ephemeral=True)
 
-    @app_commands.command(name="ga_sendtowinner",
-                          description="Send a message to all winners of a giveaway")
-    @app_commands.describe(giveaway_id="Enter the giveaway ID to fetch winners for",
-                           message="Enter the message to send to winners")
+    @app_commands.command(
+        name="ga_sendtowinner",
+        description=locale_str(
+            "Send a message to all winners of a giveaway",
+            key="giveaway.ga_sendtowinner.description",
+        ),
+    )
+    @app_commands.describe(
+        giveaway_id=locale_str(
+            "Enter the giveaway ID to fetch winners for",
+            key="giveaway.ga_sendtowinner.params.giveaway_id",
+        ),
+        message=locale_str(
+            "Enter the message to send to winners",
+            key="giveaway.ga_sendtowinner.params.message",
+        ),
+    )
     async def ga_sendtowinner(self, interaction: discord.Interaction, giveaway_id: str, message: str):
         """ Send a message to all winners of a giveaway"""
         if not await check_channel_validity(interaction):

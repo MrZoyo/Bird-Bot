@@ -2,6 +2,7 @@
 import discord
 from discord.ext import commands, tasks
 from discord import app_commands
+from discord.app_commands import locale_str
 import logging
 import os
 import tempfile
@@ -796,8 +797,19 @@ class ShopCog(commands.Cog):
             import traceback
             logging.error(traceback.format_exc())
 
-    @app_commands.command(name="create_checkin_embed", description="创建签到面板(管理员)")
-    @app_commands.describe(channel="选择要创建签到面板的频道")
+    @app_commands.command(
+        name="create_checkin_embed",
+        description=locale_str(
+            "Create a check-in panel (admin)",
+            key="shop.create_checkin_embed.description",
+        ),
+    )
+    @app_commands.describe(
+        channel=locale_str(
+            "Channel where the check-in panel will be posted",
+            key="shop.create_checkin_embed.params.channel",
+        ),
+    )
     async def create_checkin_embed(self, interaction: discord.Interaction, channel: discord.TextChannel):
         """Create a checkin embed panel in the specified channel."""
         if not await check_channel_validity(interaction):
@@ -846,8 +858,19 @@ class ShopCog(commands.Cog):
             )
 
 
-    @app_commands.command(name="balance_change", description="修改用户余额(仅管理员)")
-    @app_commands.describe(user="要修改余额的用户")
+    @app_commands.command(
+        name="balance_change",
+        description=locale_str(
+            "Modify a user's balance (admin only)",
+            key="shop.balance_change.description",
+        ),
+    )
+    @app_commands.describe(
+        user=locale_str(
+            "User whose balance to modify",
+            key="shop.balance_change.params.user",
+        ),
+    )
     async def balance_change(self, interaction: discord.Interaction, user: discord.User):
         """Admin command to modify a user's balance."""
         # Verify the command is used in an admin channel
@@ -859,8 +882,19 @@ class ShopCog(commands.Cog):
         modal = BalanceModifyModal(self.db, user, self.conf, balance)
         await interaction.response.send_modal(modal)
 
-    @app_commands.command(name="balance_history", description="查看余额变更历史")
-    @app_commands.describe(user="指定用户(仅管理员)")
+    @app_commands.command(
+        name="balance_history",
+        description=locale_str(
+            "View balance transaction history",
+            key="shop.balance_history.description",
+        ),
+    )
+    @app_commands.describe(
+        user=locale_str(
+            "Target user (admin only)",
+            key="shop.balance_history.params.user",
+        ),
+    )
     async def balance_history(self, interaction: discord.Interaction, user: discord.User = None):
         """View balance transaction history."""
         target_user = user or interaction.user
@@ -896,8 +930,19 @@ class ShopCog(commands.Cog):
         )
         view.message = message
 
-    @app_commands.command(name="checkin_history", description="查看用户签到详情(管理员)")
-    @app_commands.describe(user="必须选择用户")
+    @app_commands.command(
+        name="checkin_history",
+        description=locale_str(
+            "View detailed check-in history for a user (admin)",
+            key="shop.checkin_history.description",
+        ),
+    )
+    @app_commands.describe(
+        user=locale_str(
+            "User to inspect (required)",
+            key="shop.checkin_history.params.user",
+        ),
+    )
     async def checkin_history(self, interaction: discord.Interaction, user: discord.User):
         """Admin-only command to view comprehensive checkin details for a user."""
         # Admin channel validation

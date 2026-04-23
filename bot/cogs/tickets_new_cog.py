@@ -8,6 +8,7 @@ from typing import List, Optional, Tuple
 
 import discord
 from discord import app_commands
+from discord.app_commands import locale_str
 from discord.ext import commands
 
 from bot.utils import MediaHandler, TicketsNewDatabaseManager, check_channel_validity, config
@@ -931,10 +932,22 @@ class TicketsNewCog(commands.Cog):
         except Exception as e:
             logging.error(f"Error logging ticket action: {e}")
 
-    @app_commands.command(name="tickets_init", description="初始化工单系统")
+    @app_commands.command(
+        name="tickets_init",
+        description=locale_str(
+            "Initialize the ticket system",
+            key="tickets_new.tickets_init.description",
+        ),
+    )
     @app_commands.describe(
-        ticket_channel="工单频道（可选，留空则自动创建）",
-        info_channel="工单信息频道（可选，留空则自动创建）"
+        ticket_channel=locale_str(
+            "Ticket channel (optional — auto-created if empty)",
+            key="tickets_new.tickets_init.params.ticket_channel",
+        ),
+        info_channel=locale_str(
+            "Ticket info channel (optional — auto-created if empty)",
+            key="tickets_new.tickets_init.params.info_channel",
+        ),
     )
     async def init_ticket_system(self, interaction: discord.Interaction, 
                                 ticket_channel: discord.TextChannel = None,
@@ -1129,8 +1142,19 @@ class TicketsNewCog(commands.Cog):
             logging.exception("_validate_channel_permissions failed")
             return False
 
-    @app_commands.command(name="tickets_add_user", description="添加用户到工单")
-    @app_commands.describe(user="要添加的用户")
+    @app_commands.command(
+        name="tickets_add_user",
+        description=locale_str(
+            "Add a user to the current ticket",
+            key="tickets_new.tickets_add_user.description",
+        ),
+    )
+    @app_commands.describe(
+        user=locale_str(
+            "User to add",
+            key="tickets_new.tickets_add_user.params.user",
+        ),
+    )
     async def add_user_command(self, interaction: discord.Interaction, user: discord.Member):
         """Add user to ticket via command"""
         if not isinstance(interaction.channel, discord.Thread):
@@ -1186,7 +1210,13 @@ class TicketsNewCog(commands.Cog):
         await interaction.response.send_message(embed=embed)
         await self.log_ticket_action('add_user', thread_id, interaction.user, extra_user=user)
 
-    @app_commands.command(name="tickets_stats", description="查看工单系统统计")
+    @app_commands.command(
+        name="tickets_stats",
+        description=locale_str(
+            "View ticket system statistics",
+            key="tickets_new.tickets_stats.description",
+        ),
+    )
     async def stats_command(self, interaction: discord.Interaction):
         """Show ticket statistics"""
         if not await self.is_admin_for_type(interaction.user):
@@ -1250,7 +1280,13 @@ class TicketsNewCog(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(name="tickets_admin_list", description="显示当前的管理员配置")
+    @app_commands.command(
+        name="tickets_admin_list",
+        description=locale_str(
+            "Show current admin configuration",
+            key="tickets_new.tickets_admin_list.description",
+        ),
+    )
     async def admin_list(self, interaction: discord.Interaction):
         """Display current admin configuration."""
         if not await self.is_admin_for_type(interaction.user):
@@ -1263,8 +1299,19 @@ class TicketsNewCog(commands.Cog):
         embed = await self.format_admin_list()
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="tickets_admin_add_role", description="添加管理员身份组")
-    @app_commands.describe(role="要添加的身份组")
+    @app_commands.command(
+        name="tickets_admin_add_role",
+        description=locale_str(
+            "Add an admin role",
+            key="tickets_new.tickets_admin_add_role.description",
+        ),
+    )
+    @app_commands.describe(
+        role=locale_str(
+            "Role to add",
+            key="tickets_new.tickets_admin_add_role.params.role",
+        ),
+    )
     async def admin_add_role(self, interaction: discord.Interaction, role: discord.Role):
         """Add an admin role."""
         if not await self.is_admin_for_type(interaction.user):
@@ -1281,8 +1328,19 @@ class TicketsNewCog(commands.Cog):
             ephemeral=True
         )
 
-    @app_commands.command(name="tickets_admin_remove_role", description="移除管理员身份组")
-    @app_commands.describe(role="要移除的身份组")
+    @app_commands.command(
+        name="tickets_admin_remove_role",
+        description=locale_str(
+            "Remove an admin role",
+            key="tickets_new.tickets_admin_remove_role.description",
+        ),
+    )
+    @app_commands.describe(
+        role=locale_str(
+            "Role to remove",
+            key="tickets_new.tickets_admin_remove_role.params.role",
+        ),
+    )
     async def admin_remove_role(self, interaction: discord.Interaction, role: discord.Role):
         """Remove an admin role."""
         if not await self.is_admin_for_type(interaction.user):
@@ -1299,8 +1357,19 @@ class TicketsNewCog(commands.Cog):
             ephemeral=True
         )
 
-    @app_commands.command(name="tickets_admin_add_user", description="添加管理员用户")
-    @app_commands.describe(user="要添加的用户")
+    @app_commands.command(
+        name="tickets_admin_add_user",
+        description=locale_str(
+            "Add an admin user",
+            key="tickets_new.tickets_admin_add_user.description",
+        ),
+    )
+    @app_commands.describe(
+        user=locale_str(
+            "User to add",
+            key="tickets_new.tickets_admin_add_user.params.user",
+        ),
+    )
     async def admin_add_user(self, interaction: discord.Interaction, user: discord.User):
         """Add an admin user."""
         if not await self.is_admin_for_type(interaction.user):
@@ -1317,8 +1386,19 @@ class TicketsNewCog(commands.Cog):
             ephemeral=True
         )
 
-    @app_commands.command(name="tickets_admin_remove_user", description="移除管理员用户")
-    @app_commands.describe(user="要移除的用户")
+    @app_commands.command(
+        name="tickets_admin_remove_user",
+        description=locale_str(
+            "Remove an admin user",
+            key="tickets_new.tickets_admin_remove_user.description",
+        ),
+    )
+    @app_commands.describe(
+        user=locale_str(
+            "User to remove",
+            key="tickets_new.tickets_admin_remove_user.params.user",
+        ),
+    )
     async def admin_remove_user(self, interaction: discord.Interaction, user: discord.User):
         """Remove an admin user."""
         if not await self.is_admin_for_type(interaction.user):
@@ -1335,7 +1415,13 @@ class TicketsNewCog(commands.Cog):
             ephemeral=True
         )
 
-    @app_commands.command(name="tickets_accept", description="手动接受当前工单")
+    @app_commands.command(
+        name="tickets_accept",
+        description=locale_str(
+            "Manually accept the current ticket",
+            key="tickets_new.tickets_accept.description",
+        ),
+    )
     async def accept_ticket_command(self, interaction: discord.Interaction):
         """Accept ticket via command"""
         if not isinstance(interaction.channel, discord.Thread):
@@ -1434,8 +1520,19 @@ class TicketsNewCog(commands.Cog):
                 except (discord.Forbidden, discord.HTTPException):
                     pass  # DM failed
 
-    @app_commands.command(name="tickets_close", description="手动关闭当前工单")
-    @app_commands.describe(reason="关闭工单的原因")
+    @app_commands.command(
+        name="tickets_close",
+        description=locale_str(
+            "Manually close the current ticket",
+            key="tickets_new.tickets_close.description",
+        ),
+    )
+    @app_commands.describe(
+        reason=locale_str(
+            "Reason for closing the ticket",
+            key="tickets_new.tickets_close.params.reason",
+        ),
+    )
     async def close_ticket_command(self, interaction: discord.Interaction, reason: str):
         """Close ticket via command"""
         if not isinstance(interaction.channel, discord.Thread):
@@ -1564,7 +1661,13 @@ class TicketsNewCog(commands.Cog):
                 except (discord.Forbidden, discord.HTTPException):
                     pass  # DM failed
 
-    @app_commands.command(name="tickets_refresh_buttons", description="刷新所有工单的按钮状态")
+    @app_commands.command(
+        name="tickets_refresh_buttons",
+        description=locale_str(
+            "Refresh button states for all tickets",
+            key="tickets_new.tickets_refresh_buttons.description",
+        ),
+    )
     async def refresh_buttons_command(self, interaction: discord.Interaction):
         """Refresh button states for all tickets"""
         if not await self.is_admin_for_type(interaction.user):
@@ -1676,7 +1779,13 @@ class TicketsNewCog(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(name="tickets_refresh_main", description="刷新工单创建页面（更新头像和工单类型）")
+    @app_commands.command(
+        name="tickets_refresh_main",
+        description=locale_str(
+            "Refresh the main ticket creation page (bot avatar + ticket types)",
+            key="tickets_new.tickets_refresh_main.description",
+        ),
+    )
     async def refresh_main_message_command(self, interaction: discord.Interaction):
         """Refresh the main ticket creation message"""
         if not await self.is_admin_for_type(interaction.user):
@@ -1758,7 +1867,13 @@ class TicketsNewCog(commands.Cog):
 
     # ================== Ticket Type Management Commands ==================
 
-    @app_commands.command(name="tickets_add_type", description="添加新的工单类型")
+    @app_commands.command(
+        name="tickets_add_type",
+        description=locale_str(
+            "Add a new ticket type",
+            key="tickets_new.tickets_add_type.description",
+        ),
+    )
     async def add_ticket_type(self, interaction: discord.Interaction):
         """Add a new ticket type"""
         if not await self.is_admin_for_type(interaction.user):
@@ -1771,7 +1886,13 @@ class TicketsNewCog(commands.Cog):
         modal = TicketTypeModal(self)
         await interaction.response.send_modal(modal)
 
-    @app_commands.command(name="tickets_edit_type", description="编辑现有的工单类型")
+    @app_commands.command(
+        name="tickets_edit_type",
+        description=locale_str(
+            "Edit an existing ticket type",
+            key="tickets_new.tickets_edit_type.description",
+        ),
+    )
     async def edit_ticket_type(self, interaction: discord.Interaction):
         """Edit an existing ticket type"""
         if not await self.is_admin_for_type(interaction.user):
@@ -1795,7 +1916,13 @@ class TicketsNewCog(commands.Cog):
             ephemeral=True
         )
 
-    @app_commands.command(name="tickets_delete_type", description="删除工单类型")
+    @app_commands.command(
+        name="tickets_delete_type",
+        description=locale_str(
+            "Delete a ticket type",
+            key="tickets_new.tickets_delete_type.description",
+        ),
+    )
     async def delete_ticket_type(self, interaction: discord.Interaction):
         """Delete a ticket type"""
         if not await self.is_admin_for_type(interaction.user):

@@ -6,6 +6,7 @@ import re
 
 import discord
 from discord import app_commands
+from discord.app_commands import locale_str
 from discord.ext import commands
 from discord.utils import format_dt
 
@@ -373,8 +374,19 @@ class CreateInvitationCog(commands.Cog):
             # the same message with multiple matches
             return
 
-    @app_commands.command(name="invt")
-    @app_commands.describe(title="Optional title for the invitation.")
+    @app_commands.command(
+        name="invt",
+        description=locale_str(
+            "Create an invitation to your current voice channel",
+            key="invitation.invt.description",
+        ),
+    )
+    @app_commands.describe(
+        title=locale_str(
+            "Optional title for the invitation.",
+            key="invitation.invt.params.title",
+        ),
+    )
     async def invitation(self, interaction: discord.Interaction, title: str = None):
         """Create an invitation to the voice channel the user is currently in."""
         # Defer the response
@@ -447,7 +459,13 @@ class CreateInvitationCog(commands.Cog):
         """
         await config.save_config('invitation', self.conf)
 
-    @app_commands.command(name="invt_checkignorelist")
+    @app_commands.command(
+        name="invt_checkignorelist",
+        description=locale_str(
+            "Check the current list of ignored channels",
+            key="invitation.invt_checkignorelist.description",
+        ),
+    )
     async def check_ignore_list(self, interaction: discord.Interaction):
         """Check the current list of ignored channels."""
         if not await check_channel_validity(interaction):
@@ -506,8 +524,19 @@ class CreateInvitationCog(commands.Cog):
 
         return embed
 
-    @app_commands.command(name="invt_addignorelist")
-    @app_commands.describe(channel="The channel to add to the ignore list")
+    @app_commands.command(
+        name="invt_addignorelist",
+        description=locale_str(
+            "Add a channel to the invitation ignore list",
+            key="invitation.invt_addignorelist.description",
+        ),
+    )
+    @app_commands.describe(
+        channel=locale_str(
+            "The channel to add to the ignore list",
+            key="invitation.invt_addignorelist.params.channel",
+        ),
+    )
     async def add_ignore_list(self, interaction: discord.Interaction, channel: discord.TextChannel):
         """Add a channel to the ignore list."""
         if not await check_channel_validity(interaction):
@@ -534,10 +563,22 @@ class CreateInvitationCog(commands.Cog):
             logging.error(f"Error adding channel to ignore list: {e}")
             await interaction.followup.send("Failed to add channel to ignore list.", ephemeral=True)
 
-    @app_commands.command(name="invt_removeignorelist")
+    @app_commands.command(
+        name="invt_removeignorelist",
+        description=locale_str(
+            "Remove a channel from the invitation ignore list",
+            key="invitation.invt_removeignorelist.description",
+        ),
+    )
     @app_commands.describe(
-        channel="Select channel to remove from ignore list (if channel still exists)",
-        channel_id="Enter channel ID manually (if channel was deleted)"
+        channel=locale_str(
+            "Select channel to remove from ignore list (if channel still exists)",
+            key="invitation.invt_removeignorelist.params.channel",
+        ),
+        channel_id=locale_str(
+            "Enter channel ID manually (if channel was deleted)",
+            key="invitation.invt_removeignorelist.params.channel_id",
+        ),
     )
     async def remove_ignore_list(
         self, 

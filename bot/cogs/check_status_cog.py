@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 import discord
 import matplotlib.pyplot as plt
+from discord.app_commands import locale_str
 from discord.ext import commands, tasks
 
 from bot.utils import CheckStatusDatabaseManager, check_channel_validity, config
@@ -91,8 +92,19 @@ class CheckStatusCog(commands.Cog):
         await asyncio.sleep((next_run - now).total_seconds())
         await self.bot.wait_until_ready()
 
-    @discord.app_commands.command(name="print_voice_status")
-    @discord.app_commands.describe(date="The date in format YYYY-MM-DD, YYYY-MM, or YYYY.")
+    @discord.app_commands.command(
+        name="print_voice_status",
+        description=locale_str(
+            "Plot long-term voice activity charts for a given date / month / year",
+            key="checkstatus.print_voice_status.description",
+        ),
+    )
+    @discord.app_commands.describe(
+        date=locale_str(
+            "The date in format YYYY-MM-DD, YYYY-MM, or YYYY.",
+            key="checkstatus.print_voice_status.params.date",
+        ),
+    )
     async def print_voice_status(self, interaction: discord.Interaction, date: str):
         """Generates line graphs for the number of people and channels on a specific date, month, or year."""
         await interaction.response.defer()
@@ -258,10 +270,22 @@ class CheckStatusCog(commands.Cog):
                 t('checkstatus.error_generic', error=str(e)), ephemeral=True,
             )
 
-    @discord.app_commands.command(name="check_log")
+    @discord.app_commands.command(
+        name="check_log",
+        description=locale_str(
+            "Return the last N lines of a server log",
+            key="checkstatus.check_log.description",
+        ),
+    )
     @discord.app_commands.describe(
-        x="Number of lines from the end of the log file to return.",
-        log_type="日志类型：1/main(主日志)、2/keyword(关键词检测)、3/room(房间活动)，默认为main",
+        x=locale_str(
+            "Number of lines from the end of the log file to return.",
+            key="checkstatus.check_log.params.x",
+        ),
+        log_type=locale_str(
+            "Log type: 1/main, 2/keyword, 3/room. Defaults to main.",
+            key="checkstatus.check_log.params.log_type",
+        ),
     )
     async def check_log(self, interaction: discord.Interaction, x: int, log_type: str = "main"):
         if not await check_channel_validity(interaction):
@@ -321,7 +345,13 @@ class CheckStatusCog(commands.Cog):
                 )
             )
 
-    @discord.app_commands.command(name="check_voice_status")
+    @discord.app_commands.command(
+        name="check_voice_status",
+        description=locale_str(
+            "Return voice channel / member counts by category",
+            key="checkstatus.check_voice_status.description",
+        ),
+    )
     async def check_voice_status(self, interaction: discord.Interaction):
         """Returns the number of people and active channels in each category and the total numbers."""
         await interaction.response.defer()
@@ -401,8 +431,19 @@ class CheckStatusCog(commands.Cog):
         view = MemberPositionView(self.bot, vc_url_direct)
         await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
-    @discord.app_commands.command(name="where_is")
-    @discord.app_commands.describe(member="The member to check the position for")
+    @discord.app_commands.command(
+        name="where_is",
+        description=locale_str(
+            "Show the voice channel a member is currently in",
+            key="checkstatus.where_is.description",
+        ),
+    )
+    @discord.app_commands.describe(
+        member=locale_str(
+            "The member to check the position for",
+            key="checkstatus.where_is.params.member",
+        ),
+    )
     async def check_member_position(self, interaction: discord.Interaction, member: discord.Member):
         """Returns the current channel of the member and a list of members within the channel."""
         await interaction.response.defer(ephemeral=True)
