@@ -374,7 +374,8 @@
 | 6 (DB 基础设施) | `ticket_types` / `channel_configs` 表 + CRUD + cog 重写 | ✅ |
 | 6 (pilot) | `spymode_cog` + `checkstatus_cog` 迁 t() + locale | ✅ |
 | 7 (save_config 统一) | `ban` / `role` / `create_invitation` / `tickets_new` 四处改 `await config.save_config(...)` （P2-3） | ✅ |
-| 7 (剩余 cog 文案迁移) | welcome / shop / notebook / dnd / teamup_display / achievements / giveaway / privateroom / role / voice_channel / ban / tickets_new 的 `self.conf['messages']` → `t()` | ⬜ **跨会话接力** |
+| 7 (剩余 cog 文案迁移) | welcome / shop / teamup_display / achievements / giveaway / privateroom / role / voice_channel / ban / tickets_new / invitation 文案迁 `t()` | ✅ |
+| 7 (无独立 config 的 cog) | notebook / game_dnd / backup（`required_configs: []`，跳过） | ➖ |
 | 8 (P1-4) | 启动 schema 校验 | 🟡 最小版本（`main.locale` / `log_backup_count` 默认 + 现有 required key 检查）；pydantic 全量校验留 follow-up |
 | 9 | 清理（阶段 B `.gitignore` + 删 JSON fallback + `.json` → `old_function/`） | ⬜ **等 step 7 剩余部分完成后再做** |
 
@@ -522,13 +523,32 @@
 
 ---
 
+### P1-6.7 ✅ step 7 批量迁移完成（2026-04-23）
+
+**Commit grep**: `git log --grep='(P1-6\.7)'`
+
+**每 cog 一条 commit**：spymode / checkstatus / teamup_display / welcome / achievements / role / invitation / giveaway / shop / ban / privateroom / tickets_new / voicechannel / main（14 commit）。模式一致：`self.conf['messages']['xxx']` → `t('<cog>.messages.xxx')`（消息子树）或 `t('<cog>.xxx')`（扁平 key）；数据字段仍走 `config.get_config('<cog>')[key]`；合并 `self.messages = cog.conf['messages']` 的局部绑定到直接 `t()` call。
+
+**模式汇总**：
+- 简单 cogs（spymode / checkstatus / teamup_display / welcome）：大多数 cog 是手动 / 半手动重写，补充硬编码中文字串。
+- 中等 cogs（achievements / role / invitation / giveaway / shop）：Python sed 脚本按 locale-key set 做 bracket-form `self.conf['KEY']` → `t('<cog>.KEY')` 替换。
+- 复杂 cogs（ban / privateroom / tickets_new）：`messages:` 子树 + `messages.get('KEY', fallback)` 模式；写了 balanced-paren parser 处理含括号 / 跨行 default 的场景（见 ban 的 commit 描述）。
+- voice_channel：channel_configs → DB（step 6a 已做）；文案层面 `control_panel.*` 子树暂留 yaml（nested 子树拆分留 follow-up）；只生成 yaml.example + locale 文件占位。
+
+**清理的 latent bugs**：
+- `ban_cog.save_config` 手动 JSON I/O + 双 reload 路径 → `await config.save_config(...)`（P2-3 已 commit）。
+- `create_invitation_cog.save_config` 只写 `ignore_channel_ids` 一个字段（其它 mutation 全丢）→ `await config.save_config('invitation', self.conf)` 整体回写（P2-3 commit）。
+- `role_cog.set_signature_requirement` 的 `config.save_config('role', ...)` sync-form AttributeError silent fail → `await config.save_config(...)`（P2-3 commit）。
+- `tickets_new_cog` 两处 `db_manager.save_config('ticket_types', ...)` + `self.conf = await db_manager.get_config()` clobber → 删除 + 改 `ticket_types` CRUD（P2-5 commit）。
+
+**识别但未修**（follow-up）：
+- `welcome_cog.WelcomeDMView.member_count_button` 读取路径错（conf 顶层 vs dm 子树），silent fallback 到硬编码 "アルタ" 字符串 —— 保留原 behavior，不在本轮修。
+- `migrate_config_to_yaml.py` 的 ID 脱敏 heuristic 漏 `admin_roles / admin_users / invite_link` 等（ban / tickets_new 的 yaml.example 手动脱敏）。脚本需扩 sanitizer 模式识别（Discord snowflake 大小判定或更广 key 白名单）。
+- control_panel（voice_channel） + dm（welcome） + signature（role）的混合 data+text 子树：text leaf 抽 locale 需要脚本或 cog 层支持 nested classification。当前这些整块留在 yaml。
+
 ### 剩余工作（跨会话接手）
 
-**🔴 critical**（影响 config 2.0 完备性）：
-1. **剩余 11 cog 的 t() 文案迁移**（step 7 的量大部分）：
-   - `welcome`、`shop`、`notebook`、`game_dnd`、`teamup_display`、`achievement`、`giveaway`、`privateroom`、`role`、`voice_channel`、`ban`、`tickets_new`（voice_channel / tickets_new 的 DB 部分已完成，但 `messages:*` 文案 → t() 还没迁）
-   - 模板：(a) 跑 `python tools/migrate_config_to_yaml.py --only <name>`；(b) 基于 `tools/migration_report.md` review，必要时补 `field_classification.yaml`；(c) 重跑；(d) 把 `self.conf['messages']['xxx']` → `t('<name>.xxx')`，数据字段留 `config.get_config('<name>')['key']`；(e) commit `bot/locales/zh_CN/<name>.yaml` + `bot/config/<name>.yaml.example`（后者若有数据字段）+ cog 改动。
-   - pilot 参考：`spymode` / `checkstatus`（都已完成）。
+**🔴 critical**（config 2.0 sprint 收尾）：
 
 **🟡 important**（完成 config 2.0 sprint 才做）：
 2. step 9 清理：阶段 B `.gitignore` 拿掉 `bot/config/*.json`；`bot/utils/config.py` 删 JSON fallback 分支；`bot/config/config_*.json` + `.example` `mv` 到 `old_function/config/`；更新 `README.md` / `AGENTS.md` 的配置章节。
