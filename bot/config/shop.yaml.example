@@ -1,0 +1,11 @@
+checkin_daily_reward: 10
+history_time_format: '%Y-%m-%d %H:%M:%S'
+history_type_emoji:
+  checkin: ✅
+  shop: 🛒
+  admin: 🔧
+  makeup_checkin: 🗓️
+history_default_emoji: 🔄
+makeup_checkin_cost: 50
+makeup_checkin_limit_per_month: 3
+checkin_embed_color: '0x9966ff'

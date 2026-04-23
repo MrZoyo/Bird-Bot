@@ -10,7 +10,8 @@ import re
 from collections import defaultdict
 from typing import Optional
 
-from bot.utils import config, check_channel_validity, check_voice_state
+from bot.utils import check_channel_validity, check_voice_state, config
+from bot.utils.i18n import t
 from bot.utils.shop_db import ShopDatabaseManager
 
 
@@ -54,7 +55,7 @@ class CheckinMakeupModal(discord.ui.Modal):
         confirm_text = self.confirm_field.value.strip().lower()
         if confirm_text not in ['yes', 'y']:
             await interaction.followup.send(
-                self.conf['makeup_modal_invalid_confirm'], 
+                t('shop.makeup_modal_invalid_confirm'), 
                 ephemeral=True
             )
             return
@@ -63,7 +64,7 @@ class CheckinMakeupModal(discord.ui.Modal):
         current_balance = await self.db.get_user_balance(self.user_id)
         if current_balance < self.cost:
             await interaction.followup.send(
-                self.conf['makeup_checkin_insufficient_balance_description'].format(
+                t('shop.makeup_checkin_insufficient_balance_description').format(
                     cost=self.cost, 
                     balance=current_balance
                 ),
@@ -75,7 +76,7 @@ class CheckinMakeupModal(discord.ui.Modal):
         success = await self.db.add_makeup_record(self.user_id, self.missed_date)
         if not success:
             await interaction.followup.send(
-                self.conf['makeup_checkin_no_quota_description'].format(
+                t('shop.makeup_checkin_no_quota_description').format(
                     limit=self.conf['makeup_checkin_limit_per_month']
                 ),
                 ephemeral=True
@@ -92,7 +93,7 @@ class CheckinMakeupModal(discord.ui.Modal):
         )
         
         await interaction.followup.send(
-            self.conf['makeup_modal_success_private'].format(
+            t('shop.makeup_modal_success_private').format(
                 date=self.missed_date,
                 cost=self.cost
             ),
@@ -128,7 +129,7 @@ class CheckinEmbedView(discord.ui.View):
         # Check if user is in voice channel
         if not interaction.user.voice or not interaction.user.voice.channel:
             await interaction.response.send_message(
-                self.conf['checkin_daily_not_in_voice_private'],
+                t('shop.checkin_daily_not_in_voice_private'),
                 ephemeral=True
             )
             return
@@ -158,7 +159,7 @@ class CheckinEmbedView(discord.ui.View):
             
             # IMPORTANT: Respond to interaction first to avoid timeout
             await interaction.response.send_message(
-                self.conf['checkin_daily_success_private'].format(reward=reward),
+                t('shop.checkin_daily_success_private').format(reward=reward),
                 embed=embed,
                 ephemeral=True
             )
@@ -184,7 +185,7 @@ class CheckinEmbedView(discord.ui.View):
             )
             
             await interaction.response.send_message(
-                self.conf['checkin_daily_already_private'],
+                t('shop.checkin_daily_already_private'),
                 embed=embed,
                 ephemeral=True
             )
@@ -202,7 +203,7 @@ class CheckinEmbedView(discord.ui.View):
         remaining_count = await self.db.get_remaining_makeup_count(user_id)
         if remaining_count <= 0:
             await interaction.response.send_message(
-                self.conf['makeup_checkin_no_quota_description'].format(
+                t('shop.makeup_checkin_no_quota_description').format(
                     limit=self.conf['makeup_checkin_limit_per_month']
                 ),
                 ephemeral=True
@@ -213,7 +214,7 @@ class CheckinEmbedView(discord.ui.View):
         missed_date = await self.db.find_latest_missed_checkin(user_id)
         if not missed_date:
             await interaction.response.send_message(
-                self.conf['makeup_checkin_no_missed_days_description'],
+                t('shop.makeup_checkin_no_missed_days_description'),
                 ephemeral=True
             )
             return
@@ -224,7 +225,7 @@ class CheckinEmbedView(discord.ui.View):
         
         if balance < cost:
             await interaction.response.send_message(
-                self.conf['makeup_checkin_insufficient_balance_description'].format(
+                t('shop.makeup_checkin_insufficient_balance_description').format(
                     cost=cost,
                     balance=balance
                 ),
@@ -267,7 +268,7 @@ class CheckinEmbedView(discord.ui.View):
             try:
                 file = discord.File(
                     temp_file_path, 
-                    filename=self.conf['query_button_file_name'].format(user_name=user.name)
+                    filename=t('shop.query_button_file_name').format(user_name=user.name)
                 )
                 await interaction.followup.send(
                     embed=embed,
@@ -285,7 +286,7 @@ class CheckinEmbedView(discord.ui.View):
     def create_private_checkin_embed(self, user, balance, streak, max_streak, already_checked_in=False, last_checkin=None):
         """Create private embed for checkin response."""
         embed = discord.Embed(
-            title=self.conf['checkin_private_embed_title'].format(user_name=user.display_name),
+            title=t('shop.checkin_private_embed_title').format(user_name=user.display_name),
             color=discord.Color.gold()
         )
         
@@ -296,19 +297,19 @@ class CheckinEmbedView(discord.ui.View):
         
         embed.add_field(
             name="",
-            value=self.conf['checkin_embed_balance'].format(balance=balance),
+            value=t('shop.checkin_embed_balance').format(balance=balance),
             inline=False
         )
         
         embed.add_field(
             name="",
-            value=self.conf['checkin_embed_streak'].format(streak=streak),
+            value=t('shop.checkin_embed_streak').format(streak=streak),
             inline=True
         )
         
         embed.add_field(
             name="",
-            value=self.conf['checkin_embed_max_streak'].format(max_streak=max_streak),
+            value=t('shop.checkin_embed_max_streak').format(max_streak=max_streak),
             inline=True
         )
         
@@ -321,7 +322,7 @@ class CheckinEmbedView(discord.ui.View):
             )
         
         embed.set_footer(
-            text=self.conf['checkin_footer'].format(reward=self.conf['checkin_daily_reward'])
+            text=t('shop.checkin_footer').format(reward=self.conf['checkin_daily_reward'])
         )
         
         return embed
@@ -329,7 +330,7 @@ class CheckinEmbedView(discord.ui.View):
     def create_query_embed(self, user, balance, checkin_status):
         """Create embed for query response."""
         embed = discord.Embed(
-            title=self.conf['query_button_response_title'],
+            title=t('shop.query_button_response_title'),
             color=discord.Color.blue()
         )
         
@@ -377,7 +378,7 @@ class CheckinEmbedView(discord.ui.View):
         month_width = 9
         count_width = 9
         
-        header = self.conf['checkin_history_header']
+        header = t('shop.checkin_history_header')
         formatted_text = header + "\n"
         formatted_text += "-" * (month_width + count_width + 40) + "\n"
         
@@ -474,7 +475,7 @@ class BalanceModifyModal(discord.ui.Modal):
 
             # Send success message
             await interaction.followup.send(
-                self.conf['modify_balance_success'].format(
+                t('shop.modify_balance_success').format(
                     user_name=self.target_user.display_name,
                     amount=('+' if amount > 0 else '') + str(amount),
                     balance=new_balance
@@ -483,7 +484,7 @@ class BalanceModifyModal(discord.ui.Modal):
 
         except ValueError:
             await interaction.followup.send(
-                self.conf['modify_balance_invalid_amount'],
+                t('shop.modify_balance_invalid_amount'),
                 ephemeral=True
             )
 
@@ -568,7 +569,7 @@ class TransactionHistoryView(discord.ui.View):
 
         # Create embed
         embed = discord.Embed(
-            title=self.conf['history_title'].format(user_name=target_name),
+            title=t('shop.history_title').format(user_name=target_name),
             color=discord.Color.blue()
         )
 
@@ -587,19 +588,19 @@ class TransactionHistoryView(discord.ui.View):
             sign = "+" if amount > 0 else ""
 
             # Create field content
-            value = self.conf['history_transaction_format'].format(
+            value = t('shop.history_transaction_format').format(
                 time=tx_time,
                 amount=f"{sign}{amount}",
                 balance=new_balance,
                 operator=operator_name,
-                note=note or self.conf['history_no_note']
+                note=note or t('shop.history_no_note')
             )
 
             # Determine emoji based on operation type
             emoji = self.conf['history_type_emoji'].get(op_type, self.conf['history_default_emoji'])
 
             embed.add_field(
-                name=self.conf['history_field_title'].format(
+                name=t('shop.history_field_title').format(
                     emoji=emoji,
                     type=op_type.capitalize(),
                     id=tx_id
@@ -610,10 +611,10 @@ class TransactionHistoryView(discord.ui.View):
 
         # If no transactions found
         if not transactions:
-            embed.description = self.conf['history_no_transactions']
+            embed.description = t('shop.history_no_transactions')
 
         # Add pagination info
-        embed.set_footer(text=self.conf['history_footer'].format(
+        embed.set_footer(text=t('shop.history_footer').format(
             current_page=self.page + 1,
             total_pages=total_pages,
             total_records=total_records
@@ -707,15 +708,15 @@ class ShopCog(commands.Cog):
         
         # Create embed with date in title
         embed = discord.Embed(
-            title=self.conf['checkin_embed_title'].format(date=date_str),
-            description=self.conf['checkin_embed_description'],
+            title=t('shop.checkin_embed_title').format(date=date_str),
+            description=t('shop.checkin_embed_description'),
             color=int(self.conf['checkin_embed_color'], 16)
         )
         
         # Add checkin count field
-        count_text = str(today_count) if today_count > 0 else self.conf['checkin_embed_no_checkin']
+        count_text = str(today_count) if today_count > 0 else t('shop.checkin_embed_no_checkin')
         embed.add_field(
-            name=self.conf['checkin_embed_count_field'],
+            name=t('shop.checkin_embed_count_field'),
             value=count_text,
             inline=True
         )
@@ -725,16 +726,16 @@ class ShopCog(commands.Cog):
             first_user = self.bot.get_user(first_user_id)
             first_user_text = first_user.mention if first_user else f"<@{first_user_id}>"
         else:
-            first_user_text = self.conf['checkin_embed_no_checkin']
+            first_user_text = t('shop.checkin_embed_no_checkin')
         
         embed.add_field(
-            name=self.conf['checkin_embed_first_field'],
+            name=t('shop.checkin_embed_first_field'),
             value=first_user_text,
             inline=True
         )
         
         # Set footer with bot avatar
-        footer_text = self.conf['checkin_embed_footer']
+        footer_text = t('shop.checkin_embed_footer')
         if self.bot.user.avatar:
             embed.set_footer(text=footer_text, icon_url=self.bot.user.avatar.url)
         else:
@@ -830,18 +831,18 @@ class ShopCog(commands.Cog):
             
             if success:
                 await interaction.followup.send(
-                    self.conf['create_embed_success'].format(channel=channel.mention) + 
+                    t('shop.create_embed_success').format(channel=channel.mention) + 
                     "\n💡 如果该频道之前有签到面板，旧的已自动停用"
                 )
             else:
                 await interaction.followup.send(
-                    self.conf['create_embed_error'].format(error="数据库保存失败")
+                    t('shop.create_embed_error').format(error="数据库保存失败")
                 )
                 
         except Exception as e:
             logging.error(f"Error creating checkin embed: {e}")
             await interaction.followup.send(
-                self.conf['create_embed_error'].format(error=str(e))
+                t('shop.create_embed_error').format(error=str(e))
             )
 
 
@@ -877,7 +878,7 @@ class ShopCog(commands.Cog):
 
         if total_transactions == 0:
             await interaction.followup.send(
-                self.conf['history_no_transactions'],
+                t('shop.history_no_transactions'),
                 ephemeral=True
             )
             return
@@ -912,7 +913,7 @@ class ShopCog(commands.Cog):
         
         # Create comprehensive admin embed
         embed = discord.Embed(
-            title=self.conf['admin_history_title'].format(user_name=user.display_name),
+            title=t('shop.admin_history_title').format(user_name=user.display_name),
             color=discord.Color.blue()
         )
         
@@ -924,19 +925,19 @@ class ShopCog(commands.Cog):
         
         # Add comprehensive information fields
         embed.add_field(
-            name=self.conf['admin_history_balance_field'],
+            name=t('shop.admin_history_balance_field'),
             value=str(balance),
             inline=True
         )
         
         embed.add_field(
-            name=self.conf['admin_history_current_streak_field'],
+            name=t('shop.admin_history_current_streak_field'),
             value=f"{checkin_status['streak']}天",
             inline=True
         )
         
         embed.add_field(
-            name=self.conf['admin_history_max_streak_field'],
+            name=t('shop.admin_history_max_streak_field'),
             value=f"{checkin_status['max_streak']}天",
             inline=True
         )
@@ -945,10 +946,10 @@ class ShopCog(commands.Cog):
         if checkin_status["last_checkin"]:
             last_date = datetime.fromisoformat(checkin_status["last_checkin"]).strftime('%Y-%m-%d')
         else:
-            last_date = self.conf['admin_history_no_last_checkin']
+            last_date = t('shop.admin_history_no_last_checkin')
             
         embed.add_field(
-            name=self.conf['admin_history_last_checkin_field'],
+            name=t('shop.admin_history_last_checkin_field'),
             value=last_date,
             inline=False
         )
@@ -999,7 +1000,7 @@ class ShopCog(commands.Cog):
         count_width = 9  # Width for day count
 
         # Get header from config
-        header = self.conf['checkin_history_header']
+        header = t('shop.checkin_history_header')
 
         # Use header directly without adjusting its format
         formatted_text = header + "\n"
