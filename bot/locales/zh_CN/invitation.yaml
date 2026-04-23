@@ -1,0 +1,16 @@
+default_create_room_button: 📣 点我创建房间！
+illegal_team_response: '{mention}，本频道禁止私拉，请先拉起一个语音频道！'
+failed_invite_responses: 创建邀请链接时出错，请检查我的权限。
+invite_button_label: 📣 点我进入房间！
+roomfull_button_label: 🚫 房间满员点我
+invite_embed_content: "- 📢 语音频道: {vc_url}\n- 👤 发起用户: {mention}\n- ⏰邀请创建时间: {time}"
+invite_embed_footer: '----------------点击下方按钮进入房间------------------------'
+interaction_target_error_message: 你没有权限使用这个按钮。
+roomfull_title: '[🚫房间已满🚫]'
+invite_embed_content_edited: "- 📢 语音频道: `{name}`        [偷看一眼]({url})\n- 👤 发起用户: {mention}\n\
+  - ⏰ 创建时间: {time}"
+roomfull_set_message: 房间已被设置为满员
+not_in_vc_message: 你已经离开了房间，无法再使用这个按钮。
+extract_channel_id_error: 提取房间链接失败，请联系管理员。
+default_invite_embed_title: 快来和我一起玩！
+ignore_channel_message: 别在这找我，我在这里不干活~~

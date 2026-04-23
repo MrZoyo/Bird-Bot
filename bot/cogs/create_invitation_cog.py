@@ -10,6 +10,7 @@ from discord.ext import commands
 from discord.utils import format_dt
 
 from bot.utils import RoleDatabaseManager, check_channel_validity, config
+from bot.utils.i18n import t
 
 
 class TeamInvitationView(discord.ui.View):
@@ -22,14 +23,14 @@ class TeamInvitationView(discord.ui.View):
         self.url = f"https://discord.com/channels/{channel.guild.id}/{channel.id}"
 
         self.conf = config.get_config('invitation')
-        self.roomfull_button_label = self.conf['roomfull_button_label']
-        self.invite_button_label = self.conf['invite_button_label']
-        self.invite_embed_content = self.conf['invite_embed_content']
-        self.invite_embed_footer = self.conf['invite_embed_footer']
-        self.interaction_target_error_message = self.conf['interaction_target_error_message']
-        self.roomfull_set_message = self.conf['roomfull_set_message']
-        self.not_in_vc_message = self.conf['not_in_vc_message']
-        self.extract_channel_id_error = self.conf['extract_channel_id_error']
+        self.roomfull_button_label = t('invitation.roomfull_button_label')
+        self.invite_button_label = t('invitation.invite_button_label')
+        self.invite_embed_content = t('invitation.invite_embed_content')
+        self.invite_embed_footer = t('invitation.invite_embed_footer')
+        self.interaction_target_error_message = t('invitation.interaction_target_error_message')
+        self.roomfull_set_message = t('invitation.roomfull_set_message')
+        self.not_in_vc_message = t('invitation.not_in_vc_message')
+        self.extract_channel_id_error = t('invitation.extract_channel_id_error')
 
         # Adding the join room button
         self.add_item(discord.ui.Button(style=discord.ButtonStyle.link, label=self.invite_button_label, url=self.url))
@@ -149,7 +150,7 @@ class DefaultRoomView(discord.ui.View):
         self.url = url
         self.conf = config.get_config('invitation')
         self.default_create_room_channel_id = self.conf['default_create_room_channel_id']
-        self.default_create_room_button = self.conf['default_create_room_button']
+        self.default_create_room_button = t('invitation.default_create_room_button')
 
         self.add_item(discord.ui.Button(style=discord.ButtonStyle.link, label=self.default_create_room_button, url=self.url))
 
@@ -163,14 +164,14 @@ class CreateInvitationCog(commands.Cog):
         self.role_db = RoleDatabaseManager(self.main_config['db_path'])
 
         self.conf = config.get_config('invitation')
-        self.illegal_team_response = self.conf['illegal_team_response']
-        self.default_invite_embed_title = self.conf['default_invite_embed_title']
+        self.illegal_team_response = t('invitation.illegal_team_response')
+        self.default_invite_embed_title = t('invitation.default_invite_embed_title')
         self.default_create_room_channel_id = self.conf['default_create_room_channel_id']
-        self.ignore_channel_message = self.conf['ignore_channel_message']
-        self.failed_invite_responses = self.conf['failed_invite_responses']
+        self.ignore_channel_message = t('invitation.ignore_channel_message')
+        self.failed_invite_responses = t('invitation.failed_invite_responses')
         self.ignore_user_ids = self.conf['ignore_user_ids']
         self.ignore_channel_ids = self.conf['ignore_channel_ids']
-        self.roomfull_title = self.conf.get('roomfull_title', '【已满员】')
+        self.roomfull_title = t('invitation.roomfull_title')
 
     async def update_message_to_full(self, message):
         """将组队消息更新为满员状态（可复用方法）"""
@@ -179,7 +180,7 @@ class CreateInvitationCog(commands.Cog):
                 return
 
             embed = message.embeds[0]
-            invite_embed_content_edited = self.conf.get('invite_embed_content_edited', '')
+            invite_embed_content_edited = t('invitation.invite_embed_content_edited')
 
             # 从原embed的description中提取语音频道信息
             voice_channel_match = re.search(r'https://discord\.com/channels/\d+/(\d+)', embed.description)
