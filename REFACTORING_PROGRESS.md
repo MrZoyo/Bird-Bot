@@ -57,7 +57,7 @@
 | P1 | P1-1 命令同步逻辑 | ✅ | sync 迁 setup_hook；on_ready 只留 presence/日志 |
 | P1+P2 | 配置系统 2.0（P1-6 + P1-4 + P2-3 + P2-5） | ✅ | step 0-9 全部完成（P1-4 最小版；pydantic 全量留 follow-up） |
 | P1 | P1-7 Slash 元数据本地化 | ✅ | SlashTranslator + 176 key commands.yaml |
-| P1 | P1-3 大 cog 拆包 | ⬜ | 配置 2.0 之后 |
+| P1 | P1-3 大 cog 拆包 | 🔄 | tickets_new pilot ✅；privateroom / ban 待做 |
 | P2 | P2-1 数据库连接复用 | ⬜ | 需 close() 生命周期前置 |
 | P2 | P2-2 Schema 迁移机制 | ⬜ | |
 | P3 | P3-1 依赖管理统一 | ⬜ | |
@@ -710,19 +710,59 @@ description=locale_str(
 - `tickets_new_cog` 两处 `db_manager.save_config('ticket_types', ...)` + `self.conf = await db_manager.get_config()` clobber → 删除 + 改 `ticket_types` CRUD（P2-5 commit）。
 
 **识别但未修**（follow-up）：
-- `welcome_cog.WelcomeDMView.member_count_button` 读取路径错（conf 顶层 vs dm 子树），silent fallback 到硬编码 "アルタ" 字符串 —— 保留原 behavior，不在本轮修。
+- ~~`welcome_cog.WelcomeDMView.member_count_button` 读取路径错（conf 顶层 vs dm 子树），silent fallback 到硬编码 "アルタ" 字符串~~ —— 已在 `fix(welcome)` 修复（见下节）。
 - `migrate_config_to_yaml.py` 的 ID 脱敏 heuristic 漏 `admin_roles / admin_users / invite_link` 等（ban / tickets_new 的 yaml.example 手动脱敏）。脚本需扩 sanitizer 模式识别（Discord snowflake 大小判定或更广 key 白名单）。
 - ~~control_panel（voice_channel） + dm（welcome） + signature（role）的混合 data+text 子树~~：voicechannel.control_panel ✅ 抽到 locale（见下"nested 子树文案抽 locale"一节），role.signature 同样 ✅，welcome.dm 显式决定不抽（60%+ 条目 deploy-specific，抽会违反 locale/yaml 边界）。
 
+---
+
+### P1-3 🔄 大 cog 拆包 pilot：tickets_new（2026-04-24）
+
+**Commit grep**: `git log --grep='(P1-3'`
+
+**做了什么**：`bot/cogs/tickets_new_cog.py`（2666 行）拆成 `bot/cogs/tickets_new/` 包：
+
+| 文件 | 类 | 行数 |
+|---|---|---|
+| `embeds.py` | `EmbedColors` | 13 |
+| `modals.py` | `TicketConfirmModal` / `AddUserModal` / `CloseTicketModal` / `TicketTypeModal` | 420 |
+| `views.py` | `TicketCreateView` / `TicketThreadView` / `AdminTypeSelectView` / `TypeSelectView` / `DeleteConfirmView` | 352 |
+| `cog.py` | `TicketsNewCog`（slash commands + service-like methods） | 1910 |
+| `__init__.py` | re-export of `TicketsNewCog` | 3 |
+
+**保守选择**：**没抽 `service.py`**。原 `is_admin_for_type` / admin CRUD / `format_admin_list` / `_format_admin_entries` / `add_admins_to_ticket` 等 10 个 service 候选方法都留在 cog.py。理由：抽出会改 `self.ticket_types` / `self.conf` 的归属边界，跨类引用点多；单独评估一次 commit 更清晰；privateroom/ban pilot 做同样保守选择一致性更好。未来需要的话作为二轮 follow-up。
+
+**机械性要点**：
+- `views.py` / `modals.py` 里的类以 `cog` 作构造参数（原本就是这个 pattern），没 behavioural 变化。
+- modals ↔ views 的 cycle（`CloseTicketModal.on_submit` 调 `TicketThreadView.create_with_status`）靠 **lazy import** 打破：`from .views import TicketThreadView` 写在 method 体内。其它方向单向（`views.py → modals.py` 顶层 import，没有反向）。
+- `custom_id` 是参数化字符串（`create_ticket_{type_name}` / `accept_ticket_{thread_id}` 等），不依赖 class path —— `bot.add_view(...)` 注册的 persistent view 跨模块迁移安全。
+- `bot/main.py:93` 的 `module_path` 由 `"bot.cogs.tickets_new_cog"` 改成 `"bot.cogs.tickets_new"`；loader 用 `importlib.import_module + getattr`，不需要 `setup(bot)` 入口。
+- 旧文件 `git mv bot/cogs/tickets_new_cog.py old_function/cogs/tickets_new_cog_pre_split.py`（CLAUDE.md 约定的 deprecated-snapshot 位置）。
+
+**顺手修的 latent bug**：
+- 原 `tickets_new_cog.py` 完整文件 **没有 `from bot.utils.i18n import t`**，但 130+ 处 `t(...)` 调用。每次 ticket 按钮点击的 handler 走到 `t()` 就会 NameError（按 method body lazy-eval 的原因没在 import 时炸，但任何一次 runtime 触发都死）。新包的 modals.py / views.py / cog.py 每个都补齐了正确 import。
+- `tools/check_locales.py` 的 `COGS_DIR.glob('*.py')` → `rglob('*.py')`（带 `__pycache__` 过滤）。flat glob 看不到 package 子文件，本 commit 前它报 182 条 `tickets_new.yaml` orphan false positive；修复后 553 t() key + 170 locale_str key 全部 resolve。顺便 forward-compatible 下一轮 privateroom/ban pilot。
+
+**验证**：
+- `python -m py_compile` 五个 .py 文件 OK。
+- Runtime import smoke test（stub 掉 discord / bot.utils 依赖）：`bot.cogs.tickets_new` 正常 load，`TicketsNewCog.__module__ == 'bot.cogs.tickets_new.cog'`，modals ↔ views lazy-import cycle 可解。
+- `python tools/check_locales.py` ✅ all keys present。
+- **未做**：测试服 `/tickets_init` → 创建 → accept → close 全链路跑一遍（依赖 token / DB / 真服务器）。下次触摸 tickets 流程 前建议跑一次。
+
+**剩下 pilot**：
+- `privateroom_cog.py`（1993 行）—— 按同模式拆。views 在私密房状态面板里；modals 在房间设置；service 候选也不抽。
+- `ban_cog.py`（1430 行）—— 按同模式拆。views / modals 体量小，但 service 候选（ban 超时任务、冻结期判断等）明显；二轮再决定是否抽 service.py。
+
 ### 剩余工作（跨会话接手）
 
-Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅；P1-4 dataclass schema + 静态 key 对齐 ✅。下一轮可接手的 follow-up：
+Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅；P1-4 dataclass schema + 静态 key 对齐 ✅；P1-3 tickets_new pilot ✅。下一轮可接手的 follow-up：
 
 **🟡 important**：
-1. per-cog 配置 schema（shop / ban / tickets_new / voicechannel / privateroom 等）：按 P1-3 拆包时一并添加，把 `admin_roles: List[int]` / `ticket_types: Dict[str, TicketType]` 等固定形状字段锁死。
+1. P1-3 剩下两个 pilot：`privateroom_cog`（1993 行）+ `ban_cog`（1430 行），套 tickets_new 同模板。
+2. per-cog 配置 schema（shop / ban / tickets_new / voicechannel / privateroom 等）：可在 P1-3 剩下 pilot 里一并加，把 `admin_roles: List[int]` / `ticket_types: Dict[str, TicketType]` 等固定形状字段锁死。
 
 **🟢 nice-to-have**：
-1. P1-3 大 cog 拆包（`tickets_new_cog` / `privateroom_cog` / `ban_cog` 按 PLAN `cog.py + views.py + modals.py + embeds.py + service.py`）。建议顺序：tickets_new_cog 优先（2500+ 行，收益最大；但风险最高，需要先跑通测试服）。
+1. P1-3 pilot 之后抽 `service.py`（tickets_new / privateroom / ban 三家一起评估），把 is_admin_for_type / admin CRUD / maintenance 方法搬离 cog。cog.py 里再有 500-1000 行可以下掉。
 2. P3-5 ruff（锁 P0-4 成果 + 未来裸 except 防线）。
 3. P1-7 后续：`check_status.where_is_menu` 的 ContextMenu `name='Where Is'` 目前硬编码英文；Discord `ContextMenu.name` 不走 Translator 链，想本地化需要构造时手写 `name_localizations={Locale.chinese: '...'}` dict（与 slash name 的 ASCII 约束不同，Context Menu name 允许中文）。
 
@@ -752,11 +792,20 @@ python tools/seed_db.py            # channel_configs + ticket_types 灌 DB
 
 ### 下一个可接手的任务（压缩 context / 新 session 直接看这里）
 
-**推荐**：**P1-3 大 cog 拆包** —— PLAN §P1-3。tickets_new_cog 2500+ 行，按 `cog.py + views.py + modals.py + embeds.py + service.py` 分包，privateroom / ban 同模式。风险最高，建议：
-1. 先挑 tickets_new_cog 做 pilot；先 `/fast` 草拟包内分工（看 PLAN 推荐拆分），再 entered plan mode 做 per-file 切分设计。
-2. 拆完测试服验证（最好能跑通 `/tickets_init` → 创建 → 接受 → 关闭的完整链）。
-3. 然后 privateroom_cog / ban_cog 同模式。
-4. 中途如果发现 per-cog 配置 schema（`admin_roles: List[int]` 之类）要锁的点，一并在 `bot/utils/config_schema.py` 加 dataclass。
+**推荐**：**P1-3 pilot 复制到 privateroom_cog**（1993 行）。tickets_new pilot 已 ✅，同套 pattern 复制即可：
+
+```
+bot/cogs/privateroom/
+├── __init__.py
+├── embeds.py     # 颜色常量 / embed builders
+├── modals.py     # 房间设置 modal 们
+├── views.py      # 控制面板 View / 状态面板 View
+└── cog.py        # PrivateRoomCog（commands.Cog + 业务方法）
+```
+
+先花 5-10 分钟做 Explore agent cross-reference 报告（类 → 方法依赖图），再按 tickets_new 同模式逐类粘。参考 commit `git log --grep='(P1-3 pilot)'` 看 tickets_new 怎么做的；modals ↔ views cycle 的 lazy import 手法可能要用。
+
+**接着**：ban_cog.py（1430 行）—— 同样 pattern，但 ban 命令的业务逻辑 service-like method 比 tickets_new 还要厚（临时 ban 超时 task、解除逻辑等），抽 service.py 的收益显著。可以在 ban pilot 里**顺便评估要不要抽**。
 
 **替代**（轻的）：P3-5 ruff —— 加 pyproject `[tool.ruff]` + `E722` 规则锁 P0-4 成果；零代码风险。
 
@@ -766,4 +815,4 @@ python tools/seed_db.py            # channel_configs + ticket_types 灌 DB
 1. `cat REFACTORING_PLAN.md | head -200`（快速过 P1-3 章节）
 2. `cat REFACTORING_PROGRESS.md | grep "^##\|^###"`（看已完成 P 任务索引）
 3. `git log --oneline -30`（最近 commit 节奏）
-4. `git log --grep='(P1-6\.7)'` / `git log --grep='(P1-7'` 等回溯某 P 的全貌
+4. `git log --grep='(P1-6\.7)'` / `git log --grep='(P1-7'` / `git log --grep='(P1-3'` 等回溯某 P 的全貌
