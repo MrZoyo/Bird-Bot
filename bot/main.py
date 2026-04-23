@@ -90,7 +90,7 @@ COG_SPECS = [
     {
         "feature": "tickets_new",
         "cog_name": "TicketsNewCog",
-        "module_path": "bot.cogs.tickets_new_cog",
+        "module_path": "bot.cogs.tickets_new",
         "class_name": "TicketsNewCog",
         "required_configs": ["tickets_new"],
     },

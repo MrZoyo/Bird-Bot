@@ -55,10 +55,17 @@ _LOCALE_STR_KEY_RE = re.compile(
 
 
 def extract_cog_keys() -> Tuple[Set[str], Set[str]]:
-    """Return (t_keys, locale_str_keys) found across ``bot/cogs/*.py``."""
+    """Return (t_keys, locale_str_keys) found under ``bot/cogs/`` (recursive).
+
+    Uses rglob so that split-cog packages (e.g. ``bot/cogs/tickets_new/``)
+    are scanned as thoroughly as flat cog modules — `t()` calls inside
+    ``cog.py`` / ``views.py`` / ``modals.py`` of a package must all count.
+    """
     t_keys: Set[str] = set()
     loc_keys: Set[str] = set()
-    for path in sorted(COGS_DIR.glob('*.py')):
+    for path in sorted(COGS_DIR.rglob('*.py')):
+        if '__pycache__' in path.parts:
+            continue
         src = path.read_text(encoding='utf-8')
         for m in _T_CALL_RE.finditer(src):
             key = m.group(2)
