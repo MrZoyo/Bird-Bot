@@ -51,9 +51,19 @@ old_test/
 
 # Configuration and sensitive data
 bot/config/*.json
+bot/config/*.yaml
 *.pem
 *.key
 *.env
+
+# Migration tooling products that carry real IDs (see REFACTORING_PLAN.md P1-6 step 0)
+tools/migration_db_seed.json
+tools/migration_report.md
+
+# Archived configs under old_function/ must never return to git with real IDs
+# (`.json.example` / `.yaml.example` are NOT matched and stay tracked as templates)
+old_function/**/*.json
+old_function/**/*.yaml
 
 # Testing
 .coverage
