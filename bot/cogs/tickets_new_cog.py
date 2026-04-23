@@ -31,7 +31,6 @@ class TicketCreateView(discord.ui.View):
         super().__init__(timeout=None)
         self.cog = cog
         self.ticket_types = ticket_types
-        self.messages = cog.conf['messages']
         
         # Create buttons for each ticket type
         for type_name, type_data in ticket_types.items():
@@ -70,22 +69,21 @@ class TicketCreateView(discord.ui.View):
         except Exception as e:
             logging.error(f"Error in create_ticket_callback: {e}")
             await interaction.response.send_message(
-                self.messages['ticket_thread_create_error'], 
+                t('tickets_new.messages.ticket_thread_create_error'), 
                 ephemeral=True
             )
 
 
 class TicketConfirmModal(discord.ui.Modal):
     def __init__(self, cog, type_name: str, type_data: dict):
-        super().__init__(title=cog.conf['messages']['ticket_modal_confirm_title'].format(type_name=type_name))
+        super().__init__(title=t('tickets_new.messages.ticket_modal_confirm_title').format(type_name=type_name))
         self.cog = cog
         self.type_name = type_name
         self.type_data = type_data
-        self.messages = cog.conf['messages']
         
         self.confirm_input = discord.ui.TextInput(
-            label=self.messages['ticket_modal_confirm_label'].format(type_name=type_name),
-            placeholder=self.messages['ticket_modal_confirm_placeholder'],
+            label=t('tickets_new.messages.ticket_modal_confirm_label').format(type_name=type_name),
+            placeholder=t('tickets_new.messages.ticket_modal_confirm_placeholder'),
             max_length=10,
             required=True
         )
@@ -94,7 +92,7 @@ class TicketConfirmModal(discord.ui.Modal):
     async def on_submit(self, interaction: discord.Interaction):
         if self.confirm_input.value.lower() != "yes":
             await interaction.response.send_message(
-                self.messages['ticket_confirmation_failed'], 
+                t('tickets_new.messages.ticket_confirmation_failed'), 
                 ephemeral=True
             )
             return
@@ -112,12 +110,11 @@ class TicketThreadView(discord.ui.View):
         self.cog = cog
         self.thread_id = thread_id
         self.type_name = type_name
-        self.messages = cog.conf['messages']
         
         # Accept button
         accept_button = discord.ui.Button(
             style=discord.ButtonStyle.success,
-            label=self.messages['ticket_accept_button_disabled'] if is_accepted else self.messages['ticket_accept_button'],
+            label=t('tickets_new.messages.ticket_accept_button_disabled') if is_accepted else t('tickets_new.messages.ticket_accept_button'),
             custom_id=f'accept_ticket_{thread_id}',
             disabled=is_accepted
         )
@@ -127,7 +124,7 @@ class TicketThreadView(discord.ui.View):
         # Add user button
         add_user_button = discord.ui.Button(
             style=discord.ButtonStyle.secondary,
-            label=self.messages['ticket_add_user_button'],
+            label=t('tickets_new.messages.ticket_add_user_button'),
             custom_id=f'add_user_{thread_id}'
         )
         add_user_button.callback = self.add_user_callback
@@ -136,7 +133,7 @@ class TicketThreadView(discord.ui.View):
         # Close button
         close_button = discord.ui.Button(
             style=discord.ButtonStyle.danger,
-            label=self.messages['ticket_close_button'],
+            label=t('tickets_new.messages.ticket_close_button'),
             custom_id=f'close_ticket_{thread_id}'
         )
         close_button.callback = self.close_callback
@@ -154,7 +151,7 @@ class TicketThreadView(discord.ui.View):
         try:
             if not await self.cog.is_admin_for_type(interaction.user, self.type_name):
                 await interaction.response.send_message(
-                    self.messages['ticket_admin_only'], 
+                    t('tickets_new.messages.ticket_admin_only'), 
                     ephemeral=True
                 )
                 return
@@ -162,15 +159,15 @@ class TicketThreadView(discord.ui.View):
             success = await self.cog.db_manager.accept_ticket(self.thread_id, interaction.user.id)
             if not success:
                 await interaction.response.send_message(
-                    self.messages['ticket_already_accepted'], 
+                    t('tickets_new.messages.ticket_already_accepted'), 
                     ephemeral=True
                 )
                 return
             
             # Create accepted embed
             embed = discord.Embed(
-                title=self.messages['ticket_accepted_title'],
-                description=self.messages['ticket_accepted_content'].format(user=interaction.user.mention),
+                title=t('tickets_new.messages.ticket_accepted_title'),
+                description=t('tickets_new.messages.ticket_accepted_content').format(user=interaction.user.mention),
                 color=EmbedColors.ACCEPT
             )
             
@@ -193,8 +190,8 @@ class TicketThreadView(discord.ui.View):
                 if creator:
                     try:
                         dm_embed = discord.Embed(
-                            title=self.messages['ticket_accepted_dm_title'],
-                            description=self.messages['ticket_accepted_dm_content'].format(user=interaction.user.mention),
+                            title=t('tickets_new.messages.ticket_accepted_dm_title'),
+                            description=t('tickets_new.messages.ticket_accepted_dm_content').format(user=interaction.user.mention),
                             color=EmbedColors.ACCEPT
                         )
                         
@@ -202,7 +199,7 @@ class TicketThreadView(discord.ui.View):
                         dm_view = discord.ui.View()
                         jump_button = discord.ui.Button(
                             style=discord.ButtonStyle.link,
-                            label=self.messages['ticket_jump_button'],
+                            label=t('tickets_new.messages.ticket_jump_button'),
                             url=f"https://discord.com/channels/{interaction.guild.id}/{self.thread_id}"
                         )
                         dm_view.add_item(jump_button)
@@ -214,7 +211,7 @@ class TicketThreadView(discord.ui.View):
         except Exception as e:
             logging.error(f"Error in accept_callback: {e}")
             await interaction.response.send_message(
-                self.messages['ticket_accept_get_info_error'], 
+                t('tickets_new.messages.ticket_accept_get_info_error'), 
                 ephemeral=True
             )
 
@@ -231,14 +228,13 @@ class TicketThreadView(discord.ui.View):
 
 class AddUserModal(discord.ui.Modal):
     def __init__(self, cog, thread_id: int):
-        super().__init__(title=cog.conf['messages']['add_user_modal_title'])
+        super().__init__(title=t('tickets_new.messages.add_user_modal_title'))
         self.cog = cog
         self.thread_id = thread_id
-        self.messages = cog.conf['messages']
         
         self.user_input = discord.ui.TextInput(
-            label=self.messages['add_user_modal_label'],
-            placeholder=self.messages['add_user_modal_placeholder'],
+            label=t('tickets_new.messages.add_user_modal_label'),
+            placeholder=t('tickets_new.messages.add_user_modal_placeholder'),
             max_length=20,
             required=True
         )
@@ -251,7 +247,7 @@ class AddUserModal(discord.ui.Modal):
             
             if not user:
                 await interaction.response.send_message(
-                    self.messages['add_user_not_found'], 
+                    t('tickets_new.messages.add_user_not_found'), 
                     ephemeral=True
                 )
                 return
@@ -260,7 +256,7 @@ class AddUserModal(discord.ui.Modal):
             _, is_closed = await self.cog.db_manager.check_ticket_status(self.thread_id)
             if is_closed:
                 await interaction.response.send_message(
-                    self.messages['ticket_closed_no_modify'], 
+                    t('tickets_new.messages.ticket_closed_no_modify'), 
                     ephemeral=True
                 )
                 return
@@ -272,7 +268,7 @@ class AddUserModal(discord.ui.Modal):
             
             if not success:
                 await interaction.response.send_message(
-                    self.messages['add_user_already_added'], 
+                    t('tickets_new.messages.add_user_already_added'), 
                     ephemeral=True
                 )
                 return
@@ -284,8 +280,8 @@ class AddUserModal(discord.ui.Modal):
             
             # Create success embed
             embed = discord.Embed(
-                title=self.messages['add_user_success_title'],
-                description=self.messages['add_user_success_content'].format(
+                title=t('tickets_new.messages.add_user_success_title'),
+                description=t('tickets_new.messages.add_user_success_content').format(
                     user=user.mention, 
                     adder=interaction.user.mention
                 ),
@@ -300,8 +296,8 @@ class AddUserModal(discord.ui.Modal):
             # Send DM to added user with jump button
             try:
                 dm_embed = discord.Embed(
-                    title=self.messages['add_user_dm_title'],
-                    description=self.messages['add_user_dm_content'].format(thread=thread.mention if thread else f"<#{self.thread_id}>"),
+                    title=t('tickets_new.messages.add_user_dm_title'),
+                    description=t('tickets_new.messages.add_user_dm_content').format(thread=thread.mention if thread else f"<#{self.thread_id}>"),
                     color=EmbedColors.ADD_USER
                 )
                 
@@ -309,7 +305,7 @@ class AddUserModal(discord.ui.Modal):
                 dm_view = discord.ui.View()
                 jump_button = discord.ui.Button(
                     style=discord.ButtonStyle.link,
-                    label=self.messages['ticket_jump_button'],
+                    label=t('tickets_new.messages.ticket_jump_button'),
                     url=f"https://discord.com/channels/{thread.guild.id}/{thread.id}" if thread else f"https://discord.com/channels/{interaction.guild.id}/{self.thread_id}"
                 )
                 dm_view.add_item(jump_button)
@@ -320,27 +316,26 @@ class AddUserModal(discord.ui.Modal):
 
         except ValueError:
             await interaction.response.send_message(
-                self.messages['add_user_invalid_id'], 
+                t('tickets_new.messages.add_user_invalid_id'), 
                 ephemeral=True
             )
         except Exception as e:
             logging.error(f"Error in AddUserModal: {e}")
             await interaction.response.send_message(
-                self.messages['add_user_error'].format(error=str(e)), 
+                t('tickets_new.messages.add_user_error').format(error=str(e)), 
                 ephemeral=True
             )
 
 
 class CloseTicketModal(discord.ui.Modal):
     def __init__(self, cog, thread_id: int):
-        super().__init__(title=cog.conf['messages']['close_modal_title'])
+        super().__init__(title=t('tickets_new.messages.close_modal_title'))
         self.cog = cog
         self.thread_id = thread_id
-        self.messages = cog.conf['messages']
         
         self.reason_input = discord.ui.TextInput(
-            label=self.messages['close_modal_label'],
-            placeholder=self.messages['close_modal_placeholder'],
+            label=t('tickets_new.messages.close_modal_label'),
+            placeholder=t('tickets_new.messages.close_modal_placeholder'),
             style=discord.TextStyle.paragraph,
             max_length=500,
             required=True
@@ -355,7 +350,7 @@ class CloseTicketModal(discord.ui.Modal):
             thread = interaction.guild.get_thread(self.thread_id)
             if thread and thread.archived:
                 await interaction.response.send_message(
-                    self.messages['ticket_already_closed'],
+                    t('tickets_new.messages.ticket_already_closed'),
                     ephemeral=True
                 )
                 return
@@ -367,15 +362,15 @@ class CloseTicketModal(discord.ui.Modal):
             
             if not success:
                 await interaction.response.send_message(
-                    self.messages['ticket_close_stats_error'], 
+                    t('tickets_new.messages.ticket_close_stats_error'), 
                     ephemeral=True
                 )
                 return
             
             # Create close embed (for in-thread display)
             embed = discord.Embed(
-                title=self.messages['close_dm_title'],
-                description=self.messages['close_dm_content'].format(
+                title=t('tickets_new.messages.close_dm_title'),
+                description=t('tickets_new.messages.close_dm_content').format(
                     closer=interaction.user.mention,
                     reason=reason
                 ),
@@ -421,8 +416,8 @@ class CloseTicketModal(discord.ui.Modal):
                 if creator:
                     try:
                         dm_embed = discord.Embed(
-                            title=self.messages['close_dm_title'],
-                            description=self.messages['close_dm_content'].format(
+                            title=t('tickets_new.messages.close_dm_title'),
+                            description=t('tickets_new.messages.close_dm_content').format(
                                 closer=interaction.user.mention,
                                 reason=reason
                             ),
@@ -433,7 +428,7 @@ class CloseTicketModal(discord.ui.Modal):
                         dm_view = discord.ui.View()
                         jump_button = discord.ui.Button(
                             style=discord.ButtonStyle.link,
-                            label=self.messages['ticket_jump_button'],
+                            label=t('tickets_new.messages.ticket_jump_button'),
                             url=f"https://discord.com/channels/{interaction.guild.id}/{self.thread_id}"
                         )
                         dm_view.add_item(jump_button)
@@ -448,12 +443,12 @@ class CloseTicketModal(discord.ui.Modal):
             try:
                 if not interaction.response.is_done():
                     await interaction.response.send_message(
-                        self.messages['ticket_close_error'], 
+                        t('tickets_new.messages.ticket_close_error'), 
                         ephemeral=True
                     )
                 else:
                     await interaction.followup.send(
-                        self.messages['ticket_close_error'],
+                        t('tickets_new.messages.ticket_close_error'),
                         ephemeral=True
                     )
             except discord.HTTPException:
@@ -600,8 +595,8 @@ class TicketsNewCog(commands.Cog):
         """Update the main ticket message with current types"""
         try:
             embed = discord.Embed(
-                title=self.conf['messages']['ticket_main_title'],
-                description=self.conf['messages']['ticket_main_description'],
+                title=t('tickets_new.messages.ticket_main_title'),
+                description=t('tickets_new.messages.ticket_main_description'),
                 color=EmbedColors.CREATE
             )
             
@@ -617,7 +612,7 @@ class TicketsNewCog(commands.Cog):
                     inline=False
                 )
             
-            embed.set_footer(text=self.conf['messages']['ticket_main_footer'])
+            embed.set_footer(text=t('tickets_new.messages.ticket_main_footer'))
             
             # Create new view with current ticket types
             view = TicketCreateView(self, ticket_types)
@@ -678,7 +673,7 @@ class TicketsNewCog(commands.Cog):
             config_data = await self.db_manager.get_config()
             if not config_data or not config_data['ticket_channel_id']:
                 await interaction.followup.send(
-                    self.conf['messages']['old_system_no_new_channel'], 
+                    t('tickets_new.messages.old_system_no_new_channel'), 
                     ephemeral=True
                 )
                 return
@@ -686,7 +681,7 @@ class TicketsNewCog(commands.Cog):
             ticket_channel = interaction.guild.get_channel(config_data['ticket_channel_id'])
             if not ticket_channel:
                 await interaction.followup.send(
-                    self.conf['messages']['ticket_thread_not_found'], 
+                    t('tickets_new.messages.ticket_thread_not_found'), 
                     ephemeral=True
                 )
                 return
@@ -737,14 +732,14 @@ class TicketsNewCog(commands.Cog):
             if not success:
                 await thread.delete()
                 await interaction.followup.send(
-                    self.conf['messages']['ticket_create_db_error'], 
+                    t('tickets_new.messages.ticket_create_db_error'), 
                     ephemeral=True
                 )
                 return
             
             # Create ticket embed
             embed = discord.Embed(
-                title=self.conf['messages']['ticket_created_title'].format(
+                title=t('tickets_new.messages.ticket_created_title').format(
                     number=ticket_number, 
                     type_name=type_name
                 ),
@@ -753,21 +748,21 @@ class TicketsNewCog(commands.Cog):
             )
             
             embed.add_field(
-                name=self.conf['messages']['ticket_created_creator'],
+                name=t('tickets_new.messages.ticket_created_creator'),
                 value=interaction.user.mention,
                 inline=True
             )
             
             embed.add_field(
-                name=self.conf['messages']['ticket_created_time'],
+                name=t('tickets_new.messages.ticket_created_time'),
                 value=f"<t:{int(datetime.now().timestamp())}:F>",
                 inline=True
             )
             
             # Instructions embed
             instructions_embed = discord.Embed(
-                title=self.conf['messages']['ticket_instructions_title'],
-                description=self.conf['messages']['ticket_instructions'],
+                title=t('tickets_new.messages.ticket_instructions_title'),
+                description=t('tickets_new.messages.ticket_instructions'),
                 color=EmbedColors.DEFAULT
             )
             
@@ -788,7 +783,7 @@ class TicketsNewCog(commands.Cog):
             
             # Respond to interaction immediately
             await interaction.followup.send(
-                self.conf['messages']['ticket_create_success'].format(thread=thread.mention),
+                t('tickets_new.messages.ticket_create_success').format(thread=thread.mention),
                 ephemeral=True
             )
             
@@ -801,8 +796,8 @@ class TicketsNewCog(commands.Cog):
             # Send DM to creator with jump button
             try:
                 dm_embed = discord.Embed(
-                    title=self.conf['messages']['ticket_created_dm_title'],
-                    description=self.conf['messages']['ticket_created_dm_content'].format(
+                    title=t('tickets_new.messages.ticket_created_dm_title'),
+                    description=t('tickets_new.messages.ticket_created_dm_content').format(
                         number=ticket_number,
                         type_name=type_name
                     ),
@@ -813,7 +808,7 @@ class TicketsNewCog(commands.Cog):
                 dm_view = discord.ui.View()
                 jump_button = discord.ui.Button(
                     style=discord.ButtonStyle.link,
-                    label=self.conf['messages']['ticket_jump_button'],
+                    label=t('tickets_new.messages.ticket_jump_button'),
                     url=f"https://discord.com/channels/{thread.guild.id}/{thread.id}"
                 )
                 dm_view.add_item(jump_button)
@@ -826,14 +821,14 @@ class TicketsNewCog(commands.Cog):
             logging.error(f"Error creating ticket thread: {e}")
             try:
                 await interaction.followup.send(
-                    self.conf['messages']['ticket_thread_create_error'],
+                    t('tickets_new.messages.ticket_thread_create_error'),
                     ephemeral=True
                 )
             except discord.HTTPException:
                 # If interaction has already been responded to, try response instead
                 try:
                     await interaction.response.send_message(
-                        self.conf['messages']['ticket_thread_create_error'],
+                        t('tickets_new.messages.ticket_thread_create_error'),
                         ephemeral=True
                     )
                 except discord.HTTPException:
@@ -856,8 +851,8 @@ class TicketsNewCog(commands.Cog):
             
             if action == 'create':
                 embed = discord.Embed(
-                    title=self.conf['messages']['log_ticket_create_title'].format(number=ticket_number),
-                    description=self.conf['messages']['log_ticket_create_description'].format(
+                    title=t('tickets_new.messages.log_ticket_create_title').format(number=ticket_number),
+                    description=t('tickets_new.messages.log_ticket_create_description').format(
                         type_name=type_name,
                         creator=user.mention
                     ),
@@ -869,8 +864,8 @@ class TicketsNewCog(commands.Cog):
                 ticket_number = ticket_data['ticket_number'] if ticket_data else 'Unknown'
                 
                 embed = discord.Embed(
-                    title=self.conf['messages']['log_ticket_accept_title'].format(number=ticket_number),
-                    description=self.conf['messages']['log_ticket_accept_description'].format(
+                    title=t('tickets_new.messages.log_ticket_accept_title').format(number=ticket_number),
+                    description=t('tickets_new.messages.log_ticket_accept_description').format(
                         acceptor=user.mention
                     ),
                     color=EmbedColors.ACCEPT
@@ -878,8 +873,8 @@ class TicketsNewCog(commands.Cog):
             elif action == 'close':
                 ticket_data = await self.db_manager.get_ticket_history(thread_id)
                 if ticket_data:
-                    members_list = ", ".join([f"<@{m['user_id']}>" for m in ticket_data['members'][1:]]) or self.conf['messages']['unavailable_text']
-                    acceptor_mention = f"<@{ticket_data['accepted_by']}>" if ticket_data['accepted_by'] else self.conf['messages']['unavailable_text']
+                    members_list = ", ".join([f"<@{m['user_id']}>" for m in ticket_data['members'][1:]]) or t('tickets_new.messages.unavailable_text')
+                    acceptor_mention = f"<@{ticket_data['accepted_by']}>" if ticket_data['accepted_by'] else t('tickets_new.messages.unavailable_text')
                     creator_mention = f"<@{ticket_data['creator_id']}>"
                     
                     # Get ticket number, fallback to basic fetch if history doesn't have it
@@ -890,8 +885,8 @@ class TicketsNewCog(commands.Cog):
                     
                     ticket_number = ticket_number or 'Unknown'
                     embed = discord.Embed(
-                        title=self.conf['messages']['log_ticket_close_title'].format(number=ticket_number),
-                        description=self.conf['messages']['log_ticket_close_description'].format(
+                        title=t('tickets_new.messages.log_ticket_close_title').format(number=ticket_number),
+                        description=t('tickets_new.messages.log_ticket_close_description').format(
                             type_name=ticket_data['type_name'],
                             creator=creator_mention,
                             acceptor=acceptor_mention,
@@ -908,8 +903,8 @@ class TicketsNewCog(commands.Cog):
                 ticket_number = ticket_data['ticket_number'] if ticket_data else 'Unknown'
                 
                 embed = discord.Embed(
-                    title=self.conf['messages']['log_user_add_title'].format(number=ticket_number),
-                    description=self.conf['messages']['log_user_add_description'].format(
+                    title=t('tickets_new.messages.log_user_add_title').format(number=ticket_number),
+                    description=t('tickets_new.messages.log_user_add_description').format(
                         adder=user.mention,
                         user=extra_user.mention
                     ),
@@ -918,13 +913,13 @@ class TicketsNewCog(commands.Cog):
             else:
                 return
             
-            embed.set_footer(text=self.conf['messages']['log_footer_text'])
+            embed.set_footer(text=t('tickets_new.messages.log_footer_text'))
             
             # Add view button if thread exists
             if thread:
                 view = discord.ui.View()
                 button = discord.ui.Button(
-                    label=self.conf['messages']['log_button_view_ticket'],
+                    label=t('tickets_new.messages.log_button_view_ticket'),
                     url=f"https://discord.com/channels/{thread.guild.id}/{thread.id}",
                     style=discord.ButtonStyle.link
                 )
@@ -947,7 +942,7 @@ class TicketsNewCog(commands.Cog):
         """Initialize the ticket system with optional channel parameters"""
         if not await self.is_admin_for_type(interaction.user):
             await interaction.response.send_message(
-                self.conf['messages']['admin_no_permission']
+                t('tickets_new.messages.admin_no_permission')
             )
             return
         
@@ -963,7 +958,7 @@ class TicketsNewCog(commands.Cog):
                 
                 if existing_ticket_channel and existing_info_channel:
                     await interaction.followup.send(
-                        self.conf['messages']['init_already_configured'].format(
+                        t('tickets_new.messages.init_already_configured').format(
                             ticket_channel=existing_ticket_channel.mention,
                             info_channel=existing_info_channel.mention
                         )
@@ -974,14 +969,14 @@ class TicketsNewCog(commands.Cog):
             if ticket_channel:
                 if not await self._validate_channel_permissions(ticket_channel):
                     await interaction.followup.send(
-                        self.conf['messages']['init_channel_permission_error']
+                        t('tickets_new.messages.init_channel_permission_error')
                     )
                     return
             
             if info_channel:
                 if not await self._validate_channel_permissions(info_channel):
                     await interaction.followup.send(
-                        self.conf['messages']['init_channel_permission_error']
+                        t('tickets_new.messages.init_channel_permission_error')
                     )
                     return
             
@@ -1022,8 +1017,8 @@ class TicketsNewCog(commands.Cog):
             
             # Create main message in ticket channel
             embed = discord.Embed(
-                title=self.conf['messages']['ticket_main_title'],
-                description=self.conf['messages']['ticket_main_description'],
+                title=t('tickets_new.messages.ticket_main_title'),
+                description=t('tickets_new.messages.ticket_main_description'),
                 color=EmbedColors.DEFAULT
             )
             
@@ -1040,7 +1035,7 @@ class TicketsNewCog(commands.Cog):
                     inline=False
                 )
             
-            embed.set_footer(text=self.conf['messages']['ticket_main_footer'])
+            embed.set_footer(text=t('tickets_new.messages.ticket_main_footer'))
             
             # Create view with ticket type buttons
             view = TicketCreateView(self, ticket_types)
@@ -1057,11 +1052,15 @@ class TicketsNewCog(commands.Cog):
             if success:
                 # Determine if channels were auto-created or manually specified
                 auto_created = not (interaction.data.get('options', [{}])[0].get('value') if interaction.data.get('options') else False)
-                success_message = self.conf['messages']['init_success_auto' if auto_created else 'init_success_manual']
+                success_message = t(
+                    'tickets_new.messages.init_success_auto'
+                    if auto_created
+                    else 'tickets_new.messages.init_success_manual'
+                )
                 
                 # Send success message (visible to everyone)
                 setup_embed = discord.Embed(
-                    title=self.conf['messages']['init_success_title'],
+                    title=t('tickets_new.messages.init_success_title'),
                     description=success_message.format(
                         ticket_channel=ticket_channel.mention,
                         info_channel=info_channel.mention,
@@ -1071,8 +1070,8 @@ class TicketsNewCog(commands.Cog):
                     color=EmbedColors.CREATE
                 )
                 setup_embed.add_field(
-                    name=self.conf['messages']['setup_types_field_name'],
-                    value="\n".join([f"• {name}" for name in self.ticket_types.keys()]) or self.conf['messages']['setup_no_types'],
+                    name=t('tickets_new.messages.setup_types_field_name'),
+                    value="\n".join([f"• {name}" for name in self.ticket_types.keys()]) or t('tickets_new.messages.setup_no_types'),
                     inline=False
                 )
                 
@@ -1080,8 +1079,8 @@ class TicketsNewCog(commands.Cog):
                 
                 # Send a notification to the info channel
                 log_embed = discord.Embed(
-                    title=self.conf['messages']['init_log_title'],
-                    description=self.conf['messages']['init_log_description'].format(
+                    title=t('tickets_new.messages.init_log_title'),
+                    description=t('tickets_new.messages.init_log_description').format(
                         setup_user=interaction.user.mention,
                         ticket_channel=ticket_channel.mention
                     ),
@@ -1093,21 +1092,21 @@ class TicketsNewCog(commands.Cog):
             else:
                 # If database save failed and we created channels, clean them up
                 if not interaction.data.get('options'):  # Auto-created channels
-                    await ticket_channel.delete(reason=self.conf['messages']['cleanup_reason'])
-                    await info_channel.delete(reason=self.conf['messages']['cleanup_reason'])
+                    await ticket_channel.delete(reason=t('tickets_new.messages.cleanup_reason'))
+                    await info_channel.delete(reason=t('tickets_new.messages.cleanup_reason'))
                 
                 await interaction.followup.send(
-                    self.conf['messages']['init_db_error']
+                    t('tickets_new.messages.init_db_error')
                 )
             
         except discord.Forbidden:
             await interaction.followup.send(
-                self.conf['messages']['init_permission_error']
+                t('tickets_new.messages.init_permission_error')
             )
         except Exception as e:
             logging.error(f"Error initializing ticket system: {e}")
             await interaction.followup.send(
-                self.conf['messages']['init_error'].format(error=str(e))
+                t('tickets_new.messages.init_error').format(error=str(e))
             )
 
     async def _validate_channel_permissions(self, channel: discord.TextChannel) -> bool:
@@ -1136,7 +1135,7 @@ class TicketsNewCog(commands.Cog):
         """Add user to ticket via command"""
         if not isinstance(interaction.channel, discord.Thread):
             await interaction.response.send_message(
-                self.conf['messages']['command_thread_only'], 
+                t('tickets_new.messages.command_thread_only'), 
                 ephemeral=True
             )
             return
@@ -1147,14 +1146,14 @@ class TicketsNewCog(commands.Cog):
         ticket_exists, is_closed = await self.db_manager.check_ticket_status(thread_id)
         if not ticket_exists:
             await interaction.response.send_message(
-                self.conf['messages']['ticket_thread_not_found'], 
+                t('tickets_new.messages.ticket_thread_not_found'), 
                 ephemeral=True
             )
             return
         
         if is_closed:
             await interaction.response.send_message(
-                self.conf['messages']['ticket_closed_no_modify'], 
+                t('tickets_new.messages.ticket_closed_no_modify'), 
                 ephemeral=True
             )
             return
@@ -1166,7 +1165,7 @@ class TicketsNewCog(commands.Cog):
         
         if not success:
             await interaction.response.send_message(
-                self.conf['messages']['add_user_already_added'], 
+                t('tickets_new.messages.add_user_already_added'), 
                 ephemeral=True
             )
             return
@@ -1176,8 +1175,8 @@ class TicketsNewCog(commands.Cog):
         
         # Success response
         embed = discord.Embed(
-            title=self.conf['messages']['add_user_success_title'],
-            description=self.conf['messages']['add_user_success_content'].format(
+            title=t('tickets_new.messages.add_user_success_title'),
+            description=t('tickets_new.messages.add_user_success_content').format(
                 user=user.mention, 
                 adder=interaction.user.mention
             ),
@@ -1192,7 +1191,7 @@ class TicketsNewCog(commands.Cog):
         """Show ticket statistics"""
         if not await self.is_admin_for_type(interaction.user):
             await interaction.response.send_message(
-                self.conf['messages']['admin_no_permission'], 
+                t('tickets_new.messages.admin_no_permission'), 
                 ephemeral=True
             )
             return
@@ -1201,31 +1200,31 @@ class TicketsNewCog(commands.Cog):
             stats = await self.db_manager.get_ticket_stats()
             
             embed = discord.Embed(
-                title=self.conf['messages']['ticket_stats_title'],
+                title=t('tickets_new.messages.ticket_stats_title'),
                 color=EmbedColors.DEFAULT
             )
             
             embed.add_field(
-                name=self.conf['messages']['ticket_stats_total'],
+                name=t('tickets_new.messages.ticket_stats_total'),
                 value=str(stats['total']),
                 inline=True
             )
             
             embed.add_field(
-                name=self.conf['messages']['ticket_stats_active'],
+                name=t('tickets_new.messages.ticket_stats_active'),
                 value=str(stats['active']),
                 inline=True
             )
             
             embed.add_field(
-                name=self.conf['messages']['ticket_stats_closed'],
+                name=t('tickets_new.messages.ticket_stats_closed'),
                 value=str(stats['closed']),
                 inline=True
             )
             
             embed.add_field(
-                name=self.conf['messages']['ticket_stats_response_time'],
-                value=self.conf['messages']['ticket_stats_response_time_format'].format(
+                name=t('tickets_new.messages.ticket_stats_response_time'),
+                value=t('tickets_new.messages.ticket_stats_response_time_format').format(
                     time=stats['avg_response_time']
                 ),
                 inline=True
@@ -1237,8 +1236,8 @@ class TicketsNewCog(commands.Cog):
                     for type_name, count in stats['by_type']
                 ])
                 embed.add_field(
-                    name=self.conf['messages']['ticket_stats_by_type'],
-                    value=type_stats or self.conf['messages']['ticket_stats_no_data'],
+                    name=t('tickets_new.messages.ticket_stats_by_type'),
+                    value=type_stats or t('tickets_new.messages.ticket_stats_no_data'),
                     inline=False
                 )
             
@@ -1247,7 +1246,7 @@ class TicketsNewCog(commands.Cog):
         except Exception as e:
             logging.error(f"Error getting ticket stats: {e}")
             await interaction.response.send_message(
-                self.conf['messages'].get('stats_error', '获取统计数据时发生错误'), 
+                t('tickets_new.messages.stats_error'), 
                 ephemeral=True
             )
 
@@ -1256,7 +1255,7 @@ class TicketsNewCog(commands.Cog):
         """Display current admin configuration."""
         if not await self.is_admin_for_type(interaction.user):
             await interaction.response.send_message(
-                self.conf['messages']['admin_no_permission'],
+                t('tickets_new.messages.admin_no_permission'),
                 ephemeral=True
             )
             return
@@ -1270,14 +1269,14 @@ class TicketsNewCog(commands.Cog):
         """Add an admin role."""
         if not await self.is_admin_for_type(interaction.user):
             await interaction.response.send_message(
-                self.conf['messages']['admin_no_permission'],
+                t('tickets_new.messages.admin_no_permission'),
                 ephemeral=True
             )
             return
 
         view = AdminTypeSelectView(self, 'add', 'role', role.id)
         await interaction.response.send_message(
-            self.conf['messages']['admin_type_select_add_role'],
+            t('tickets_new.messages.admin_type_select_add_role'),
             view=view,
             ephemeral=True
         )
@@ -1288,14 +1287,14 @@ class TicketsNewCog(commands.Cog):
         """Remove an admin role."""
         if not await self.is_admin_for_type(interaction.user):
             await interaction.response.send_message(
-                self.conf['messages']['admin_no_permission'],
+                t('tickets_new.messages.admin_no_permission'),
                 ephemeral=True
             )
             return
 
         view = AdminTypeSelectView(self, 'remove', 'role', role.id)
         await interaction.response.send_message(
-            self.conf['messages']['admin_type_select_remove_role'],
+            t('tickets_new.messages.admin_type_select_remove_role'),
             view=view,
             ephemeral=True
         )
@@ -1306,14 +1305,14 @@ class TicketsNewCog(commands.Cog):
         """Add an admin user."""
         if not await self.is_admin_for_type(interaction.user):
             await interaction.response.send_message(
-                self.conf['messages']['admin_no_permission'],
+                t('tickets_new.messages.admin_no_permission'),
                 ephemeral=True
             )
             return
 
         view = AdminTypeSelectView(self, 'add', 'user', user.id)
         await interaction.response.send_message(
-            self.conf['messages']['admin_type_select_add_user'],
+            t('tickets_new.messages.admin_type_select_add_user'),
             view=view,
             ephemeral=True
         )
@@ -1324,14 +1323,14 @@ class TicketsNewCog(commands.Cog):
         """Remove an admin user."""
         if not await self.is_admin_for_type(interaction.user):
             await interaction.response.send_message(
-                self.conf['messages']['admin_no_permission'],
+                t('tickets_new.messages.admin_no_permission'),
                 ephemeral=True
             )
             return
 
         view = AdminTypeSelectView(self, 'remove', 'user', user.id)
         await interaction.response.send_message(
-            self.conf['messages']['admin_type_select_remove_user'],
+            t('tickets_new.messages.admin_type_select_remove_user'),
             view=view,
             ephemeral=True
         )
@@ -1341,7 +1340,7 @@ class TicketsNewCog(commands.Cog):
         """Accept ticket via command"""
         if not isinstance(interaction.channel, discord.Thread):
             await interaction.response.send_message(
-                self.conf['messages']['command_thread_only'], 
+                t('tickets_new.messages.command_thread_only'), 
                 ephemeral=True
             )
             return
@@ -1352,7 +1351,7 @@ class TicketsNewCog(commands.Cog):
         # Check if thread is already archived
         if thread.archived:
             await interaction.response.send_message(
-                self.conf['messages']['ticket_already_closed'],
+                t('tickets_new.messages.ticket_already_closed'),
                 ephemeral=True
             )
             return
@@ -1361,14 +1360,14 @@ class TicketsNewCog(commands.Cog):
         ticket_exists, is_closed = await self.db_manager.check_ticket_status(thread_id)
         if not ticket_exists:
             await interaction.response.send_message(
-                self.conf['messages']['ticket_thread_not_found'], 
+                t('tickets_new.messages.ticket_thread_not_found'), 
                 ephemeral=True
             )
             return
         
         if is_closed:
             await interaction.response.send_message(
-                self.conf['messages']['ticket_closed_no_modify'], 
+                t('tickets_new.messages.ticket_closed_no_modify'), 
                 ephemeral=True
             )
             return
@@ -1377,7 +1376,7 @@ class TicketsNewCog(commands.Cog):
         ticket_data = await self.db_manager.fetch_ticket(thread_id)
         if not ticket_data:
             await interaction.response.send_message(
-                self.conf['messages']['ticket_accept_get_info_error'], 
+                t('tickets_new.messages.ticket_accept_get_info_error'), 
                 ephemeral=True
             )
             return
@@ -1385,7 +1384,7 @@ class TicketsNewCog(commands.Cog):
         # Check admin permissions
         if not await self.is_admin_for_type(interaction.user, ticket_data['type_name']):
             await interaction.response.send_message(
-                self.conf['messages']['ticket_admin_only'], 
+                t('tickets_new.messages.ticket_admin_only'), 
                 ephemeral=True
             )
             return
@@ -1394,15 +1393,15 @@ class TicketsNewCog(commands.Cog):
         success = await self.db_manager.accept_ticket(thread_id, interaction.user.id)
         if not success:
             await interaction.response.send_message(
-                self.conf['messages']['ticket_already_accepted'], 
+                t('tickets_new.messages.ticket_already_accepted'), 
                 ephemeral=True
             )
             return
         
         # Create success embed
         embed = discord.Embed(
-            title=self.conf['messages']['ticket_accepted_title'],
-            description=self.conf['messages']['ticket_accepted_content'].format(user=interaction.user.mention),
+            title=t('tickets_new.messages.ticket_accepted_title'),
+            description=t('tickets_new.messages.ticket_accepted_content').format(user=interaction.user.mention),
             color=EmbedColors.ACCEPT
         )
         
@@ -1417,8 +1416,8 @@ class TicketsNewCog(commands.Cog):
             if creator:
                 try:
                     dm_embed = discord.Embed(
-                        title=self.conf['messages']['ticket_accepted_dm_title'],
-                        description=self.conf['messages']['ticket_accepted_dm_content'].format(user=interaction.user.mention),
+                        title=t('tickets_new.messages.ticket_accepted_dm_title'),
+                        description=t('tickets_new.messages.ticket_accepted_dm_content').format(user=interaction.user.mention),
                         color=EmbedColors.ACCEPT
                     )
 
@@ -1426,7 +1425,7 @@ class TicketsNewCog(commands.Cog):
                     dm_view = discord.ui.View()
                     jump_button = discord.ui.Button(
                         style=discord.ButtonStyle.link,
-                        label=self.conf['messages']['ticket_jump_button'],
+                        label=t('tickets_new.messages.ticket_jump_button'),
                         url=f"https://discord.com/channels/{interaction.guild.id}/{thread_id}"
                     )
                     dm_view.add_item(jump_button)
@@ -1441,7 +1440,7 @@ class TicketsNewCog(commands.Cog):
         """Close ticket via command"""
         if not isinstance(interaction.channel, discord.Thread):
             await interaction.response.send_message(
-                self.conf['messages']['command_thread_only'], 
+                t('tickets_new.messages.command_thread_only'), 
                 ephemeral=True
             )
             return
@@ -1452,7 +1451,7 @@ class TicketsNewCog(commands.Cog):
         # Check if thread is already archived
         if thread.archived:
             await interaction.response.send_message(
-                self.conf['messages']['ticket_already_closed'],
+                t('tickets_new.messages.ticket_already_closed'),
                 ephemeral=True
             )
             return
@@ -1461,14 +1460,14 @@ class TicketsNewCog(commands.Cog):
         ticket_exists, is_closed = await self.db_manager.check_ticket_status(thread_id)
         if not ticket_exists:
             await interaction.response.send_message(
-                self.conf['messages']['ticket_thread_not_found'], 
+                t('tickets_new.messages.ticket_thread_not_found'), 
                 ephemeral=True
             )
             return
         
         if is_closed:
             await interaction.response.send_message(
-                self.conf['messages']['ticket_already_closed'], 
+                t('tickets_new.messages.ticket_already_closed'), 
                 ephemeral=True
             )
             return
@@ -1477,7 +1476,7 @@ class TicketsNewCog(commands.Cog):
         ticket_data = await self.db_manager.fetch_ticket(thread_id)
         if not ticket_data:
             await interaction.response.send_message(
-                self.conf['messages']['ticket_accept_get_info_error'], 
+                t('tickets_new.messages.ticket_accept_get_info_error'), 
                 ephemeral=True
             )
             return
@@ -1485,7 +1484,7 @@ class TicketsNewCog(commands.Cog):
         # Check admin permissions
         if not await self.is_admin_for_type(interaction.user, ticket_data['type_name']):
             await interaction.response.send_message(
-                self.conf['messages']['ticket_admin_only'], 
+                t('tickets_new.messages.ticket_admin_only'), 
                 ephemeral=True
             )
             return
@@ -1494,15 +1493,15 @@ class TicketsNewCog(commands.Cog):
         success = await self.db_manager.close_ticket(thread_id, interaction.user.id, reason)
         if not success:
             await interaction.response.send_message(
-                self.conf['messages']['ticket_close_stats_error'], 
+                t('tickets_new.messages.ticket_close_stats_error'), 
                 ephemeral=True
             )
             return
         
         # Create success embed
         embed = discord.Embed(
-            title=self.conf['messages']['close_dm_title'],
-            description=self.conf['messages']['close_dm_content'].format(
+            title=t('tickets_new.messages.close_dm_title'),
+            description=t('tickets_new.messages.close_dm_content').format(
                 closer=interaction.user.mention,
                 reason=reason
             ),
@@ -1544,8 +1543,8 @@ class TicketsNewCog(commands.Cog):
             if creator:
                 try:
                     dm_embed = discord.Embed(
-                        title=self.conf['messages']['close_dm_title'],
-                        description=self.conf['messages']['close_dm_content'].format(
+                        title=t('tickets_new.messages.close_dm_title'),
+                        description=t('tickets_new.messages.close_dm_content').format(
                             closer=interaction.user.mention,
                             reason=reason
                         ),
@@ -1556,7 +1555,7 @@ class TicketsNewCog(commands.Cog):
                     dm_view = discord.ui.View()
                     jump_button = discord.ui.Button(
                         style=discord.ButtonStyle.link,
-                        label=self.conf['messages']['ticket_jump_button'],
+                        label=t('tickets_new.messages.ticket_jump_button'),
                         url=f"https://discord.com/channels/{interaction.guild.id}/{thread_id}"
                     )
                     dm_view.add_item(jump_button)
@@ -1570,7 +1569,7 @@ class TicketsNewCog(commands.Cog):
         """Refresh button states for all tickets"""
         if not await self.is_admin_for_type(interaction.user):
             await interaction.response.send_message(
-                self.conf['messages']['admin_no_permission'], 
+                t('tickets_new.messages.admin_no_permission'), 
                 ephemeral=True
             )
             return
@@ -1595,7 +1594,7 @@ class TicketsNewCog(commands.Cog):
             if total_tickets > 5:
                 try:
                     await interaction.edit_original_response(
-                        content=self.conf['messages']['refresh_buttons_starting'].format(total=total_tickets)
+                        content=t('tickets_new.messages.refresh_buttons_starting').format(total=total_tickets)
                     )
                 except discord.HTTPException:
                     pass
@@ -1645,7 +1644,7 @@ class TicketsNewCog(commands.Cog):
                 if total_tickets > 10 and i % (batch_size * 3) == 0 and current_progress < total_tickets:
                     try:
                         await interaction.edit_original_response(
-                            content=self.conf['messages']['refresh_buttons_progress'].format(
+                            content=t('tickets_new.messages.refresh_buttons_progress').format(
                                 current=current_progress,
                                 total=total_tickets,
                                 updated=updated_count,
@@ -1662,7 +1661,7 @@ class TicketsNewCog(commands.Cog):
             
             # Final result message
             await interaction.followup.send(
-                self.conf['messages']['refresh_buttons_complete'].format(
+                t('tickets_new.messages.refresh_buttons_complete').format(
                     updated=updated_count,
                     skipped=skipped_count,
                     errors=error_count
@@ -1673,7 +1672,7 @@ class TicketsNewCog(commands.Cog):
         except Exception as e:
             logging.error(f"Error in refresh_buttons_command: {e}")
             await interaction.followup.send(
-                self.conf['messages']['refresh_buttons_error'], 
+                t('tickets_new.messages.refresh_buttons_error'), 
                 ephemeral=True
             )
 
@@ -1682,7 +1681,7 @@ class TicketsNewCog(commands.Cog):
         """Refresh the main ticket creation message"""
         if not await self.is_admin_for_type(interaction.user):
             await interaction.response.send_message(
-                self.conf['messages']['admin_no_permission'], 
+                t('tickets_new.messages.admin_no_permission'), 
                 ephemeral=True
             )
             return
@@ -1692,7 +1691,7 @@ class TicketsNewCog(commands.Cog):
             config_data = await self.db_manager.get_config()
             if not config_data:
                 await interaction.response.send_message(
-                    self.conf['messages']['refresh_main_no_config'], 
+                    t('tickets_new.messages.refresh_main_no_config'), 
                     ephemeral=True
                 )
                 return
@@ -1702,7 +1701,7 @@ class TicketsNewCog(commands.Cog):
             
             if not ticket_channel_id or not main_message_id:
                 await interaction.response.send_message(
-                    self.conf['messages']['refresh_main_config_incomplete'], 
+                    t('tickets_new.messages.refresh_main_config_incomplete'), 
                     ephemeral=True
                 )
                 return
@@ -1711,7 +1710,7 @@ class TicketsNewCog(commands.Cog):
             ticket_channel = self.bot.get_channel(ticket_channel_id)
             if not ticket_channel:
                 await interaction.response.send_message(
-                    self.conf['messages']['refresh_main_channel_not_found'], 
+                    t('tickets_new.messages.refresh_main_channel_not_found'), 
                     ephemeral=True
                 )
                 return
@@ -1724,9 +1723,9 @@ class TicketsNewCog(commands.Cog):
                 if ticket_types:
                     await self.update_main_message(ticket_channel, main_message, ticket_types)
                     
-                    avatar_status = self.conf['messages']['refresh_main_avatar_updated'] if self.bot.user.avatar else self.conf['messages']['refresh_main_no_avatar']
+                    avatar_status = t('tickets_new.messages.refresh_main_avatar_updated') if self.bot.user.avatar else t('tickets_new.messages.refresh_main_no_avatar')
                     await interaction.response.send_message(
-                        self.conf['messages']['refresh_main_success'].format(
+                        t('tickets_new.messages.refresh_main_success').format(
                             type_count=len(ticket_types),
                             avatar_status=avatar_status
                         ),
@@ -1734,26 +1733,26 @@ class TicketsNewCog(commands.Cog):
                     )
                 else:
                     await interaction.response.send_message(
-                        self.conf['messages']['refresh_main_no_types'], 
+                        t('tickets_new.messages.refresh_main_no_types'), 
                         ephemeral=True
                     )
                 
             except discord.NotFound:
                 await interaction.response.send_message(
-                    self.conf['messages']['refresh_main_message_not_found'], 
+                    t('tickets_new.messages.refresh_main_message_not_found'), 
                     ephemeral=True
                 )
             except Exception as e:
                 logging.error(f"Error updating main message: {e}")
                 await interaction.response.send_message(
-                    self.conf['messages']['refresh_main_update_error'], 
+                    t('tickets_new.messages.refresh_main_update_error'), 
                     ephemeral=True
                 )
                 
         except Exception as e:
             logging.error(f"Error in refresh_main_message_command: {e}")
             await interaction.response.send_message(
-                self.conf['messages']['refresh_main_error'], 
+                t('tickets_new.messages.refresh_main_error'), 
                 ephemeral=True
             )
 
@@ -1764,7 +1763,7 @@ class TicketsNewCog(commands.Cog):
         """Add a new ticket type"""
         if not await self.is_admin_for_type(interaction.user):
             await interaction.response.send_message(
-                self.conf['messages']['admin_no_permission'], 
+                t('tickets_new.messages.admin_no_permission'), 
                 ephemeral=True
             )
             return
@@ -1777,7 +1776,7 @@ class TicketsNewCog(commands.Cog):
         """Edit an existing ticket type"""
         if not await self.is_admin_for_type(interaction.user):
             await interaction.response.send_message(
-                self.conf['messages']['admin_no_permission'], 
+                t('tickets_new.messages.admin_no_permission'), 
                 ephemeral=True
             )
             return
@@ -1791,7 +1790,7 @@ class TicketsNewCog(commands.Cog):
 
         view = TypeSelectView(self, 'edit')
         await interaction.response.send_message(
-            self.conf['messages'].get('ticket_type_edit_title', '选择要修改的工单类型'),
+            t('tickets_new.messages.ticket_type_edit_title'),
             view=view,
             ephemeral=True
         )
@@ -1801,7 +1800,7 @@ class TicketsNewCog(commands.Cog):
         """Delete a ticket type"""
         if not await self.is_admin_for_type(interaction.user):
             await interaction.response.send_message(
-                self.conf['messages']['admin_no_permission'], 
+                t('tickets_new.messages.admin_no_permission'), 
                 ephemeral=True
             )
             return
@@ -1815,7 +1814,7 @@ class TicketsNewCog(commands.Cog):
 
         view = TypeSelectView(self, 'delete')
         await interaction.response.send_message(
-            self.conf['messages'].get('ticket_type_delete_title', '选择要删除的工单类型'),
+            t('tickets_new.messages.ticket_type_delete_title'),
             view=view,
             ephemeral=True
         )
@@ -1893,7 +1892,7 @@ class TicketsNewCog(commands.Cog):
             raise ValueError("Could not find configured guild")
 
         embed = discord.Embed(
-            title=self.conf['messages']['admin_list_title'],
+            title=t('tickets_new.messages.admin_list_title'),
             color=EmbedColors.DEFAULT
         )
 
@@ -1922,26 +1921,25 @@ class TicketsNewCog(commands.Cog):
 
     def _format_admin_entries(self, role_ids: list, user_ids: list, guild: discord.Guild) -> str:
         """Helper method to format admin entries for each section."""
-        messages = self.conf['messages']
         lines = []
 
         if role_ids:
-            lines.append(messages['admin_list_roles_header'])
+            lines.append(t('tickets_new.messages.admin_list_roles_header'))
             for role_id in role_ids:
                 role = guild.get_role(role_id)
                 if role:
-                    lines.append(messages['admin_list_role_item'].format(role=role.mention))
+                    lines.append(t('tickets_new.messages.admin_list_role_item').format(role=role.mention))
 
         if user_ids:
             if lines:
                 lines.append("")
-            lines.append(messages['admin_list_users_header'])
+            lines.append(t('tickets_new.messages.admin_list_users_header'))
             for user_id in user_ids:
                 user = self.bot.get_user(user_id)
                 if user:
-                    lines.append(messages['admin_list_user_item'].format(user=user.mention))
+                    lines.append(t('tickets_new.messages.admin_list_user_item').format(user=user.mention))
 
-        return "\n".join(lines) if lines else messages['admin_list_empty']
+        return "\n".join(lines) if lines else t('tickets_new.messages.admin_list_empty')
 
     async def save_config(self):
         """Persist tickets_new YAML config via the unified writer (P2-3).
@@ -1994,14 +1992,14 @@ class TicketsNewCog(commands.Cog):
         if target_type == 'role':
             if target_id in self.conf.get('admin_roles', []):
                 await interaction.followup.send(
-                    self.conf['messages']['admin_global_role_exists'],
+                    t('tickets_new.messages.admin_global_role_exists'),
                     ephemeral=True
                 )
                 return False
         else:
             if target_id in self.conf.get('admin_users', []):
                 await interaction.followup.send(
-                    self.conf['messages']['admin_global_user_exists'],
+                    t('tickets_new.messages.admin_global_user_exists'),
                     ephemeral=True
                 )
                 return False
@@ -2054,23 +2052,22 @@ class TicketsNewCog(commands.Cog):
         if not interaction:
             return
 
-        messages = self.conf['messages']
         if success:
             if action == 'add':
                 if ticket_type == "global":
-                    message = messages['admin_add_global'].format(mention=target.mention)
+                    message = t('tickets_new.messages.admin_add_global', mention=target.mention)
                 else:
-                    message = messages['admin_add_type'].format(mention=target.mention, type=ticket_type)
+                    message = t('tickets_new.messages.admin_add_type', mention=target.mention, type=ticket_type)
             else:
                 if ticket_type == "global":
-                    message = messages['admin_remove_global'].format(mention=target.mention)
+                    message = t('tickets_new.messages.admin_remove_global', mention=target.mention)
                 else:
-                    message = messages['admin_remove_type'].format(mention=target.mention, type=ticket_type)
+                    message = t('tickets_new.messages.admin_remove_type', mention=target.mention, type=ticket_type)
         else:
             if action == 'add':
-                message = messages['admin_add_failed'].format(mention=target.mention)
+                message = t('tickets_new.messages.admin_add_failed', mention=target.mention)
             else:
-                message = messages['admin_remove_failed'].format(mention=target.mention)
+                message = t('tickets_new.messages.admin_remove_failed', mention=target.mention)
 
         await interaction.followup.send(message, ephemeral=True)
         
@@ -2169,8 +2166,8 @@ class TicketsNewCog(commands.Cog):
             for admin in all_admins_for_notification:
                 try:
                     admin_embed = discord.Embed(
-                        title=self.conf['messages']['admin_notification_title'],
-                        description=self.conf['messages']['admin_notification_description'].format(
+                        title=t('tickets_new.messages.admin_notification_title'),
+                        description=t('tickets_new.messages.admin_notification_description').format(
                             type_name=type_name,
                             ticket_number=ticket_number,
                             creator=creator.mention
@@ -2182,7 +2179,7 @@ class TicketsNewCog(commands.Cog):
                     dm_view = discord.ui.View()
                     jump_button = discord.ui.Button(
                         style=discord.ButtonStyle.link,
-                        label=self.conf['messages']['admin_notification_jump_button'],
+                        label=t('tickets_new.messages.admin_notification_jump_button'),
                         url=f"https://discord.com/channels/{thread.guild.id}/{thread.id}"
                     )
                     dm_view.add_item(jump_button)
@@ -2230,12 +2227,11 @@ class AdminTypeSelectView(discord.ui.View):
         self.action_type = action_type
         self.target_type = target_type
         self.target_id = target_id
-        self.messages = self.cog.conf['messages']
 
         options = [
             discord.SelectOption(
-                label=self.messages['global_ticket_select_label'],
-                description=self.messages['global_ticket_select_description'],
+                label=t('tickets_new.messages.global_ticket_select_label'),
+                description=t('tickets_new.messages.global_ticket_select_description'),
                 value="global"
             )
         ]
@@ -2250,7 +2246,7 @@ class AdminTypeSelectView(discord.ui.View):
             )
 
         select = discord.ui.Select(
-            placeholder=self.messages['ticket_type_select_placeholder'],
+            placeholder=t('tickets_new.messages.ticket_type_select_placeholder'),
             min_values=1,
             max_values=1,
             options=options
@@ -2268,7 +2264,7 @@ class AdminTypeSelectView(discord.ui.View):
             target = await self.cog.bot.fetch_user(self.target_id)
 
         if not target:
-            await interaction.followup.send(self.messages['target_not_found'], ephemeral=True)
+            await interaction.followup.send(t('tickets_new.messages.target_not_found'), ephemeral=True)
             return
 
         if selected_type == "global":
@@ -2314,18 +2310,17 @@ class AdminTypeSelectView(discord.ui.View):
 
 class TicketTypeModal(discord.ui.Modal):
     def __init__(self, cog, edit_type=None):
-        title = cog.conf['messages'].get('ticket_type_modal_edit_title', '修改工单类型：{type_name}').format(type_name=edit_type) if edit_type else cog.conf['messages'].get('ticket_type_modal_title', '添加工单类型')
+        title = t('tickets_new.messages.ticket_type_modal_edit_title').format(type_name=edit_type) if edit_type else t('tickets_new.messages.ticket_type_modal_title')
         super().__init__(title=title)
         self.cog = cog
         self.edit_type = edit_type
-        self.messages = cog.conf['messages']
 
         # Pre-fill if editing
         existing_data = cog.ticket_types.get(edit_type, {}) if edit_type else {}
 
         self.type_name = discord.ui.TextInput(
-            label=self.messages.get('ticket_type_name_label', '类型名称'),
-            placeholder=self.messages.get('ticket_type_name_placeholder', '例如: 功能反馈'),
+            label=t('tickets_new.messages.ticket_type_name_label'),
+            placeholder=t('tickets_new.messages.ticket_type_name_placeholder'),
             default=(edit_type or "")[:50],  # Ensure default doesn't exceed max_length
             required=True,
             max_length=50
@@ -2333,8 +2328,8 @@ class TicketTypeModal(discord.ui.Modal):
         self.add_item(self.type_name)
 
         self.description = discord.ui.TextInput(
-            label=self.messages.get('ticket_type_description_label', '类型说明'),
-            placeholder=self.messages.get('ticket_type_description_placeholder', '在主页面显示的说明文字'),
+            label=t('tickets_new.messages.ticket_type_description_label'),
+            placeholder=t('tickets_new.messages.ticket_type_description_placeholder'),
             default=existing_data.get('description', '')[:100],  # Ensure default doesn't exceed max_length
             required=True,
             max_length=100
@@ -2342,8 +2337,8 @@ class TicketTypeModal(discord.ui.Modal):
         self.add_item(self.description)
 
         self.guide = discord.ui.TextInput(
-            label=self.messages.get('ticket_type_guide_label', '用户指引'),
-            placeholder=self.messages.get('ticket_type_guide_placeholder', '用户创建工单后看到的指引文字'),
+            label=t('tickets_new.messages.ticket_type_guide_label'),
+            placeholder=t('tickets_new.messages.ticket_type_guide_placeholder'),
             style=discord.TextStyle.paragraph,
             default=existing_data.get('guide', '')[:1000],  # Ensure default doesn't exceed max_length
             required=True,
@@ -2352,8 +2347,8 @@ class TicketTypeModal(discord.ui.Modal):
         self.add_item(self.guide)
 
         self.button_color = discord.ui.TextInput(
-            label=self.messages.get('ticket_type_color_label', '按钮颜色 (R, G, B)'),
-            placeholder=self.messages.get('ticket_type_color_placeholder', '例如: R, G, B 或 red, green, blue'),
+            label=t('tickets_new.messages.ticket_type_color_label'),
+            placeholder=t('tickets_new.messages.ticket_type_color_placeholder'),
             default=existing_data.get('button_color', 'b')[:10],  # Ensure default doesn't exceed max_length
             required=False,
             max_length=10
@@ -2480,7 +2475,7 @@ class TypeSelectView(discord.ui.View):
 
         if options:
             select = discord.ui.Select(
-                placeholder=cog.conf['messages'].get('ticket_type_select_placeholder', '选择工单类型'),
+                placeholder=t('tickets_new.messages.ticket_type_select_placeholder'),
                 options=options[:25]  # Discord limit
             )
             select.callback = self.select_callback
@@ -2522,7 +2517,7 @@ class DeleteConfirmView(discord.ui.View):
                 await self.cog._refresh_ticket_types()
 
                 await interaction.response.send_message(
-                    self.cog.conf['messages'].get('ticket_type_delete_success', '已删除工单类型: {type_name}').format(type_name=self.type_name),
+                    t('tickets_new.messages.ticket_type_delete_success').format(type_name=self.type_name),
                     ephemeral=True
                 )
                 
