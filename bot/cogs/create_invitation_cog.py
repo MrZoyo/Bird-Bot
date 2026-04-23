@@ -1,16 +1,15 @@
 # bot/cogs/create_invitation_cog.py
-import discord
-from discord.ext import commands
-from discord import app_commands
-import re
-import logging
-import datetime
-import json
 import asyncio
+import datetime
+import logging
+import re
+
+import discord
+from discord import app_commands
+from discord.ext import commands
 from discord.utils import format_dt
-from pathlib import Path
-import aiofiles
-from bot.utils import config, check_channel_validity, RoleDatabaseManager
+
+from bot.utils import RoleDatabaseManager, check_channel_validity, config
 
 
 class TeamInvitationView(discord.ui.View):
@@ -438,17 +437,14 @@ class CreateInvitationCog(commands.Cog):
             await interaction.followup.send(reply_message, view=view)
 
     async def save_config(self):
-        """Save the current configuration back to the JSON file."""
-        config_path = Path('./bot/config/config_invitation.json')
-        async with aiofiles.open(config_path, 'r', encoding='utf-8') as f:
-            content = await f.read()
-            config_data = json.loads(content)
+        """Persist invitation config via the unified writer (see P2-3).
 
-        # Update the ignore_user_ids in the config data
-        config_data['ignore_channel_ids'] = self.conf['ignore_channel_ids']
-
-        async with aiofiles.open(config_path, 'w', encoding='utf-8') as f:
-            await f.write(json.dumps(config_data, indent=2, ensure_ascii=False))
+        Writes the entire ``self.conf`` snapshot back to
+        ``bot/config/invitation.yaml`` through the atomic YAML writer
+        (ruamel round-trip + tempfile + os.replace). The old manual
+        JSON I/O path is gone; a single source of truth lives in YAML.
+        """
+        await config.save_config('invitation', self.conf)
 
     @app_commands.command(name="invt_checkignorelist")
     async def check_ignore_list(self, interaction: discord.Interaction):

@@ -985,8 +985,12 @@ class RoleCog(commands.Cog):
         # Update the config
         self.role_config['signature']['time_requirement'] = minutes
 
-        # Save the updated config
-        config.save_config('role', self.role_config)
+        # Save the updated config through the unified async writer (P2-3).
+        # Pre-refactor the call was `config.save_config(...)` (sync),
+        # which never existed on Config and raised AttributeError silently
+        # through discord.py's error handler — /signature_set_requirement
+        # appeared to work but never persisted anything.
+        await config.save_config('role', self.role_config)
 
         await interaction.followup.send(
             f"Signature requirement has been updated to {minutes} minutes of voice time.",

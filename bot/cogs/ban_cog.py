@@ -1,17 +1,14 @@
 import asyncio
-import json
 import logging
 import re
 from datetime import datetime, timedelta
 from typing import Optional
-from pathlib import Path
 
-import aiofiles
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from bot.utils import config, BanDatabaseManager, check_channel_validity
+from bot.utils import BanDatabaseManager, check_channel_validity, config
 
 
 class RejoinServerView(discord.ui.View):
@@ -53,27 +50,18 @@ class BanCog(commands.Cog):
         await self.recover_tempbans()
 
     async def save_config(self):
-        """Save the current configuration back to the JSON file"""
-        config_path = Path('./bot/config/config_ban.json')
-        
+        """Persist ban config via the unified writer (see P2-3).
+
+        Delegates to ``config.save_config('ban', ...)`` which round-trips
+        through ruamel.yaml (comments on each admin role / user id entry
+        are preserved), writes atomically via tempfile + os.replace,
+        and reloads the in-memory cache. If the write fails (disk full,
+        permission error), the error is logged and state is not
+        clobbered — admins can retry.
+        """
         try:
-            # Read existing config file
-            async with aiofiles.open(config_path, 'r', encoding='utf-8') as f:
-                content = await f.read()
-                config_data = json.loads(content)
-            
-            # Update with current in-memory config
-            config_data.update(self.config_data)
-            
-            # Write back to file with proper formatting
-            async with aiofiles.open(config_path, 'w', encoding='utf-8') as f:
-                await f.write(json.dumps(config_data, indent=2, ensure_ascii=False))
-            
-            # Reload config to get updated values
-            from bot.utils.config import Config
-            config_instance = Config()
-            self.config_data = config_instance.reload_config('ban')
-            
+            reloaded = await config.save_config('ban', self.config_data)
+            self.config_data = reloaded
         except Exception as e:
             logging.error(f"Error saving ban config: {e}")
 
