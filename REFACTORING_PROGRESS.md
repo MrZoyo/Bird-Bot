@@ -56,7 +56,7 @@
 | P1 | P1-2 ban_cog 迁 cog_load | ✅ | 建表 → cog_load；recover_tempbans → on_ready 首次 |
 | P1 | P1-1 命令同步逻辑 | ✅ | sync 迁 setup_hook；on_ready 只留 presence/日志 |
 | P1+P2 | 配置系统 2.0（P1-6 + P1-4 + P2-3 + P2-5） | ✅ | step 0-9 全部完成（P1-4 最小版；pydantic 全量留 follow-up） |
-| P1 | P1-7 Slash 元数据本地化 | ⬜ | 与配置 2.0 并行/紧接 |
+| P1 | P1-7 Slash 元数据本地化 | ✅ | SlashTranslator + 176 key commands.yaml |
 | P1 | P1-3 大 cog 拆包 | ⬜ | 配置 2.0 之后 |
 | P2 | P2-1 数据库连接复用 | ⬜ | 需 close() 生命周期前置 |
 | P2 | P2-2 Schema 迁移机制 | ⬜ | |
@@ -523,6 +523,46 @@
 
 ---
 
+### P1-7 ✅ Slash 命令元数据本地化（2026-04-23）
+
+**Commit grep**: `git log --grep='(P1-7a)'` / `git log --grep='(P1-7b)'`
+
+**两条 source commit**：
+- `(P1-7a)`：基础设施 + notebook pilot。
+- `(P1-7b)`：其余 13 cog + check_status 4 slash + commands.yaml 补齐到 176 key。
+
+**结构**：
+- `bot/utils/slash_translator.py`：`app_commands.Translator` 子类。`Locale.chinese` → `zh_CN`；其他 locale 返回 `None`（Discord fallback 到 `locale_str.message` 英文字面量）。`TranslationContextLocation.{command_name,group_name,parameter_name,choice_name}` 跳过（Discord `name` 字段 ASCII 约束，中文会被拒）。其余类型从 `string.extras['key']` 读 dot-path 在 `bot/locales/<lang>/commands.yaml` 查表；miss warn-once-per-(lang,key)。
+- `bot/main.py` setup_hook：`await bot.tree.set_translator(SlashTranslator())` **在** `sync_commands_once` 之前 —— 否则注册时 Discord 拿到的 payload 没翻译。
+- `bot/locales/zh_CN/commands.yaml`：176 key，按 `<cog>.<cmd>[.params.<arg>].description` 结构。
+
+**call site 形式**：
+```python
+description=locale_str(
+    "Ban a user from the server",            # English fallback shown to non-zh-CN clients
+    key="ban.ban.description",               # dot-path into commands.yaml
+)
+```
+- `message` = 英文字面量 = non-zh-CN 用户看到的 fallback。
+- `extras['key']` = lookup key。没有 `key=` 的 `locale_str` 直接被 translator 跳过（保持纯英文行为）。
+
+**覆盖范围**：
+- 14 cog × 138 个 decorator 全迁。每个原本没有显式 `description=` 的命令（如 notebook 的 4 个）都显式补了英文 description —— 没补前 Discord 在非 zh-CN 客户端会用空描述或 docstring 里的字符串（行为依赖实现细节，不稳定）。
+- `check_status.where_is_menu` 的 ContextMenu 保留硬编码 `name='Where Is'` —— ContextMenu 走独立的 name_localizations 路径，不在 Translator 链里；留 follow-up。
+
+**验收**（运行时）：
+- 简体中文客户端：`/notebook_log` 在命令补全栏显示 `"为指定成员记录一条事件日志"`（zh_CN 命中）。
+- English 客户端：显示 `"Log an event for a specific member"`（`locale_str.message` fallback；Translator 返回 None）。
+- 未命中的 key：bot.log 里出现 `Slash translator miss (...): key=...` 一次警告，用户侧仍然看到英文 fallback。
+
+**静态校验**：`python3 -c "walk every key in /tmp/cmdkeys.txt"` —— 176 key 全部在 commands.yaml 有对应 string node，missing=0。
+
+**为什么 P1-7 和 P1-6 不混（关键设计区别）**：
+- P1-6 的 `t()`：服务器端单一 `main.locale`，bot 的回复文本统一选一门语言。
+- P1-7 的 Translator：Discord 客户端的**每个用户**分别看自己 locale 的 slash metadata，bot 不感知。二者共享 YAML 目录但是**不同的 loader**，不能让 `t()` 去读 `commands.yaml`（会混淆两种语义）。
+
+---
+
 ### P1-6.9 ✅ step 9 清理 + Config 2.0 整体收官（2026-04-23）
 
 **Commit grep**: `git log --grep='(P1-6\.9)'`
@@ -588,18 +628,18 @@
 
 ### 剩余工作（跨会话接手）
 
-Config 2.0 sprint **整体收官**（step 0-9 全 ✅）。下一轮可接手的 follow-up：
+Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅。下一轮可接手的 follow-up：
 
 **🟡 important**：
-1. 完整 P1-4 schema（pydantic / dataclass）+ per-cog locale key 对齐校验（slug-mapped 字段：starsign / mbti / gender / role_type_name）。
-2. P1-7 Slash 命令元数据本地化（`bot/utils/slash_translator.py` + `setup_hook` 注册 `bot.tree.set_translator()` + `bot/locales/zh_CN/commands.yaml`）。
-3. 迁移脚本 sanitizer 扩 ID 白名单或 snowflake-magnitude 检测（修 `admin_roles` / `admin_users` / `invite_link` 漏脱敏 bug）。
-4. nested 子树文案抽 locale：`welcome.dm.*` / `role.signature.*` / `voicechannel.control_panel.{title,footer,messages,buttons,description_template}` 目前整块留在 yaml。
+1. 完整 P1-4 schema（pydantic / dataclass）+ per-cog locale key 对齐校验（slug-mapped 字段：starsign / mbti / gender / role_type_name）+ commands.yaml key 对齐校验（一个 locale_str `key=` 漏 yaml 节点时启动 warn / fail-fast）。
+2. 迁移脚本 sanitizer 扩 ID 白名单或 snowflake-magnitude 检测（修 `admin_roles` / `admin_users` / `invite_link` 漏脱敏 bug）。
+3. nested 子树文案抽 locale：`welcome.dm.*` / `role.signature.*` / `voicechannel.control_panel.{title,footer,messages,buttons,description_template}` 目前整块留在 yaml。
 
 **🟢 nice-to-have**：
-5. P1-3 大 cog 拆包（`tickets_new_cog` / `privateroom_cog` / `ban_cog` 按 PLAN `cog.py + views.py + modals.py + embeds.py + service.py`）。
-6. P3-5 ruff（锁 P0-4 成果 + 未来裸 except 防线）。
-7. `welcome_cog.WelcomeDMView.member_count_button` 的 conf 读取路径 bug（顶层 vs dm 子树，silent fallback 到硬编码 "アルタ"）。
+4. P1-3 大 cog 拆包（`tickets_new_cog` / `privateroom_cog` / `ban_cog` 按 PLAN `cog.py + views.py + modals.py + embeds.py + service.py`）。
+5. P3-5 ruff（锁 P0-4 成果 + 未来裸 except 防线）。
+6. `welcome_cog.WelcomeDMView.member_count_button` 的 conf 读取路径 bug（顶层 vs dm 子树，silent fallback 到硬编码 "アルタ"）。
+7. P1-7 后续：`check_status.where_is_menu` 的 ContextMenu `name='Where Is'` 目前硬编码英文；Discord `ContextMenu.name` 不走 Translator 链（所有 context 不经 translate 路径），想本地化需要构造时手写 `name_localizations={Locale.chinese: '...'}` dict（与 slash name 的 ASCII 约束不同，Context Menu name 允许中文）。
 
 ---
 
