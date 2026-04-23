@@ -1,5 +1,6 @@
 # bot/utils/__init__.py
 from .config import config
+from .i18n import t
 from .privateroom_db import PrivateRoomDatabaseManager
 from .tickets_new_db import TicketsNewDatabaseManager
 from .media_handler import MediaHandler
@@ -17,6 +18,7 @@ from .role_helpers import safe_member_role_edit
 
 __all__ = [
     'config',
+    't',
     'TicketsNewDatabaseManager',
     'MediaHandler',
     'generate_file_tree',
