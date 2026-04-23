@@ -1,0 +1,4 @@
+soundboard_not_in_vc_message: 你现在不在语音频道中。
+soundboard_no_permission_message: 你不是语音频道的创建者。
+soundboard_disabled_message: 声音版功能已为所有人禁用。
+soundboard_enabled_message: 声音版功能已为所有人启用。
