@@ -376,7 +376,7 @@
 | 7 (save_config 统一) | `ban` / `role` / `create_invitation` / `tickets_new` 四处改 `await config.save_config(...)` （P2-3） | ✅ |
 | 7 (剩余 cog 文案迁移) | welcome / shop / teamup_display / achievements / giveaway / privateroom / role / voice_channel / ban / tickets_new / invitation 文案迁 `t()` | ✅ |
 | 7 (无独立 config 的 cog) | notebook / game_dnd / backup（`required_configs: []`，跳过） | ➖ |
-| 8 (P1-4) | 启动 schema 校验 | 🟡 最小版本（`main.locale` / `log_backup_count` 默认 + 现有 required key 检查）；pydantic 全量校验留 follow-up |
+| 8 (P1-4) | 启动 schema 校验 | ✅ dataclass MainConfig + validate_main_config + tools/check_locales.py 静态 key 对齐（含 commands.yaml P1-7 收尾） |
 | 9 | 清理（阶段 B `.gitignore` + 删 JSON fallback + `.json` → `old_function/`） | ✅ |
 
 ### P1-6.0 ✅ step 0: .gitignore 阶段 A + 历史泄露（2026-04-23）
@@ -523,6 +523,51 @@
 
 ---
 
+### P1-4 ✅ 完整 schema + 静态 locale key 对齐（2026-04-23）
+
+**Commit grep**: `git log --grep='(P1-4)'`（原最小版本）+ `git log --grep="(P1-4)"` 新 commit。latent-bug 修复 commit：`git log --grep='ban.*flatten'`。
+
+**三条 commit**（单次推进）：
+1. `fix(ban): flatten locale yaml to match 't(ban.KEY)' call shape` —— step 7 的 ban 迁移把 yaml 留在 `messages:` 子树下，但 cog 调 `t('ban.no_permission')`（扁平）—— 每次 `/ban` / `/tempban` / `/mute` / 管理员命令都会 KeyError 从未测过。扁平化 yaml（`messages:` 去掉、66 key 提顶）修掉。
+2. `feat(config): dataclass schema + static locale key checker (P1-4)` —— 新建 `bot/utils/config_schema.py` + `tools/check_locales.py` + 接到 `config.py`。
+3. `docs: track progress after P1-4 ...`（**本 commit**）
+
+**bot/utils/config_schema.py**：
+- `MainConfig` dataclass：每个 field 有类型 + 默认值；required (`token` / `logging_file` / `db_path` / `guild_id`) + optional + defaulted (`locale='zh_CN'` / `log_backup_count=14`)。
+- `validate_main_config(data) -> List[str]`：tolerant 返 warning list，不 raise；applies defaults in-place；检测 non-dict root / wrong-type values / feature 非 bool。
+- **零新依赖**（纯 dataclass + typing），不引 pydantic。
+- **留给后续**：per-cog schemas（`admin_roles: List[int]` / `ticket_types` 固定 key 等）shape-variable，PLAN 建议 P1-3 拆包时一并做。
+
+**bot/utils/config.py `_verify_main_config` 接到 schema**：
+```python
+def _verify_main_config(self) -> None:
+    from bot.utils.config_schema import validate_main_config
+    for warning in validate_main_config(self._configs['main']):
+        print(warning)
+```
+- 3 行，替代原来的 required_keys 列表 + setdefault 双重维护。
+- 行为等价：缺 required key 仍然 print warning + 设 None，bot 继续启动。
+
+**tools/check_locales.py**：
+- walk `bot/cogs/*.py`：两条 regex（保守、literal-string-only）抽 `t('ns.key')` / `locale_str("english", key="ns.key")`。
+- walk `bot/locales/<lang>/*.yaml`：递归所有 string leaf 转 dot-path。
+- 两组比：t() keys 对 per-cog yaml、locale_str keys 对 `commands.yaml`。
+- 报 MISSING（cog 引用但 yaml 缺）/ ORPHAN（yaml 有但没人引用，info）。exit code 非零 = 有 MISSING。
+- 设计约束：动态 key（ternary / f-string / 函数调用返回 key）不抓 —— 工具 header 明说是 "high-confidence lower bound"，不是全集。
+- **运行结果**（fix ban 扁平化之后）：502 t() keys + 170 locale_str keys 全部对齐，`RESULT: All referenced keys are present ✅`。
+
+**验收**：
+- `/tmp/yaml-venv/bin/python tools/check_locales.py` exit 0。
+- `python3 -m compileall -q bot/` 通过。
+- dataclass schema 的 4 个 smoke case（minimal / missing required / wrong type / non-dict）全通过。
+- 已知漏报（高 confidence）：voice_channel / welcome 的 nested 子树留 yaml，工具报 "no t() references" 是 info 不是 bug。
+
+**本轮顺手修的 latent bug（step 7 regression 清算）**：
+- `ban_cog` 的 99 处 `t('ban.KEY')` 调用全部 KeyError —— yaml 层级与 cog 约定不匹配。flatten yaml 修好；P1-4 工具立即收敛到 0 MISSING。
+- 没有其他 cog 有类似问题（check_locales.py 输出确认 privateroom / tickets_new / teamup_display 的 nested `messages.` 层级与 cog 里 `t('xxx.messages.*')` 对齐）。
+
+---
+
 ### P1-7 ✅ Slash 命令元数据本地化（2026-04-23）
 
 **Commit grep**: `git log --grep='(P1-7a)'` / `git log --grep='(P1-7b)'`
@@ -628,18 +673,18 @@ description=locale_str(
 
 ### 剩余工作（跨会话接手）
 
-Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅。下一轮可接手的 follow-up：
+Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅；P1-4 dataclass schema + 静态 key 对齐 ✅。下一轮可接手的 follow-up：
 
 **🟡 important**：
-1. 完整 P1-4 schema（pydantic / dataclass）+ per-cog locale key 对齐校验（slug-mapped 字段：starsign / mbti / gender / role_type_name）+ commands.yaml key 对齐校验（一个 locale_str `key=` 漏 yaml 节点时启动 warn / fail-fast）。
-2. 迁移脚本 sanitizer 扩 ID 白名单或 snowflake-magnitude 检测（修 `admin_roles` / `admin_users` / `invite_link` 漏脱敏 bug）。
-3. nested 子树文案抽 locale：`welcome.dm.*` / `role.signature.*` / `voicechannel.control_panel.{title,footer,messages,buttons,description_template}` 目前整块留在 yaml。
+1. 迁移脚本 sanitizer 扩 ID 白名单或 snowflake-magnitude 检测（修 `admin_roles` / `admin_users` / `invite_link` 漏脱敏 bug）。
+2. nested 子树文案抽 locale：`welcome.dm.*` / `role.signature.*` / `voicechannel.control_panel.{title,footer,messages,buttons,description_template}` 目前整块留在 yaml。完成后 `check_locales.py` 的 `voicechannel.yaml has no t() references` info 会消失。
+3. per-cog 配置 schema（shop / ban / tickets_new / voicechannel / privateroom 等）：按 P1-3 拆包时一并添加，把 `admin_roles: List[int]` / `ticket_types: Dict[str, TicketType]` 等固定形状字段锁死。
 
 **🟢 nice-to-have**：
 4. P1-3 大 cog 拆包（`tickets_new_cog` / `privateroom_cog` / `ban_cog` 按 PLAN `cog.py + views.py + modals.py + embeds.py + service.py`）。
 5. P3-5 ruff（锁 P0-4 成果 + 未来裸 except 防线）。
 6. `welcome_cog.WelcomeDMView.member_count_button` 的 conf 读取路径 bug（顶层 vs dm 子树，silent fallback 到硬编码 "アルタ"）。
-7. P1-7 后续：`check_status.where_is_menu` 的 ContextMenu `name='Where Is'` 目前硬编码英文；Discord `ContextMenu.name` 不走 Translator 链（所有 context 不经 translate 路径），想本地化需要构造时手写 `name_localizations={Locale.chinese: '...'}` dict（与 slash name 的 ASCII 约束不同，Context Menu name 允许中文）。
+7. P1-7 后续：`check_status.where_is_menu` 的 ContextMenu `name='Where Is'` 目前硬编码英文；Discord `ContextMenu.name` 不走 Translator 链，想本地化需要构造时手写 `name_localizations={Locale.chinese: '...'}` dict。
 
 ---
 
