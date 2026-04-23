@@ -9,6 +9,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from bot.utils import BanDatabaseManager, check_channel_validity, config
+from bot.utils.i18n import t
 
 
 class RejoinServerView(discord.ui.View):
@@ -271,15 +272,14 @@ class BanCog(commands.Cog):
             logging.error(f"Bot lacks Embed Links permission in channel {channel_id}")
             return
 
-        messages = self.config_data.get('messages', {})
 
         # Create embed
         if duration:
-            title = messages.get('tempban_notification_title', 'User Temporarily Banned')
-            description = messages.get('tempban_notification_description', 'User {user} has been temporarily banned')
+            title = t('ban.tempban_notification_title')
+            description = t('ban.tempban_notification_description')
         else:
-            title = messages.get('ban_notification_title', 'User Banned')
-            description = messages.get('ban_notification_description', 'User {user} has been banned')
+            title = t('ban.ban_notification_title')
+            description = t('ban.ban_notification_description')
 
         embed = discord.Embed(
             title=title,
@@ -300,28 +300,28 @@ class BanCog(commands.Cog):
 
         # Add fields
         embed.add_field(
-            name=messages.get('reason_field', 'Reason'),
-            value=reason or messages.get('no_reason', 'No reason provided'),
+            name=t('ban.reason_field'),
+            value=reason or t('ban.no_reason'),
             inline=False
         )
 
         if duration:
             embed.add_field(
-                name=messages.get('duration_field', 'Duration'),
+                name=t('ban.duration_field'),
                 value=duration,
                 inline=True
             )
 
             if unban_time:
                 embed.add_field(
-                    name=messages.get('unban_time_field', 'Unban Time'),
+                    name=t('ban.unban_time_field'),
                     value=f"<t:{int(unban_time.timestamp())}:F>",
                     inline=True
                 )
         else:
             embed.add_field(
-                name=messages.get('duration_field', 'Duration'),
-                value=messages.get('permanent', 'Permanent'),
+                name=t('ban.duration_field'),
+                value=t('ban.permanent'),
                 inline=True
             )
 
@@ -345,11 +345,10 @@ class BanCog(commands.Cog):
         if not channel:
             return
         
-        messages = self.config_data.get('messages', {})
         
         # Create embed
-        title = messages.get('mute_notification_title', 'User Muted')
-        description = messages.get('mute_notification_description', 'User {user} has been muted')
+        title = t('ban.mute_notification_title')
+        description = t('ban.mute_notification_description')
         
         embed = discord.Embed(
             title=title,
@@ -370,19 +369,19 @@ class BanCog(commands.Cog):
         
         # Add fields
         embed.add_field(
-            name=messages.get('mute_reason_field', 'Reason'),
-            value=reason or messages.get('no_reason', 'No reason provided'),
+            name=t('ban.mute_reason_field'),
+            value=reason or t('ban.no_reason'),
             inline=False
         )
         
         embed.add_field(
-            name=messages.get('mute_duration_field', 'Duration'),
+            name=t('ban.mute_duration_field'),
             value=duration,
             inline=True
         )
         
         embed.add_field(
-            name=messages.get('mute_end_time_field', 'Unmute Time'),
+            name=t('ban.mute_end_time_field'),
             value=f"<t:{int(unmute_time.timestamp())}:F>",
             inline=True
         )
@@ -395,12 +394,11 @@ class BanCog(commands.Cog):
     async def send_tempban_dm(self, user: discord.User, guild: discord.Guild, reason: str, duration: str, unban_time: datetime):
         """Send tempban notification DM to user"""
         try:
-            messages = self.config_data.get('messages', {})
             
             # Create embed for DM
             embed = discord.Embed(
-                title=messages.get('tempban_dm_title', 'You have been temporarily banned'),
-                description=messages.get('tempban_dm_description', 'You have been temporarily banned from **{guild_name}**.').format(guild_name=guild.name),
+                title=t('ban.tempban_dm_title'),
+                description=t('ban.tempban_dm_description').format(guild_name=guild.name),
                 color=discord.Color.orange(),
                 timestamp=discord.utils.utcnow()
             )
@@ -411,26 +409,26 @@ class BanCog(commands.Cog):
             
             # Add fields
             embed.add_field(
-                name=messages.get('tempban_dm_reason_field', 'Reason'),
+                name=t('ban.tempban_dm_reason_field'),
                 value=reason,
                 inline=False
             )
             
             embed.add_field(
-                name=messages.get('tempban_dm_duration_field', 'Duration'),
+                name=t('ban.tempban_dm_duration_field'),
                 value=duration,
                 inline=True
             )
             
             embed.add_field(
-                name=messages.get('tempban_dm_unban_time_field', 'Unban Time'),
+                name=t('ban.tempban_dm_unban_time_field'),
                 value=f"<t:{int(unban_time.timestamp())}:F>",
                 inline=True
             )
             
             # Set footer
             embed.set_footer(
-                text=messages.get('tempban_dm_footer', 'You can rejoin the server after the ban ends.'),
+                text=t('ban.tempban_dm_footer'),
                 icon_url=user.display_avatar.url
             )
             
@@ -438,7 +436,7 @@ class BanCog(commands.Cog):
             view = None
             invite_link = self.config_data.get('invite_link')
             if invite_link:
-                view = RejoinServerView(invite_link, messages.get('rejoin_button_label', 'Rejoin Server'))
+                view = RejoinServerView(invite_link, t('ban.rejoin_button_label'))
             
             # Send DM
             await user.send(embed=embed, view=view)
@@ -452,12 +450,11 @@ class BanCog(commands.Cog):
     async def send_mute_dm(self, user: discord.User, guild: discord.Guild, reason: str, duration: str, unmute_time: datetime):
         """Send mute notification DM to user"""
         try:
-            messages = self.config_data.get('messages', {})
             
             # Create embed for DM
             embed = discord.Embed(
-                title=messages.get('mute_dm_title', 'You have been muted'),
-                description=messages.get('mute_dm_description', 'You have been muted in **{guild_name}**.').format(guild_name=guild.name),
+                title=t('ban.mute_dm_title'),
+                description=t('ban.mute_dm_description').format(guild_name=guild.name),
                 color=discord.Color.yellow(),
                 timestamp=discord.utils.utcnow()
             )
@@ -468,26 +465,26 @@ class BanCog(commands.Cog):
             
             # Add fields
             embed.add_field(
-                name=messages.get('mute_dm_reason_field', 'Reason'),
+                name=t('ban.mute_dm_reason_field'),
                 value=reason,
                 inline=False
             )
             
             embed.add_field(
-                name=messages.get('mute_dm_duration_field', 'Duration'),
+                name=t('ban.mute_dm_duration_field'),
                 value=duration,
                 inline=True
             )
             
             embed.add_field(
-                name=messages.get('mute_dm_unmute_time_field', 'Unmute Time'),
+                name=t('ban.mute_dm_unmute_time_field'),
                 value=f"<t:{int(unmute_time.timestamp())}:F>",
                 inline=True
             )
             
             # Set footer
             embed.set_footer(
-                text=messages.get('mute_dm_footer', 'You can speak again after the mute ends.'),
+                text=t('ban.mute_dm_footer'),
                 icon_url=user.display_avatar.url
             )
             
@@ -551,9 +548,8 @@ class BanCog(commands.Cog):
         delete_message_days: Optional[int] = 0
     ):
         if not await self.has_ban_permission(interaction):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('no_permission', 'You do not have permission to use this command.'),
+                t('ban.no_permission'),
                 ephemeral=False
             )
             return
@@ -562,9 +558,8 @@ class BanCog(commands.Cog):
         if delete_message_days is None:
             delete_message_days = 0
         elif delete_message_days < 0 or delete_message_days > 7:
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('invalid_delete_days', 'Delete message days must be between 0 and 7.'),
+                t('ban.invalid_delete_days'),
                 ephemeral=False
             )
             return
@@ -578,9 +573,8 @@ class BanCog(commands.Cog):
             )
             
             # Send success response
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('ban_success', 'User {user} has been banned.').format(user=user.mention),
+                t('ban.ban_success').format(user=user.mention),
                 ephemeral=False
             )
             
@@ -590,15 +584,13 @@ class BanCog(commands.Cog):
             logging.info(f"User {user.id} banned by {interaction.user.id} in guild {interaction.guild.id}")
             
         except discord.Forbidden:
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('ban_failed_permissions', 'Failed to ban user. Missing permissions.'),
+                t('ban.ban_failed_permissions'),
                 ephemeral=False
             )
         except discord.HTTPException as e:
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('ban_failed_error', 'Failed to ban user due to an error.'),
+                t('ban.ban_failed_error'),
                 ephemeral=False
             )
             logging.error(f"Failed to ban user {user.id}: {e}")
@@ -619,9 +611,8 @@ class BanCog(commands.Cog):
         delete_message_days: Optional[int] = 0
     ):
         if not await self.has_ban_permission(interaction):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('no_permission', 'You do not have permission to use this command.'),
+                t('ban.no_permission'),
                 ephemeral=False
             )
             return
@@ -629,18 +620,16 @@ class BanCog(commands.Cog):
         # Parse duration
         ban_duration = self.parse_duration(duration)
         if not ban_duration:
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('invalid_duration', 'Invalid duration format. Use formats like: 1m, 1h, 1d, 1w (minimum 1 minute).'),
+                t('ban.invalid_duration'),
                 ephemeral=False
             )
             return
         
         # Check minimum duration (1 minute)
         if ban_duration < timedelta(minutes=1):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('duration_too_short', 'Ban duration must be at least 1 minute.'),
+                t('ban.duration_too_short'),
                 ephemeral=False
             )
             return
@@ -649,9 +638,8 @@ class BanCog(commands.Cog):
         if delete_message_days is None:
             delete_message_days = 0
         elif delete_message_days < 0 or delete_message_days > 7:
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('invalid_delete_days', 'Delete message days must be between 0 and 7.'),
+                t('ban.invalid_delete_days'),
                 ephemeral=False
             )
             return
@@ -660,9 +648,8 @@ class BanCog(commands.Cog):
             # Check if user already has an active tempban
             existing_tempban = await self.db.get_user_tempban(user.id, interaction.guild.id)
             if existing_tempban:
-                messages = self.config_data.get('messages', {})
                 await interaction.response.send_message(
-                    messages.get('user_already_tempbanned', 'User {user} already has an active temporary ban. Please unban them first or wait for the current ban to expire.').format(user=user.mention),
+                    t('ban.user_already_tempbanned').format(user=user.mention),
                     ephemeral=False
                 )
                 return
@@ -694,9 +681,8 @@ class BanCog(commands.Cog):
             await self.schedule_unban_with_db(interaction.guild, user, unban_time, tempban_id)
             
             # Send success response
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('tempban_success', 'User {user} has been temporarily banned for {duration}.').format(
+                t('ban.tempban_success').format(
                     user=user.mention,
                     duration=duration
                 ),
@@ -709,15 +695,13 @@ class BanCog(commands.Cog):
             logging.info(f"User {user.id} temporarily banned for {duration} by {interaction.user.id} in guild {interaction.guild.id}")
             
         except discord.Forbidden:
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('ban_failed_permissions', 'Failed to ban user. Missing permissions.'),
+                t('ban.ban_failed_permissions'),
                 ephemeral=False
             )
         except discord.HTTPException as e:
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('ban_failed_error', 'Failed to ban user due to an error.'),
+                t('ban.ban_failed_error'),
                 ephemeral=False
             )
             logging.error(f"Failed to temporarily ban user {user.id}: {e}")
@@ -736,9 +720,8 @@ class BanCog(commands.Cog):
         reason: str
     ):
         if not await self.has_ban_permission(interaction):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('no_permission', 'You do not have permission to use this command.'),
+                t('ban.no_permission'),
                 ephemeral=False
             )
             return
@@ -746,27 +729,24 @@ class BanCog(commands.Cog):
         # Parse duration
         mute_duration = self.parse_duration(duration)
         if not mute_duration:
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('invalid_duration', 'Invalid duration format. Use formats like: 1m, 1h, 1d, 1w (minimum 1 minute).'),
+                t('ban.invalid_duration'),
                 ephemeral=False
             )
             return
         
         # Check minimum duration (1 minute)
         if mute_duration < timedelta(minutes=1):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('duration_too_short', 'Mute duration must be at least 1 minute.'),
+                t('ban.duration_too_short'),
                 ephemeral=False
             )
             return
         
         # Check maximum duration (28 days - Discord timeout limit)
         if mute_duration > timedelta(days=28):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('mute_duration_too_long', 'Mute duration cannot exceed 28 days (Discord limit).'),
+                t('ban.mute_duration_too_long'),
                 ephemeral=False
             )
             return
@@ -782,9 +762,8 @@ class BanCog(commands.Cog):
             await user.timeout(unmute_time, reason=reason)
             
             # Send success response
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('mute_success', 'User {user} has been muted for {duration}.').format(
+                t('ban.mute_success').format(
                     user=user.mention,
                     duration=duration
                 ),
@@ -797,15 +776,13 @@ class BanCog(commands.Cog):
             logging.info(f"User {user.id} muted for {duration} by {interaction.user.id} in guild {interaction.guild.id}")
             
         except discord.Forbidden:
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('mute_failed_permissions', 'Failed to mute user. Missing permissions.'),
+                t('ban.mute_failed_permissions'),
                 ephemeral=False
             )
         except discord.HTTPException as e:
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('mute_failed_error', 'Failed to mute user due to an error.'),
+                t('ban.mute_failed_error'),
                 ephemeral=False
             )
             logging.error(f"Failed to mute user {user.id}: {e}")
@@ -815,18 +792,16 @@ class BanCog(commands.Cog):
         """Show current ban admin permissions"""
         # Check if user has permission
         if not await self.has_ban_permission(interaction):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('no_permission', 'You do not have permission to use this command.'),
+                t('ban.no_permission'),
                 ephemeral=False
             )
             return
         
         # Check if in admin channel
         if not await self.is_admin_channel_only_check(interaction):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('admin_channel_only', 'This command can only be used in the admin channel.'),
+                t('ban.admin_channel_only'),
                 ephemeral=False
             )
             return
@@ -835,9 +810,8 @@ class BanCog(commands.Cog):
         admin_roles = self.config_data.get('admin_roles', [])
         admin_users = self.config_data.get('admin_users', [])
         
-        messages = self.config_data.get('messages', {})
         embed = discord.Embed(
-            title=messages.get('admin_list_title', 'Ban Admin Permissions'),
+            title=t('ban.admin_list_title'),
             color=discord.Color.blue(),
             timestamp=discord.utils.utcnow()
         )
@@ -853,14 +827,14 @@ class BanCog(commands.Cog):
                     role_mentions.append(f"<@&{role_id}> (不存在)")
             
             embed.add_field(
-                name=messages.get('admin_roles_title', 'Admin Roles'),
-                value='\n'.join(role_mentions) if role_mentions else messages.get('none', 'None'),
+                name=t('ban.admin_roles_title'),
+                value='\n'.join(role_mentions) if role_mentions else t('ban.none'),
                 inline=False
             )
         else:
             embed.add_field(
-                name=messages.get('admin_roles_title', 'Admin Roles'),
-                value=messages.get('none', 'None'),
+                name=t('ban.admin_roles_title'),
+                value=t('ban.none'),
                 inline=False
             )
         
@@ -875,14 +849,14 @@ class BanCog(commands.Cog):
                     user_mentions.append(f"<@{user_id}> (不存在)")
             
             embed.add_field(
-                name=messages.get('admin_users_title', 'Admin Users'),
-                value='\n'.join(user_mentions) if user_mentions else messages.get('none', 'None'),
+                name=t('ban.admin_users_title'),
+                value='\n'.join(user_mentions) if user_mentions else t('ban.none'),
                 inline=False
             )
         else:
             embed.add_field(
-                name=messages.get('admin_users_title', 'Admin Users'),
-                value=messages.get('none', 'None'),
+                name=t('ban.admin_users_title'),
+                value=t('ban.none'),
                 inline=False
             )
         
@@ -895,10 +869,10 @@ class BanCog(commands.Cog):
             else:
                 channel_text = f"<#{notification_channel_id}> (不存在)"
         else:
-            channel_text = messages.get('none', 'None')
+            channel_text = t('ban.none')
         
         embed.add_field(
-            name=messages.get('notification_channel_title', 'Notification Channel'),
+            name=t('ban.notification_channel_title'),
             value=channel_text,
             inline=False
         )
@@ -908,7 +882,7 @@ class BanCog(commands.Cog):
         if invite_link:
             invite_text = f"[点击查看]({invite_link})"
         else:
-            invite_text = messages.get('none', 'None')
+            invite_text = t('ban.none')
         
         embed.add_field(
             name="🔗 邀请链接",
@@ -918,7 +892,7 @@ class BanCog(commands.Cog):
         
         # Set footer with admin note
         embed.set_footer(
-            text=messages.get('admin_note', 'Users with Administrator permission can also use ban commands.')
+            text=t('ban.admin_note')
         )
         
         await interaction.response.send_message(embed=embed, ephemeral=False)
@@ -929,18 +903,16 @@ class BanCog(commands.Cog):
         """Add a role to ban admin permissions"""
         # Check if user has permission
         if not await self.has_ban_permission(interaction):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('no_permission', 'You do not have permission to use this command.'),
+                t('ban.no_permission'),
                 ephemeral=False
             )
             return
         
         # Check if in admin channel
         if not await self.is_admin_channel_only_check(interaction):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('admin_channel_only', 'This command can only be used in the admin channel.'),
+                t('ban.admin_channel_only'),
                 ephemeral=False
             )
             return
@@ -948,9 +920,8 @@ class BanCog(commands.Cog):
         # Check if role is already in admin roles
         admin_roles = self.config_data.get('admin_roles', [])
         if role.id in admin_roles:
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('role_already_admin', 'Role {role} is already an admin role.').format(role=role.mention),
+                t('ban.role_already_admin').format(role=role.mention),
                 ephemeral=False
             )
             return
@@ -962,9 +933,8 @@ class BanCog(commands.Cog):
         # Save config
         await self.save_config()
         
-        messages = self.config_data.get('messages', {})
         await interaction.response.send_message(
-            messages.get('role_added_success', 'Role {role} has been added to ban admin permissions.').format(role=role.mention),
+            t('ban.role_added_success').format(role=role.mention),
             ephemeral=False
         )
 
@@ -974,18 +944,16 @@ class BanCog(commands.Cog):
         """Remove a role from ban admin permissions"""
         # Check if user has permission
         if not await self.has_ban_permission(interaction):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('no_permission', 'You do not have permission to use this command.'),
+                t('ban.no_permission'),
                 ephemeral=False
             )
             return
         
         # Check if in admin channel
         if not await self.is_admin_channel_only_check(interaction):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('admin_channel_only', 'This command can only be used in the admin channel.'),
+                t('ban.admin_channel_only'),
                 ephemeral=False
             )
             return
@@ -993,9 +961,8 @@ class BanCog(commands.Cog):
         # Check if role is in admin roles
         admin_roles = self.config_data.get('admin_roles', [])
         if role.id not in admin_roles:
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('role_not_admin', 'Role {role} is not an admin role.').format(role=role.mention),
+                t('ban.role_not_admin').format(role=role.mention),
                 ephemeral=False
             )
             return
@@ -1007,9 +974,8 @@ class BanCog(commands.Cog):
         # Save config
         await self.save_config()
         
-        messages = self.config_data.get('messages', {})
         await interaction.response.send_message(
-            messages.get('role_removed_success', 'Role {role} has been removed from ban admin permissions.').format(role=role.mention),
+            t('ban.role_removed_success').format(role=role.mention),
             ephemeral=False
         )
 
@@ -1019,18 +985,16 @@ class BanCog(commands.Cog):
         """Add a user to ban admin permissions"""
         # Check if user has permission
         if not await self.has_ban_permission(interaction):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('no_permission', 'You do not have permission to use this command.'),
+                t('ban.no_permission'),
                 ephemeral=False
             )
             return
         
         # Check if in admin channel
         if not await self.is_admin_channel_only_check(interaction):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('admin_channel_only', 'This command can only be used in the admin channel.'),
+                t('ban.admin_channel_only'),
                 ephemeral=False
             )
             return
@@ -1038,9 +1002,8 @@ class BanCog(commands.Cog):
         # Check if user is already in admin users
         admin_users = self.config_data.get('admin_users', [])
         if user.id in admin_users:
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('user_already_admin', 'User {user} is already an admin user.').format(user=user.mention),
+                t('ban.user_already_admin').format(user=user.mention),
                 ephemeral=False
             )
             return
@@ -1052,9 +1015,8 @@ class BanCog(commands.Cog):
         # Save config
         await self.save_config()
         
-        messages = self.config_data.get('messages', {})
         await interaction.response.send_message(
-            messages.get('user_added_success', 'User {user} has been added to ban admin permissions.').format(user=user.mention),
+            t('ban.user_added_success').format(user=user.mention),
             ephemeral=False
         )
 
@@ -1064,18 +1026,16 @@ class BanCog(commands.Cog):
         """Remove a user from ban admin permissions"""
         # Check if user has permission
         if not await self.has_ban_permission(interaction):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('no_permission', 'You do not have permission to use this command.'),
+                t('ban.no_permission'),
                 ephemeral=False
             )
             return
         
         # Check if in admin channel
         if not await self.is_admin_channel_only_check(interaction):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('admin_channel_only', 'This command can only be used in the admin channel.'),
+                t('ban.admin_channel_only'),
                 ephemeral=False
             )
             return
@@ -1083,9 +1043,8 @@ class BanCog(commands.Cog):
         # Check if user is in admin users
         admin_users = self.config_data.get('admin_users', [])
         if user.id not in admin_users:
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('user_not_admin', 'User {user} is not an admin user.').format(user=user.mention),
+                t('ban.user_not_admin').format(user=user.mention),
                 ephemeral=False
             )
             return
@@ -1097,9 +1056,8 @@ class BanCog(commands.Cog):
         # Save config
         await self.save_config()
         
-        messages = self.config_data.get('messages', {})
         await interaction.response.send_message(
-            messages.get('user_removed_success', 'User {user} has been removed from ban admin permissions.').format(user=user.mention),
+            t('ban.user_removed_success').format(user=user.mention),
             ephemeral=False
         )
 
@@ -1109,18 +1067,16 @@ class BanCog(commands.Cog):
         """Set the ban notification channel"""
         # Check if user has permission
         if not await self.has_ban_permission(interaction):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('no_permission', 'You do not have permission to use this command.'),
+                t('ban.no_permission'),
                 ephemeral=False
             )
             return
         
         # Check if in admin channel
         if not await self.is_admin_channel_only_check(interaction):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('admin_channel_only', 'This command can only be used in the admin channel.'),
+                t('ban.admin_channel_only'),
                 ephemeral=False
             )
             return
@@ -1131,9 +1087,8 @@ class BanCog(commands.Cog):
         # Save config
         await self.save_config()
         
-        messages = self.config_data.get('messages', {})
         await interaction.response.send_message(
-            messages.get('notification_channel_set', 'Ban notification channel has been set to {channel}.').format(channel=channel.mention),
+            t('ban.notification_channel_set').format(channel=channel.mention),
             ephemeral=False
         )
 
@@ -1142,27 +1097,24 @@ class BanCog(commands.Cog):
         """Remove the ban notification channel"""
         # Check if user has permission
         if not await self.has_ban_permission(interaction):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('no_permission', 'You do not have permission to use this command.'),
+                t('ban.no_permission'),
                 ephemeral=False
             )
             return
         
         # Check if in admin channel
         if not await self.is_admin_channel_only_check(interaction):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('admin_channel_only', 'This command can only be used in the admin channel.'),
+                t('ban.admin_channel_only'),
                 ephemeral=False
             )
             return
         
         # Check if notification channel is set
         if not self.config_data.get('ban_notification_channel_id'):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('notification_channel_not_set', 'Ban notification channel is not set.'),
+                t('ban.notification_channel_not_set'),
                 ephemeral=False
             )
             return
@@ -1173,9 +1125,8 @@ class BanCog(commands.Cog):
         # Save config
         await self.save_config()
         
-        messages = self.config_data.get('messages', {})
         await interaction.response.send_message(
-            messages.get('notification_channel_removed', 'Ban notification channel has been removed.'),
+            t('ban.notification_channel_removed'),
             ephemeral=False
         )
 
@@ -1185,18 +1136,16 @@ class BanCog(commands.Cog):
         """Set the invite link for tempbanned users"""
         # Check if user has permission
         if not await self.has_ban_permission(interaction):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('no_permission', 'You do not have permission to use this command.'),
+                t('ban.no_permission'),
                 ephemeral=False
             )
             return
         
         # Check if in admin channel
         if not await self.is_admin_channel_only_check(interaction):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('admin_channel_only', 'This command can only be used in the admin channel.'),
+                t('ban.admin_channel_only'),
                 ephemeral=False
             )
             return
@@ -1215,9 +1164,8 @@ class BanCog(commands.Cog):
         # Save config
         await self.save_config()
         
-        messages = self.config_data.get('messages', {})
         await interaction.response.send_message(
-            messages.get('invite_link_set', 'Invite link has been set to: {link}').format(link=invite_link),
+            t('ban.invite_link_set').format(link=invite_link),
             ephemeral=False
         )
 
@@ -1228,9 +1176,8 @@ class BanCog(commands.Cog):
         """List all active temporary bans in the server"""
         # Check if user has permission
         if not await self.has_ban_permission(interaction):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('no_permission', 'You do not have permission to use this command.'),
+                t('ban.no_permission'),
                 ephemeral=False
             )
             return
@@ -1239,16 +1186,14 @@ class BanCog(commands.Cog):
             active_tempbans = await self.db.get_active_tempbans(interaction.guild.id)
             
             if not active_tempbans:
-                messages = self.config_data.get('messages', {})
                 await interaction.response.send_message(
-                    messages.get('no_active_tempbans', '✅ 当前没有活跃的临时封禁。'),
+                    t('ban.no_active_tempbans'),
                     ephemeral=False
                 )
                 return
             
-            messages = self.config_data.get('messages', {})
             embed = discord.Embed(
-                title=messages.get('active_tempbans_title', '⏰ 活跃临时封禁列表'),
+                title=t('ban.active_tempbans_title'),
                 color=discord.Color.orange(),
                 timestamp=discord.utils.utcnow()
             )
@@ -1286,9 +1231,8 @@ class BanCog(commands.Cog):
             
         except Exception as e:
             logging.error(f"Error listing tempbans: {e}")
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('tempban_list_error', '❌ 获取临时封禁列表时出错。'),
+                t('ban.tempban_list_error'),
                 ephemeral=False
             )
 
@@ -1297,27 +1241,24 @@ class BanCog(commands.Cog):
         """Remove the invite link for tempbanned users"""
         # Check if user has permission
         if not await self.has_ban_permission(interaction):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('no_permission', 'You do not have permission to use this command.'),
+                t('ban.no_permission'),
                 ephemeral=False
             )
             return
         
         # Check if in admin channel
         if not await self.is_admin_channel_only_check(interaction):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('admin_channel_only', 'This command can only be used in the admin channel.'),
+                t('ban.admin_channel_only'),
                 ephemeral=False
             )
             return
         
         # Check if invite link is set
         if not self.config_data.get('invite_link'):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('invite_link_not_set', 'Invite link is not set.'),
+                t('ban.invite_link_not_set'),
                 ephemeral=False
             )
             return
@@ -1328,9 +1269,8 @@ class BanCog(commands.Cog):
         # Save config
         await self.save_config()
         
-        messages = self.config_data.get('messages', {})
         await interaction.response.send_message(
-            messages.get('invite_link_removed', 'Invite link has been removed.'),
+            t('ban.invite_link_removed'),
             ephemeral=False
         )
 
@@ -1338,9 +1278,8 @@ class BanCog(commands.Cog):
     async def mute_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         """Handle mute command errors"""
         if isinstance(error, app_commands.TransformerError):
-            messages = self.config_data.get('messages', {})
             await interaction.response.send_message(
-                messages.get('member_not_found', 'Could not find that member in the server. Please make sure the user is in the server and try again.'),
+                t('ban.member_not_found'),
                 ephemeral=False
             )
         else:
