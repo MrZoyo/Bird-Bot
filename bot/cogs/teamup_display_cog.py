@@ -1,41 +1,37 @@
 # bot/cogs/teamup_display_cog.py
-import discord
-from discord.ext import commands, tasks
-from discord import app_commands
-import re
-from datetime import datetime, timedelta, timezone
 import logging
-from typing import Dict, List, Optional
+import re
+from datetime import datetime
+from typing import Dict
+
+import discord
+from discord import app_commands
+from discord.ext import commands, tasks
 
 from bot.utils import config
 from bot.utils.channel_validator import check_channel_validity
+from bot.utils.i18n import t
 from bot.utils.teamup_display_manager import TeamupDisplayManager
 
 
 class TeamupDisplayCog(commands.Cog):
     """Teamup information display board functionality"""
-    
+
     def __init__(self, bot):
         self.bot = bot
         self.main_config = config.get_config('main')
         self.db_path = self.main_config['db_path']
         self.db_manager = TeamupDisplayManager(self.db_path)
-        
-        self.conf = config.get_config('teamup_display')
-        
-        # Message configuration
-        self.messages = self.conf['messages']
-        
-        # Display configuration
-        self.display_config = self.conf['display']
+
+        # Data fields stay in YAML; the messages subtree lives in
+        # bot/locales/zh_CN/teamup_display.yaml and is read via t().
+        conf = config.get_config('teamup_display')
+        self.display_config = conf['display']
         self.max_content_length = self.display_config['max_content_length']
         self.embed_color = self.display_config['embed_color']
         self.refresh_interval = self.display_config['refresh_interval_minutes']
-        
-        # Emoji configuration
-        self.emojis = self.conf['emojis']
-        
-        # Start scheduled tasks
+        self.emojis = conf['emojis']
+
         self.refresh_displays.start()
     
     def cog_unload(self):
@@ -80,12 +76,12 @@ class TeamupDisplayCog(commands.Cog):
             # Use Discord's relative time formatting
             return discord.utils.format_dt(created_time, style='R')
         except Exception:
-            return self.messages['time_just_now']
+            return t('teamup_display.messages.time_just_now')
     
     async def create_display_embed(self) -> discord.Embed:
         """Create display board embed"""
         embed = discord.Embed(
-            title=self.messages['display_title'],
+            title=t('teamup_display.messages.display_title'),
             color=self.embed_color
         )
         
@@ -93,7 +89,7 @@ class TeamupDisplayCog(commands.Cog):
         invitations = await self.db_manager.get_active_invitations()
         
         if not invitations:
-            embed.description = self.messages['no_teamup_message']
+            embed.description = t('teamup_display.messages.no_teamup_message')
         else:
             # Get game type configurations
             game_types = await self.db_manager.get_all_game_types()
@@ -144,7 +140,7 @@ class TeamupDisplayCog(commands.Cog):
                 
                 # Only add section title if there are valid lines
                 if valid_general_lines:
-                    embed_content.append(f"\n**{self.messages['general_teamup_title']}**")
+                    embed_content.append(f"\n**{t('teamup_display.messages.general_teamup_title')}**")
                     for i, line in enumerate(valid_general_lines):
                         embed_content.append(line)
                         # Add space between invitations of the same type (but not after the last one)
@@ -154,13 +150,13 @@ class TeamupDisplayCog(commands.Cog):
             if embed_content:
                 embed.description = "\n".join(embed_content)
             else:
-                embed.description = self.messages['no_teamup_message']
+                embed.description = t('teamup_display.messages.no_teamup_message')
         
         # Add footer with bot avatar
         if self.bot.user.avatar:
-            embed.set_footer(text=self.messages['footer_text'], icon_url=self.bot.user.avatar.url)
+            embed.set_footer(text=t('teamup_display.messages.footer_text'), icon_url=self.bot.user.avatar.url)
         else:
-            embed.set_footer(text=self.messages['footer_text'])
+            embed.set_footer(text=t('teamup_display.messages.footer_text'))
         
         return embed
     
@@ -184,7 +180,7 @@ class TeamupDisplayCog(commands.Cog):
         
         # Get user
         user = self.bot.get_user(invitation['user_id'])
-        username = user.display_name if user else self.messages['unknown_user']
+        username = user.display_name if user else t('teamup_display.messages.unknown_user')
         
         # Format time
         time_ago = self.format_time_ago(invitation['created_at'])
@@ -194,19 +190,19 @@ class TeamupDisplayCog(commands.Cog):
         channel_link = f"https://discord.com/channels/{guild_id}/{invitation['voice_channel_id']}"
         
         # Format invitation lines using config templates
-        line1 = self.messages['invitation_format']['line1'].format(
+        line1 = t('teamup_display.messages.invitation_format.line1').format(
             search_emoji=self.emojis['search'],
             content=content
         )
-        line2 = self.messages['invitation_format']['line2'].format(
+        line2 = t('teamup_display.messages.invitation_format.line2').format(
             players_emoji=self.emojis['players'],
-            room_count_prefix=self.messages['room_count_prefix'],
+            room_count_prefix=t('teamup_display.messages.room_count_prefix'),
             player_count=invitation['player_count'],
-            players_suffix=self.messages['players_suffix'],
+            players_suffix=t('teamup_display.messages.players_suffix'),
             time_emoji=self.emojis['time'],
             time_ago=time_ago
         )
-        line3 = self.messages['invitation_format']['line3'].format(
+        line3 = t('teamup_display.messages.invitation_format.line3').format(
             link_emoji=self.emojis['link'],
             channel_link=channel_link
         )
@@ -290,7 +286,7 @@ class TeamupDisplayCog(commands.Cog):
         try:
             # Check permissions
             if not channel.permissions_for(interaction.guild.me).send_messages:
-                await interaction.followup.send(self.messages['permission_error'], ephemeral=True)
+                await interaction.followup.send(t('teamup_display.messages.permission_error'), ephemeral=True)
                 return
             
             # Create display board embed
@@ -304,15 +300,15 @@ class TeamupDisplayCog(commands.Cog):
             
             if success:
                 await interaction.followup.send(
-                    f"{self.messages['init_success']}\n"
-                    f"{self.messages['board_created_in']} {channel.mention}"
+                    f"{t('teamup_display.messages.init_success')}\n"
+                    f"{t('teamup_display.messages.board_created_in')} {channel.mention}"
                 )
             else:
-                await interaction.followup.send(self.messages['init_error'], ephemeral=True)
+                await interaction.followup.send(t('teamup_display.messages.init_error'), ephemeral=True)
             
         except Exception as e:
             logging.error(f"Failed to create display board: {e}")
-            await interaction.followup.send(self.messages['init_error'], ephemeral=True)
+            await interaction.followup.send(t('teamup_display.messages.init_error'), ephemeral=True)
     
     @app_commands.command(
         name="teamup_type_add",
@@ -334,17 +330,17 @@ class TeamupDisplayCog(commands.Cog):
             
             if success:
                 embed = await self.create_game_types_embed()
-                embed.title = self.messages['type_add_success']
-                embed.description = self.messages['channel_set_as_type'].format(
+                embed.title = t('teamup_display.messages.type_add_success')
+                embed.description = t('teamup_display.messages.channel_set_as_type').format(
                     channel_mention=channel.mention, game_type=game_type
                 ) + "\n\n" + (embed.description or "")
                 await interaction.followup.send(embed=embed)
             else:
-                await interaction.followup.send(self.messages['type_add_error'], ephemeral=True)
+                await interaction.followup.send(t('teamup_display.messages.type_add_error'), ephemeral=True)
             
         except Exception as e:
             logging.error(f"Failed to add game type: {e}")
-            await interaction.followup.send(self.messages['type_add_error'], ephemeral=True)
+            await interaction.followup.send(t('teamup_display.messages.type_add_error'), ephemeral=True)
     
     @app_commands.command(
         name="teamup_type_delete",
@@ -380,7 +376,7 @@ class TeamupDisplayCog(commands.Cog):
                 try:
                     target_channel_id = int(channel_id)
                 except ValueError:
-                    await interaction.followup.send(self.messages['invalid_channel'], ephemeral=True)
+                    await interaction.followup.send(t('teamup_display.messages.invalid_channel'), ephemeral=True)
                     return
                 
                 # Get channel object for display (might be None if channel was deleted)
@@ -393,17 +389,17 @@ class TeamupDisplayCog(commands.Cog):
             
             if success:
                 embed = await self.create_game_types_embed()
-                embed.title = self.messages['type_delete_success']
-                embed.description = self.messages['channel_type_deleted'].format(
+                embed.title = t('teamup_display.messages.type_delete_success')
+                embed.description = t('teamup_display.messages.channel_type_deleted').format(
                     channel_id=target_channel_id
                 ) + "\n\n" + (embed.description or "")
                 await interaction.followup.send(embed=embed)
             else:
-                await interaction.followup.send(self.messages['type_delete_error'], ephemeral=True)
+                await interaction.followup.send(t('teamup_display.messages.type_delete_error'), ephemeral=True)
             
         except Exception as e:
             logging.error(f"Failed to delete game type: {e}")
-            await interaction.followup.send(self.messages['type_delete_error'], ephemeral=True)
+            await interaction.followup.send(t('teamup_display.messages.type_delete_error'), ephemeral=True)
     
     @app_commands.command(
         name="teamup_type_list",
@@ -421,14 +417,14 @@ class TeamupDisplayCog(commands.Cog):
     async def create_game_types_embed(self) -> discord.Embed:
         """Create game type configuration display embed"""
         embed = discord.Embed(
-            title=self.messages['type_list_title'],
+            title=t('teamup_display.messages.type_list_title'),
             color=self.embed_color
         )
         
         game_types = await self.db_manager.get_all_game_types()
         
         if not game_types:
-            embed.description = self.messages['type_list_empty']
+            embed.description = t('teamup_display.messages.type_list_empty')
             return embed
         
         type_list = []
@@ -437,7 +433,7 @@ class TeamupDisplayCog(commands.Cog):
             if channel:
                 type_list.append(f"• **{game_type}** - {channel.mention}")
             else:
-                type_list.append(f"• **{game_type}** - <#{channel_id}> {self.messages['channel_not_exist']}")
+                type_list.append(f"• **{game_type}** - <#{channel_id}> {t('teamup_display.messages.channel_not_exist')}")
         
         embed.description = "\n".join(type_list)
         return embed

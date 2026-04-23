@@ -1,0 +1,17 @@
+display:
+  max_content_length: 50
+  embed_color: 10039500
+  refresh_interval_minutes: 3
+  invitation_expire_minutes: 5
+emojis:
+  search: 🔍
+  players: 🏠
+  link: 📍
+  time: ⏳
+  teamup_board: 🎮
+  no_teamup: 📭
+  general: 🌐
+  success: ✅
+  error: ❌
+  settings: 🎯
+  empty: 📝
