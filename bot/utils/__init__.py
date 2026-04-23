@@ -13,6 +13,7 @@ from .giveaway_db import GiveawayDatabaseManager
 from .check_status_db import CheckStatusDatabaseManager
 from .notebook_db import NotebookDatabaseManager
 from .voice_channel_db import VoiceChannelDatabaseManager
+from .role_helpers import safe_member_role_edit
 
 __all__ = [
     'config',
@@ -31,4 +32,5 @@ __all__ = [
     'CheckStatusDatabaseManager',
     'NotebookDatabaseManager',
     'VoiceChannelDatabaseManager',
+    'safe_member_role_edit',
 ]

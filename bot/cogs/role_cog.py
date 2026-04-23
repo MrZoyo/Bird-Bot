@@ -6,12 +6,17 @@ from discord.ui import Button, View
 import logging
 from datetime import datetime, timezone
 
-from bot.utils import config, check_channel_validity
+from bot.utils import config, check_channel_validity, safe_member_role_edit
 from bot.utils.role_db import RoleDatabaseManager
 
 
 async def ensure_optional_role(member: discord.Member, role_id: int | None, reason: str) -> None:
-    """Add an optional starter role when configured and present in the guild."""
+    """Add an optional starter role when configured and present in the guild.
+
+    Silently swallows discord.Forbidden (role hierarchy issue) so the
+    caller's primary action isn't blocked by a starter-role side effect;
+    failure is still logged for diagnostics.
+    """
     if not role_id:
         return
 
@@ -23,7 +28,20 @@ async def ensure_optional_role(member: discord.Member, role_id: int | None, reas
         logging.warning("Configured starter role %s not found in guild %s", role_id, member.guild.id)
         return
 
-    await member.add_roles(role, reason=reason)
+    try:
+        await member.add_roles(role, reason=reason)
+    except discord.Forbidden:
+        logging.error(
+            "Cannot add starter role %r (pos=%d) to %s (%s); bot top_role=%r (pos=%d). "
+            "Check role hierarchy.",
+            role.name, role.position, member.id, member.display_name,
+            member.guild.me.top_role.name, member.guild.me.top_role.position,
+        )
+    except discord.HTTPException as exc:
+        logging.error(
+            "HTTPException adding starter role %r to %s (%s): %s",
+            role.name, member.id, member.display_name, exc,
+        )
 
 
 def _escape_markdown_table_cell(value: object) -> str:
@@ -112,7 +130,13 @@ class AchievementRoleView(View):
             # Remove all achievement roles of this type
             achievement_roles = [discord.utils.get(interaction.guild.roles, id=a['role_id']) for a in
                                  same_type_achievements]
-            await interaction.user.remove_roles(*achievement_roles, reason="Removing achievement roles")
+            if not await safe_member_role_edit(
+                interaction,
+                remove=achievement_roles,
+                reason="Removing achievement roles",
+                context="achievement",
+            ):
+                return
             await interaction.followup.send(
                 self.role_remove_message.format(name=current_achievement_role.name),
                 ephemeral=True
@@ -124,8 +148,14 @@ class AchievementRoleView(View):
         if current_achievement_role:
             # Remove the current role and give them their highest eligible role
             other_roles = [discord.utils.get(interaction.guild.roles, id=a['role_id']) for a in same_type_achievements]
-            await interaction.user.remove_roles(*other_roles, reason="Removing other achievement roles")
-            await interaction.user.add_roles(highest_eligible_role, reason="Adding higher achievement role")
+            if not await safe_member_role_edit(
+                interaction,
+                remove=other_roles,
+                add=[highest_eligible_role],
+                reason="Upgrading achievement role",
+                context="achievement",
+            ):
+                return
             await interaction.followup.send(
                 self.role_success_message.format(name=highest_eligible_role.name),
                 ephemeral=True
@@ -135,7 +165,13 @@ class AchievementRoleView(View):
             return
 
         # If user has no role yet, give them their highest eligible role
-        await interaction.user.add_roles(highest_eligible_role, reason="Adding achievement role")
+        if not await safe_member_role_edit(
+            interaction,
+            add=[highest_eligible_role],
+            reason="Adding achievement role",
+            context="achievement",
+        ):
+            return
         await interaction.followup.send(
             self.role_success_message.format(name=highest_eligible_role.name),
             ephemeral=True
@@ -180,7 +216,13 @@ class StarSignView(View):
         # Check if user already has this role
         if star_sign_role in interaction.user.roles:
             # Remove the role and send removal message
-            await interaction.user.remove_roles(star_sign_role, reason="User removed star sign role")
+            if not await safe_member_role_edit(
+                interaction,
+                remove=[star_sign_role],
+                reason="User removed star sign role",
+                context="starsign",
+            ):
+                return
             await interaction.followup.send(self.starsign_remove_message.format(name=star_sign_role.name),
                                             ephemeral=True)
             logging.info(f"User {interaction.user.id} has removed the {star_sign_role.name} role")
@@ -192,13 +234,17 @@ class StarSignView(View):
             "Adding social start role"
         )
 
-        # Remove other star sign roles from the user
+        # Remove other star sign roles from the user + add the new one
         other_roles = [discord.utils.get(interaction.guild.roles, id=star_sign['role_id']) for star_sign in
                        self.starsign_name if star_sign['name'] != star_sign_name]
-        await interaction.user.remove_roles(*other_roles, reason="Removing other star sign roles")
-
-        # Add the role for the clicked star sign to the user
-        await interaction.user.add_roles(star_sign_role, reason="Adding star sign role")
+        if not await safe_member_role_edit(
+            interaction,
+            remove=other_roles,
+            add=[star_sign_role],
+            reason="Switching star sign role",
+            context="starsign",
+        ):
+            return
 
         # Notify the user after successfully adding the role
         await interaction.followup.send(self.starsign_success_message.format(name=star_sign_role.name), ephemeral=True)
@@ -242,7 +288,13 @@ class MBTIView(View):
         # Check if user already has this role
         if mbti_role in interaction.user.roles:
             # Remove the role and send removal message
-            await interaction.user.remove_roles(mbti_role, reason="User removed MBTI role")
+            if not await safe_member_role_edit(
+                interaction,
+                remove=[mbti_role],
+                reason="User removed MBTI role",
+                context="mbti",
+            ):
+                return
             await interaction.followup.send(self.mbti_remove_message.format(name=mbti_role.name), ephemeral=True)
             logging.info(f"User {interaction.user.id} has removed the {mbti_role.name} role")
             return
@@ -253,13 +305,17 @@ class MBTIView(View):
             "Adding social start role"
         )
 
-        # Remove other MBTI roles from the user
+        # Remove other MBTI roles from the user + add the new one
         other_roles = [discord.utils.get(interaction.guild.roles, id=mbti['role_id']) for mbti in
                        self.mbti_name if mbti['name'] != mbti_name]
-        await interaction.user.remove_roles(*other_roles, reason="Removing other mbti roles")
-
-        # Add the role for the clicked MBTI type to the user
-        await interaction.user.add_roles(mbti_role, reason="Adding mbti role")
+        if not await safe_member_role_edit(
+            interaction,
+            remove=other_roles,
+            add=[mbti_role],
+            reason="Switching MBTI role",
+            context="mbti",
+        ):
+            return
 
         await interaction.followup.send(self.mbti_success_message.format(name=mbti_role.name), ephemeral=True)
         logging.info(f"User {interaction.user.id} has been awarded the {mbti_role.name} role")
@@ -302,18 +358,28 @@ class GenderView(View):
         # Check if user already has this role
         if gender_role in interaction.user.roles:
             # Remove the role and send removal message
-            await interaction.user.remove_roles(gender_role, reason="User removed gender role")
+            if not await safe_member_role_edit(
+                interaction,
+                remove=[gender_role],
+                reason="User removed gender role",
+                context="gender",
+            ):
+                return
             await interaction.followup.send(self.gender_remove_message.format(name=gender_role.name), ephemeral=True)
             logging.info(f"User {interaction.user.id} has removed the {gender_role.name} role")
             return
 
-        # Remove other gender roles from the user
+        # Remove other gender roles from the user + add the new one
         other_roles = [discord.utils.get(interaction.guild.roles, id=gender['role_id']) for gender in
                        self.gender_name if gender['name'] != gender_name]
-        await interaction.user.remove_roles(*other_roles, reason="Removing other gender roles")
-
-        # Add the role for the clicked gender to the user
-        await interaction.user.add_roles(gender_role, reason="Adding gender role")
+        if not await safe_member_role_edit(
+            interaction,
+            remove=other_roles,
+            add=[gender_role],
+            reason="Switching gender role",
+            context="gender",
+        ):
+            return
 
         # Notify the user after successfully adding the role
         await interaction.followup.send(self.gender_success_message.format(name=gender_role.name), ephemeral=True)
