@@ -54,7 +54,7 @@
 | **P0 整体** | **P0 系列全部完成** | ✅ | `grep -rn "aiosqlite" bot/cogs/` 整个清零 |
 | P1 | P1-5 日志 rotation | ✅ | 3 个 logger 统一 TimedRotatingFileHandler |
 | P1 | P1-2 ban_cog 迁 cog_load | ✅ | 建表 → cog_load；recover_tempbans → on_ready 首次 |
-| P1 | P1-1 命令同步逻辑 | ⬜ | 下一步 |
+| P1 | P1-1 命令同步逻辑 | ✅ | sync 迁 setup_hook；on_ready 只留 presence/日志 |
 | P1+P2 | 配置系统 2.0（P1-6 + P1-4 + P2-3 + P2-5） | ⬜ | 绑定一次冲刺做 |
 | P1 | P1-7 Slash 元数据本地化 | ⬜ | 与配置 2.0 并行/紧接 |
 | P1 | P1-3 大 cog 拆包 | ⬜ | 配置 2.0 之后 |
@@ -318,3 +318,38 @@
 **未动**（PLAN P1-2 明确"不扩到其他 cog"）：
 - `self.cleanup_tempbans.start()` / `self.check_expired_tempbans.start()` 仍在 `__init__` —— 后台任务启动时机是另一个模式（`tasks.loop` 本身有 `before_loop` + `wait_until_ready` 处理），不在本轮范围。
 - 其他 cog 的类似 pattern（`achievement_cog` / `shop_cog` / `tickets_new_cog` / `voice_channel_cog`）按 PLAN 说明**已经在用 `cog_load`**，本轮核查时无需改动。
+
+---
+
+## P1-1 ✅ 命令同步逻辑（2026-04-23）
+
+**Commit grep**: `git log --grep='(P1-1)'`
+
+**做的事**：
+- `bot/main.py` 的 `on_ready` listener 移除 `tree.clear_commands(guild=...)` + `tree.sync(guild=...)` + `tree.sync()` 三行。
+- 新增 `async def sync_commands_once(bot)`，`setup_hook` 里 `await setup_bot(bot)` 之后调一次。
+- 用 `discord.Object(id=guild_id)` 代替 `for guild in bot.guilds` 里的真 `Guild` 对象 —— `setup_hook` 跑在 gateway 连接**之前**，`bot.guilds` 为空，但 sync 只需要 id 即可。
+- sync 失败不再致命：`discord.HTTPException` 被捕获 + `logging.error(..., exc_info=True)` + 打印；bot 继续用上次同步过的命令定义启动（不因 sync 瞬时失败而拒绝服务）。
+
+**on_ready 保留的职责**：只有"登录日志 + 对每个 guild 判断是否目标服 + 设置 presence/日志 not-allowed"。这部分每次重连都要跑（presence 会因 session 重置而丢失，必须 re-apply）。
+
+**为什么选 `setup_hook` 而不是 "on_ready + flag"**：
+- PLAN 给了两种选项："迁移到 setup_hook，或在 cog 上加 self._synced 标志位，仅首次同步"。
+- setup_hook 方案的优点：
+  - 职责分离清晰 —— sync 是"启动期一次性动作"，presence/连接日志是"每连接一次的动作"。
+  - 无需维护可变 flag 状态（也没有 cog 可挂 —— 这段逻辑在 `main.py` 不在 cog）。
+  - 失败处理更自然：在 setup_hook 里 try/except 是启动期配置错误路径，on_ready 里做同样的 try 会把 HTTP 错误混进"每次 ready 事件处理"里语义模糊。
+- 选 flag 方案的唯一理由会是"担心 setup_hook 里 http 不可用"，但 discord.py 已保证 setup_hook 在 login 之后执行（`bot.http` 已可用），OK。
+
+**rate limit 影响**：
+- 原代码：每次 `on_ready`（首连 + 每次断线重连）都 `tree.sync()`（全局 + guild 各一次）。Discord 全局命令 sync 有严格 rate limit（200/day/app）—— 长期运行 + 频繁重连的环境可能被限流，且 sync 实际会对 command list 做 diff 对比，没变的情况下 API 也会重复计费配额。
+- 迁后：启动仅一次 sync，计 2 次（guild + global）。`synccommands` 手动命令仍保留，运维手动强制 resync 路径不变。
+
+**验收**：
+- `python3 -m py_compile bot/main.py` 过。
+- 功能验收需跑起 bot 观察：首次启动日志出现 `"Startup sync: N global commands synced."`；重连后 `on_ready` 日志不再出现 `"Global commands synced"` 字样。
+- 若 setup_hook 阶段 Discord API 返回 401/403（token 无效），会 log 出来但 bot 仍尝试启动 —— 注意生产部署后 grep 这条 log 做启动健康检查。
+
+**未做（后续任务范围）**：
+- `synccommands` 手动命令里的 `except Exception` 仍是宽捕获（非本次 P1-1 范围 —— P0-4 已通过，这一处原本就在豁免名单外；若要收窄留 P3-5 ruff E722 / 类似 narrow exception lint 规则统一清理）。
+- 从更大的架构角度，slash command 的 sync 应该只在"命令定义确实变了"时做。缓存 command hash 比较的优化留给未来（不在 PLAN）。
