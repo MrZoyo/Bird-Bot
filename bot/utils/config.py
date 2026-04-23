@@ -111,13 +111,21 @@ class Config:
 
     def _verify_main_config(self) -> None:
         required_keys = ['token', 'logging_file', 'db_path', 'guild_id']
+        main = self._configs['main']
         for key in required_keys:
-            if key not in self._configs['main']:
+            if key not in main:
                 print(
                     f"Missing required key '{key}' in main configuration. "
                     "Please add it."
                 )
-                self._configs['main'][key] = None
+                main[key] = None
+
+        # Defaulted keys (minimal P1-4 schema): operators who migrate from
+        # a pre-P1-6 JSON main.config won't have these keys. We add them
+        # with sane defaults rather than hard-failing, so existing deploys
+        # keep working and only break on fields we genuinely need.
+        main.setdefault('locale', 'zh_CN')
+        main.setdefault('log_backup_count', 14)
 
     def get_config(
         self,
