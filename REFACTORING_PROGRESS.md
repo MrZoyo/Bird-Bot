@@ -55,7 +55,7 @@
 | P1 | P1-5 日志 rotation | ✅ | 3 个 logger 统一 TimedRotatingFileHandler |
 | P1 | P1-2 ban_cog 迁 cog_load | ✅ | 建表 → cog_load；recover_tempbans → on_ready 首次 |
 | P1 | P1-1 命令同步逻辑 | ✅ | sync 迁 setup_hook；on_ready 只留 presence/日志 |
-| P1+P2 | 配置系统 2.0（P1-6 + P1-4 + P2-3 + P2-5） | 🔄 | step 0 完成；step 1-9 待做 |
+| P1+P2 | 配置系统 2.0（P1-6 + P1-4 + P2-3 + P2-5） | ✅ | step 0-9 全部完成（P1-4 最小版；pydantic 全量留 follow-up） |
 | P1 | P1-7 Slash 元数据本地化 | ⬜ | 与配置 2.0 并行/紧接 |
 | P1 | P1-3 大 cog 拆包 | ⬜ | 配置 2.0 之后 |
 | P2 | P2-1 数据库连接复用 | ⬜ | 需 close() 生命周期前置 |
@@ -377,7 +377,7 @@
 | 7 (剩余 cog 文案迁移) | welcome / shop / teamup_display / achievements / giveaway / privateroom / role / voice_channel / ban / tickets_new / invitation 文案迁 `t()` | ✅ |
 | 7 (无独立 config 的 cog) | notebook / game_dnd / backup（`required_configs: []`，跳过） | ➖ |
 | 8 (P1-4) | 启动 schema 校验 | 🟡 最小版本（`main.locale` / `log_backup_count` 默认 + 现有 required key 检查）；pydantic 全量校验留 follow-up |
-| 9 | 清理（阶段 B `.gitignore` + 删 JSON fallback + `.json` → `old_function/`） | ⬜ **等 step 7 剩余部分完成后再做** |
+| 9 | 清理（阶段 B `.gitignore` + 删 JSON fallback + `.json` → `old_function/`） | ✅ |
 
 ### P1-6.0 ✅ step 0: .gitignore 阶段 A + 历史泄露（2026-04-23）
 
@@ -523,6 +523,46 @@
 
 ---
 
+### P1-6.9 ✅ step 9 清理 + Config 2.0 整体收官（2026-04-23）
+
+**Commit grep**: `git log --grep='(P1-6\.9)'`
+
+**做的事**（一条源码 commit + 一条 progress commit）：
+- `.gitignore` 阶段 B：去掉 `bot/config/*.json` 规则（YAML 成为 canonical；legacy JSON 的真 ID 防泄改由 `old_function/**/*.json` 规则接管）。加注释点到本文件 step 9 做 cross-ref。
+- `git mv bot/config/config_*.json.example` → `old_function/config/`（14 个模板，rename 保留在 git history）。
+- `mv bot/config/config_*.json` → `old_function/config/`（普通 mv；源本来就未追踪；目标端 `old_function/**/*.json` 规则继续挡）。
+- `bot/utils/config.py`：删除 `load_config` 的 JSON fallback 分支、`get_json_path` 方法、`import json`；`config_exists` 收窄为 YAML-only。`_verify_main_config` 的 setdefault 兜底保留（处理老部署迁 YAML 时缺失可选 key 的场景）。
+- README Setup：step 4 改 `*.yaml.example` → `*.yaml`；step 5 的 "config_main.json" → "main.yaml"；新插一步（step 7）点到 `tools/migrate_config_to_yaml.py` + `tools/seed_db.py` + 本文件 "Upgrade 协议"；后续步骤编号 +1。`config` utility 段落整段重写（YAML / atomic writes / i18n loader 四条）。
+- AGENTS.md：项目结构段改 `*.yaml.example` 并提 `bot/locales/<lang>/<cog>.yaml` + `bot.utils.i18n.t()`；安全配置段落更新 `.json.example` → `.yaml.example`；归档段落追加"本次 config_*.json `git mv` 到 `old_function/` 的事实"供将来 cross-ref。
+
+**验收**：
+- `grep -rn "get_json_path\|import json" bot/utils/config.py` 清零；`config_exists` 唯一剩下的 caller 是 `bot/main.py:130` 的启动校验，行为不变。
+- `python3 -m py_compile bot/utils/config.py bot/main.py` 过。
+- `ls bot/config/*.json` 返回空；`old_function/config/` 含 14 组 JSON + `.example`。
+- `git check-ignore -v old_function/config/config_ban.json` 仍由 `old_function/**/*.json` 规则挡住（真 ID 不会 regress 进 git）。
+- `git check-ignore bot/config/ban.yaml.example` 空（`.example` 模板保持 trackable）。
+
+**Config 2.0 sprint 收官快照**（step 0-9 全 ✅）：
+- P1-6（YAML 迁移 + i18n）：`bot/config/<name>.yaml` + `bot/locales/<lang>/<name>.yaml` 成形，`bot.utils.i18n.t()` 为统一 call-site。
+- P1-4（最小 schema）：`_verify_main_config` 的 setdefault 兜底 `locale` / `log_backup_count`；required key 缺失只 warn + None（老行为保留）。pydantic 全量 / slug-mapped key 对齐留 follow-up。
+- P2-3（统一 save_config）：`ban` / `create_invitation` / `role` / `tickets_new` 四处 callsite 走 `await config.save_config(name, data)` 原子回写；治好了 3 个 silent-fail latent bug（详见 step 7 子节）。
+- P2-5（JSON 子树 → DB 表）：`voicechannel.channel_configs` / `tickets_new.ticket_types` 迁 `voice_channel_db` / `tickets_new_db` 表 + upsert CRUD + `tools/seed_db.py` 幂等灌库。
+
+**commit 链**（方便 `git log --grep` 追溯 sprint 全貌）：
+- `(P1-6.0)`：阶段 A gitignore + 历史泄露清。
+- `(P1-6.2)`：requirements.lock 加 ruamel.yaml。
+- `(P1-6.3)`：config.py YAML 分派 + async save_config + get_locale。
+- `(P1-6.4)`：i18n.py 新建。
+- `(P1-6.5)` / `(P1-6.5b)`：迁移脚本 + seed_db.py + field_classification.yaml。
+- `(P2-5)` ×2：DB 基础设施（channel_configs / ticket_types）+ cog 重写。
+- `(P1-6.6)`：pilot（spymode / checkstatus）。
+- `(P2-3)`：save_config 四处统一。
+- `(P1-6.7 *)` ×14：每 cog 一条文案迁移 commit。
+- `(P1-4 minimal)`：`_verify_main_config` setdefault。
+- `(P1-6.9)`：阶段 B 清理 + 文档更新（**本 commit**）。
+
+---
+
 ### P1-6.7 ✅ step 7 批量迁移完成（2026-04-23）
 
 **Commit grep**: `git log --grep='(P1-6\.7)'`
@@ -548,16 +588,18 @@
 
 ### 剩余工作（跨会话接手）
 
-**🔴 critical**（config 2.0 sprint 收尾）：
+Config 2.0 sprint **整体收官**（step 0-9 全 ✅）。下一轮可接手的 follow-up：
 
-**🟡 important**（完成 config 2.0 sprint 才做）：
-2. step 9 清理：阶段 B `.gitignore` 拿掉 `bot/config/*.json`；`bot/utils/config.py` 删 JSON fallback 分支；`bot/config/config_*.json` + `.example` `mv` 到 `old_function/config/`；更新 `README.md` / `AGENTS.md` 的配置章节。
-3. 完整 P1-4 schema（pydantic）+ key 对齐校验。
-4. P1-7 Slash 命令元数据本地化（`bot/utils/slash_translator.py` + `setup_hook` 注册 + `locales/zh_CN/commands.yaml`）。
+**🟡 important**：
+1. 完整 P1-4 schema（pydantic / dataclass）+ per-cog locale key 对齐校验（slug-mapped 字段：starsign / mbti / gender / role_type_name）。
+2. P1-7 Slash 命令元数据本地化（`bot/utils/slash_translator.py` + `setup_hook` 注册 `bot.tree.set_translator()` + `bot/locales/zh_CN/commands.yaml`）。
+3. 迁移脚本 sanitizer 扩 ID 白名单或 snowflake-magnitude 检测（修 `admin_roles` / `admin_users` / `invite_link` 漏脱敏 bug）。
+4. nested 子树文案抽 locale：`welcome.dm.*` / `role.signature.*` / `voicechannel.control_panel.{title,footer,messages,buttons,description_template}` 目前整块留在 yaml。
 
 **🟢 nice-to-have**：
-5. P1-3 大 cog 拆包（配置 2.0 完成后 PLAN 推荐顺序）。
+5. P1-3 大 cog 拆包（`tickets_new_cog` / `privateroom_cog` / `ban_cog` 按 PLAN `cog.py + views.py + modals.py + embeds.py + service.py`）。
 6. P3-5 ruff（锁 P0-4 成果 + 未来裸 except 防线）。
+7. `welcome_cog.WelcomeDMView.member_count_button` 的 conf 读取路径 bug（顶层 vs dm 子树，silent fallback 到硬编码 "アルタ"）。
 
 ---
 
