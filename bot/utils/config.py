@@ -1,6 +1,5 @@
 # bot/utils/config.py
 import asyncio
-import json
 import os
 import tempfile
 from pathlib import Path
@@ -43,23 +42,11 @@ class Config:
     def get_yaml_path(self, config_name: str) -> Path:
         return self._config_dir() / f'{config_name}.yaml'
 
-    def get_json_path(self, config_name: str) -> Path:
-        return self._config_dir() / f'config_{config_name}.json'
-
     def get_config_path(self, config_name: str = 'main') -> Path:
-        """Canonical config path (YAML).
-
-        The JSON-version still lives under `get_json_path` during the
-        migration window; use `config_exists` when you need a
-        fallback-aware existence check.
-        """
         return self.get_yaml_path(config_name)
 
     def config_exists(self, config_name: str = 'main') -> bool:
-        return (
-            self.get_yaml_path(config_name).exists()
-            or self.get_json_path(config_name).exists()
-        )
+        return self.get_yaml_path(config_name).exists()
 
     # ---- Config load / get / reload ------------------------------------
 
@@ -68,13 +55,8 @@ class Config:
         config_name: str = 'main',
         silent: bool = False,
     ) -> Dict[str, Any]:
-        """Load a config by name, preferring YAML with a legacy-JSON fallback.
-
-        The JSON fallback is the migration safety net for per-cog rollouts;
-        it will be removed in config 2.0 step 10.
-        """
+        """Load a config by name from ``bot/config/<name>.yaml``."""
         yaml_path = self.get_yaml_path(config_name)
-        json_path = self.get_json_path(config_name)
 
         loaded: Any = None
         if yaml_path.exists():
@@ -84,23 +66,11 @@ class Config:
             except Exception as e:
                 if not silent:
                     print(f"Could not parse YAML config {yaml_path}: {e}")
-        elif json_path.exists():
-            try:
-                with open(json_path, 'r', encoding='utf-8') as f:
-                    loaded = json.load(f)
-            except json.JSONDecodeError:
-                if not silent:
-                    print(
-                        f"Could not parse JSON config {json_path}. "
-                        "Please check its syntax."
-                    )
-        else:
-            if config_name == 'main' and not silent:
-                print(
-                    f"No config file found for '{config_name}' "
-                    f"(looked for {yaml_path.name} and {json_path.name}). "
-                    "Creating empty config."
-                )
+        elif config_name == 'main' and not silent:
+            print(
+                f"No config file found for '{config_name}' "
+                f"(looked for {yaml_path.name}). Creating empty config."
+            )
 
         self._configs[config_name] = loaded if loaded is not None else {}
 

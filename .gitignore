@@ -50,7 +50,10 @@ old_test/
 !archives/*
 
 # Configuration and sensitive data
-bot/config/*.json
+# Real configs live in bot/config/*.yaml; *.yaml.example templates remain tracked.
+# The legacy bot/config/config_*.json files were archived to old_function/config/ in
+# the config 2.0 sprint (see REFACTORING_PROGRESS.md step 9) and are gitignored via
+# the old_function/ rule below.
 bot/config/*.yaml
 *.pem
 *.key
