@@ -1,17 +1,14 @@
 # bot/cogs/voice_channel_cog.py
 import asyncio
+import logging
 from asyncio import sleep
 
-import logging
 import discord
-from discord.ui import Button
-from discord.ext import commands, tasks
 from discord import app_commands, ui
-import json
-import aiofiles
-from pathlib import Path
+from discord.ext import commands, tasks
+from discord.ui import Button
 
-from bot.utils import config, check_channel_validity, VoiceChannelDatabaseManager
+from bot.utils import VoiceChannelDatabaseManager, check_channel_validity, config
 
 
 class AddChannelForm(ui.Modal):
@@ -48,11 +45,16 @@ class AddChannelForm(ui.Modal):
             "type": self.channel_type.value.lower()
         }
 
-        # Update the cog's channel_configs
+        # Persist via the channel_configs DB table (P2-5: migrated from
+        # config_voicechannel.json). The in-memory dict mirrors the DB so
+        # on_voice_state_update can still do its hot-path lookup without
+        # a SELECT on every voice transition.
+        await self.cog.db.upsert_channel_config(
+            self.channel.id,
+            config_data['name_prefix'],
+            config_data['type'],
+        )
         self.cog.channel_configs[self.channel.id] = config_data
-
-        # Save to file
-        await self.cog.save_channel_configs()
 
         # Create and send embed with all configurations
         embed = await self.cog.format_channel_configs_embed(
@@ -71,10 +73,10 @@ class DeleteChannelConfirmView(discord.ui.View):
 
     @discord.ui.button(label="Confirm", style=discord.ButtonStyle.danger)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Remove the channel configuration
-        if self.channel_id in self.cog.channel_configs:  # Check for integer ID
+        # Remove the channel configuration (DB + in-memory)
+        if self.channel_id in self.cog.channel_configs:
+            await self.cog.db.delete_channel_config(self.channel_id)
             del self.cog.channel_configs[self.channel_id]
-            await self.cog.save_channel_configs()
 
             embed = discord.Embed(
                 title="Voice Channel Configuration Removed",
@@ -531,11 +533,14 @@ class VoiceStateCog(commands.Cog):
         self.db_path = self.main_config['db_path']
         self.db = VoiceChannelDatabaseManager(self.db_path)
 
-        self.conf = config.get_config('voicechannel')
-        self.channel_configs = {int(channel_id): c for channel_id, c in self.conf['channel_configs'].items()}
+        # channel_configs now lives in DB (P2-5); it is populated in
+        # cog_load below so that cog instantiation is side-effect-free
+        # with respect to the database.
+        self.channel_configs: dict = {}
 
     async def cog_load(self):
         await self.db.initialize_database()
+        self.channel_configs = await self.db.list_channel_configs()
         if not self.cleanup_task.is_running():
             self.cleanup_task.start()
 
@@ -848,10 +853,10 @@ class VoiceStateCog(commands.Cog):
 
             @discord.ui.button(label="Confirm", style=discord.ButtonStyle.danger)
             async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
-                # Remove the channel configuration
+                # Remove the channel configuration (DB + in-memory)
                 if self.channel_id in self.cog.channel_configs:
+                    await self.cog.db.delete_channel_config(self.channel_id)
                     del self.cog.channel_configs[self.channel_id]
-                    await self.cog.save_channel_configs()
 
                     # Create embed with updated configurations
                     channel_mention = self.channel.mention if self.channel else f"Channel ID: {self.channel_id} (deleted)"
@@ -960,24 +965,6 @@ class VoiceStateCog(commands.Cog):
             await self.db.clear_control_panel(voice_channel_id)
         except Exception as e:
             logging.error(f"Error clearing control panel data: {e}", exc_info=True)
-
-    async def save_channel_configs(self):
-        """Save the channel configurations to the JSON file."""
-        config_path = Path('./bot/config/config_voicechannel.json')
-
-        async with aiofiles.open(config_path, 'r', encoding='utf-8') as f:
-            content = await f.read()
-            config_data = json.loads(content)
-
-        # Update the channel_configs in the config data
-        # Convert all keys to strings for JSON serialization
-        config_data['channel_configs'] = {
-            str(channel_id): config
-            for channel_id, config in self.channel_configs.items()
-        }
-
-        async with aiofiles.open(config_path, 'w', encoding='utf-8') as f:
-            await f.write(json.dumps(config_data, indent=2, ensure_ascii=False))
 
     @commands.Cog.listener()
     async def on_ready(self):

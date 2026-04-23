@@ -1,29 +1,36 @@
 # bot/utils/voice_channel_db.py
 import aiosqlite
 import logging
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 
 class VoiceChannelDatabaseManager:
-    """Temporary voice channels (table ``temp_channels``).
+    """Voice channel state tables.
 
-    One row per auto-created room from the voice channel cog. Carries:
+    Two tables live here:
+
+    ``temp_channels`` — one row per auto-created room:
       - creator_id / created_at
-      - control_panel_message_id / control_panel_channel_id (the text-chat
-        panel attached to the voice channel; NULL until the panel is sent,
-        NULL again after the room is cleaned up)
+      - control_panel_message_id / control_panel_channel_id (NULL until the
+        panel is sent, NULL again after cleanup)
       - is_soundboard_enabled (BOOL)
       - current_room_type: 'public' or 'private'
+
+    ``channel_configs`` — one row per "entry" voice channel (the channels
+    users join to spin up their own temp room). Migrated out of
+    ``config_voicechannel.json`` in the P1-6 config 2.0 sprint
+    (P2-5 judged this map DB-appropriate: frequent runtime CRUD and a
+    dict shape that scales with deployment).
     """
 
     def __init__(self, db_path: str):
         self.db_path = db_path
 
     async def initialize_database(self) -> None:
-        """Create the temp_channels table and migrate any missing columns.
+        """Create the voice channel tables and migrate any missing columns.
 
-        Kept here because the live schema has grown over time; migrations are
-        done in-place so existing deployments don't need to rebuild the table.
+        Kept here because the live schema has grown over time; migrations
+        are done in-place so existing deployments don't need to rebuild.
         """
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute('''
@@ -53,6 +60,66 @@ class VoiceChannelDatabaseManager:
                     logging.info(f"[MIGRATION] Adding column {col_name} to temp_channels")
                     await db.execute(f"ALTER TABLE temp_channels ADD COLUMN {col_name} {col_type}")
 
+            # channel_configs: the "entry-channel → auto-room template" map
+            # that used to live under voicechannel.channel_configs in JSON.
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS channel_configs (
+                    channel_id INTEGER PRIMARY KEY,
+                    name_prefix TEXT NOT NULL,
+                    type TEXT NOT NULL
+                );
+            ''')
+
+            await db.commit()
+
+    # ---- channel_configs CRUD ------------------------------------------
+
+    async def list_channel_configs(self) -> Dict[int, Dict[str, str]]:
+        """Return all entry-channel configs as ``{channel_id: {name_prefix, type}}``.
+
+        Matches the in-memory shape the cog previously loaded from JSON,
+        so the rest of the voice_channel_cog can keep using
+        ``self.channel_configs[channel_id]['name_prefix' | 'type']``
+        unchanged after this migration.
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                'SELECT channel_id, name_prefix, type FROM channel_configs'
+            )
+            rows = await cursor.fetchall()
+            await cursor.close()
+        return {
+            row[0]: {'name_prefix': row[1], 'type': row[2]}
+            for row in rows
+        }
+
+    async def upsert_channel_config(
+        self, channel_id: int, name_prefix: str, room_type: str
+    ) -> None:
+        """INSERT or UPDATE an entry-channel config row.
+
+        Used by /set_create_room_channel. Runs as a single statement so
+        concurrent toggles are race-free.
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                '''
+                INSERT INTO channel_configs (channel_id, name_prefix, type)
+                VALUES (?, ?, ?)
+                ON CONFLICT(channel_id) DO UPDATE SET
+                    name_prefix = excluded.name_prefix,
+                    type = excluded.type
+                ''',
+                (channel_id, name_prefix, room_type),
+            )
+            await db.commit()
+
+    async def delete_channel_config(self, channel_id: int) -> None:
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                'DELETE FROM channel_configs WHERE channel_id = ?',
+                (channel_id,),
+            )
             await db.commit()
 
     async def insert_temp_channel(
