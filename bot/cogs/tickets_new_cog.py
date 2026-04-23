@@ -11,7 +11,6 @@ from typing import Optional, List
 from typing import Tuple
 
 import aiofiles
-import aiosqlite
 import discord
 from discord import app_commands
 from discord.ext import commands

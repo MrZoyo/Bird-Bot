@@ -12,6 +12,7 @@ from .achievement_db import AchievementDatabaseManager
 from .giveaway_db import GiveawayDatabaseManager
 from .check_status_db import CheckStatusDatabaseManager
 from .notebook_db import NotebookDatabaseManager
+from .voice_channel_db import VoiceChannelDatabaseManager
 
 __all__ = [
     'config',
@@ -29,4 +30,5 @@ __all__ = [
     'GiveawayDatabaseManager',
     'CheckStatusDatabaseManager',
     'NotebookDatabaseManager',
+    'VoiceChannelDatabaseManager',
 ]

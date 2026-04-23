@@ -2,7 +2,6 @@
 import asyncio
 from asyncio import sleep
 
-import aiosqlite
 import logging
 import discord
 from discord.ui import Button
@@ -12,7 +11,7 @@ import json
 import aiofiles
 from pathlib import Path
 
-from bot.utils import config, check_channel_validity
+from bot.utils import config, check_channel_validity, VoiceChannelDatabaseManager
 
 
 class AddChannelForm(ui.Modal):
@@ -180,13 +179,14 @@ class CheckTempChannelView(discord.ui.View):
 class RoomControlPanelView(discord.ui.View):
     """房间控制面板View - 包含解锁、上锁、满员、声音板四个按钮"""
 
-    def __init__(self, bot, voice_channel, creator, soundboard_enabled=True, room_type="public"):
+    def __init__(self, bot, voice_channel, creator, db, soundboard_enabled=True, room_type="public"):
         super().__init__(timeout=None)  # 永久有效
         self.bot = bot
         self.voice_channel = voice_channel
         self.voice_channel_id = voice_channel.id
         self.creator = creator
         self.creator_id = creator.id
+        self.db = db
         self.soundboard_enabled = soundboard_enabled
         self.room_type = room_type
 
@@ -260,14 +260,7 @@ class RoomControlPanelView(discord.ui.View):
                 return
 
             # 更新数据库
-            main_config = config.get_config('main')
-            async with aiosqlite.connect(main_config['db_path']) as db:
-                await db.execute('''
-                    UPDATE temp_channels
-                    SET current_room_type = 'public'
-                    WHERE channel_id = ?
-                ''', (self.voice_channel_id,))
-                await db.commit()
+            await self.db.set_room_type(self.voice_channel_id, 'public')
 
             # 更新room_type并刷新embed
             self.room_type = "public"
@@ -309,14 +302,7 @@ class RoomControlPanelView(discord.ui.View):
                 return
 
             # 更新数据库
-            main_config = config.get_config('main')
-            async with aiosqlite.connect(main_config['db_path']) as db:
-                await db.execute('''
-                    UPDATE temp_channels
-                    SET current_room_type = 'private'
-                    WHERE channel_id = ?
-                ''', (self.voice_channel_id,))
-                await db.commit()
+            await self.db.set_room_type(self.voice_channel_id, 'private')
 
             # 更新room_type并刷新embed
             self.room_type = "private"
@@ -415,14 +401,7 @@ class RoomControlPanelView(discord.ui.View):
                 return
 
             # 更新数据库
-            main_config = config.get_config('main')
-            async with aiosqlite.connect(main_config['db_path']) as db:
-                await db.execute('''
-                    UPDATE temp_channels
-                    SET is_soundboard_enabled = ?
-                    WHERE channel_id = ?
-                ''', (1 if new_soundboard_state else 0, self.voice_channel_id))
-                await db.commit()
+            await self.db.set_soundboard(self.voice_channel_id, new_soundboard_state)
 
             # 更新状态并刷新embed
             self.soundboard_enabled = new_soundboard_state
@@ -550,50 +529,19 @@ class VoiceStateCog(commands.Cog):
 
         self.main_config = config.get_config('main')
         self.db_path = self.main_config['db_path']
+        self.db = VoiceChannelDatabaseManager(self.db_path)
 
         self.conf = config.get_config('voicechannel')
         self.channel_configs = {int(channel_id): c for channel_id, c in self.conf['channel_configs'].items()}
 
     async def cog_load(self):
-        await self.ensure_temp_channels_table()
+        await self.db.initialize_database()
         if not self.cleanup_task.is_running():
             self.cleanup_task.start()
 
     def cog_unload(self):
         if self.cleanup_task.is_running():
             self.cleanup_task.cancel()
-
-    async def ensure_temp_channels_table(self):
-        """Create/migrate temp channel table before any background task touches it."""
-        async with aiosqlite.connect(self.db_path) as db:
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS temp_channels (
-                    channel_id INTEGER PRIMARY KEY,
-                    creator_id INTEGER NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    control_panel_message_id INTEGER,
-                    control_panel_channel_id INTEGER,
-                    is_soundboard_enabled BOOLEAN DEFAULT 1,
-                    current_room_type TEXT DEFAULT 'public'
-                );
-            ''')
-
-            cursor = await db.execute("PRAGMA table_info(temp_channels)")
-            existing_columns = {row[1] for row in await cursor.fetchall()}
-
-            columns_to_add = [
-                ("control_panel_message_id", "INTEGER"),
-                ("control_panel_channel_id", "INTEGER"),
-                ("is_soundboard_enabled", "BOOLEAN DEFAULT 1"),
-                ("current_room_type", "TEXT DEFAULT 'public'")
-            ]
-
-            for col_name, col_type in columns_to_add:
-                if col_name not in existing_columns:
-                    logging.info(f"[MIGRATION] Adding column {col_name} to temp_channels")
-                    await db.execute(f"ALTER TABLE temp_channels ADD COLUMN {col_name} {col_type}")
-
-            await db.commit()
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
@@ -681,13 +629,9 @@ class VoiceStateCog(commands.Cog):
         initial_room_type = "private" if conf["type"] == "private" else "public"
 
         # Record the temporary channel in the database
-        async with aiosqlite.connect(self.db_path) as db:
-            await db.execute('''
-                INSERT INTO temp_channels
-                (channel_id, creator_id, is_soundboard_enabled, current_room_type)
-                VALUES (?, ?, ?, ?)
-            ''', (temp_channel.id, member.id, 1, initial_room_type))
-            await db.commit()
+        await self.db.insert_temp_channel(
+            temp_channel.id, member.id, True, initial_room_type,
+        )
 
         # Send control panel in the voice channel's text chat after a small delay
         await asyncio.sleep(0.5)
@@ -701,6 +645,7 @@ class VoiceStateCog(commands.Cog):
                 self.bot,
                 voice_channel,
                 creator,
+                self.db,
                 soundboard_enabled=True,
                 room_type=room_type
             )
@@ -711,13 +656,7 @@ class VoiceStateCog(commands.Cog):
             message = await voice_channel.send(embed=embed, view=view)
 
             # 保存控制面板消息ID到数据库
-            async with aiosqlite.connect(self.db_path) as db:
-                await db.execute('''
-                    UPDATE temp_channels
-                    SET control_panel_message_id = ?, control_panel_channel_id = ?
-                    WHERE channel_id = ?
-                ''', (message.id, voice_channel.id, voice_channel.id))
-                await db.commit()
+            await self.db.set_control_panel(voice_channel.id, message.id, voice_channel.id)
 
             # Log to room activity log
             room_logger = logging.getLogger('room_activity')
@@ -729,29 +668,22 @@ class VoiceStateCog(commands.Cog):
     async def cleanup_channel(self, channel_id):
         channel = self.bot.get_channel(channel_id)
         if channel and not channel.members:
-            async with aiosqlite.connect(self.db_path) as db:
-                cursor = await db.execute('SELECT channel_id FROM temp_channels WHERE channel_id = ?', (channel_id,))
-                result = await cursor.fetchone()
-                if result:
-                    # await db.execute('DELETE FROM temp_channels WHERE channel_id = ?', (channel_id,))
-                    # await db.commit()
-                    await channel.delete(reason="Temporary channel cleanup")
-                    await sleep(0.5)  # Sleep for a short time to let the channel delete
-                    if not channel.category.channels:  # If the category is empty, delete it
-                        await channel.category.delete(reason="Temporary category cleanup")
+            # 只对仍被记为 temp_channels 的频道下手, 避免误删非托管频道; DB 记录保留,
+            # 等 cleanup_task 发现 bot.get_channel == None 时再一次性清掉。
+            if await self.db.exists(channel_id):
+                await channel.delete(reason="Temporary channel cleanup")
+                await sleep(0.5)  # Sleep for a short time to let the channel delete
+                if not channel.category.channels:  # If the category is empty, delete it
+                    await channel.category.delete(reason="Temporary category cleanup")
 
     @tasks.loop(hours=1)
     async def cleanup_task(self):
         logging.info("Running cleanup task")
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.execute('SELECT channel_id FROM temp_channels')
-            channels = await cursor.fetchall()
-            for (channel_id,) in channels:
-                channel = self.bot.get_channel(channel_id)
-                if channel is None:
-                    # The channel no longer exists, so clean up the database entry
-                    await db.execute('DELETE FROM temp_channels WHERE channel_id = ?', (channel_id,))
-                    await db.commit()
+        for channel_id in await self.db.fetch_all_channel_ids():
+            channel = self.bot.get_channel(channel_id)
+            if channel is None:
+                # The channel no longer exists, so clean up the database entry
+                await self.db.delete_temp_channel(channel_id)
 
     @cleanup_task.before_loop
     async def before_cleanup(self):
@@ -768,9 +700,7 @@ class VoiceStateCog(commands.Cog):
         await interaction.response.defer()
 
         # Fetch the records from the database
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.execute('SELECT * FROM temp_channels ORDER BY created_at DESC')
-            records = await cursor.fetchall()
+        records = await self.db.fetch_all_records()
 
         if not records:
             await interaction.edit_original_response(content="No records found.")
@@ -962,14 +892,7 @@ class VoiceStateCog(commands.Cog):
     async def restore_control_panels(self):
         """恢复所有房间控制面板（Bot重启后调用）"""
         try:
-            async with aiosqlite.connect(self.db_path) as db:
-                cursor = await db.execute('''
-                    SELECT channel_id, creator_id, control_panel_message_id,
-                           is_soundboard_enabled, current_room_type
-                    FROM temp_channels
-                    WHERE control_panel_message_id IS NOT NULL
-                ''')
-                records = await cursor.fetchall()
+            records = await self.db.fetch_control_panels()
 
             restored_count = 0
             failed_count = 0
@@ -1013,6 +936,7 @@ class VoiceStateCog(commands.Cog):
                         self.bot,
                         voice_channel,
                         creator,
+                        self.db,
                         soundboard_enabled=bool(soundboard),
                         room_type=room_type or "public"
                     )
@@ -1033,13 +957,7 @@ class VoiceStateCog(commands.Cog):
     async def clear_control_panel_data(self, voice_channel_id: int):
         """清理控制面板数据"""
         try:
-            async with aiosqlite.connect(self.db_path) as db:
-                await db.execute('''
-                    UPDATE temp_channels
-                    SET control_panel_message_id = NULL, control_panel_channel_id = NULL
-                    WHERE channel_id = ?
-                ''', (voice_channel_id,))
-                await db.commit()
+            await self.db.clear_control_panel(voice_channel_id)
         except Exception as e:
             logging.error(f"Error clearing control panel data: {e}", exc_info=True)
 
@@ -1063,32 +981,26 @@ class VoiceStateCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        await self.ensure_temp_channels_table()
+        # 建表已由 cog_load 完成, 这里只做 Discord 侧状态同步: 清理数据库里残留的
+        # 不存在频道, 对空频道触发 cleanup_channel, 删空分类, 恢复控制面板 View。
+        for channel_id in await self.db.fetch_all_channel_ids():
+            channel = self.bot.get_channel(channel_id)
+            if channel is None:
+                # The channel no longer exists, so clean up the database entry
+                await self.db.delete_temp_channel(channel_id)
+            elif not channel.members:
+                # If the channel exists and is empty, delete it
+                await self.cleanup_channel(channel_id)
 
-        async with aiosqlite.connect(self.db_path) as db:
+        # Check for empty categories on startup
+        for guild in self.bot.guilds:
+            # Get the category names from CHANNEL_CONFIGS
+            category_names = [self.bot.get_channel(channel_id).category.name
+                              for channel_id in self.channel_configs.keys()
+                              if self.bot.get_channel(channel_id) is not None]
+            for category in guild.categories:
+                if not category.channels and category.name in category_names:
+                    await category.delete(reason="Temporary category cleanup")
 
-            # Check for empty channels on startup
-            cursor = await db.execute('SELECT channel_id FROM temp_channels')
-            channels = await cursor.fetchall()
-            for (channel_id,) in channels:
-                channel = self.bot.get_channel(channel_id)
-                if channel is None:
-                    # The channel no longer exists, so clean up the database entry
-                    await db.execute('DELETE FROM temp_channels WHERE channel_id = ?', (channel_id,))
-                    await db.commit()
-                elif not channel.members:
-                    # If the channel exists and is empty, delete it
-                    await self.cleanup_channel(channel_id)
-
-            # Check for empty categories on startup
-            for guild in self.bot.guilds:
-                # Get the category names from CHANNEL_CONFIGS
-                category_names = [self.bot.get_channel(channel_id).category.name
-                                  for channel_id in self.channel_configs.keys()
-                                  if self.bot.get_channel(channel_id) is not None]
-                for category in guild.categories:
-                    if not category.channels and category.name in category_names:
-                        await category.delete(reason="Temporary category cleanup")
-
-            # Restore control panels for existing rooms
-            await self.restore_control_panels()
+        # Restore control panels for existing rooms
+        await self.restore_control_panels()
