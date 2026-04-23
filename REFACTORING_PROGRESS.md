@@ -10,6 +10,28 @@
 
 ---
 
+## P0 系列收官小结（2026-04-23）
+
+**成就**：
+- `grep -rn "^\s*except:" bot/` 为空（P0-4，21 处裸 except 全收窄）
+- `grep -rn "aiosqlite" bot/cogs/` 为空（P0-1/2/3 全部 cog 不再直连 aiosqlite；47+ 处 SQL 全迁到 manager）
+- 新增 5 个 manager：`GiveawayDatabaseManager`、`CheckStatusDatabaseManager`、`NotebookDatabaseManager`、`VoiceChannelDatabaseManager`，以及 `PrivateRoomDatabaseManager` 扩展；`RoleDatabaseManager` 在 create_invitation 跨域复用。
+
+**顺手修的 bug（迁移路上发现的）**：
+- `giveaway_cog.update_giveaway_description` 缺 `db.commit()`，命令 `/ga_description` 实际不生效 → P0-1 迁 manager 时补上
+- `check_status_cog` 的建表竞态（on_ready listener vs `before_loop.wait_until_ready()` 并发） → P0-3a 迁 cog_load 修掉
+
+**共 8 个 commit**（源码 + progress 各一次）：P0-4 / P0-1 / P0-2 / P0-3a / P0-3b / P0-3c / P0-3d + `docs: track progress after ...`
+
+**未做的收尾工作（显性未做，供后续接手）**：
+- 功能层所有路径**未测试服验证**（代码改动面非常大，建议用户起测试服跑一轮 —— 尤其是 giveaway 的完整流程、voice_channel 的建房/锁/解/声音板/重启恢复）
+- `voice_channel_cog` 里 `save_channel_configs` 还在写 JSON 文件，未迁 DB —— 这是 P2-5 决策范围（判定 `channel_configs` 迁 DB），不属 P0
+- 建表位置："全部迁 `cog_load`" 只是 P0-3 的规模；giveaway 的 `initialize_database()` 目前在 `on_ready` 调（原代码就这样）；`cog_load` vs `on_ready` 的全面对齐是 P1-2 范围
+- 所有 cog 的 `start()` 后台任务仍在 `__init__`（P1-2 治理）
+- ruff E722 规则未加（P3-5）—— 裸 except 治理成果暂没机器锁死
+
+---
+
 ## 总进度速览
 
 | 阶段 | 任务 | 状态 | 备注 |
@@ -20,8 +42,9 @@
 | P0 | P0-3a check_status 补 db manager（含建表竞态修复） | ✅ | 3 处清零 + 竞态修复 |
 | P0 | P0-3b notebook 补 db manager | ✅ | 7 处清零 |
 | P0 | P0-3c create_invitation 补 db manager | ✅ | 1 处清零（复用 RoleDatabaseManager） |
-| P0 | P0-3d voice_channel 补 db manager | ⬜ | 下一步；最重，放最后 |
-| P1 | P1-5 日志 rotation | ⬜ | 下一轮 |
+| P0 | P0-3d voice_channel 补 db manager | ✅ | 12 处清零 + 顺手删 tickets_new_cog 死 import |
+| **P0 整体** | **P0 系列全部完成** | ✅ | `grep -rn "aiosqlite" bot/cogs/` 整个清零 |
+| P1 | P1-5 日志 rotation | ⬜ | 下一步（新冲刺起点） |
 | P1 | P1-2 ban_cog 迁 cog_load | ⬜ | 下一轮 |
 | P1 | P1-1 命令同步逻辑 | ⬜ | 下一轮 |
 | P1+P2 | 配置系统 2.0（P1-6 + P1-4 + P2-3 + P2-5） | ⬜ | 绑定一次冲刺做 |
@@ -180,6 +203,23 @@
 - 清掉冗余的 `datetime` import（时间戳生成下沉 manager）。
 
 **无竞态修复**（这个 cog 没有后台任务在 `__init__` 启动）。
+
+---
+
+### P0-3d ✅ voice_channel（2026-04-23）
+
+**Commit grep**: `git log --grep='(P0-3d)'`
+
+**做的事**：
+- 新建 `bot/utils/voice_channel_db.py` + `VoiceChannelDatabaseManager`（11 方法），所有 SQL 操作 `temp_channels` 单表。
+- `initialize_database()` 内含 schema migration 逻辑（老部署的 `ALTER TABLE ... ADD COLUMN` 补列），保持原 `ensure_temp_channels_table` 语义。
+- cog `__init__` 加 `self.db = VoiceChannelDatabaseManager(db_path)`；`cog_load` 调 `self.db.initialize_database()`；原 `ensure_temp_channels_table` 方法整个删除。
+- `cleanup_task` / `cleanup_channel` / `on_ready` 原本是"单连接里 SELECT+for 循环+条件 DELETE"—— 改为"先 `fetch_all_channel_ids()` 一次，Python 里循环"，SQL 单点化。
+- `on_ready` 里的独立 `aiosqlite.connect` 块整体删除。
+- `RoomControlPanelView.__init__` 加 `db` 参数；2 处实例化点（`send_control_panel` + `restore_control_panels` 恢复流程）传 `self.db`；unlock/lock/soundboard 3 个 callback 改为 manager 调用。
+
+**保留的历史行为（不改）**：
+- `cleanup_channel` 原本是"SELECT check → DELETE 被注释 → Discord 删频道"。DB 记录留给下次 `cleanup_task` 发现 `bot.get_channel == None` 时统一清。迁 manager 后行为等价（用 `db.exists(channel_id)` 替 SELECT 判断），DB 仍然不删 —— 这是历史设计（可能是为了避免误删），保留。
 
 ---
 
