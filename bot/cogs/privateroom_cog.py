@@ -8,7 +8,8 @@ import json
 from datetime import datetime, timedelta, time
 from typing import Optional, Dict, List, Tuple, Any
 
-from bot.utils import config, check_channel_validity, ShopDatabaseManager
+from bot.utils import ShopDatabaseManager, check_channel_validity, config
+from bot.utils.i18n import t
 from bot.utils.privateroom_db import PrivateRoomDatabaseManager
 
 
@@ -26,15 +27,14 @@ class ConfirmPurchaseView(discord.ui.View):
         self.is_renewal = is_renewal
 
         # 加载消息文本
-        self.messages = cog.conf['messages']
 
         # 添加确认按钮
         if is_renewal:
-            confirm_label = self.messages['renewal_confirm_button']
-            cancel_label = self.messages['renewal_cancel_button']
+            confirm_label = t('privateroom.messages.renewal_confirm_button')
+            cancel_label = t('privateroom.messages.renewal_cancel_button')
         else:
-            confirm_label = self.messages['confirm_button']
-            cancel_label = self.messages['cancel_button']
+            confirm_label = t('privateroom.messages.confirm_button')
+            cancel_label = t('privateroom.messages.cancel_button')
 
         confirm_button = discord.ui.Button(
             style=discord.ButtonStyle.green,
@@ -80,7 +80,7 @@ class ConfirmPurchaseView(discord.ui.View):
         if interaction.user.id != self.user.id:
             return
 
-        cancel_message = self.messages['renewal_cancelled'] if self.is_renewal else self.messages['purchase_cancelled']
+        cancel_message = t('privateroom.messages.renewal_cancelled') if self.is_renewal else t('privateroom.messages.purchase_cancelled')
         await interaction.response.edit_message(
             content=cancel_message,
             embed=None,
@@ -109,7 +109,6 @@ class PurchaseModal(discord.ui.Modal):
         self.is_renewal = is_renewal
 
         # 加载消息文本
-        self.messages = cog.conf['messages']
 
         # 添加确认输入
         self.confirmation = discord.ui.TextInput(
@@ -126,7 +125,7 @@ class PurchaseModal(discord.ui.Modal):
         # 确认输入验证
         if self.confirmation.value.lower() != 'yes':
             await interaction.followup.send(
-                self.messages['error_confirmation_failed'],
+                t('privateroom.messages.error_confirmation_failed'),
                 ephemeral=True
             )
             return
@@ -142,7 +141,7 @@ class PurchaseModal(discord.ui.Modal):
             channel = self.cog.bot.get_channel(active_room['room_id'])
             if channel:
                 await interaction.followup.send(
-                    self.messages['error_already_owns'],
+                    t('privateroom.messages.error_already_owns'),
                     ephemeral=True
                 )
                 return
@@ -152,7 +151,7 @@ class PurchaseModal(discord.ui.Modal):
             current_balance = await self.cog.shop_db.get_user_balance(interaction.user.id)
             if current_balance < self.cost:
                 await interaction.followup.send(
-                    self.messages['error_insufficient_balance'],
+                    t('privateroom.messages.error_insufficient_balance'),
                     ephemeral=True
                 )
                 return
@@ -165,7 +164,7 @@ class PurchaseModal(discord.ui.Modal):
 
         if not success:
             await interaction.followup.send(
-                self.messages['error_create_failed'],
+                t('privateroom.messages.error_create_failed'),
                 ephemeral=True
             )
 
@@ -177,12 +176,11 @@ class PrivateRoomShopView(discord.ui.View):
         self.cog = cog
 
         # 加载消息文本
-        self.messages = cog.conf['messages']
 
         # 添加购买按钮
         purchase_button = discord.ui.Button(
             style=discord.ButtonStyle.primary,
-            label=self.messages['shop_button_label'],
+            label=t('privateroom.messages.shop_button_label'),
             custom_id='purchase_privateroom'
         )
         purchase_button.callback = self.purchase_callback
@@ -190,7 +188,7 @@ class PrivateRoomShopView(discord.ui.View):
         # 添加提前续费按钮
         renewal_button = discord.ui.Button(
             style=discord.ButtonStyle.secondary,
-            label=self.messages['shop_renewal_button_label'],
+            label=t('privateroom.messages.shop_renewal_button_label'),
             custom_id='advance_renewal_privateroom'
         )
         renewal_button.callback = self.renewal_callback
@@ -198,7 +196,7 @@ class PrivateRoomShopView(discord.ui.View):
         # 添加恢复按钮
         restore_button = discord.ui.Button(
             style=discord.ButtonStyle.success,
-            label=self.messages['shop_restore_button_label'],
+            label=t('privateroom.messages.shop_restore_button_label'),
             custom_id='restore_privateroom'
         )
         restore_button.callback = self.restore_callback
@@ -221,12 +219,11 @@ class ResetConfirmView(discord.ui.View):
     def __init__(self, cog):
         super().__init__(timeout=60)
         self.cog = cog
-        self.messages = cog.conf['messages']
 
         # 添加确认按钮
         confirm_button = discord.ui.Button(
             style=discord.ButtonStyle.danger,
-            label=self.messages['reset_confirm_button'],
+            label=t('privateroom.messages.reset_confirm_button'),
             custom_id='confirm_reset'
         )
         confirm_button.callback = self.confirm_callback
@@ -234,7 +231,7 @@ class ResetConfirmView(discord.ui.View):
         # 添加取消按钮
         cancel_button = discord.ui.Button(
             style=discord.ButtonStyle.secondary,
-            label=self.messages['reset_cancel_button'],
+            label=t('privateroom.messages.reset_cancel_button'),
             custom_id='cancel_reset'
         )
         cancel_button.callback = self.cancel_callback
@@ -248,7 +245,7 @@ class ResetConfirmView(discord.ui.View):
 
     async def cancel_callback(self, interaction: discord.Interaction):
         await interaction.response.edit_message(
-            content=self.messages['reset_cancelled'],
+            content=t('privateroom.messages.reset_cancelled'),
             view=None
         )
 
@@ -263,12 +260,11 @@ class RoomListView(discord.ui.View):
         self.total_pages = (total_rooms - 1) // items_per_page + 1 if total_rooms > 0 else 1
 
         # Messages
-        self.messages = cog.conf['messages']
 
         # Add navigation buttons
         self.prev_button = discord.ui.Button(
             style=discord.ButtonStyle.secondary,
-            label=self.messages.get('list_prev_button', "上一页"),
+            label=t('privateroom.messages.list_prev_button'),
             disabled=page <= 1,
             row=0
         )
@@ -276,7 +272,7 @@ class RoomListView(discord.ui.View):
 
         self.next_button = discord.ui.Button(
             style=discord.ButtonStyle.secondary,
-            label=self.messages.get('list_next_button', "下一页"),
+            label=t('privateroom.messages.list_next_button'),
             disabled=page >= self.total_pages,
             row=0
         )
@@ -290,7 +286,7 @@ class RoomListView(discord.ui.View):
         rooms, _ = await self.cog.db.get_paginated_active_rooms(self.page, self.items_per_page)
 
         embed = discord.Embed(
-            title=self.messages.get('list_title', "🏠 私人房间列表"),
+            title=t('privateroom.messages.list_title'),
             color=discord.Color.blue()
         )
 
@@ -310,8 +306,7 @@ class RoomListView(discord.ui.View):
             # Add field
             embed.add_field(
                 name=channel_name,
-                value=self.messages.get('list_room_info',
-                                        "👑 拥有者: {owner_mention}\n⏱️ 创建: {start} · 到期: {end}").format(
+                value=t('privateroom.messages.list_room_info').format(
                     owner_mention=user_mention,
                     start=start,
                     end=end
@@ -320,8 +315,7 @@ class RoomListView(discord.ui.View):
             )
 
         # Add pagination info to footer
-        embed.set_footer(text=self.messages.get('list_footer',
-                                                "第 {current_page}/{total_pages} 页 · 共 {total_rooms} 个房间").format(
+        embed.set_footer(text=t('privateroom.messages.list_footer').format(
             current_page=self.page,
             total_pages=self.total_pages,
             total_rooms=self.total_rooms
@@ -443,14 +437,14 @@ class PrivateRoomCog(commands.Cog):
 
             # 创建嵌入消息
             embed = discord.Embed(
-                title=self.conf['messages']['room_expired_title'],
-                description=self.conf['messages']['room_expired_description'].format(
+                title=t('privateroom.messages.room_expired_title'),
+                description=t('privateroom.messages.room_expired_description').format(
                     room_name=room_name
                 ),
                 color=discord.Color.red()
             )
 
-            embed.set_footer(text=self.conf['messages']['room_expired_footer'])
+            embed.set_footer(text=t('privateroom.messages.room_expired_footer'))
 
             # 创建带有按钮的视图
             view = discord.ui.View()
@@ -464,7 +458,7 @@ class PrivateRoomCog(commands.Cog):
                 # 创建跳转按钮
                 button = discord.ui.Button(
                     style=discord.ButtonStyle.link,
-                    label=self.conf['messages']['room_expired_button'],
+                    label=t('privateroom.messages.room_expired_button'),
                     url=f"https://discord.com/channels/{self.bot.get_guild(self.main_config['guild_id']).id}/{channel_id}/{message_id}"
                 )
                 view.add_item(button)
@@ -544,8 +538,8 @@ class PrivateRoomCog(commands.Cog):
 
             # 创建嵌入消息
             embed = discord.Embed(
-                title=self.conf['messages']['renewal_reminder_title'],
-                description=self.conf['messages']['renewal_reminder_description'].format(
+                title=t('privateroom.messages.renewal_reminder_title'),
+                description=t('privateroom.messages.renewal_reminder_description').format(
                     room_name=room_name,
                     days_remaining=days_remaining
                 ),
@@ -555,7 +549,7 @@ class PrivateRoomCog(commands.Cog):
             # 添加房间信息字段
             embed.add_field(
                 name="",
-                value=self.conf['messages']['renewal_reminder_room_info'].format(
+                value=t('privateroom.messages.renewal_reminder_room_info').format(
                     room_name=room_name,
                     end_date=end_date.strftime("%Y-%m-%d %H:%M"),
                     days_remaining=days_remaining
@@ -563,7 +557,7 @@ class PrivateRoomCog(commands.Cog):
                 inline=False
             )
 
-            embed.set_footer(text=self.conf['messages']['renewal_reminder_footer'])
+            embed.set_footer(text=t('privateroom.messages.renewal_reminder_footer'))
 
             # 创建视图（可能包含按钮）
             view = discord.ui.View()
@@ -585,7 +579,7 @@ class PrivateRoomCog(commands.Cog):
                         # 创建跳转按钮
                         button = discord.ui.Button(
                             style=discord.ButtonStyle.link,
-                            label=self.conf['messages']['renewal_reminder_button_label'],
+                            label=t('privateroom.messages.renewal_reminder_button_label'),
                             url=shop_url
                         )
                         view.add_item(button)
@@ -593,14 +587,14 @@ class PrivateRoomCog(commands.Cog):
                     # 商店频道不存在，添加警告信息
                     embed.add_field(
                         name="",
-                        value=self.conf['messages']['renewal_reminder_no_shop'],
+                        value=t('privateroom.messages.renewal_reminder_no_shop'),
                         inline=False
                     )
             else:
                 # 没有商店消息，添加警告信息
                 embed.add_field(
                     name="",
-                    value=self.conf['messages']['renewal_reminder_no_shop'],
+                    value=t('privateroom.messages.renewal_reminder_no_shop'),
                     inline=False
                 )
 
@@ -654,7 +648,7 @@ class PrivateRoomCog(commands.Cog):
         # 检查是否已初始化
         category_id = await self.db.get_category_id()
         if category_id:
-            await interaction.followup.send(self.conf['messages']['init_already'], ephemeral=True)
+            await interaction.followup.send(t('privateroom.messages.init_already'), ephemeral=True)
             return
 
         # 创建分类
@@ -687,7 +681,7 @@ class PrivateRoomCog(commands.Cog):
             await self.db.initialize_database()
 
             await interaction.followup.send(
-                self.conf['messages']['init_success'].format(
+                t('privateroom.messages.init_success').format(
                     category_id=category.id
                 ),
                 ephemeral=True
@@ -695,7 +689,7 @@ class PrivateRoomCog(commands.Cog):
 
         except discord.HTTPException as e:
             logging.error(f"Failed to initialize private room system: {e}")
-            await interaction.followup.send(self.conf['messages']['init_fail'], ephemeral=True)
+            await interaction.followup.send(t('privateroom.messages.init_fail'), ephemeral=True)
 
     @app_commands.command(
         name="privateroom_reset",
@@ -710,7 +704,7 @@ class PrivateRoomCog(commands.Cog):
         # 显示确认对话框
         view = ResetConfirmView(self)
         await interaction.response.send_message(
-            self.conf['messages']['reset_confirm'],
+            t('privateroom.messages.reset_confirm'),
             view=view,
             ephemeral=True
         )
@@ -744,7 +738,7 @@ class PrivateRoomCog(commands.Cog):
             # 重置数据库
             await self.db.reset_privateroom_system()
 
-            await interaction.followup.send(self.conf['messages']['reset_success'], ephemeral=True)
+            await interaction.followup.send(t('privateroom.messages.reset_success'), ephemeral=True)
 
         except Exception as e:
             logging.error(f"Failed to reset private room system: {e}")
@@ -766,7 +760,7 @@ class PrivateRoomCog(commands.Cog):
         # 检查是否已初始化
         category_id = await self.db.get_category_id()
         if not category_id:
-            await interaction.followup.send(self.conf['messages']['error_no_category'], ephemeral=True)
+            await interaction.followup.send(t('privateroom.messages.error_no_category'), ephemeral=True)
             return
 
         try:
@@ -783,8 +777,8 @@ class PrivateRoomCog(commands.Cog):
 
             # 创建商店嵌入消息
             embed = discord.Embed(
-                title=self.conf['messages']['shop_title'],
-                description=self.conf['messages']['shop_description'].format(
+                title=t('privateroom.messages.shop_title'),
+                description=t('privateroom.messages.shop_description').format(
                     points_cost=self.conf['points_cost'],
                     duration=self.conf['room_duration_days'],
                     hours_threshold=self.conf['voice_hours_threshold'],
@@ -796,7 +790,7 @@ class PrivateRoomCog(commands.Cog):
             )
 
             # 设置页脚
-            embed.set_footer(text=self.conf['messages']['shop_footer'])
+            embed.set_footer(text=t('privateroom.messages.shop_footer'))
 
             # 如果机器人有头像，添加为嵌入消息的缩略图
             if self.bot.user.avatar:
@@ -812,16 +806,16 @@ class PrivateRoomCog(commands.Cog):
             await self.db.save_shop_message(target_channel.id, message.id)
 
             # 构建响应消息
-            response_message = self.conf['messages']['setup_success'].format(channel=target_channel.mention)
+            response_message = t('privateroom.messages.setup_success').format(channel=target_channel.mention)
             if cleaned_count > 0:
-                response_message += "\n" + self.conf['messages']['shop_cleaned_old'].format(count=cleaned_count)
+                response_message += "\n" + t('privateroom.messages.shop_cleaned_old').format(count=cleaned_count)
 
             await interaction.followup.send(response_message, ephemeral=True)
 
         except Exception as e:
             logging.error(f"Failed to setup private room shop: {e}")
             await interaction.followup.send(
-                self.conf['messages']['setup_fail'].format(error=str(e)),
+                t('privateroom.messages.setup_fail').format(error=str(e)),
                 ephemeral=True
             )
 
@@ -923,7 +917,7 @@ class PrivateRoomCog(commands.Cog):
         max_rooms = self.conf.get('max_rooms', 40)  # Default to 40 if not set
         if active_rooms_count >= max_rooms:
             await interaction.followup.send(
-                self.conf['messages'].get('error_room_limit_reached', "❌ 私人房间名额已满"),
+                t('privateroom.messages.error_room_limit_reached'),
                 ephemeral=True
             )
             return
@@ -935,7 +929,7 @@ class PrivateRoomCog(commands.Cog):
             channel = self.bot.get_channel(active_room['room_id'])
             if channel:
                 # 房间确实存在且活跃
-                await interaction.followup.send(self.conf['messages']['error_already_owns'], ephemeral=True)
+                await interaction.followup.send(t('privateroom.messages.error_already_owns'), ephemeral=True)
                 return
             else:
                 # 房间在数据库中标记为活跃，但实际不存在，需要恢复
@@ -953,8 +947,8 @@ class PrivateRoomCog(commands.Cog):
         if cost > 0 and balance < cost:
             # Create an informative embed instead of simple error message
             embed = discord.Embed(
-                title=self.conf['messages']['error_insufficient_balance_title'],
-                description=self.conf['messages']['error_insufficient_balance_description'],
+                title=t('privateroom.messages.error_insufficient_balance_title'),
+                description=t('privateroom.messages.error_insufficient_balance_description'),
                 color=discord.Color.red()
             )
 
@@ -965,14 +959,14 @@ class PrivateRoomCog(commands.Cog):
 
             # Add details to the embed
             embed.add_field(
-                name=self.conf['messages']['error_insufficient_balance_original_price'],
-                value=f"**{original_cost}** {self.conf['messages']['points_label']}",
+                name=t('privateroom.messages.error_insufficient_balance_original_price'),
+                value=f"**{original_cost}** {t('privateroom.messages.points_label')}",
                 inline=False
             )
 
             embed.add_field(
-                name=self.conf['messages']['error_insufficient_balance_voice_time'],
-                value=self.conf['messages']['error_insufficient_balance_voice_format'].format(
+                name=t('privateroom.messages.error_insufficient_balance_voice_time'),
+                value=t('privateroom.messages.error_insufficient_balance_voice_format').format(
                     hours=round(actual_hours, 1),
                     minutes=int(actual_hours * 60),
                     discount=discount_amount
@@ -989,14 +983,14 @@ class PrivateRoomCog(commands.Cog):
                 )
 
             embed.add_field(
-                name=self.conf['messages']['error_insufficient_balance_after_discount'],
-                value=f"**{cost}** {self.conf['messages']['points_label']}",
+                name=t('privateroom.messages.error_insufficient_balance_after_discount'),
+                value=f"**{cost}** {t('privateroom.messages.points_label')}",
                 inline=False
             )
 
             embed.add_field(
-                name=self.conf['messages']['error_insufficient_balance_current'],
-                value=self.conf['messages']['error_insufficient_balance_current_format'].format(
+                name=t('privateroom.messages.error_insufficient_balance_current'),
+                value=t('privateroom.messages.error_insufficient_balance_current_format').format(
                     balance=balance,
                     needed=points_needed
                 ),
@@ -1004,14 +998,11 @@ class PrivateRoomCog(commands.Cog):
             )
 
             # Set footer with suggestion (添加助力用户提示)
-            footer_text = self.conf['messages']['error_insufficient_balance_footer']
+            footer_text = t('privateroom.messages.error_insufficient_balance_footer')
             if not is_booster:
                 booster_hours_config = await self.get_booster_bonus_hours()
                 if booster_hours_config > 0:
-                    footer_text += "\n" + self.conf['messages'].get(
-                        'error_insufficient_balance_booster_info',
-                        "💡 成为助力用户可额外获得 {booster_hours} 小时时长加成！"
-                    ).format(booster_hours=round(booster_hours_config, 1))
+                    footer_text += "\n" + t('privateroom.messages.error_insufficient_balance_booster_info').format(booster_hours=round(booster_hours_config, 1))
             embed.set_footer(text=footer_text)
 
             await interaction.followup.send(embed=embed, ephemeral=True)
@@ -1019,13 +1010,13 @@ class PrivateRoomCog(commands.Cog):
 
         # 创建确认嵌入消息
         embed = discord.Embed(
-            title=self.conf['messages']['confirm_title'],
+            title=t('privateroom.messages.confirm_title'),
             color=discord.Color.gold()
         )
 
         embed.add_field(
             name="",
-            value=self.conf['messages']['confirm_last_month'].format(
+            value=t('privateroom.messages.confirm_last_month').format(
                 hours=round(actual_hours, 1)
             ),
             inline=False
@@ -1035,7 +1026,7 @@ class PrivateRoomCog(commands.Cog):
         if is_booster and bonus_hours > 0:
             embed.add_field(
                 name="",
-                value=self.conf['messages']['confirm_booster_bonus'].format(
+                value=t('privateroom.messages.confirm_booster_bonus').format(
                     bonus_hours=round(bonus_hours, 1)
                 ),
                 inline=False
@@ -1043,7 +1034,7 @@ class PrivateRoomCog(commands.Cog):
 
         embed.add_field(
             name="",
-            value=self.conf['messages']['confirm_discount'].format(
+            value=t('privateroom.messages.confirm_discount').format(
                 discount=round(discount, 1)
             ),
             inline=False
@@ -1051,13 +1042,13 @@ class PrivateRoomCog(commands.Cog):
 
         embed.add_field(
             name="",
-            value=self.conf['messages']['confirm_cost'].format(cost=cost),
+            value=t('privateroom.messages.confirm_cost').format(cost=cost),
             inline=False
         )
 
         embed.add_field(
             name="",
-            value=self.conf['messages']['confirm_balance'].format(balance=balance),
+            value=t('privateroom.messages.confirm_balance').format(balance=balance),
             inline=False
         )
 
@@ -1076,7 +1067,7 @@ class PrivateRoomCog(commands.Cog):
         active_room = await self.db.get_active_room_by_user(user_id)
         if not active_room:
             await interaction.followup.send(
-                self.conf['messages']['error_no_room_for_renewal'],
+                t('privateroom.messages.error_no_room_for_renewal'),
                 ephemeral=True
             )
             return
@@ -1085,7 +1076,7 @@ class PrivateRoomCog(commands.Cog):
         channel = self.bot.get_channel(active_room['room_id'])
         if not channel:
             await interaction.followup.send(
-                self.conf['messages']['error_room_not_found'],
+                t('privateroom.messages.error_room_not_found'),
                 ephemeral=True
             )
             return
@@ -1098,7 +1089,7 @@ class PrivateRoomCog(commands.Cog):
         renewal_threshold = self.conf.get('renewal_days_threshold', 7)
         if days_remaining > renewal_threshold:
             await interaction.followup.send(
-                self.conf['messages']['error_renewal_too_early'].format(
+                t('privateroom.messages.error_renewal_too_early').format(
                     days_remaining=days_remaining,
                     threshold=renewal_threshold
                 ),
@@ -1116,8 +1107,8 @@ class PrivateRoomCog(commands.Cog):
         if cost > 0 and balance < cost:
             # 创建详细的余额不足消息
             embed = discord.Embed(
-                title=self.conf['messages']['error_insufficient_balance_title'],
-                description=self.conf['messages']['error_renewal_insufficient_balance_description'],
+                title=t('privateroom.messages.error_insufficient_balance_title'),
+                description=t('privateroom.messages.error_renewal_insufficient_balance_description'),
                 color=discord.Color.red()
             )
 
@@ -1128,14 +1119,14 @@ class PrivateRoomCog(commands.Cog):
 
             # 添加详细信息到embed
             embed.add_field(
-                name=self.conf['messages']['error_insufficient_balance_original_price'],
-                value=f"**{original_cost}** {self.conf['messages']['points_label']}",
+                name=t('privateroom.messages.error_insufficient_balance_original_price'),
+                value=f"**{original_cost}** {t('privateroom.messages.points_label')}",
                 inline=False
             )
 
             embed.add_field(
-                name=self.conf['messages']['error_insufficient_balance_voice_time'],
-                value=self.conf['messages']['error_insufficient_balance_voice_format'].format(
+                name=t('privateroom.messages.error_insufficient_balance_voice_time'),
+                value=t('privateroom.messages.error_insufficient_balance_voice_format').format(
                     hours=round(actual_hours, 1),
                     minutes=int(actual_hours * 60),
                     discount=discount_amount
@@ -1152,14 +1143,14 @@ class PrivateRoomCog(commands.Cog):
                 )
 
             embed.add_field(
-                name=self.conf['messages']['error_insufficient_balance_after_discount'],
-                value=f"**{cost}** {self.conf['messages']['points_label']}",
+                name=t('privateroom.messages.error_insufficient_balance_after_discount'),
+                value=f"**{cost}** {t('privateroom.messages.points_label')}",
                 inline=False
             )
 
             embed.add_field(
-                name=self.conf['messages']['error_insufficient_balance_current'],
-                value=self.conf['messages']['error_insufficient_balance_current_format'].format(
+                name=t('privateroom.messages.error_insufficient_balance_current'),
+                value=t('privateroom.messages.error_insufficient_balance_current_format').format(
                     balance=balance,
                     needed=points_needed
                 ),
@@ -1167,14 +1158,11 @@ class PrivateRoomCog(commands.Cog):
             )
 
             # 设置页脚（添加助力用户提示）
-            footer_text = self.conf['messages']['error_insufficient_balance_footer']
+            footer_text = t('privateroom.messages.error_insufficient_balance_footer')
             if not is_booster:
                 booster_hours_config = await self.get_booster_bonus_hours()
                 if booster_hours_config > 0:
-                    footer_text += "\n" + self.conf['messages'].get(
-                        'error_insufficient_balance_booster_info',
-                        "💡 成为助力用户可额外获得 {booster_hours} 小时时长加成！"
-                    ).format(booster_hours=round(booster_hours_config, 1))
+                    footer_text += "\n" + t('privateroom.messages.error_insufficient_balance_booster_info').format(booster_hours=round(booster_hours_config, 1))
             embed.set_footer(text=footer_text)
 
             await interaction.followup.send(embed=embed, ephemeral=True)
@@ -1182,14 +1170,14 @@ class PrivateRoomCog(commands.Cog):
 
         # 创建续费确认嵌入消息
         embed = discord.Embed(
-            title=self.conf['messages']['renewal_confirm_title'],
+            title=t('privateroom.messages.renewal_confirm_title'),
             color=discord.Color.gold()
         )
 
         # 显示当前房间信息
         embed.add_field(
             name="",
-            value=self.conf['messages']['renewal_current_room'].format(
+            value=t('privateroom.messages.renewal_current_room').format(
                 room_name=channel.name,
                 days_remaining=days_remaining
             ),
@@ -1198,7 +1186,7 @@ class PrivateRoomCog(commands.Cog):
 
         embed.add_field(
             name="",
-            value=self.conf['messages']['renewal_extend_days'].format(
+            value=t('privateroom.messages.renewal_extend_days').format(
                 extend_days=self.conf.get('renewal_extend_days', 31)
             ),
             inline=False
@@ -1206,7 +1194,7 @@ class PrivateRoomCog(commands.Cog):
 
         embed.add_field(
             name="",
-            value=self.conf['messages']['confirm_last_month'].format(
+            value=t('privateroom.messages.confirm_last_month').format(
                 hours=round(actual_hours, 1)
             ),
             inline=False
@@ -1216,7 +1204,7 @@ class PrivateRoomCog(commands.Cog):
         if is_booster and bonus_hours > 0:
             embed.add_field(
                 name="",
-                value=self.conf['messages']['confirm_booster_bonus'].format(
+                value=t('privateroom.messages.confirm_booster_bonus').format(
                     bonus_hours=round(bonus_hours, 1)
                 ),
                 inline=False
@@ -1224,7 +1212,7 @@ class PrivateRoomCog(commands.Cog):
 
         embed.add_field(
             name="",
-            value=self.conf['messages']['confirm_discount'].format(
+            value=t('privateroom.messages.confirm_discount').format(
                 discount=round(discount, 1)
             ),
             inline=False
@@ -1232,13 +1220,13 @@ class PrivateRoomCog(commands.Cog):
 
         embed.add_field(
             name="",
-            value=self.conf['messages']['renewal_cost'].format(cost=cost),
+            value=t('privateroom.messages.renewal_cost').format(cost=cost),
             inline=False
         )
 
         embed.add_field(
             name="",
-            value=self.conf['messages']['confirm_balance'].format(balance=balance),
+            value=t('privateroom.messages.confirm_balance').format(balance=balance),
             inline=False
         )
 
@@ -1261,7 +1249,7 @@ class PrivateRoomCog(commands.Cog):
             if channel:
                 # Room exists and is active - no need to restore
                 await interaction.followup.send(
-                    self.conf['messages']['error_already_owns'],
+                    t('privateroom.messages.error_already_owns'),
                     ephemeral=True
                 )
                 return
@@ -1273,7 +1261,7 @@ class PrivateRoomCog(commands.Cog):
             if not inactive_room:
                 # No room to restore
                 await interaction.followup.send(
-                    self.conf['messages']['error_no_room_to_restore'],
+                    t('privateroom.messages.error_no_room_to_restore'),
                     ephemeral=True
                 )
                 return
@@ -1284,8 +1272,8 @@ class PrivateRoomCog(commands.Cog):
         end_date = active_room['end_date']
 
         embed = discord.Embed(
-            title=self.conf['messages']['room_restore_title'],
-            description=self.conf['messages']['room_restore_description'].format(
+            title=t('privateroom.messages.room_restore_title'),
+            description=t('privateroom.messages.room_restore_description').format(
                 start_date=start_date.strftime("%Y-%m-%d"),
                 end_date=end_date.strftime("%Y-%m-%d")
             ),
@@ -1307,8 +1295,8 @@ class PrivateRoomCog(commands.Cog):
         end_date = room_data['end_date']
 
         embed = discord.Embed(
-            title=self.conf['messages']['room_restore_title'],
-            description=self.conf['messages']['room_restore_description'].format(
+            title=t('privateroom.messages.room_restore_title'),
+            description=t('privateroom.messages.room_restore_description').format(
                 start_date=start_date.strftime("%Y-%m-%d"),
                 end_date=end_date.strftime("%Y-%m-%d")
             ),
@@ -1334,7 +1322,7 @@ class PrivateRoomCog(commands.Cog):
                 current_balance = await self.shop_db.get_user_balance(user_id)
                 if current_balance < cost:
                     await interaction.followup.send(
-                        self.conf['messages']['error_insufficient_balance'],
+                        t('privateroom.messages.error_insufficient_balance'),
                         ephemeral=True
                     )
                     return False
@@ -1343,7 +1331,7 @@ class PrivateRoomCog(commands.Cog):
             active_room = await self.db.get_active_room_by_user(user_id)
             if not active_room:
                 await interaction.followup.send(
-                    self.conf['messages']['error_no_room_for_renewal'],
+                    t('privateroom.messages.error_no_room_for_renewal'),
                     ephemeral=True
                 )
                 return False
@@ -1352,7 +1340,7 @@ class PrivateRoomCog(commands.Cog):
             channel = self.bot.get_channel(active_room['room_id'])
             if not channel:
                 await interaction.followup.send(
-                    self.conf['messages']['error_room_not_found'],
+                    t('privateroom.messages.error_room_not_found'),
                     ephemeral=True
                 )
                 return False
@@ -1363,7 +1351,7 @@ class PrivateRoomCog(commands.Cog):
             renewal_threshold = self.conf.get('renewal_days_threshold', 7)
             if days_remaining > renewal_threshold:
                 await interaction.followup.send(
-                    self.conf['messages']['error_renewal_too_early'].format(
+                    t('privateroom.messages.error_renewal_too_early').format(
                         days_remaining=days_remaining,
                         threshold=renewal_threshold
                     ),
@@ -1396,7 +1384,7 @@ class PrivateRoomCog(commands.Cog):
 
             # 发送成功确认
             await interaction.followup.send(
-                self.conf['messages']['renewal_success_title'],
+                t('privateroom.messages.renewal_success_title'),
                 ephemeral=True
             )
 
@@ -1411,7 +1399,7 @@ class PrivateRoomCog(commands.Cog):
         except Exception as e:
             logging.error(f"Error processing advance renewal: {e}", exc_info=True)
             await interaction.followup.send(
-                self.conf['messages']['error_renewal_failed'],
+                t('privateroom.messages.error_renewal_failed'),
                 ephemeral=True
             )
             return False
@@ -1430,7 +1418,7 @@ class PrivateRoomCog(commands.Cog):
 
         if days <= 0:
             await interaction.followup.send(
-                self.conf['messages']['fix_invalid_days'],
+                t('privateroom.messages.fix_invalid_days'),
                 ephemeral=False
             )
             return
@@ -1438,7 +1426,7 @@ class PrivateRoomCog(commands.Cog):
         active_room = await self.db.get_active_room_by_user(user.id)
         if not active_room:
             await interaction.followup.send(
-                self.conf['messages']['fix_no_active_room'].format(user_mention=user.mention),
+                t('privateroom.messages.fix_no_active_room').format(user_mention=user.mention),
                 ephemeral=False
             )
             return
@@ -1446,7 +1434,7 @@ class PrivateRoomCog(commands.Cog):
         now = datetime.now()
         if active_room['end_date'] <= now:
             await interaction.followup.send(
-                self.conf['messages']['fix_no_active_room'].format(user_mention=user.mention),
+                t('privateroom.messages.fix_no_active_room').format(user_mention=user.mention),
                 ephemeral=False
             )
             return
@@ -1454,7 +1442,7 @@ class PrivateRoomCog(commands.Cog):
         channel = self.bot.get_channel(active_room['room_id'])
         if not channel:
             await interaction.followup.send(
-                self.conf['messages']['fix_room_not_found'].format(user_mention=user.mention),
+                t('privateroom.messages.fix_room_not_found').format(user_mention=user.mention),
                 ephemeral=False
             )
             return
@@ -1470,7 +1458,7 @@ class PrivateRoomCog(commands.Cog):
         await self.db.extend_room_validity(active_room['room_id'], new_end_date)
 
         await interaction.followup.send(
-            self.conf['messages']['fix_success'].format(
+            t('privateroom.messages.fix_success').format(
                 user_mention=user.mention,
                 days=days,
                 end_date=new_end_date.strftime("%Y-%m-%d %H:%M")
@@ -1498,7 +1486,7 @@ class PrivateRoomCog(commands.Cog):
         if success:
             # 确认购买成功
             await interaction.followup.send(
-                self.conf['messages']['purchase_success_title'],
+                t('privateroom.messages.purchase_success_title'),
                 ephemeral=True
             )
 
@@ -1524,7 +1512,7 @@ class PrivateRoomCog(commands.Cog):
         if success:
             # Confirm restoration success
             await interaction.followup.send(
-                self.conf['messages']['room_restored_success'],
+                t('privateroom.messages.room_restored_success'),
                 ephemeral=True
             )
 
@@ -1557,7 +1545,7 @@ class PrivateRoomCog(commands.Cog):
                 current_balance = await self.shop_db.get_user_balance(user.id)
                 if current_balance < cost:
                     await interaction.followup.send(
-                        self.conf['messages']['error_insufficient_balance'],
+                        t('privateroom.messages.error_insufficient_balance'),
                         ephemeral=True
                     )
                     return False, None
@@ -1568,7 +1556,7 @@ class PrivateRoomCog(commands.Cog):
                 channel = self.bot.get_channel(active_room['room_id'])
                 if channel:
                     await interaction.followup.send(
-                        self.conf['messages']['error_already_owns'],
+                        t('privateroom.messages.error_already_owns'),
                         ephemeral=True
                     )
                     return False, None
@@ -1580,13 +1568,13 @@ class PrivateRoomCog(commands.Cog):
             if not category:
                 logging.error(f"Private room category {category_id} not found")
                 await interaction.followup.send(
-                    self.conf['messages']['error_no_category'],
+                    t('privateroom.messages.error_no_category'),
                     ephemeral=True
                 )
                 return False, None
 
             # 创建房间名称
-            room_name = self.conf['messages']['room_name'].format(user_name=user.display_name)
+            room_name = t('privateroom.messages.room_name').format(user_name=user.display_name)
 
             # 设置房间权限
             overwrites = {
@@ -1650,7 +1638,7 @@ class PrivateRoomCog(commands.Cog):
         except Exception as e:
             logging.error(f"Error {'restoring' if is_restore else 'creating'} private room: {e}", exc_info=True)
             await interaction.followup.send(
-                self.conf['messages']['error_create_failed'],
+                t('privateroom.messages.error_create_failed'),
                 ephemeral=True
             )
             return False, None
@@ -1658,7 +1646,7 @@ class PrivateRoomCog(commands.Cog):
     async def send_room_info(self, channel, user, start_date, end_date):
         """在私人房间中发送信息嵌入消息"""
         embed = discord.Embed(
-            title=self.conf['messages']['room_info_title'].format(
+            title=t('privateroom.messages.room_info_title').format(
                 owner=user.display_name
             ),
             color=discord.Color.green()
@@ -1666,7 +1654,7 @@ class PrivateRoomCog(commands.Cog):
 
         embed.add_field(
             name="",
-            value=self.conf['messages']['room_info_owner'].format(
+            value=t('privateroom.messages.room_info_owner').format(
                 owner=user.mention
             ),
             inline=False
@@ -1674,7 +1662,7 @@ class PrivateRoomCog(commands.Cog):
 
         embed.add_field(
             name="",
-            value=self.conf['messages']['room_info_created'].format(
+            value=t('privateroom.messages.room_info_created').format(
                 start_date=start_date.strftime("%Y-%m-%d %H:%M")
             ),
             inline=False
@@ -1682,19 +1670,19 @@ class PrivateRoomCog(commands.Cog):
 
         embed.add_field(
             name="",
-            value=self.conf['messages']['room_info_warning'],
+            value=t('privateroom.messages.room_info_warning'),
             inline=False
         )
 
         embed.add_field(
             name="",
-            value=self.conf['messages']['room_info_expires'].format(
+            value=t('privateroom.messages.room_info_expires').format(
                 end_date=end_date.strftime("%Y-%m-%d %H:%M")
             ),
             inline=False
         )
 
-        embed.set_footer(text=self.conf['messages']['room_info_footer'])
+        embed.set_footer(text=t('privateroom.messages.room_info_footer'))
 
         # 如果用户有头像，添加为嵌入消息的缩略图
         if user.avatar:
@@ -1709,14 +1697,12 @@ class PrivateRoomCog(commands.Cog):
         try:
             if is_restore:
                 # 恢复房间成功消息
-                title = self.conf['messages'].get('room_restore_success_title',
-                                                  "🔄 私人房间恢复成功！")
-                description = self.conf['messages'].get('room_restore_success_description',
-                                                        "您的私人房间已恢复成功！\n\n🔑 您是房主，拥有完全控制权。\n⏰ 有效期至: {end_date}")
+                title = t('privateroom.messages.room_restore_success_title')
+                description = t('privateroom.messages.room_restore_success_description')
             else:
                 # 购买房间成功消息
-                title = self.conf['messages']['purchase_success_title']
-                description = self.conf['messages']['purchase_success_description']
+                title = t('privateroom.messages.purchase_success_title')
+                description = t('privateroom.messages.purchase_success_description')
 
             embed = discord.Embed(
                 title=title,
@@ -1730,7 +1716,7 @@ class PrivateRoomCog(commands.Cog):
             view = discord.ui.View()
             button = discord.ui.Button(
                 style=discord.ButtonStyle.link,
-                label=self.conf['messages']['purchase_success_button'],
+                label=t('privateroom.messages.purchase_success_button'),
                 url=channel.jump_url
             )
             view.add_item(button)
@@ -1744,8 +1730,8 @@ class PrivateRoomCog(commands.Cog):
     async def send_renewal_success_embed(self, channel, user, new_end_date, extend_days):
         """在私人房间中发送续费成功的嵌入消息"""
         embed = discord.Embed(
-            title=self.conf['messages']['renewal_room_success_title'],
-            description=self.conf['messages']['renewal_room_success_description'].format(
+            title=t('privateroom.messages.renewal_room_success_title'),
+            description=t('privateroom.messages.renewal_room_success_description').format(
                 owner=user.mention,
                 extend_days=extend_days,
                 new_end_date=new_end_date.strftime("%Y-%m-%d %H:%M")
@@ -1759,7 +1745,7 @@ class PrivateRoomCog(commands.Cog):
         elif self.bot.user.avatar:
             embed.set_thumbnail(url=self.bot.user.avatar.url)
 
-        embed.set_footer(text=self.conf['messages']['renewal_room_success_footer'])
+        embed.set_footer(text=t('privateroom.messages.renewal_room_success_footer'))
 
         await channel.send(embed=embed)
 
@@ -1767,8 +1753,8 @@ class PrivateRoomCog(commands.Cog):
         """向用户发送私信确认续费成功"""
         try:
             embed = discord.Embed(
-                title=self.conf['messages']['renewal_dm_success_title'],
-                description=self.conf['messages']['renewal_dm_success_description'].format(
+                title=t('privateroom.messages.renewal_dm_success_title'),
+                description=t('privateroom.messages.renewal_dm_success_description').format(
                     extend_days=extend_days,
                     new_end_date=new_end_date.strftime("%Y-%m-%d %H:%M")
                 ),
@@ -1779,7 +1765,7 @@ class PrivateRoomCog(commands.Cog):
             view = discord.ui.View()
             button = discord.ui.Button(
                 style=discord.ButtonStyle.link,
-                label=self.conf['messages']['renewal_dm_success_button'],
+                label=t('privateroom.messages.renewal_dm_success_button'),
                 url=channel.jump_url
             )
             view.add_item(button)
@@ -1885,7 +1871,7 @@ class PrivateRoomCog(commands.Cog):
 
             if not active_room:
                 await interaction.followup.send(
-                    self.conf['messages'].get('ban_no_room', "⚠️ {user_mention} 没有活跃的私人房间").format(
+                    t('privateroom.messages.ban_no_room').format(
                         user_mention=user.mention
                     ),
                     ephemeral=True
@@ -1908,7 +1894,7 @@ class PrivateRoomCog(commands.Cog):
 
             # Send success message
             await interaction.followup.send(
-                self.conf['messages'].get('ban_success', "✅ 已禁止 {user_mention} 使用私人房间并删除现有房间").format(
+                t('privateroom.messages.ban_success').format(
                     user_mention=user.mention
                 ),
                 ephemeral=True
@@ -1917,7 +1903,7 @@ class PrivateRoomCog(commands.Cog):
         except Exception as e:
             logging.error(f"Error banning user from private rooms: {e}")
             await interaction.followup.send(
-                self.conf['messages'].get('ban_error', "❌ 删除房间失败: {error}").format(error=str(e)),
+                t('privateroom.messages.ban_error').format(error=str(e)),
                 ephemeral=True
             )
 
@@ -1947,7 +1933,7 @@ class PrivateRoomCog(commands.Cog):
 
                     # Update the embed description
                     embed = message.embeds[0]
-                    embed.description = self.conf['messages']['shop_description'].format(
+                    embed.description = t('privateroom.messages.shop_description').format(
                         points_cost=self.conf['points_cost'],
                         duration=self.conf['room_duration_days'],
                         hours_threshold=self.conf['voice_hours_threshold'],

@@ -1,0 +1,123 @@
+messages:
+  init_success: '✅ 私人房间系统已初始化成功！Category ID: {category_id}'
+  init_fail: ❌ 初始化失败，请确保机器人有足够的权限创建分类。
+  init_already: ⚠️ 私人房间系统已经初始化，如需重置请先使用 /privateroom_reset 命令。
+  reset_success: 🔄 私人房间系统已重置。
+  reset_confirm: ⚠️ 确定要重置私人房间系统？这将删除所有现有的私人房间数据！
+  reset_confirm_button: 确认重置
+  reset_cancel_button: 取消
+  reset_cancelled: ✅ 重置操作已取消。
+  setup_success: ✅ 已在 {channel} 创建私人房间商店。
+  setup_fail: '❌ 设置商店失败: {error}'
+  setup_already: ⚠️ 商店已存在，请先使用 /privateroom_reset 重置系统。
+  shop_title: 🏠 私人房间商店
+  shop_description: "在这里你可以购买私人房间，享受你专属的语音空间！\n 每日在签到面板中点击签到按钮可以获得10积分。\n\n💰 价格: **{points_cost}**
+    积分\n⏰ 有效期: **{duration}** 天\n\n**老🐦福利:** 上个月__语音时长__满 **{hours_threshold}** 小时即可免费获得！可按比例抵扣积分~\n\
+    🚀 **助力用户福利:** 额外享受 **{booster_hours}** 小时语音时长加成！\n\n🏠 当前可用: **{available_rooms}/{max_rooms}**"
+  shop_button_label: 🛍️ 购买私人房间
+  shop_footer: 私人房间到期后将自动删除，包括所有聊天记录。
+  confirm_title: 确认购买私人房间
+  confirm_last_month: '📊 上个月语音时长: **{hours}** 小时'
+  confirm_discount: '💯 享受折扣: **{discount}%** 折扣'
+  confirm_cost: '💰 需支付: **{cost}** 积分'
+  confirm_balance: '💳 当前余额: **{balance}** 积分'
+  confirm_button: ✅ 确认购买
+  cancel_button: ❌ 取消
+  purchase_cancelled: 🛑 已取消购买。
+  modal_title: 最终确认
+  modal_label: 请输入 'yes' 确认购买
+  modal_placeholder: 输入 yes 确认
+  purchase_success_title: 🎉 私人房间购买成功！
+  purchase_success_description: "您的私人房间已创建成功！\n\n🔑 您是房主，拥有完全控制权。\n⏰ 有效期至: {end_date}"
+  purchase_success_button: 👉 前往我的房间
+  room_name: 🏠 {user_name} 的私人房间
+  room_info_title: 🏠 {owner} 的私人房间
+  room_info_owner: '👑 房主: {owner}'
+  room_info_created: '🕒 创建时间: {start_date}'
+  room_info_expires: '⌛ 到期时间: {end_date}'
+  room_info_footer: 房间到期后将自动删除，包括所有聊天记录。
+  room_info_warning: ⚠️ 
+    由于discord的权限设置存在漏洞，请明确在私房中禁止任何人拥有和使用[服务器静音]或者[服务器双向禁止]权限，这会导致严重后果。对于权限滥用，您可能会被取消私房权限。
+  room_expired_title: 📢 您的私人房间已过期
+  room_expired_description: "您的私人房间 **{room_name}** 已到期并被删除。\n\n如果您想继续使用私人房间，可以再次购买。"
+  room_expired_button: 🔄 再次购买
+  room_expired_footer: 感谢您使用私人房间服务！
+  shop_restore_button_label: 🔄 误删恢复
+  room_restore_title: 🔄 恢复私人房间
+  room_restore_description: "您的私人房间在有效期内被删除，您可以恢复它！\n\n原房间创建于: {start_date}\n到期时间:
+    {end_date}"
+  room_restore_cost: '💰 恢复需要: **{cost}** 积分'
+  room_restore_balance: '💳 当前余额: **{balance}** 积分'
+  room_restore_button: ✅ 恢复房间
+  room_restored_success: ✅ 您的私人房间已恢复！
+  error_no_room_to_restore: ❌ 您没有可恢复的私人房间。请先购买一个私人房间。
+  room_restore_success_title: 🔄 私人房间恢复成功！
+  room_restore_success_description: "您的私人房间已恢复成功！\n\n🔑 您是房主，拥有完全控制权。\n⏰ 有效期至: {end_date}"
+  shop_cleaned_old: 🧹 已清理 {count} 个不再存在的旧商店消息记录。
+  shop_verify_success: ✅ 所有商店消息验证完成。
+  shop_verify_cleanup: 🧹 已清理 {count} 个不存在的商店消息记录。
+  list_title: 🏠 私人房间列表
+  list_footer: 第 {current_page}/{total_pages} 页 · 共 {total_rooms} 个房间
+  list_room_info: "👑 拥有者: {owner_mention}\n⏱️ 创建: {start} · 到期: {end}"
+  list_prev_button: 上一页
+  list_next_button: 下一页
+  ban_success: ✅ 已禁止 {user_mention} 的私人房间并删除现有房间
+  ban_no_room: ⚠️ {user_mention} 没有有效的私人房间
+  ban_error: '❌ 删除房间失败: {error}'
+  fix_success: '✅ 已将 {user_mention} 的私人房间有效期调整为 {days} 天（到期: {end_date}）。'
+  fix_no_active_room: ❌ {user_mention} 没有激活且有效的私人房间。
+  fix_room_not_found: ❌ {user_mention} 的私人房间未找到，请先检查房间状态。
+  fix_invalid_days: ❌ 请输入大于 0 的天数。
+  error_room_limit_reached: ❌ 私人房间名额已满
+  error_no_category: ❌ 私人房间系统未初始化，请联系管理员。
+  error_insufficient_balance: ❌ 积分不足，无法购买私人房间。
+  error_already_owns: ❌ 您已拥有一个私人房间，无法同时拥有多个。
+  error_confirmation_failed: ❌ 确认失败，请输入 'yes' 确认购买。
+  error_create_failed: ❌ 创建房间失败，请联系管理员。
+  error_insufficient_balance_title: ❌ 积分不足
+  error_insufficient_balance_description: 您的积分不足以购买私人房间
+  error_insufficient_balance_original_price: 🏷️ 原价
+  error_insufficient_balance_voice_time: 🎙️ 语音时长折扣
+  error_insufficient_balance_after_discount: 💰 折扣后价格
+  error_insufficient_balance_current: 💳 当前余额
+  error_insufficient_balance_current_format: '**{balance}** 积分（还需 **{needed}** 积分）'
+  error_insufficient_balance_voice_format: 上个月语音 **{hours}** 小时（**{minutes}** 
+    分钟），抵扣 **{discount}** 积分
+  error_insufficient_balance_footer: 提示：每日签到可获得积分，或者增加语音时长来获得下个月更多折扣
+  points_label: 积分
+  shop_renewal_button_label: ⏰ 提前续费
+  renewal_confirm_title: 确认提前续费私人房间
+  renewal_current_room: '🏠 当前房间: **{room_name}** (剩余 **{days_remaining}** 天)'
+  renewal_extend_days: '⏰ 续费延长: **{extend_days}** 天'
+  renewal_cost: '💰 续费费用: **{cost}** 积分'
+  renewal_confirm_button: ✅ 确认续费
+  renewal_cancel_button: ❌ 取消
+  renewal_cancelled: 🛑 已取消续费。
+  renewal_modal_title: 最终确认续费
+  renewal_modal_label: 请输入 'yes' 确认续费
+  renewal_modal_placeholder: 输入 yes 确认
+  renewal_success_title: 🎉 私人房间续费成功！
+  renewal_room_success_title: 🔄 房间续费成功！
+  renewal_room_success_description: "🎉 {owner} 已成功续费此私人房间！\n\n⏰ 延长时间: **{extend_days}**
+    天\n📅 新到期时间: **{new_end_date}**"
+  renewal_room_success_footer: 感谢您继续使用私人房间服务！
+  renewal_dm_success_title: 🎉 私人房间续费成功！
+  renewal_dm_success_description: "您的私人房间已成功续费！\n\n⏰ 延长时间: **{extend_days}** 天\n📅
+    新到期时间: **{new_end_date}**"
+  renewal_dm_success_button: 👉 前往我的房间
+  error_no_room_for_renewal: ❌ 您没有可续费的私人房间。
+  error_room_not_found: ❌ 您的私人房间未找到，请联系管理员。
+  error_renewal_too_early: ❌ 私人房间剩余时间还有 **{days_remaining}** 天，至少要少于 
+    **{threshold}** 天才能续费。
+  error_renewal_insufficient_balance_description: 您的积分不足以续费私人房间
+  error_renewal_failed: ❌ 续费失败，请联系管理员。
+  confirm_booster_bonus: '🚀 助力用户加成: **+{bonus_hours}** 小时'
+  error_insufficient_balance_booster_info: 💡 成为助力用户可额外获得 {booster_hours} 小时时长加成！
+  renewal_reminder_title: ⏰ 私人房间即将过期提醒
+  renewal_reminder_description: "您的私人房间 **{room_name}** 即将在 **{days_remaining}** 天后过期。\n\
+    \n您现在可以提前续费延长房间使用时间！"
+  renewal_reminder_room_info: "🏠 房间名称: {room_name}\n📅 到期时间: {end_date}\n⏰ 剩余时间: {days_remaining}
+    天"
+  renewal_reminder_button_label: 🛍️ 前往商店续费
+  renewal_reminder_footer: 提示：在商店页面点击「⏰ 提前续费」按钮即可续费您的私人房间
+  renewal_reminder_no_shop: ⚠️ 商店频道未找到，请联系管理员
