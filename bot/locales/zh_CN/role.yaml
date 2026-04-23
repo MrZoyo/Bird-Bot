@@ -1,0 +1,53 @@
+role_no_column_name_message: 错误：未知的成就类型。请联系管理员。
+role_no_progress_message: 你还没有开始积累成就进度。
+role_no_achievement_message: 啊呀，你还没有完成这类成就呢~
+role_success_message: '恭喜你获得了成就： {name} '
+role_pickup_title: 请选择你想要领取的成就类型
+role_pickup_footer: '------点击按钮领取的成就，当前类型的成就将被替换为最高等级的成就------'
+starsign_fire_title: 火象星座
+starsign_fire_description: "- ♈️ 白羊座 3月21日 - 4月19日\n- ♌️ 狮子座 7月23日 - 8月22日\n- ♐️ 射手座
+  11月23日 - 12月21日"
+starsign_earth_title: 土象星座
+starsign_earth_description: "- ♉️ 金牛座 4月20日 - 5月20日\n- ♍️ 处女座 8月23日 - 9月22日\n- ♑️
+  摩羯座 12月22日 - 1月19日"
+starsign_air_title: 风象星座
+starsign_air_description: "- ♊️ 双子座 5月21日 - 6月21日\n- ♎️ 天秤座 9月23日 - 10月23日\n- ♒️ 水瓶座
+  1月20日 - 2月18日"
+starsign_water_title: 水象星座
+starsign_water_description: "- ♋️ 巨蟹座 6月22日 - 7月22日\n- ♏️ 天蝎座 10月24日 - 11月22日\n- ♓️
+  双鱼座 2月19日 - 3月20日"
+starsign_pickup_title: 请选择你的星座
+starsign_pickup_footer: '------点击按钮选择你的星座，当前星座将被替换为新的星座------'
+starsign_success_message: '已为你添加了星座： {name} '
+mbti_pickup_title: 请选择你的MBTI类型
+mbti_pickup_footer: '------点击按钮选择你的MBTI类型，当前MBTI类型将被替换为新的MBTI类型------'
+mbti_success_message: '已为你添加了MBTI类型： {name} '
+mbti_first_field_title: MBTI分类依据
+mbti_first_field_description: "**能量态度**： 内向Introversion (I) / 外向Extraversion (E)\n\
+  **认知功能**：感觉Sensing (S) / 直觉iNtuition (N)\n**决策功能**：思考Thinking (T) / 感觉Feeling (F)\n\
+  **生活方式**：判断Judging (J) / 知觉Perceiving (P)"
+mbti_SP_title: SP组（工匠）
+mbti_SP_description: "\n- ESTP: 创业者Promoter\n- ISTP: 手艺人Crafter \n- ISFP: 作词人Composer\n\
+  - ESFP: 表演者Performer"
+mbti_SJ_title: SJ组（守护者）
+mbti_SJ_description: "\n- ESTJ: 监督者Supervisor\n- ISTJ: 调查员Inspector\n- ISFJ: 保护者Protector\n\
+  - ESFJ: 供给者Provider"
+mbti_NF_title: NF组（理想主义者）
+mbti_NF_description: "\n- ENFJ: 教育家Teacher\n- INFJ: 咨询师Counselor\n- INFP: 治疗师Healer\n\
+  - ENFP: 捍卫者Champion"
+mbti_NT_title: NT组（理性主义者）
+mbti_NT_description: "\n- ENTJ: 指挥官Fieldmarshal\n- INTJ: 策略家Mastermind\n- INTP: 建筑师Architect\n\
+  - ENTP: 发明家Inventor"
+starsign_remove_message: 已为你移除星座： {name} ，如需重新选择可再次点击。
+mbti_remove_message: 已为你移除MBTI类型： {name} ，如需重新选择可再次点击。
+role_remove_message: 已为你移除成就： {name} ，如需重新领取可再次点击。
+gender_pickup_title: 请选择你的性别标识
+gender_pickup_footer: '------点击按钮选择你的性别标识，再次点击可以移除------'
+gender_success_message: '已为你添加性别标识： {name} '
+gender_remove_message: 已为你移除性别标识： {name} ，如需重新选择可再次点击。
+gender_tree_title: 玉树临风
+gender_tree_description: '- 🌳 Tree 永远挺立'
+gender_sakura_title: 闭月羞花
+gender_sakura_description: '- 🌸 Sakura 永远绽放'
+gender_ninja_title: 我是忍者
+gender_ninja_description: '- 🥷 Ninja 永远神秘'

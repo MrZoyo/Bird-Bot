@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timezone
 
 from bot.utils import config, check_channel_validity, safe_member_role_edit
+from bot.utils.i18n import t
 from bot.utils.role_db import RoleDatabaseManager
 
 
@@ -63,11 +64,11 @@ class AchievementRoleView(View):
         self.achievements = self.achievement_config['achievements']
         self.role_type_name = self.role_config['role_type_name']
         self.achievement_start_role_id = self.role_config['achievement_start_role_id']
-        self.role_no_column_name_message = self.role_config['role_no_column_name_message']
-        self.role_no_progress_message = self.role_config['role_no_progress_message']
-        self.role_no_achievement_message = self.role_config['role_no_achievement_message']
-        self.role_success_message = self.role_config['role_success_message']
-        self.role_remove_message = self.role_config['role_remove_message']
+        self.role_no_column_name_message = t('role.role_no_column_name_message')
+        self.role_no_progress_message = t('role.role_no_progress_message')
+        self.role_no_achievement_message = t('role.role_no_achievement_message')
+        self.role_success_message = t('role.role_success_message')
+        self.role_remove_message = t('role.role_remove_message')
 
         for index, role in enumerate(self.role_type_name):
             row = index // 3  # Calculate row: 0, 1, 2 go to row 0; 3, 4, 5 go to row 1
@@ -191,8 +192,8 @@ class StarSignView(View):
         self.role_config = config.get_config('role')
         self.starsign_name = self.role_config['starsign_name']
         self.social_start_role_id = self.role_config['social_start_role_id']
-        self.starsign_success_message = self.role_config['starsign_success_message']
-        self.starsign_remove_message = self.role_config['starsign_remove_message']
+        self.starsign_success_message = t('role.starsign_success_message')
+        self.starsign_remove_message = t('role.starsign_remove_message')
 
         for index, star_sign in enumerate(self.starsign_name):
             row = index % self.buttons_per_row  # Calculate the row for the button
@@ -263,8 +264,8 @@ class MBTIView(View):
         self.role_config = config.get_config('role')
         self.mbti_name = self.role_config['mbti_name']
         self.social_start_role_id = self.role_config['social_start_role_id']
-        self.mbti_success_message = self.role_config['mbti_success_message']
-        self.mbti_remove_message = self.role_config['mbti_remove_message']
+        self.mbti_success_message = t('role.mbti_success_message')
+        self.mbti_remove_message = t('role.mbti_remove_message')
 
         for index, mbti in enumerate(self.mbti_name):
             row = index % self.buttons_per_row
@@ -332,8 +333,8 @@ class GenderView(View):
 
         self.role_config = config.get_config('role')
         self.gender_name = self.role_config['gender_name']
-        self.gender_success_message = self.role_config['gender_success_message']
-        self.gender_remove_message = self.role_config['gender_remove_message']
+        self.gender_success_message = t('role.gender_success_message')
+        self.gender_remove_message = t('role.gender_remove_message')
 
         for index, gender in enumerate(self.gender_name):
             button = Button(
@@ -549,49 +550,49 @@ class RoleCog(commands.Cog):
         self.achievements = self.achievement_config['achievements']
         self.role_type_name = self.role_config['role_type_name']
 
-        self.role_pickup_title = self.role_config['role_pickup_title']
-        self.role_pickup_footer = self.role_config['role_pickup_footer']
+        self.role_pickup_title = t('role.role_pickup_title')
+        self.role_pickup_footer = t('role.role_pickup_footer')
 
         # StarSign configs
         self.starsign_name = self.role_config['starsign_name']
-        self.starsign_pickup_title = self.role_config['starsign_pickup_title']
-        self.starsign_pickup_footer = self.role_config['starsign_pickup_footer']
-        self.starsign_fire_title = self.role_config['starsign_fire_title']
-        self.starsign_fire_description = self.role_config['starsign_fire_description']
-        self.starsign_earth_title = self.role_config['starsign_earth_title']
-        self.starsign_earth_description = self.role_config['starsign_earth_description']
-        self.starsign_air_title = self.role_config['starsign_air_title']
-        self.starsign_air_description = self.role_config['starsign_air_description']
-        self.starsign_water_title = self.role_config['starsign_water_title']
-        self.starsign_water_description = self.role_config['starsign_water_description']
+        self.starsign_pickup_title = t('role.starsign_pickup_title')
+        self.starsign_pickup_footer = t('role.starsign_pickup_footer')
+        self.starsign_fire_title = t('role.starsign_fire_title')
+        self.starsign_fire_description = t('role.starsign_fire_description')
+        self.starsign_earth_title = t('role.starsign_earth_title')
+        self.starsign_earth_description = t('role.starsign_earth_description')
+        self.starsign_air_title = t('role.starsign_air_title')
+        self.starsign_air_description = t('role.starsign_air_description')
+        self.starsign_water_title = t('role.starsign_water_title')
+        self.starsign_water_description = t('role.starsign_water_description')
 
         # MBTI configs
         self.mbti_name = self.role_config['mbti_name']
-        self.mbti_pickup_title = self.role_config['mbti_pickup_title']
-        self.mbti_pickup_footer = self.role_config['mbti_pickup_footer']
-        self.mbti_first_field_title = self.role_config['mbti_first_field_title']
-        self.mbti_first_field_description = self.role_config['mbti_first_field_description']
-        self.mbti_SP_title = self.role_config['mbti_SP_title']
-        self.mbti_SP_description = self.role_config['mbti_SP_description']
-        self.mbti_SJ_title = self.role_config['mbti_SJ_title']
-        self.mbti_SJ_description = self.role_config['mbti_SJ_description']
-        self.mbti_NF_title = self.role_config['mbti_NF_title']
-        self.mbti_NF_description = self.role_config['mbti_NF_description']
-        self.mbti_NT_title = self.role_config['mbti_NT_title']
-        self.mbti_NT_description = self.role_config['mbti_NT_description']
+        self.mbti_pickup_title = t('role.mbti_pickup_title')
+        self.mbti_pickup_footer = t('role.mbti_pickup_footer')
+        self.mbti_first_field_title = t('role.mbti_first_field_title')
+        self.mbti_first_field_description = t('role.mbti_first_field_description')
+        self.mbti_SP_title = t('role.mbti_SP_title')
+        self.mbti_SP_description = t('role.mbti_SP_description')
+        self.mbti_SJ_title = t('role.mbti_SJ_title')
+        self.mbti_SJ_description = t('role.mbti_SJ_description')
+        self.mbti_NF_title = t('role.mbti_NF_title')
+        self.mbti_NF_description = t('role.mbti_NF_description')
+        self.mbti_NT_title = t('role.mbti_NT_title')
+        self.mbti_NT_description = t('role.mbti_NT_description')
 
         # Gender configs - new additions
         self.gender_name = self.role_config['gender_name']
-        self.gender_pickup_title = self.role_config['gender_pickup_title']
-        self.gender_pickup_footer = self.role_config['gender_pickup_footer']
-        self.gender_success_message = self.role_config['gender_success_message']
-        self.gender_remove_message = self.role_config['gender_remove_message']
-        self.gender_tree_title = self.role_config['gender_tree_title']
-        self.gender_tree_description = self.role_config['gender_tree_description']
-        self.gender_sakura_title = self.role_config['gender_sakura_title']
-        self.gender_sakura_description = self.role_config['gender_sakura_description']
-        self.gender_ninja_title = self.role_config['gender_ninja_title']
-        self.gender_ninja_description = self.role_config['gender_ninja_description']
+        self.gender_pickup_title = t('role.gender_pickup_title')
+        self.gender_pickup_footer = t('role.gender_pickup_footer')
+        self.gender_success_message = t('role.gender_success_message')
+        self.gender_remove_message = t('role.gender_remove_message')
+        self.gender_tree_title = t('role.gender_tree_title')
+        self.gender_tree_description = t('role.gender_tree_description')
+        self.gender_sakura_title = t('role.gender_sakura_title')
+        self.gender_sakura_description = t('role.gender_sakura_description')
+        self.gender_ninja_title = t('role.gender_ninja_title')
+        self.gender_ninja_description = t('role.gender_ninja_description')
 
         self.signature_config = self.role_config['signature']
 
