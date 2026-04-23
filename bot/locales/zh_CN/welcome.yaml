@@ -1,0 +1,12 @@
+# Text templates safe for git (no concrete channel / guild IDs).
+# `welcome_text` carries Discord URLs / custom-emoji IDs embedded in the
+# copy and lives in bot/config/welcome.yaml (per-deploy, gitignored).
+# Its sanitised form is in welcome.yaml.example. A future i18n pass
+# can split the URLs out into config placeholders + pull the text
+# back here; until then the cog reads welcome_text from config.
+#
+# The DM subtree under bot/config/welcome.yaml similarly mixes data
+# (color / dm_image / rules_channel_id) with user-visible text; it
+# stays in the config YAML for now, pending a namespaced split.
+welcome_text_picture_1: 漆黑的世界，我寻着光，遇到了你。 {user_name}，祝君开心。
+welcome_text_picture_2: 本服务器第 {member_number} 名成员

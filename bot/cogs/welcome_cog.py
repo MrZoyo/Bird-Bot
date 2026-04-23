@@ -10,6 +10,7 @@ import aiohttp
 from pathlib import Path
 
 from bot.utils import config, check_channel_validity
+from bot.utils.i18n import t
 
 
 class WelcomeDMView(discord.ui.View):
@@ -36,25 +37,28 @@ class WelcomeCog(commands.Cog):
         self.main_config = config.get_config('main')
         self.db_path = self.main_config['db_path']
 
-        self.conf = config.get_config('welcome')
-        # Set the parameters from the config
-        self.welcome_channel_id = self.conf['welcome_channel_id']
-        self.text_color = tuple(self.conf['text_color'])
+        conf = config.get_config('welcome')
+        # Data fields stay in YAML; user-visible picture text moves to
+        # bot/locales/zh_CN/welcome.yaml (P1-6 step 7). welcome_text
+        # stays in YAML because it embeds per-deploy Discord URLs +
+        # custom-emoji IDs that we do not want in a tracked locale file.
+        self.welcome_channel_id = conf['welcome_channel_id']
+        self.text_color = tuple(conf['text_color'])
 
-        self.font_size = self.conf['font_size']
-        self.avatar_size = tuple(self.conf['avatar_size'])
-        self.welcome_text_1_distance = self.conf['welcome_text_1_distance']
-        self.welcome_text_2_distance = self.conf['welcome_text_2_distance']
-        self.welcome_text_picture_1 = self.conf['welcome_text_picture_1']
-        self.welcome_text_picture_2 = self.conf['welcome_text_picture_2']
-        self.welcome_text = self.conf['welcome_text']
+        self.font_size = conf['font_size']
+        self.avatar_size = tuple(conf['avatar_size'])
+        self.welcome_text_1_distance = conf['welcome_text_1_distance']
+        self.welcome_text_2_distance = conf['welcome_text_2_distance']
+        self.welcome_text = conf['welcome_text']
 
         self.base_path = Path(__file__).parent.parent.parent
-        self.font_path = str(self.base_path / "resources" / "fonts" / Path(self.conf['font_path']).name)
-        self.background_image = str(self.base_path / "resources" / "images" / Path(self.conf['background_image']).name)
+        self.font_path = str(self.base_path / "resources" / "fonts" / Path(conf['font_path']).name)
+        self.background_image = str(self.base_path / "resources" / "images" / Path(conf['background_image']).name)
 
-        # Add new config parameters for DM welcome message
-        self.dm_config = self.conf.get('dm', {})
+        # Add new config parameters for DM welcome message. DM copy is a
+        # mix of data (colour, image, rules_channel_id) and text; a full
+        # i18n split is a follow-up — for now dm_config stays YAML-backed.
+        self.dm_config = conf.get('dm', {})
         self.welcome_dm_image = str(self.base_path / "resources" / "images" / Path(self.dm_config.get('dm_image', "welcome_dm.png")).name)
 
         # Verify resources exist
@@ -99,12 +103,12 @@ class WelcomeCog(commands.Cog):
             font = ImageFont.truetype(self.font_path, self.font_size)
 
             # First line of text
-            text1 = self.welcome_text_picture_1.format(user_name=user_name)
+            text1 = t('welcome.welcome_text_picture_1', user_name=user_name)
             text1_width = draw.textlength(text1, font=font)
             text1_height = self.font_size  # Assuming single line, this might need adjustment
 
             # Second line of text
-            text2 = self.welcome_text_picture_2.format(member_number=member_number)
+            text2 = t('welcome.welcome_text_picture_2', member_number=member_number)
             text2_width = draw.textlength(text2, font=font)
 
             # Position for the first line of text, placed below the avatar with some space

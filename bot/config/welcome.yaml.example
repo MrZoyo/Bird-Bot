@@ -1,0 +1,39 @@
+welcome_channel_id: 1145141919810
+text_color:
+- 107
+- 104
+- 180
+font_path: mengshenshouxieti.ttf
+font_size: 60
+avatar_size:
+- 400
+- 400
+welcome_text_1_distance: 30
+welcome_text_2_distance: 30
+background_image: background.png
+# welcome_text lives here rather than the locale file because it
+# carries real channel / guild URLs + custom-emoji IDs per deployment.
+# Placeholders: {member}, {member.mention}.
+welcome_text: "欢迎来到本服务器, {member.mention}! 希望你能在这里度过一段美好时光。<:200013:1145141919810>\n请查看\
+  \ https://discord.com/channels/1145141919810/1145141919810 了解更多信息。"
+dm:
+  description0_title: 小鸟知道你在想什么・永久邀请链接
+  description1_title: https://discord.gg/Birdgaming
+  description1:
+  - "\n 你好，{user}，欢迎你的加入 \n"
+  description2_title: 🐦小鸟知道你在想什么・欧服综合游戏社区 🏮
+  description2:
+  - 同时也是最大的LOL EUW社区 🎮
+  - 我们欢迎任何志同道合的绿色玩家🤗
+  - 希望你能在这里成为我们和谐家庭的一员💫
+  rules:
+    rules_title: 📜 规则与指南
+    rules_text: 请你熟悉一下我们服务器的规则🎐
+  footer: 小鸟知道你在想什么・欧服综合游戏社区
+  dm_image: welcome_dm.png
+  color:
+  - 107
+  - 104
+  - 180
+  rules_channel_id: '1145141919810'
+  member_count_button: 你是小鸟的第 {member_count} 名成员
