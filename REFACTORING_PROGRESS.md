@@ -523,6 +523,25 @@
 
 ---
 
+### sanitizer 扩 ID 白名单 + URL + 嵌入 snowflake（2026-04-23）
+
+**Commit grep**: `git log --grep='sanitizer snowflake'`
+
+**动的**：`tools/migrate_config_to_yaml.py`。
+
+**三层防御**（由窄到宽，首个匹配即终止路由）：
+1. `ID_KEY_PATTERNS` 扩到包含 `admin_roles` / `admin_users` / `mod_roles` / `mod_users` / `blocklist` / `banlist`（无 `_id` 后缀的 snowflake 列表）。
+2. `URL_KEY_PATTERNS`（`_link` / `_url` / `invite_link` / `invite_url`）走 `_sanitize_url_like` 把整串换成 `https://discord.gg/YOUR_INVITE_CODE` 占位。
+3. `_sanitize_snowflake_scalar` 兜底：
+   - scalar int / 纯数字 str ≥ `10**17` → 换 `1145141919810`（schema drift 时的 fail-closed）。
+   - 自由文本里嵌的 Discord token（invite URL、`discord.com/channels/.../...` deep-link、自定义 emoji `<:name:id>`、`<@id>` / `<#id>` / `<@&id>` mention）用预编译 regex 做字段级替换，只改 ID 部分，周围中文 / 英文 prose 原样保留。
+
+**验收**：对 14 个 `old_function/config/config_*.json` 端到端跑 `migrate_config_to_yaml` → `sanitize_for_example` → YAML dump；每个生成的 `.yaml.example` 只剩 `1145141919810`（sanitizer 占位）和 `123456789012345678`（原始 JSON 里模态对话框的文档占位符）。零真实 snowflake、零真实 invite URL、零 guild/channel deep-link 残留。
+
+**为什么要 fail-closed 兜底**：原脚本的 heuristic 是白名单 —— 任何键名打错或没列到的新字段都会静默漏过。三层结构里第三层（snowflake 规模 + 嵌入 regex）确保即使前两层都没对上，真 ID 仍被换掉。Discord snowflake 从 2017 后就稳定 ≥ 10^17，所以规模阈值几乎零误伤（"1145141919810" 这个经常被引用的 meme placeholder 恰好也满足阈值，刚好一起被当占位符处理，无副作用）。
+
+---
+
 ### P1-4 ✅ 完整 schema + 静态 locale key 对齐（2026-04-23）
 
 **Commit grep**: `git log --grep='(P1-4)'`（原最小版本）+ `git log --grep="(P1-4)"` 新 commit。latent-bug 修复 commit：`git log --grep='ban.*flatten'`。
@@ -676,9 +695,8 @@ description=locale_str(
 Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅；P1-4 dataclass schema + 静态 key 对齐 ✅。下一轮可接手的 follow-up：
 
 **🟡 important**：
-1. 迁移脚本 sanitizer 扩 ID 白名单或 snowflake-magnitude 检测（修 `admin_roles` / `admin_users` / `invite_link` 漏脱敏 bug）。
-2. nested 子树文案抽 locale：`welcome.dm.*` / `role.signature.*` / `voicechannel.control_panel.{title,footer,messages,buttons,description_template}` 目前整块留在 yaml。完成后 `check_locales.py` 的 `voicechannel.yaml has no t() references` info 会消失。
-3. per-cog 配置 schema（shop / ban / tickets_new / voicechannel / privateroom 等）：按 P1-3 拆包时一并添加，把 `admin_roles: List[int]` / `ticket_types: Dict[str, TicketType]` 等固定形状字段锁死。
+1. nested 子树文案抽 locale：`welcome.dm.*` / `role.signature.*` / `voicechannel.control_panel.{title,footer,messages,buttons,description_template}` 目前整块留在 yaml。完成后 `check_locales.py` 的 `voicechannel.yaml has no t() references` info 会消失。
+2. per-cog 配置 schema（shop / ban / tickets_new / voicechannel / privateroom 等）：按 P1-3 拆包时一并添加，把 `admin_roles: List[int]` / `ticket_types: Dict[str, TicketType]` 等固定形状字段锁死。
 
 **🟢 nice-to-have**：
 4. P1-3 大 cog 拆包（`tickets_new_cog` / `privateroom_cog` / `ban_cog` 按 PLAN `cog.py + views.py + modals.py + embeds.py + service.py`）。
