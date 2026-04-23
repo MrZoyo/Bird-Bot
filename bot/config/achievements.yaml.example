@@ -1,0 +1,219 @@
+achievements:
+- name: 表达情绪
+  description: 为10条信息添加反应
+  threshold: 10
+  type: reaction
+  milestone: reaction1
+  role_id: 1145141919810
+- name: 打标达人
+  description: 为100条信息添加反应
+  threshold: 100
+  type: reaction
+  milestone: reaction2
+  role_id: 1145141919810
+- name: 如何评价···
+  description: 为1000条信息添加反应
+  threshold: 1000
+  type: reaction
+  milestone: reaction3
+  role_id: 1145141919810
+- name: 你好！
+  description: 发言10次
+  threshold: 10
+  type: message
+  milestone: message1
+  role_id: 1145141919810
+- name: 有人来吗？
+  description: 发言100次
+  threshold: 100
+  type: message
+  milestone: message2
+  role_id: 1145141919810
+- name: 超级:regional_indicator_e:人
+  description: 发言1000次
+  threshold: 1000
+  type: message
+  milestone: message3
+  role_id: 1145141919810
+- name: '我一直在喷水:whale:'
+  description: 发言10000次
+  threshold: 10000
+  type: message
+  milestone: message4
+  role_id: 1145141919810
+- name: '第一次做:bird:'
+  description: 在语音频道中待满60分钟
+  threshold: 60
+  type: time_spent
+  milestone: timespent1
+  role_id: 1145141919810
+- name: 在:bird:的第一天
+  description: 在语音频道中待满24小时
+  threshold: 1440
+  type: time_spent
+  milestone: timespent2
+  role_id: 1145141919810
+- name: 已经做了一个月:bird:了
+  description: 在语音频道中待满1个月
+  threshold: 43200
+  type: time_spent
+  milestone: timespent3
+  role_id: 1145141919810
+- name: 999小时的陪伴
+  description: 在语音频道中待满999小时
+  threshold: 59940
+  type: time_spent
+  milestone: timespent4
+  role_id: 1145141919810
+- name: 我知道:bird:在想什么
+  description: 在语音频道中待满1年
+  threshold: 525600
+  type: time_spent
+  milestone: timespent5
+  role_id: 1145141919810
+- name: :game_die:赌:dog:来咯
+  description: 参加一次抽奖
+  threshold: 1
+  type: giveaway
+  milestone: giveaway1
+  role_id: 1145141919810
+- name: :joker:土块！
+  description: 参加10次抽奖
+  threshold: 10
+  type: giveaway
+  milestone: giveaway2
+  role_id: 1145141919810
+- name: :regional_indicator_q::regional_indicator_q::regional_indicator_q:三个蛋！
+  description: 参加100次抽奖
+  threshold: 100
+  type: giveaway
+  milestone: giveaway3
+  role_id: 1145141919810
+- name: 打卡旅人·起步章🧭
+  description: 刚踏上这条签到之路
+  threshold: 7
+  type: checkin_sum
+  milestone: checkin_sum1
+  role_id: 1145141919810
+- name: 打卡旅人·月轮章🌓
+  description: 已坚持一个完整月份
+  threshold: 30
+  type: checkin_sum
+  milestone: checkin_sum2
+  role_id: 1145141919810
+- name: 打卡旅人·季印章🍁
+  description: 三个月的旅途留下印记
+  threshold: 90
+  type: checkin_sum
+  milestone: checkin_sum3
+  role_id: 1145141919810
+- name: 打卡旅人·年鉴章🗓️
+  description: 一整年的记录，值得纪念
+  threshold: 365
+  type: checkin_sum
+  milestone: checkin_sum4
+  role_id: 1145141919810
+- name: 打卡旅人·传说章🏔️
+  description: 传说中那位签到千日的人
+  threshold: 999
+  type: checkin_sum
+  milestone: checkin_sum5
+  role_id: 1145141919810
+- name: 🕊️子都躲着我
+  description: 不鸽一周，立Flag成功
+  threshold: 7
+  type: checkin_combo
+  milestone: checkin_combo1
+  role_id: 1145141919810
+- name: 月月有🕊️在
+  description: 整个月都见你
+  threshold: 30
+  type: checkin_combo
+  milestone: checkin_combo5
+  role_id: 1145141919810
+- name: 🕊️打卡上瘾
+  description: 三个月不签不舒服
+  threshold: 90
+  type: checkin_combo
+  milestone: checkin_combo3
+  role_id: 1145141919810
+- name: 🕊️从未消失
+  description: 本年度驻站之神
+  threshold: 365
+  type: checkin_combo
+  milestone: checkin_combo4
+  role_id: 1145141919810
+- name: 🕊️只是个传说
+  description: 签到界的永动鸽
+  threshold: 999
+  type: checkin_combo
+  milestone: checkin_combo5
+  role_id: 1145141919810
+achievements_ranking_emoji:
+- ':first_place:'
+- ':second_place:'
+- ':third_place:'
+- ':four:'
+- ':five:'
+- ':six:'
+- ':seven:'
+- ':eight:'
+- ':nine:'
+- ':keycap_ten:'
+achievements_ranking:
+- name: ':heart: 添加最多反应 :heart: '
+  type: reaction
+- name: ':green_heart: 发送最多消息 :green_heart: '
+  type: message
+- name: ':yellow_heart: 语音时长最久(min) :yellow_heart: '
+  type: time_spent
+- name: ':blue_heart: 参加最多抽奖 :blue_heart: '
+  type: giveaway
+- name: ':orange_heart: 累计签到最多 :orange_heart: '
+  type: checkin_sum
+- name: ':purple_heart: 连续签到最久 :purple_heart: '
+  type: checkin_combo
+achievements_type_name:
+  reaction: 🔴 添加反应
+  message: 🟡 发送消息
+  time_spent: 🔵 语音时长(min)
+  giveaway: 🟢 参加抽奖
+  checkin_sum: 🟠 累计签到
+  checkin_combo: 🟣 连续签到
+rank:
+  all_button_label: 🟣 全部排名
+  type_button_labels:
+    reaction: 添加反应
+    message: 发送消息
+    time_spent: 语音时长
+    giveaway: 参加抽奖
+    checkin_sum: 累计签到
+    checkin_combo: 连续签到
+  embed_title_all: 🏆 成就排行榜 🏆
+  embed_title_single: 🏆 {type_name}排行榜 🏆
+  embed_title_date_format: '{title} ({year}-{month})'
+  pagination_field_name: 排名 {start}-{end}
+  rank_prefix: '#{rank}'
+  no_data_message: 暂无数据
+  extended_emojis:
+  - ':first_place:'
+  - ':second_place:'
+  - ':third_place:'
+  - ':four:'
+  - ':five:'
+  - ':six:'
+  - ':seven:'
+  - ':eight:'
+  - ':nine:'
+  - ':keycap_ten:'
+  intro_title: 🏆 成就排行榜 🏆
+  intro_description: 欢迎使用成就排行榜！请点击下方按钮查看不同类型的成就排行：
+  intro_all_button: 查看全部成就排行 TOP 10
+  intro_type_buttons:
+    reaction: 查看 **添加反应** 成就 TOP 40
+    message: 查看 **发送消息** 成就 TOP 40
+    time_spent: 查看 **语音时长** 成就 TOP 40
+    giveaway: 查看 **参加抽奖** 成就 TOP 40
+    checkin_sum: 查看 **累计签到** 成就 TOP 40
+    checkin_combo: 查看 **连续签到** 成就 TOP 40
+  intro_footer: '---------点击按钮查看对应排名--------'

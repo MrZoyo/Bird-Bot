@@ -6,7 +6,8 @@ from discord.ext import commands
 from discord import app_commands
 from datetime import datetime, timezone, timedelta
 from discord.ui import Button, View
-from bot.utils import config, check_channel_validity, AchievementDatabaseManager
+from bot.utils import AchievementDatabaseManager, check_channel_validity, config
+from bot.utils.i18n import t
 
 
 FEATURE_LINKED_ACHIEVEMENT_TYPES = {
@@ -56,11 +57,14 @@ class AchievementRefreshView(View):
         user_name = user.name
 
         # Create an embed with the user's achievements
-        title = self.achievement_config['achievements_page_title'].format(user_name=user_name)
-        description = self.achievement_config['achievements_page_description'].format(user_mention=user_mention,
-                                                                          completed_achievements=completed_achievements,
-                                                                          total_achievements=len(achievements))
-        achievements_finish_emoji = self.achievement_config['achievements_finish_emoji']
+        title = t('achievements.achievements_page_title', user_name=user_name)
+        description = t(
+            'achievements.achievements_page_description',
+            user_mention=user_mention,
+            completed_achievements=completed_achievements,
+            total_achievements=len(achievements),
+        )
+        achievements_finish_emoji = t('achievements.achievements_finish_emoji')
         embed = discord.Embed(title=title, description=description, color=discord.Color.blue())
         
         # Add user avatar to embed
@@ -108,7 +112,7 @@ class AchievementRefreshView(View):
         user_name = user.name
 
         # Create an embed with the user's achievements progress
-        title = self.achievement_config['achievements_progress_title'].format(date=date)
+        title = t('achievements.achievements_progress_title', date=date)
         type_names = achievement_cog.get_visible_achievement_type_names()
 
         embed = discord.Embed(title=title, color=discord.Color.blue())
@@ -203,7 +207,7 @@ class AchievementRankingView(View):
         achievements_ranking = ranking_configs
 
         # Create an embed with the rankings
-        title = self.achievement_config['achievements_ranking_title']
+        title = t('achievements.achievements_ranking_title')
         if self.year is not None and self.month is not None:
             embed = discord.Embed(title=f"{title} ({self.year}-{self.month})", color=discord.Color.blue())
         else:
@@ -371,7 +375,7 @@ class RankView(discord.ui.View):
 
     def format_all_rankings_embed(self):
         """Format embed showing all rankings (limited to 10 per type)"""
-        title = self.achievement_config['achievements_ranking_title']
+        title = t('achievements.achievements_ranking_title')
         if self.year is not None and self.month is not None:
             embed = discord.Embed(
                 title=self.rank_config.get('embed_title_date_format', '{title} ({year}-{month})').format(

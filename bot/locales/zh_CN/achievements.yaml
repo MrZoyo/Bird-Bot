@@ -1,0 +1,7 @@
+achievements_page_title: '{user_name}的成就清单'
+achievements_page_description: "{user_mention} 完成了 {completed_achievements}/{total_achievements}
+  项成就!\n**---------**"
+achievements_finish_emoji: ':white_check_mark:'
+achievements_incomplete_emoji: ''
+achievements_ranking_title: ':crown:成就排行榜:crown:'
+achievements_progress_title: '{date} 成就进度 '
