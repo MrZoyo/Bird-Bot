@@ -665,6 +665,44 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 - **现状**：`old_function/`、`old_test/`、`old_updates.md` 随时间膨胀。
 - **建议**：git 本身保留历史，可给每个归档文件标注"到 vX.Y 可真删"时间线，定期清理。
 
+### P3-7. 日志里用户 / 频道的 id ↔ name 双记录
+
+**提出背景**：2026-04-23 测试 P0 系列时，用户反馈日志只记 `User 123456` 很难快速定位是谁；同理看到 `频道A` 也要查 id 才能 grep。希望日志里**凡是记录一个用户或频道**，都同时附带 id + 可读 name。
+
+**现状问题**：
+- 绝大多数 cog 里的 `logging.info` / `logging.error` 只记一边。示例：
+  - `role_cog.py:186` `User {interaction.user.id} has removed the {star_sign_role.name} role` → 只有 id
+  - `voice_channel_cog.py:933` `logging.warning(f"Voice channel {voice_channel_id} not found during restore")` → 只有 id
+  - `tickets_new_cog.py` 部分日志只有 `Error creating ticket thread: {e}` → user 信息全无
+- 排障时要么到 Discord 里查 id 要么 grep 出一堆记录，效率低。
+
+**建议做法**：
+1. 在 `bot/utils/` 新增 `log_helpers.py`，提供：
+   ```python
+   def fmt_user(user) -> str:
+       """'display_name (id)' for Member/User; 'unknown (id)' for raw int."""
+   def fmt_channel(channel) -> str:
+       """'name (id)' for Channel/Thread; 'unknown (id)' for raw int."""
+   def fmt_role(role) -> str:
+       """'name (id)' for Role."""
+   ```
+2. **不强推**立刻全仓替换（17k 行），而是定下**新写代码必须走 `fmt_*` 帮助函数**；老代码在触碰时顺手改。
+3. 结构化日志字段（如果未来上 JSON logger）可以一并设计，但本条不强制。
+
+**验收**：
+- `bot/utils/log_helpers.py` 存在且导出三个函数。
+- `bot/utils/__init__.py` 导出。
+- 抽样验证：改过的几个 cog（至少 role_cog、voice_channel_cog、tickets_new_cog）日志里所有 `User {id}` / `Channel {id}` 类记录都至少带一边额外信息。
+- 新的 PR 审核时把"是否用了 `fmt_*`"纳入 checklist。
+
+**不要做**：
+- 不要写 `logging.info(f"User {id} {name}")` 的裸 f-string —— 容易漏；走帮助函数统一格式。
+- 不要为了日志可读性**引入 N+1 Discord API 查询**（例如为记 name 去 `await guild.fetch_member(id)`）。`fmt_user` 接 Member/User 对象就好，Discord gateway 已经提供 cache；当 callsite 只有 raw int 时记为 `"unknown (id)"` 是可接受的。
+
+**与其他项的耦合**：
+- 与 P1-5（日志 rotation）可以在同一冲刺做（都是 logging 层改动）。
+- 与 P3-5（ruff）可以加 lint 规则禁止 `logging.*(f"... {user_id} ...")` 这种裸 id f-string（高级要求，可选）。
+
 ---
 
 ## 推进顺序建议
