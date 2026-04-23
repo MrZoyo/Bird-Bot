@@ -57,8 +57,109 @@ class TicketsNewDatabaseManager:
                     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
-            
+
+            # ticket_types: migrated out of config_tickets_new.json per P2-5.
+            # type_data is a JSON blob carrying description/guide/button_color/
+            # admin_roles/admin_users; per-field columns would churn for every
+            # new ticket-type feature, JSON lets the cog's modal define the shape.
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS ticket_types (
+                    type_name TEXT PRIMARY KEY,
+                    type_data TEXT NOT NULL
+                )
+            ''')
+
             await db.commit()
+
+    # ---- ticket_types CRUD ---------------------------------------------
+
+    async def list_ticket_types(self) -> Dict[str, Dict]:
+        """Return all ticket types as ``{type_name: type_data_dict}``.
+
+        Matches the shape the cog previously saw under
+        ``self.conf['ticket_types']`` so reads elsewhere in tickets_new_cog
+        stay literal (``ticket_types[name]['description']`` etc.).
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            try:
+                cursor = await db.execute(
+                    'SELECT type_name, type_data FROM ticket_types'
+                )
+                rows = await cursor.fetchall()
+                return {row[0]: json.loads(row[1]) for row in rows}
+            except Exception as e:
+                logging.error(f"Error listing ticket types: {e}")
+                return {}
+
+    async def upsert_ticket_type(self, type_name: str, type_data: Dict) -> bool:
+        """INSERT or UPDATE a ticket type.
+
+        Single-statement upsert keeps concurrent modal submits from racing
+        into two rows with the same name.
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            try:
+                await db.execute(
+                    '''
+                    INSERT INTO ticket_types (type_name, type_data)
+                    VALUES (?, ?)
+                    ON CONFLICT(type_name) DO UPDATE SET
+                        type_data = excluded.type_data
+                    ''',
+                    (type_name, json.dumps(type_data, ensure_ascii=False)),
+                )
+                await db.commit()
+                return True
+            except Exception as e:
+                logging.error(f"Error upserting ticket type {type_name}: {e}")
+                return False
+
+    async def rename_ticket_type(
+        self, old_name: str, new_name: str, type_data: Dict,
+    ) -> bool:
+        """Delete the old-named row and upsert the renamed one in one transaction.
+
+        Called from the edit modal when the operator changes ``type_name``;
+        doing it transactionally prevents a partial state where the old name
+        is gone but the new one failed to insert (or vice-versa).
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            try:
+                await db.execute('BEGIN')
+                await db.execute(
+                    'DELETE FROM ticket_types WHERE type_name = ?',
+                    (old_name,),
+                )
+                await db.execute(
+                    '''
+                    INSERT INTO ticket_types (type_name, type_data)
+                    VALUES (?, ?)
+                    ON CONFLICT(type_name) DO UPDATE SET
+                        type_data = excluded.type_data
+                    ''',
+                    (new_name, json.dumps(type_data, ensure_ascii=False)),
+                )
+                await db.commit()
+                return True
+            except Exception as e:
+                await db.rollback()
+                logging.error(
+                    f"Error renaming ticket type {old_name} -> {new_name}: {e}"
+                )
+                return False
+
+    async def remove_ticket_type(self, type_name: str) -> bool:
+        async with aiosqlite.connect(self.db_path) as db:
+            try:
+                await db.execute(
+                    'DELETE FROM ticket_types WHERE type_name = ?',
+                    (type_name,),
+                )
+                await db.commit()
+                return True
+            except Exception as e:
+                logging.error(f"Error removing ticket type {type_name}: {e}")
+                return False
 
     async def set_config(self, ticket_channel_id: int, info_channel_id: int, 
                         main_message_id: Optional[int] = None) -> bool:

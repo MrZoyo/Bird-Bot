@@ -1,21 +1,16 @@
-from discord.ext import commands
 import asyncio
 import io
-import json
 import logging
 import os
 import tempfile
 from datetime import datetime
-from pathlib import Path
-from typing import Optional, List
-from typing import Tuple
+from typing import List, Optional, Tuple
 
-import aiofiles
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-from bot.utils import config, check_channel_validity, TicketsNewDatabaseManager, MediaHandler
+from bot.utils import MediaHandler, TicketsNewDatabaseManager, check_channel_validity, config
 from bot.utils.config import Config
 
 
@@ -470,22 +465,36 @@ class TicketsNewCog(commands.Cog):
         self.bot = bot
         self.config = Config()
         self.conf = self.config.get_config('tickets_new')
+        # ticket_types now lives in the DB (P2-5). Drop it from the
+        # snapshot so a later `await config.save_config('tickets_new',
+        # self.conf)` can't accidentally mirror the DB-backed map back
+        # into YAML and create a double source of truth.
+        self.conf.pop('ticket_types', None)
         self.main_conf = self.config.get_config('main')
         self.db_manager = TicketsNewDatabaseManager(self.main_conf['db_path'])
-        
+        # DB-backed cache refreshed on cog_load / after every CRUD.
+        self.ticket_types: dict = {}
+
     async def cog_load(self):
         """Initialize the cog"""
         await self.db_manager.initialize_database()
-        
+        self.ticket_types = await self.db_manager.list_ticket_types()
+
         # Fix any tickets with NULL ticket_number
         fixed_count = await self.db_manager.fix_null_ticket_numbers()
         if fixed_count > 0:
             logging.info(f"Fixed {fixed_count} tickets with NULL ticket_number")
-        
+
         # Check and close tickets for missing channels
         await self.check_and_close_missing_tickets()
-        
-        logging.info("TicketsNewCog loaded successfully")
+
+        logging.info(
+            f"TicketsNewCog loaded successfully ({len(self.ticket_types)} ticket types)"
+        )
+
+    async def _refresh_ticket_types(self) -> None:
+        """Reload the ticket_types cache from DB; call after any CRUD."""
+        self.ticket_types = await self.db_manager.list_ticket_types()
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -514,7 +523,7 @@ class TicketsNewCog(commands.Cog):
                 main_message = await ticket_channel.fetch_message(main_message_id)
                 
                 # Create and register persistent view for main message
-                ticket_types = self.conf.get('ticket_types', {})
+                ticket_types = self.ticket_types
                 if ticket_types:
                     main_view = TicketCreateView(self, ticket_types)
                     self.bot.add_view(main_view)
@@ -647,8 +656,8 @@ class TicketsNewCog(commands.Cog):
             return True
         
         # Check type-specific admins if ticket_type provided
-        if ticket_type and ticket_type in self.conf.get('ticket_types', {}):
-            type_data = self.conf['ticket_types'][ticket_type]
+        if ticket_type and ticket_type in self.ticket_types:
+            type_data = self.ticket_types[ticket_type]
             
             # Type-specific admin roles
             for role_id in type_data.get('admin_roles', []):
@@ -1023,7 +1032,7 @@ class TicketsNewCog(commands.Cog):
                 embed.set_thumbnail(url=self.bot.user.avatar.url)
             
             # Add fields for each ticket type
-            ticket_types = self.conf.get('ticket_types', {})
+            ticket_types = self.ticket_types
             for type_name, type_data in ticket_types.items():
                 embed.add_field(
                     name=type_name,
@@ -1063,7 +1072,7 @@ class TicketsNewCog(commands.Cog):
                 )
                 setup_embed.add_field(
                     name=self.conf['messages']['setup_types_field_name'],
-                    value="\n".join([f"• {name}" for name in self.conf.get('ticket_types', {}).keys()]) or self.conf['messages']['setup_no_types'],
+                    value="\n".join([f"• {name}" for name in self.ticket_types.keys()]) or self.conf['messages']['setup_no_types'],
                     inline=False
                 )
                 
@@ -1711,7 +1720,7 @@ class TicketsNewCog(commands.Cog):
                 main_message = await ticket_channel.fetch_message(main_message_id)
                 
                 # Update the main message with current ticket types and bot avatar
-                ticket_types = self.conf.get('ticket_types', {})
+                ticket_types = self.ticket_types
                 if ticket_types:
                     await self.update_main_message(ticket_channel, main_message, ticket_types)
                     
@@ -1773,7 +1782,7 @@ class TicketsNewCog(commands.Cog):
             )
             return
 
-        if not self.conf.get('ticket_types'):
+        if not self.ticket_types:
             await interaction.response.send_message(
                 "❌ 没有可编辑的工单类型",
                 ephemeral=True
@@ -1797,7 +1806,7 @@ class TicketsNewCog(commands.Cog):
             )
             return
 
-        if not self.conf.get('ticket_types'):
+        if not self.ticket_types:
             await interaction.response.send_message(
                 "❌ 没有可删除的工单类型",
                 ephemeral=True
@@ -1898,7 +1907,7 @@ class TicketsNewCog(commands.Cog):
             inline=False
         )
 
-        for type_name, type_data in self.conf.get('ticket_types', {}).items():
+        for type_name, type_data in self.ticket_types.items():
             embed.add_field(
                 name=f"{type_name} 管理员",
                 value=self._format_admin_entries(
@@ -1935,39 +1944,43 @@ class TicketsNewCog(commands.Cog):
         return "\n".join(lines) if lines else messages['admin_list_empty']
 
     async def save_config(self):
-        """Save the current configuration back to the JSON file"""
-        config_path = Path('./bot/config/config_tickets_new.json')
+        """Persist tickets_new YAML config via the unified writer (P2-3).
 
+        self.conf carries the admin_roles / admin_users / channel ids /
+        messages fields only — ticket_types was popped at cog init
+        because it lives in the DB now (P2-5). Writing the current
+        snapshot through config.save_config round-trips ruamel.yaml
+        (comments preserved) and refreshes the in-memory cache so
+        subsequent reads observe the canonical parsed form.
+        """
         try:
-            async with aiofiles.open(config_path, 'r', encoding='utf-8') as f:
-                content = await f.read()
-                config_data = json.loads(content)
-
-            config_data.update(self.conf)
-
-            async with aiofiles.open(config_path, 'w', encoding='utf-8') as f:
-                await f.write(json.dumps(config_data, indent=2, ensure_ascii=False))
-
-            # Reload config to get updated values
-            from bot.utils.config import Config
-            config_instance = Config()
-            self.conf = config_instance.get_config('tickets_new')
-            
+            from bot.utils import config as _config
+            reloaded = await _config.save_config('tickets_new', self.conf)
+            # `ticket_types` is never in YAML anymore; keep the snapshot
+            # aligned so an accidental re-read of self.conf doesn't
+            # resurface a stale key.
+            reloaded.pop('ticket_types', None)
+            self.conf = reloaded
         except Exception as e:
             logging.error(f"Error saving config: {e}")
 
     async def add_global_admin(self, target_type: str, target_id: int, interaction: discord.Interaction) -> bool:
-        """Add a global admin (role or user)."""
-        # Remove from type-specific admins first
-        for type_data in self.conf.get('ticket_types', {}).values():
-            if target_type == 'role':
-                if target_id in type_data.get('admin_roles', []):
-                    type_data['admin_roles'].remove(target_id)
-            else:
-                if target_id in type_data.get('admin_users', []):
-                    type_data['admin_users'].remove(target_id)
+        """Add a global admin (role or user).
 
-        target_list = 'admin_roles' if target_type == 'role' else 'admin_users'
+        Promoting an id to the global list also removes any per-type
+        override that already carried it. With ticket_types now in DB,
+        those per-type mutations need to round-trip through
+        upsert_ticket_type — mutating the cache alone would not persist.
+        """
+        type_list_key = 'admin_roles' if target_type == 'role' else 'admin_users'
+        for type_name, type_data in list(self.ticket_types.items()):
+            if target_id in type_data.get(type_list_key, []):
+                updated = dict(type_data)
+                updated[type_list_key] = [x for x in type_data.get(type_list_key, []) if x != target_id]
+                await self.db_manager.upsert_ticket_type(type_name, updated)
+        await self._refresh_ticket_types()
+
+        target_list = type_list_key
         if target_id not in self.conf.get(target_list, []):
             if target_list not in self.conf:
                 self.conf[target_list] = []
@@ -1993,21 +2006,20 @@ class TicketsNewCog(commands.Cog):
                 )
                 return False
 
-        if 'ticket_types' not in self.conf:
-            self.conf['ticket_types'] = {}
-        
-        if ticket_type not in self.conf['ticket_types']:
+        if ticket_type not in self.ticket_types:
             return False
 
-        type_data = self.conf['ticket_types'][ticket_type]
+        type_data = dict(self.ticket_types[ticket_type])  # shallow copy; we persist via upsert
         target_list = 'admin_roles' if target_type == 'role' else 'admin_users'
-        
-        if target_list not in type_data:
-            type_data[target_list] = []
-            
+
+        type_data.setdefault(target_list, list(type_data.get(target_list, [])))
+
         if target_id not in type_data[target_list]:
             type_data[target_list].append(target_id)
-            await self.save_config()
+            # Persist the mutated type_data row (DB is authoritative for
+            # ticket_types; save_config only writes the YAML conf).
+            await self.db_manager.upsert_ticket_type(ticket_type, type_data)
+            await self._refresh_ticket_types()
             return True
         return False
 
@@ -2022,14 +2034,16 @@ class TicketsNewCog(commands.Cog):
 
     async def remove_type_admin(self, ticket_type: str, target_type: str, target_id: int, interaction: discord.Interaction) -> bool:
         """Remove a type-specific admin (role or user)."""
-        type_data = self.conf.get('ticket_types', {}).get(ticket_type)
-        if not type_data:
+        source = self.ticket_types.get(ticket_type)
+        if not source:
             return False
 
         target_list = 'admin_roles' if target_type == 'role' else 'admin_users'
-        if target_id in type_data.get(target_list, []):
-            type_data[target_list].remove(target_id)
-            await self.save_config()
+        if target_id in source.get(target_list, []):
+            type_data = dict(source)
+            type_data[target_list] = [x for x in source.get(target_list, []) if x != target_id]
+            await self.db_manager.upsert_ticket_type(ticket_type, type_data)
+            await self._refresh_ticket_types()
             return True
         return False
 
@@ -2087,7 +2101,7 @@ class TicketsNewCog(commands.Cog):
                     all_admins_for_notification.add(member)
             
             # Handle type-specific admin roles - add all role members to thread
-            type_data = self.conf.get('ticket_types', {}).get(type_name, {})
+            type_data = self.ticket_types.get(type_name, {})
             for role_id in type_data.get('admin_roles', []):
                 role = thread.guild.get_role(role_id)
                 if role:
@@ -2226,7 +2240,7 @@ class AdminTypeSelectView(discord.ui.View):
             )
         ]
 
-        for type_name, type_data in cog.conf.get('ticket_types', {}).items():
+        for type_name, type_data in cog.ticket_types.items():
             options.append(
                 discord.SelectOption(
                     label=type_name,
@@ -2307,7 +2321,7 @@ class TicketTypeModal(discord.ui.Modal):
         self.messages = cog.conf['messages']
 
         # Pre-fill if editing
-        existing_data = cog.conf['ticket_types'].get(edit_type, {}) if edit_type else {}
+        existing_data = cog.ticket_types.get(edit_type, {}) if edit_type else {}
 
         self.type_name = discord.ui.TextInput(
             label=self.messages.get('ticket_type_name_label', '类型名称'),
@@ -2358,67 +2372,70 @@ class TicketTypeModal(discord.ui.Modal):
                            'red': 'r', 'green': 'g', 'blue': 'b'}
             button_color = valid_colors.get(button_color, 'b')
 
-            # Check if editing or creating new
+            # Check if editing or creating new.
+            # Pre-refactor this block mutated self.cog.ticket_types in place
+            # then called db_manager.save_config('ticket_types', ...) — a
+            # method that never existed on TicketsNewDatabaseManager — and
+            # overwrote self.cog.conf with db_manager.get_config()'s 3-field
+            # result, wiping messages / admin_* / channel ids from memory.
+            # The whole command silently failed through discord.py's error
+            # handler. Now: mutate a local type_data dict, persist via the
+            # ticket_types CRUD (single row in DB), then refresh the cache.
             if self.edit_type and self.edit_type != type_name:
-                # Renaming: remove old and add new
-                if type_name in self.cog.conf['ticket_types']:
+                # Renaming path
+                if type_name in self.cog.ticket_types:
                     await interaction.response.send_message(
                         f"❌ 工单类型 '{type_name}' 已存在",
                         ephemeral=True
                     )
                     return
-                
-                # Save old data
-                old_data = self.cog.conf['ticket_types'][self.edit_type].copy()
-                # Remove old type
-                del self.cog.conf['ticket_types'][self.edit_type]
-                
-                # Add new type with updated data
-                self.cog.conf['ticket_types'][type_name] = {
+
+                old_data = self.cog.ticket_types[self.edit_type]
+                type_data = {
                     'name': type_name,
                     'description': description,
                     'guide': guide,
                     'button_color': button_color,
-                    'admin_roles': old_data.get('admin_roles', []),
-                    'admin_users': old_data.get('admin_users', [])
+                    'admin_roles': list(old_data.get('admin_roles', [])),
+                    'admin_users': list(old_data.get('admin_users', [])),
                 }
-                
+                await self.cog.db_manager.rename_ticket_type(
+                    self.edit_type, type_name, type_data,
+                )
+
                 action = "edit"
                 old_name = self.edit_type
             else:
-                # Creating new or editing without rename
-                if not self.edit_type and type_name in self.cog.conf['ticket_types']:
+                # Add or in-place edit (no rename)
+                if not self.edit_type and type_name in self.cog.ticket_types:
                     await interaction.response.send_message(
                         f"❌ 工单类型 '{type_name}' 已存在",
                         ephemeral=True
                     )
                     return
-                
-                # Preserve existing admin settings if editing
+
                 existing_admin_data = {}
                 if self.edit_type:
+                    prior = self.cog.ticket_types.get(self.edit_type, {})
                     existing_admin_data = {
-                        'admin_roles': self.cog.conf['ticket_types'][self.edit_type].get('admin_roles', []),
-                        'admin_users': self.cog.conf['ticket_types'][self.edit_type].get('admin_users', [])
+                        'admin_roles': list(prior.get('admin_roles', [])),
+                        'admin_users': list(prior.get('admin_users', [])),
                     }
-                
-                self.cog.conf['ticket_types'][type_name] = {
+
+                type_data = {
                     'name': type_name,
                     'description': description,
                     'guide': guide,
                     'button_color': button_color,
                     'admin_roles': existing_admin_data.get('admin_roles', []),
-                    'admin_users': existing_admin_data.get('admin_users', [])
+                    'admin_users': existing_admin_data.get('admin_users', []),
                 }
-                
+                await self.cog.db_manager.upsert_ticket_type(type_name, type_data)
+
                 action = "edit" if self.edit_type else "add"
                 old_name = self.edit_type if self.edit_type else None
 
-            # Save to database
-            await self.cog.db_manager.save_config('ticket_types', self.cog.conf['ticket_types'])
-            
-            # Reload config
-            self.cog.conf = await self.cog.db_manager.get_config()
+            await self.cog._refresh_ticket_types()
 
             # Send success message
             if action == "add":
@@ -2454,7 +2471,7 @@ class TypeSelectView(discord.ui.View):
             return
 
         options = []
-        for type_name, type_data in cog.conf['ticket_types'].items():
+        for type_name, type_data in cog.ticket_types.items():
             options.append(discord.SelectOption(
                 label=type_name,
                 description=type_data.get('description', '')[:100],
@@ -2496,16 +2513,14 @@ class DeleteConfirmView(discord.ui.View):
     @discord.ui.button(label="确认删除", style=discord.ButtonStyle.danger, emoji="🗑️")
     async def confirm_delete(self, interaction: discord.Interaction, button: discord.ui.Button):
         try:
-            # Remove from config
-            if self.type_name in self.cog.conf['ticket_types']:
-                del self.cog.conf['ticket_types'][self.type_name]
-                
-                # Save to database
-                await self.cog.db_manager.save_config('ticket_types', self.cog.conf['ticket_types'])
-                
-                # Reload config
-                self.cog.conf = await self.cog.db_manager.get_config()
-                
+            # Remove from the ticket_types table (DB is authoritative
+            # now, P2-5). Same pattern as the add/edit path — no more
+            # broken save_config('ticket_types', ...) / self.conf
+            # clobber from get_config().
+            if self.type_name in self.cog.ticket_types:
+                await self.cog.db_manager.remove_ticket_type(self.type_name)
+                await self.cog._refresh_ticket_types()
+
                 await interaction.response.send_message(
                     self.cog.conf['messages'].get('ticket_type_delete_success', '已删除工单类型: {type_name}').format(type_name=self.type_name),
                     ephemeral=True
