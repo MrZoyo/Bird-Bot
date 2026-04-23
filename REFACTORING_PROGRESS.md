@@ -367,9 +367,9 @@
 |---|---|---|
 | 0 | `.gitignore` 阶段 A 规则 + 清历史泄露 | ✅ |
 | 1 | 硬编码文案清单扫描（非改码，调研） | ⬜（与 step 7 合并做） |
-| 2 | `requirements.txt` + `requirements.lock` 加 `ruamel.yaml` | ⬜ |
-| 3 | `bot/utils/config.py` 改造（YAML 分派 + `get_locale` + async `save_config`） | ⬜ |
-| 4 | `bot/utils/i18n.py` 新建（`t()` + fallback 链） | ⬜ |
+| 2 | `requirements.txt` + `requirements.lock` 加 `ruamel.yaml` | ✅ |
+| 3 | `bot/utils/config.py` 改造（YAML 分派 + `get_locale` + async `save_config`） | ✅ |
+| 4 | `bot/utils/i18n.py` 新建（`t()` + fallback 链） | ✅ |
 | 5 | `tools/migrate_config_to_yaml.py` + `tools/seed_db.py` + `tools/field_classification.yaml` | ⬜ |
 | 6 | DB 基础设施：`ticket_types` / `channel_configs` 表 + CRUD + 迁 `tickets_new_cog` / `voice_channel_cog` | ⬜ |
 | 7 | 试点迁移（`spymode_cog` → `welcome_cog`） | ⬜ |
@@ -394,3 +394,54 @@
 - `git log --oneline -1` 显示 step 0 commit 生效。
 
 **下一步**：step 2（依赖加 `ruamel.yaml`），step 1 的硬编码清单扫描合并到 step 7 per-cog 迁移时执行（PLAN step 1 是"调研清单"，实际抽文案的动作在每个 cog 迁移 PR 里）。
+
+### P1-6.2 ✅ step 2: 依赖加 ruamel.yaml（2026-04-23）
+
+**Commit grep**: `git log --grep='(P1-6\.2)'`
+
+**动的**：
+- `requirements.txt` 尾部追加 `ruamel.yaml`（带注释说明用途）。
+- `requirements.lock` 用 `uv pip compile requirements.txt -o requirements.lock` 重新生成；新增 `ruamel-yaml==0.19.1`（pure-Python on cpython>=3.12，无 `ruamel-yaml-clib` 传递依赖）。
+
+**pyproject.toml 没动**：按 PLAN 的"P3-1 时一起改，不留三处声明漂移"原则，暂 `dependencies = []`。
+
+**验证方法**：`uv pip compile` 无错；lock diff 只增一行 `ruamel-yaml==0.19.1`。
+
+### P1-6.3 ✅ step 3: config.py 改造（2026-04-23）
+
+**Commit grep**: `git log --grep='(P1-6\.3)'`
+
+**新接口**：
+- `get_config(name, silent=)`：先查 `bot/config/<name>.yaml`（ruamel.yaml round-trip load），不存在则回退读 `config_<name>.json`。迁移期两种格式共存；step 10 清 JSON 分支。
+- `get_locale(name, lang=None) -> dict`：读 `bot/locales/<lang>/<name>.yaml`，按 `(lang, name)` tuple 缓存。`lang=None` 从 `main.locale` 取，缺则 `zh_CN`。
+- `async def save_config(name, data=None, *, reload=True) -> dict`：**ruamel.yaml round-trip 写入**保留原文件注释 + **同目录 tempfile + `os.replace` 原子替换**，`asyncio.to_thread` 卸到线程池避免阻塞事件循环。`data=None` 时写当前内存态 `self._configs[name]`（匹配"就地改 self.conf 然后持久化"的常见 pattern）。
+
+**微改**：`load_config(file_path=...)` 参数整体移除（`grep -rn "load_config("` 确认无外部调用点传过）。
+
+**smoke test 结果**（`/tmp/yaml-venv` 带 ruamel.yaml 的隔离环境）：
+- YAML 优先 / JSON fallback 两条路径都走通
+- save_config 写完后 `# top comment` 仍在文件顶部（round-trip 有效）
+- save_config 原子性靠 `os.replace`（tempfile 与目标在同文件系统）
+- `reload_all` / `reload_config` / `reload_locale` 行为正确
+- missing locale file 返回 `{}` 而非异常（让 i18n.t 的 fallback 链接手）
+
+**ruamel.yaml 实例 per-call 而非全局**：避免多协程并发 save 时共享状态问题；创建成本可忽略（构造函数内部几乎无工作）。
+
+### P1-6.4 ✅ step 4: i18n.py 新建（2026-04-23）
+
+**Commit grep**: `git log --grep='(P1-6\.4)'`
+
+**新文件 `bot/utils/i18n.py`**：`def t(key, *, lang=None, **kwargs) -> str`，配套从 `bot/utils/__init__.py` 导出。
+
+**语义**：
+- dot-path 查找：`t('role.starsign.aries')` → 命名空间 `role` + 路径 `[starsign, aries]` → `bot/locales/<lang>/role.yaml` 的 `starsign.aries`。
+- fallback 链：requested lang → `zh_CN` baseline → `KeyError`（消息含 dot-path + 所有尝试过的语言）。
+- 命名空间缺失（无 dot）→ 立即 `KeyError`，避免"以 key 为值"的静默回退导致线上显示英文 key。
+- kwargs 走 `str.format_map`，译文里写 `'已为你添加了星座：{name}'` 即可被 caller `t('...', name='Zoyo')` 填充。
+- 非 str 叶节点（如误指向 dict）按"未命中"处理 + 触发 fallback 链（最终 KeyError）。
+
+**Lazy vs eager 加载**：PLAN 建议"启动时一次性加载"，当前实现是 lazy（首次访问 namespace 触发 `config.get_locale` + 缓存）。功能等价，启动路径更干净；eager preload 可在未来需要时加一行 `for ns in list_locales(): config.get_locale(ns)`。
+
+**smoke test**：基本查询 / format_map / 缺 key 抛 KeyError / 非法 key 被拒 / `lang='en_US'` 落回 `zh_CN` 全过。
+
+**下一步**：step 5 —— 写 `tools/migrate_config_to_yaml.py` + `tools/seed_db.py` + `tools/field_classification.yaml`。这一步是"生成迁移产物"的纯工具代码，不触碰现有 cog；写完可在本仓跑一次生成出所有 `<name>.yaml`（本地，不 commit）作为后续 step 7 试点迁移的输入。
