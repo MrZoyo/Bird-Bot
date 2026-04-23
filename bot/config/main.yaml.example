@@ -1,0 +1,34 @@
+# bot/config/main.yaml.example
+#
+# Template for bot/config/main.yaml. Copy to main.yaml and fill in
+# real values. The real file is gitignored (it carries the bot token
+# and deployment IDs).
+token: YOUR_BOT_TOKEN
+logging_file: ./data/bot.log
+keyword_log_file: ./data/keyword_detection.log
+room_log_file: ./data/room_activity.log
+log_backup_count: 14  # TimedRotatingFileHandler keeps N days of *.log.YYYY-MM-DD files
+db_path: ./data/bot.db
+guild_id: 1145141919810
+admin_channel_id: 1145141919810
+# locale controls runtime-response language via bot.utils.i18n.t();
+# currently only zh_CN is delivered (P1-6 decision B2).
+locale: zh_CN
+# Feature toggles — set false to skip loading a cog.
+features:
+  voicechannel: true
+  welcome: true
+  invitation: true
+  dnd: true
+  checkstatus: true
+  achievements: true
+  notebook: true
+  spymode: true
+  giveaway: true
+  role: true
+  backup: true
+  tickets_new: true
+  shop: true
+  privateroom: true
+  ban: true
+  teamup_display: true
