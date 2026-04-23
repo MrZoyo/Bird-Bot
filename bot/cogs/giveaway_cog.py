@@ -11,7 +11,8 @@ import datetime
 import tempfile
 import logging
 
-from bot.utils import config, check_channel_validity, GiveawayDatabaseManager
+from bot.utils import GiveawayDatabaseManager, check_channel_validity, config
+from bot.utils.i18n import t
 
 
 class GiveawayParticipationView(ui.View):
@@ -23,14 +24,14 @@ class GiveawayParticipationView(ui.View):
         self.message_id = None
 
         self.conf = config.get_config('giveaway')
-        self.giveaway_join_button_label = self.conf['giveaway_join_button_label']
-        self.giveaway_exit_button_label = self.conf['giveaway_exit_button_label']
-        self.giveaway_already_joined_message = self.conf['giveaway_already_joined_message']
-        self.giveaway_joined_message = self.conf['giveaway_joined_message']
-        self.giveaway_leave_message = self.conf['giveaway_leave_message']
-        self.giveaway_not_access_message = self.conf['giveaway_not_access_message']
-        self.giveaway_embed_participants_title = self.conf['giveaway_embed_participants_title']
-        self.giveaway_end_message = self.conf['giveaway_end_message']
+        self.giveaway_join_button_label = t('giveaway.giveaway_join_button_label')
+        self.giveaway_exit_button_label = t('giveaway.giveaway_exit_button_label')
+        self.giveaway_already_joined_message = t('giveaway.giveaway_already_joined_message')
+        self.giveaway_joined_message = t('giveaway.giveaway_joined_message')
+        self.giveaway_leave_message = t('giveaway.giveaway_leave_message')
+        self.giveaway_not_access_message = t('giveaway.giveaway_not_access_message')
+        self.giveaway_embed_participants_title = t('giveaway.giveaway_embed_participants_title')
+        self.giveaway_end_message = t('giveaway.giveaway_end_message')
 
         # buttons definition
         self.participate_button = Button(label=self.giveaway_join_button_label,
@@ -155,14 +156,14 @@ class GiveawayConfirmationView(View):
         self.bot = bot
 
         self.conf = config.get_config('giveaway')
-        self.giveaway_embed_title_open = self.conf['giveaway_embed_title_open']
-        self.giveaway_embed_provider_title = self.conf['giveaway_embed_provider_title']
-        self.giveaway_embed_timeend_title = self.conf['giveaway_embed_timeend_title']
-        self.giveaway_embed_winner_number_title = self.conf['giveaway_embed_winner_number_title']
-        self.giveaway_embed_participants_title = self.conf['giveaway_embed_participants_title']
-        self.giveaway_embed_participants_text = self.conf['giveaway_embed_participants_text']
-        self.giveaway_embed_description_title = self.conf['giveaway_embed_description_title']
-        self.giveaway_embed_footer = self.conf['giveaway_embed_footer']
+        self.giveaway_embed_title_open = t('giveaway.giveaway_embed_title_open')
+        self.giveaway_embed_provider_title = t('giveaway.giveaway_embed_provider_title')
+        self.giveaway_embed_timeend_title = t('giveaway.giveaway_embed_timeend_title')
+        self.giveaway_embed_winner_number_title = t('giveaway.giveaway_embed_winner_number_title')
+        self.giveaway_embed_participants_title = t('giveaway.giveaway_embed_participants_title')
+        self.giveaway_embed_participants_text = t('giveaway.giveaway_embed_participants_text')
+        self.giveaway_embed_description_title = t('giveaway.giveaway_embed_description_title')
+        self.giveaway_embed_footer = t('giveaway.giveaway_embed_footer')
 
     def create_embed(self, giveaway_id, prizes, description, winners, duration, providers, interaction):
         # Create an embed to show all the giveaway information
@@ -213,7 +214,7 @@ class GiveawayForm(ui.Modal, title='Create Giveaway'):
 
         self.conf = config.get_config('giveaway')
         self.giveaway_channel_id = self.conf['giveaway_channel_id']
-        self.giveaway_default_provider = self.conf['giveaway_default_provider']
+        self.giveaway_default_provider = t('giveaway.giveaway_default_provider')
 
         self.reaction_limit = reaction_limit
         self.message_limit = message_limit
@@ -416,21 +417,21 @@ class GiveawayCog(commands.Cog):
 
         self.conf = config.get_config('giveaway')
         self.giveaway_channel_id = self.conf['giveaway_channel_id']
-        self.giveaway_embed_title_open = self.conf['giveaway_embed_title_open']
-        self.giveaway_embed_title_closed = self.conf['giveaway_embed_title_closed']
-        self.giveaway_embed_title_closed_deleted = self.conf['giveaway_embed_title_closed_deleted']
-        self.giveaway_embed_description_closed_deleted = self.conf['giveaway_embed_description_closed_deleted']
-        self.giveaway_embed_description_title = self.conf['giveaway_embed_description_title']
-        self.giveaway_embed_end_label = self.conf['giveaway_embed_end_label']
-        self.giveaway_embed_winner_title = self.conf['giveaway_embed_winner_title']
-        self.giveaway_embed_no_winner = self.conf['giveaway_embed_no_winner']
-        self.giveaway_embed_cancel_label = self.conf['giveaway_embed_cancel_label']
-        self.giveaway_embed_earlyend_label = self.conf['giveaway_embed_earlyend_label']
-        self.giveaway_embed_time_extend_label = self.conf['giveaway_embed_time_extend_label']
-        self.giveaway_embed_timeend_title = self.conf['giveaway_embed_timeend_title']
-        self.giveaway_win_public_message = self.conf['giveaway_win_public_message']
-        self.giveaway_win_private_message = self.conf['giveaway_win_private_message']
-        self.giveaway_fail_message = self.conf['giveaway_fail_message']
+        self.giveaway_embed_title_open = t('giveaway.giveaway_embed_title_open')
+        self.giveaway_embed_title_closed = t('giveaway.giveaway_embed_title_closed')
+        self.giveaway_embed_title_closed_deleted = t('giveaway.giveaway_embed_title_closed_deleted')
+        self.giveaway_embed_description_closed_deleted = t('giveaway.giveaway_embed_description_closed_deleted')
+        self.giveaway_embed_description_title = t('giveaway.giveaway_embed_description_title')
+        self.giveaway_embed_end_label = t('giveaway.giveaway_embed_end_label')
+        self.giveaway_embed_winner_title = t('giveaway.giveaway_embed_winner_title')
+        self.giveaway_embed_no_winner = t('giveaway.giveaway_embed_no_winner')
+        self.giveaway_embed_cancel_label = t('giveaway.giveaway_embed_cancel_label')
+        self.giveaway_embed_earlyend_label = t('giveaway.giveaway_embed_earlyend_label')
+        self.giveaway_embed_time_extend_label = t('giveaway.giveaway_embed_time_extend_label')
+        self.giveaway_embed_timeend_title = t('giveaway.giveaway_embed_timeend_title')
+        self.giveaway_win_public_message = t('giveaway.giveaway_win_public_message')
+        self.giveaway_win_private_message = t('giveaway.giveaway_win_private_message')
+        self.giveaway_fail_message = t('giveaway.giveaway_fail_message')
 
         # Start the background task
         self.check_giveaways.start()
