@@ -523,6 +523,30 @@
 
 ---
 
+### nested 子树文案抽 locale（2026-04-23）
+
+**Commit grep**: `git log --grep='voicechannel.*control_panel'` / `git log --grep='role.*signature'`
+
+**两条 source commit**：
+1. `refactor(voicechannel): extract control_panel text to locale` —— `control_panel.{title,footer,description_template,buttons,messages}` 从 yaml 抽到 `bot/locales/zh_CN/voicechannel.yaml`；yaml 只剩 `control_panel.colors.{public,private}` 两个 int。Cog 的 `self.messages` / `self.button_labels` / `self.control_panel_conf` 三个 dict 缓存全删，按钮 label + 所有 message 走 `t('voicechannel.control_panel.*')`。28 key。
+2. `refactor(role): extract signature text to locale` —— `signature.{pickup_*,modal_*,*_message,admin_check_*}` 等 30 text key 抽到 locale；yaml 只剩 `signature.{max_length,max_changes_per_week,time_requirement,helper_role_id}` 四个数据字段。cog 的 `self.signature_config` 整体删（没 caller 了），`SignatureModal` / `SignatureView` 的 callbacks + `RoleCog` 的 admin 命令全走 t()。顺带把硬编码 `"更新签名失败，请稍后重试。"` 也抽了（新 key `signature.update_failed_message`）；loop var `t` 改名 `ts` 避免 shadow i18n helper。
+
+**welcome.dm 显式不抽**（决策记录）：
+- `welcome.dm.description0_title` = `"小鸟知道你在想什么・永久邀请链接"` —— 含服务器品牌名
+- `welcome.dm.description1_title` = `"https://discord.gg/Birdgaming"` —— 每部署的邀请 URL
+- `welcome.dm.description2_title` = `"🐦小鸟知道你在想什么・欧服综合游戏社区 🏮"` —— 品牌 + slogan
+- `welcome.dm.description2[*]` = 服务器介绍段落（深绑定本服）
+- `welcome.dm.footer` = `"小鸟知道你在想什么・欧服综合游戏社区"` —— 品牌 footer
+- `welcome.dm.member_count_button` = `"你是小鸟的第 {member_count} 名成员"` —— 品牌 + placeholder
+
+这些内容 60% 以上和本部署的"小鸟"品牌 / 真实邀请链接深绑，和一般意义上"可翻译的 UI 文案"不同。把它们搬到 `bot/locales/zh_CN/welcome.yaml` 会让 locale 文件承担"deploy-specific 配置"的角色，违反 P1-6 locale vs yaml 的边界（locale = 通用翻译，yaml = 每部署数据）。留 yaml 即可，后续若有多部署再说。
+
+对应地 `check_locales.py` 目前不会抱怨：`welcome.yaml` locale 里只有 `welcome_text_picture_1/2` 两个真正通用的 key，没有 orphan；welcome 的 t() 引用也只有这两个。
+
+**验收**：`tools/check_locales.py` 从 502 t() key 长到 553，全部映射到 locale 字符串叶子，零 MISSING。三个 follow-up（voicechannel / role.signature / welcome.dm）全部闭环（后者以显式决策结束，不是遗漏）。
+
+---
+
 ### sanitizer 扩 ID 白名单 + URL + 嵌入 snowflake（2026-04-23）
 
 **Commit grep**: `git log --grep='sanitizer snowflake'`
@@ -695,8 +719,7 @@ description=locale_str(
 Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅；P1-4 dataclass schema + 静态 key 对齐 ✅。下一轮可接手的 follow-up：
 
 **🟡 important**：
-1. nested 子树文案抽 locale：`welcome.dm.*` / `role.signature.*` / `voicechannel.control_panel.{title,footer,messages,buttons,description_template}` 目前整块留在 yaml。完成后 `check_locales.py` 的 `voicechannel.yaml has no t() references` info 会消失。
-2. per-cog 配置 schema（shop / ban / tickets_new / voicechannel / privateroom 等）：按 P1-3 拆包时一并添加，把 `admin_roles: List[int]` / `ticket_types: Dict[str, TicketType]` 等固定形状字段锁死。
+1. per-cog 配置 schema（shop / ban / tickets_new / voicechannel / privateroom 等）：按 P1-3 拆包时一并添加，把 `admin_roles: List[int]` / `ticket_types: Dict[str, TicketType]` 等固定形状字段锁死。
 
 **🟢 nice-to-have**：
 4. P1-3 大 cog 拆包（`tickets_new_cog` / `privateroom_cog` / `ban_cog` 按 PLAN `cog.py + views.py + modals.py + embeds.py + service.py`）。
