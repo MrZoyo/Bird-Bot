@@ -39,7 +39,37 @@ CLASSIFY_FILE = REPO_ROOT / 'tools' / 'field_classification.yaml'
 SEED_FILE = REPO_ROOT / 'tools' / 'migration_db_seed.json'
 REPORT_FILE = REPO_ROOT / 'tools' / 'migration_report.md'
 
-ID_KEY_PATTERNS = ('_id', '_ids', 'guild_id', 'channel_id', 'role_id', 'user_id')
+# Keys whose values are Discord IDs / lists of IDs. Matched via substring
+# so `ban_notification_channel_id` / `ticket_channel_id` / `main_guild_id`
+# etc. fall under the `_id` bucket automatically. The bare names
+# (`admin_roles`, `admin_users`) cover the lists where the key itself
+# doesn't end in `_id` / `_ids`.
+ID_KEY_PATTERNS = (
+    '_id',
+    '_ids',
+    'guild_id',
+    'channel_id',
+    'role_id',
+    'user_id',
+    'admin_roles',
+    'admin_users',
+    'mod_roles',
+    'mod_users',
+    'blocklist',
+    'banlist',
+)
+
+# Keys whose values are full URLs (with real invite codes). Scrubbed to a
+# placeholder URL since the whole link is sensitive, not just an ID.
+URL_KEY_PATTERNS = ('_link', '_url', 'invite_link', 'invite_url')
+
+# Defense-in-depth: any int ≥ this value is a Discord snowflake with
+# overwhelming probability. Discord IDs crossed 10^17 around 2017; every
+# ID produced by the service in the last ~8 years exceeds it. This
+# catches values whose key name we didn't list above (future schema
+# drift, deeply nested paths) so sanitizer gaps fail closed.
+_SNOWFLAKE_MIN = 10 ** 17
+
 LOCALE_KEY_SUFFIXES = (
     '_message',
     '_title',
@@ -101,7 +131,23 @@ def heuristic_is_yaml(value: Any) -> bool:
 
 
 def sanitize_for_example(obj: Any) -> Any:
-    """Replace secrets / IDs with placeholder values for .example output."""
+    """Replace secrets / IDs / URLs with placeholders for .example output.
+
+    Three-layer defense so leaks fail closed:
+
+    1. Explicit key whitelist (`ID_KEY_PATTERNS`) — known-sensitive keys
+       routed through :func:`_sanitize_id_like` which recurses into
+       lists so nested ``admin_roles[*]`` / ``admin_users[*]`` become
+       placeholder IDs.
+    2. URL key patterns (`URL_KEY_PATTERNS`) — ``invite_link`` and any
+       ``*_url`` / ``*_link`` key whose value is a Discord URL is
+       scrubbed to a placeholder URL, preserving the scheme so
+       operators still know the field holds an invite link.
+    3. Snowflake-magnitude catch-all — any remaining int / numeric
+       string ≥ :data:`_SNOWFLAKE_MIN` is replaced after the dict
+       recursion, so keys whose name drifts from the whitelist still
+       get scrubbed instead of leaking.
+    """
     if isinstance(obj, dict):
         result = {}
         for k, v in obj.items():
@@ -111,11 +157,16 @@ def sanitize_for_example(obj: Any) -> Any:
             if any(pat in k for pat in ID_KEY_PATTERNS):
                 result[k] = _sanitize_id_like(v)
                 continue
+            if any(pat in k for pat in URL_KEY_PATTERNS):
+                result[k] = _sanitize_url_like(v)
+                continue
             result[k] = sanitize_for_example(v)
         return result
     if isinstance(obj, list):
         return [sanitize_for_example(v) for v in obj]
-    return obj
+    # Scalar fallback — catch a stray snowflake whose key pattern we
+    # didn't recognize.
+    return _sanitize_snowflake_scalar(obj)
 
 
 def _sanitize_id_like(v: Any) -> Any:
@@ -126,6 +177,71 @@ def _sanitize_id_like(v: Any) -> Any:
     if isinstance(v, list):
         return [_sanitize_id_like(x) for x in v]
     return v
+
+
+def _sanitize_url_like(v: Any) -> Any:
+    if isinstance(v, str) and v:
+        return 'https://discord.gg/YOUR_INVITE_CODE'
+    if isinstance(v, list):
+        return [_sanitize_url_like(x) for x in v]
+    return v
+
+
+def _sanitize_snowflake_scalar(v: Any) -> Any:
+    """Catch a snowflake-sized int / numeric str that escaped the key checks.
+
+    Also scrubs Discord URLs and ``<#..>`` / ``<@..>`` / ``<:name:..>``
+    mention or custom-emoji tokens embedded inside free-form strings
+    (e.g. ``welcome_text`` carries both invite URLs and custom-emoji
+    snowflakes). The string replacements are surgical — only the ID
+    substrings change, surrounding prose stays intact so the .example
+    template still documents the shape the operator should fill in.
+    """
+    if isinstance(v, bool):
+        # bool is an int subclass in Python — don't touch.
+        return v
+    if isinstance(v, int) and v >= _SNOWFLAKE_MIN:
+        return 1145141919810
+    if isinstance(v, str):
+        if v.isdigit() and int(v) >= _SNOWFLAKE_MIN:
+            return '1145141919810'
+        return _scrub_embedded_ids(v)
+    return v
+
+
+# Precompiled patterns — each matches an ID / URL form we commonly see
+# inside free-form config text (welcome_text, dm.description, etc.).
+_EMBEDDED_PATTERNS: List[Tuple['re.Pattern[str]', str]] = []  # populated below
+
+
+def _scrub_embedded_ids(text: str) -> str:
+    for pat, repl in _EMBEDDED_PATTERNS:
+        text = pat.sub(repl, text)
+    return text
+
+
+def _build_embedded_patterns() -> None:
+    import re
+    _EMBEDDED_PATTERNS.extend([
+        # Invite links: https://discord.gg/<code> or discord.com/invite/<code>
+        (re.compile(r'https?://(?:www\.)?discord\.gg/[A-Za-z0-9]+'),
+         'https://discord.gg/YOUR_INVITE_CODE'),
+        (re.compile(r'https?://discord\.com/invite/[A-Za-z0-9]+'),
+         'https://discord.com/invite/YOUR_INVITE_CODE'),
+        # Channel / message deep links carry guild + channel (+ message) IDs.
+        (re.compile(r'https?://discord\.com/channels/\d{15,}/\d{15,}(?:/\d{15,})?'),
+         'https://discord.com/channels/1145141919810/1145141919810'),
+        # Custom emoji: <:name:12345...> or animated <a:name:12345...>
+        (re.compile(r'<(a?):([A-Za-z0-9_~]+):(\d{15,})>'),
+         r'<\1:\2:1145141919810>'),
+        # Bare mentions: <@id> / <@!id> / <#id> / <@&id>
+        (re.compile(r'<@!?(\d{15,})>'), '<@1145141919810>'),
+        (re.compile(r'<#(\d{15,})>'), '<#1145141919810>'),
+        (re.compile(r'<@&(\d{15,})>'), '<@&1145141919810>'),
+    ])
+
+
+_build_embedded_patterns()
 
 
 def classify_config(
