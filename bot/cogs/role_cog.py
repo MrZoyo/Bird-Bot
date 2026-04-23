@@ -390,11 +390,11 @@ class GenderView(View):
 
 class SignatureModal(discord.ui.Modal):
     def __init__(self, bot, max_length):
-        super().__init__(title=bot.get_cog('RoleCog').role_config['signature']['modal_title'])
+        super().__init__(title=t('role.signature.modal_title'))
         self.bot = bot
         self.signature = discord.ui.TextInput(
-            label=bot.get_cog('RoleCog').role_config['signature']['modal_label'],
-            placeholder=bot.get_cog('RoleCog').role_config['signature']['modal_placeholder'],
+            label=t('role.signature.modal_label'),
+            placeholder=t('role.signature.modal_placeholder'),
             max_length=max_length,
             style=discord.TextStyle.paragraph
         )
@@ -403,41 +403,38 @@ class SignatureModal(discord.ui.Modal):
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer()
 
-        config = self.bot.get_cog('RoleCog').role_config['signature']
-
         role_db = RoleDatabaseManager(self.bot.get_cog('RoleCog').main_config['db_path'])
-        
+
         # Check if user is disabled
         signature_data = await role_db.get_user_signature(interaction.user.id)
         if signature_data and signature_data['is_disabled']:
-            await interaction.followup.send(config['disabled_message'], ephemeral=True)
+            await interaction.followup.send(t('role.signature.disabled_message'), ephemeral=True)
             return
-        
+
         # Find available time slot
         available_slot = await role_db.find_available_time_slot(interaction.user.id)
         if available_slot is None:
             # Cannot change signature yet
             current_sig = signature_data['signature'] if signature_data else "无"
             await interaction.followup.send(
-                config['cooldown_message'].format(signature=current_sig),
+                t('role.signature.cooldown_message', signature=current_sig),
                 ephemeral=True
             )
             return
-        
+
         # Update signature
         if await role_db.update_user_signature(interaction.user.id, str(self.signature), available_slot):
             # Calculate remaining changes
             remaining_times = await role_db.get_signature_remaining_changes(interaction.user.id)
-            
+
             await interaction.followup.send(
-                config['success_message'].format(
-                    signature=str(self.signature),
-                    remaining_times=remaining_times
-                ),
+                t('role.signature.success_message',
+                  signature=str(self.signature),
+                  remaining_times=remaining_times),
                 ephemeral=True
             )
         else:
-            await interaction.followup.send("更新签名失败，请稍后重试。", ephemeral=True)
+            await interaction.followup.send(t('role.signature.update_failed_message'), ephemeral=True)
 
 
 class SignatureView(View):
@@ -445,12 +442,10 @@ class SignatureView(View):
         super().__init__(timeout=None)
         self.bot = bot
 
-        config = bot.get_cog('RoleCog').role_config['signature']
-
         # 设置签名按钮
         set_button = Button(
             style=components.ButtonStyle.primary,
-            label=config['button_label'],
+            label=t('role.signature.button_label'),
             custom_id="signature_button",
             row=0
         )
@@ -460,7 +455,7 @@ class SignatureView(View):
         # 查看签名按钮
         view_button = Button(
             style=components.ButtonStyle.secondary,
-            label=config['view_button_label'],
+            label=t('role.signature.view_button_label'),
             custom_id="view_signature_button",
             row=0
         )
@@ -468,9 +463,9 @@ class SignatureView(View):
         self.add_item(view_button)
 
     async def check_voice_time_requirement(self, user_id):
-        config = self.bot.get_cog('RoleCog').role_config['signature']
-        required_time = config['time_requirement']
-        helper_role_id = config['helper_role_id']
+        sig_cfg = self.bot.get_cog('RoleCog').role_config['signature']
+        required_time = sig_cfg['time_requirement']
+        helper_role_id = sig_cfg['helper_role_id']
 
         # 检查是否是服务器助力成员
         for guild in self.bot.guilds:
@@ -483,35 +478,33 @@ class SignatureView(View):
         return await role_db.check_voice_time_requirement(user_id, required_time)
 
     async def on_button_click(self, interaction: discord.Interaction):
-        config = self.bot.get_cog('RoleCog').role_config['signature']
+        sig_cfg = self.bot.get_cog('RoleCog').role_config['signature']
 
         # Check voice time requirement
         meets_requirement, current_time = await self.check_voice_time_requirement(interaction.user.id)
         if not meets_requirement:
             await interaction.response.send_message(
-                config['no_permission_message'].format(
-                    required_time=config['time_requirement'],
-                    current_time=int(current_time)
-                ),
+                t('role.signature.no_permission_message',
+                  required_time=sig_cfg['time_requirement'],
+                  current_time=int(current_time)),
                 ephemeral=True
             )
             return
 
-        modal = SignatureModal(self.bot, config['max_length'])
+        modal = SignatureModal(self.bot, sig_cfg['max_length'])
         await interaction.response.send_modal(modal)
 
     async def on_view_button_click(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        config = self.bot.get_cog('RoleCog').role_config['signature']
+        sig_cfg = self.bot.get_cog('RoleCog').role_config['signature']
 
         # Check voice time requirement
         meets_requirement, current_time = await self.check_voice_time_requirement(interaction.user.id)
         if not meets_requirement:
             await interaction.followup.send(
-                config['no_permission_message'].format(
-                    required_time=config['time_requirement'],
-                    current_time=int(current_time)
-                ),
+                t('role.signature.no_permission_message',
+                  required_time=sig_cfg['time_requirement'],
+                  current_time=int(current_time)),
                 ephemeral=True
             )
             return
@@ -520,19 +513,19 @@ class SignatureView(View):
         signature_data = await role_db.get_user_signature(interaction.user.id)
 
         if not signature_data:
-            await interaction.followup.send(config['no_signature_message'], ephemeral=True)
+            await interaction.followup.send(t('role.signature.no_signature_message'), ephemeral=True)
             return
 
         if signature_data['is_disabled']:
-            await interaction.followup.send(config['disabled_message'], ephemeral=True)
+            await interaction.followup.send(t('role.signature.disabled_message'), ephemeral=True)
             return
 
         if not signature_data['signature']:
-            await interaction.followup.send(config['no_signature_message'], ephemeral=True)
+            await interaction.followup.send(t('role.signature.no_signature_message'), ephemeral=True)
             return
 
         await interaction.followup.send(
-            config['view_message'].format(signature=signature_data['signature']),
+            t('role.signature.view_message', signature=signature_data['signature']),
             ephemeral=True
         )
 
@@ -594,8 +587,6 @@ class RoleCog(commands.Cog):
         self.gender_sakura_description = t('role.gender_sakura_description')
         self.gender_ninja_title = t('role.gender_ninja_title')
         self.gender_ninja_description = t('role.gender_ninja_description')
-
-        self.signature_config = self.role_config['signature']
 
     def _get_panel_role_targets(self, panel_type: str) -> list[dict[str, object]]:
         if panel_type == 'role':
@@ -913,11 +904,11 @@ class RoleCog(commands.Cog):
 
         view = SignatureView(self.bot)
         embed = discord.Embed(
-            title=self.signature_config['pickup_title'],
-            description=self.signature_config['pickup_description'],
+            title=t('role.signature.pickup_title'),
+            description=t('role.signature.pickup_description'),
             color=discord.Color.brand_green()
         )
-        embed.set_footer(text=self.signature_config['pickup_footer'])
+        embed.set_footer(text=t('role.signature.pickup_footer'))
 
         if self.bot.user.avatar:
             embed.set_thumbnail(url=self.bot.user.avatar.url)
@@ -958,10 +949,9 @@ class RoleCog(commands.Cog):
 
         message_key = 'admin_disable_message' if disable else 'admin_enable_message'
         await interaction.followup.send(
-            self.signature_config[message_key].format(
-                user_mention=user.mention,
-                user_id=user_id
-            )
+            t(f'role.signature.{message_key}',
+              user_mention=user.mention,
+              user_id=user_id)
         )
 
     @app_commands.command(
@@ -991,10 +981,9 @@ class RoleCog(commands.Cog):
         await self.role_db.clear_user_signature(int(user_id))
 
         await interaction.followup.send(
-            self.signature_config['admin_clear_success'].format(
-                user_mention=user.mention,
-                user_id=user_id
-            )
+            t('role.signature.admin_clear_success',
+              user_mention=user.mention,
+              user_id=user_id)
         )
 
 
@@ -1095,62 +1084,60 @@ class RoleCog(commands.Cog):
 
         if not signature_data:
             await interaction.followup.send(
-                self.signature_config['admin_check_no_record_message'].format(
-                    user_mention=user.mention,
-                    user_id=user_id
-                )
+                t('role.signature.admin_check_no_record_message',
+                  user_mention=user.mention,
+                  user_id=user_id)
             )
             return
 
         current_time = datetime.now(timezone.utc)
-        
-        # 计算每个时间槽距今多少天
-        times = []
-        for t in [signature_data['change_time1'], signature_data['change_time2'], signature_data['change_time3']]:
-            try:
-                if t:
-                    time_obj = datetime.fromisoformat(t)
-                    days = (current_time - time_obj).days
-                    times.append(self.signature_config['admin_check_time_format'].format(
-                        timestamp=int(time_obj.timestamp()),
-                        days=days
-                    ))
-                else:
-                    times.append(self.signature_config['admin_check_time_unused'])
-            except (ValueError, TypeError):
-                times.append(self.signature_config['admin_check_time_unused'])
 
-        status = (self.signature_config['admin_check_status_disabled']
+        # 计算每个时间槽距今多少天 (loop var renamed from `t` to `ts`
+        # to avoid shadowing the i18n helper).
+        times = []
+        for ts in [signature_data['change_time1'], signature_data['change_time2'], signature_data['change_time3']]:
+            try:
+                if ts:
+                    time_obj = datetime.fromisoformat(ts)
+                    days = (current_time - time_obj).days
+                    times.append(t('role.signature.admin_check_time_format',
+                                   timestamp=int(time_obj.timestamp()),
+                                   days=days))
+                else:
+                    times.append(t('role.signature.admin_check_time_unused'))
+            except (ValueError, TypeError):
+                times.append(t('role.signature.admin_check_time_unused'))
+
+        status = (t('role.signature.admin_check_status_disabled')
                   if signature_data['is_disabled']
-                  else self.signature_config['admin_check_status_normal'])
+                  else t('role.signature.admin_check_status_normal'))
 
         embed = discord.Embed(
-            title=self.signature_config['admin_check_title'],
+            title=t('role.signature.admin_check_title'),
             color=discord.Color.blue() if not signature_data['is_disabled'] else discord.Color.red()
         )
 
         embed.add_field(
-            name=self.signature_config['admin_check_user_info_title'],
+            name=t('role.signature.admin_check_user_info_title'),
             value=f"{user.mention} ({user_id})",
             inline=False
         )
         embed.add_field(
-            name=self.signature_config['admin_check_status_title'],
+            name=t('role.signature.admin_check_status_title'),
             value=status,
             inline=False
         )
         embed.add_field(
-            name=self.signature_config['admin_check_signature_title'],
-            value=signature_data['signature'] or self.signature_config['admin_check_no_signature'],
+            name=t('role.signature.admin_check_signature_title'),
+            value=signature_data['signature'] or t('role.signature.admin_check_no_signature'),
             inline=False
         )
         embed.add_field(
-            name=self.signature_config['admin_check_history_title'],
-            value=self.signature_config['admin_check_history_format'].format(
-                time1=times[0],
-                time2=times[1],
-                time3=times[2]
-            ),
+            name=t('role.signature.admin_check_history_title'),
+            value=t('role.signature.admin_check_history_format',
+                    time1=times[0],
+                    time2=times[1],
+                    time3=times[2]),
             inline=False
         )
 

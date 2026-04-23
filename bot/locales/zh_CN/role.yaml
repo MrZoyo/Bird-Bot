@@ -51,3 +51,67 @@ gender_sakura_title: 闭月羞花
 gender_sakura_description: '- 🌸 Sakura 永远绽放'
 gender_ninja_title: 我是忍者
 gender_ninja_description: '- 🥷 Ninja 永远神秘'
+
+# P1-4 follow-up: signature subtree extracted from role.yaml data-side.
+# Data fields (max_length / max_changes_per_week / time_requirement /
+# helper_role_id) remain in bot/config/role.yaml — those are operator-
+# tunable knobs, not translatable prose.
+signature:
+  pickup_title: 个性签名设置
+  pickup_description: |-
+    💬想要组队时展现你的个性or展示你的宣言吗？
+    📮那就设置一个 个性签名 吧~
+
+    **⚖️规则：**
+    - ❤️本功能目前暂向达成成就进度`箫管🐥雏来`以及`🦄助力用户`开放
+    - 💾每个签名最多50字
+    - 📆每周最多修改3次
+    - 🔇请遵守社区规范，和谐友善，否则可能被禁用此功能
+  pickup_footer: ------点击按钮设置你的个性签名------
+  button_label: 设置签名
+  modal_title: 设置个性签名
+  modal_label: 在此输入你的新签名
+  modal_placeholder: 请输入你的个性签名...
+  # Placeholders: {signature}, {remaining_times}
+  success_message: |-
+    签名设置成功！
+    当前签名：{signature}
+    本周剩余修改次数：{remaining_times}次
+  update_failed_message: 更新签名失败，请稍后重试。
+  disabled_message: 你已被禁用个性签名功能，如有疑问请联系管理员。
+  # Placeholders: {signature}
+  cooldown_message: |-
+    修改次数已达本周上限，请等待先前修改超过7天后再试。
+    当前签名：{signature}
+  view_button_label: 查看我的签名
+  # Placeholders: {signature}
+  view_message: |-
+    你的当前签名是：
+    {signature}
+  no_signature_message: 你还没有设置个性签名。
+  # Placeholders: {required_time}, {current_time}
+  no_permission_message: |-
+    设置个性签名需要语音时长达到 {required_time} 分钟或成为助力服务器成员。
+    你当前的语音时长为 {current_time} 分钟。
+  # Placeholders: {user_mention}, {user_id}
+  admin_disable_message: 已禁用 {user_mention} ({user_id}) 的个性签名功能。
+  admin_enable_message: 已启用 {user_mention} ({user_id}) 的个性签名功能。
+  admin_clear_success: 已清空 {user_mention} ({user_id}) 的个性签名。
+  admin_check_title: 用户签名信息查询
+  admin_check_no_record_message: "{user_mention} ({user_id}) 还没有设置过签名。"
+  admin_check_user_info_title: 用户信息
+  admin_check_status_title: 当前状态
+  admin_check_signature_title: 当前签名
+  admin_check_history_title: 修改记录
+  # Placeholders: {time1}, {time2}, {time3}
+  admin_check_history_format: |-
+    最近三次修改时间：
+    1️⃣ {time1}
+    2️⃣ {time2}
+    3️⃣ {time3}
+  admin_check_status_disabled: 🔴 已禁用
+  admin_check_status_normal: 🟢 正常
+  admin_check_time_unused: 未使用
+  # Placeholders: {timestamp}, {days}
+  admin_check_time_format: <t:{timestamp}:F> ({days}天前)
+  admin_check_no_signature: 无

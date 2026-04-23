@@ -115,39 +115,12 @@ gender_name:
 - name: Ninja
   emoji: 🥷
   role_id: 1145141919810
+# Only data / config fields stay in yaml. All user-visible text (modal
+# prompts, success / cooldown / admin messages, etc.) lives under
+# `signature:` in bot/locales/<lang>/role.yaml and is resolved via
+# bot.utils.i18n.t('role.signature.*').
 signature:
   max_length: 50
   max_changes_per_week: 3
   time_requirement: 43200
   helper_role_id: 1145141919810
-  pickup_title: 个性签名设置
-  pickup_description: "💬想要组队时展现你的个性or展示你的宣言吗？\n📮那就设置一个 个性签名 吧~\n\n**⚖️规则：**\n- ❤️本功能目前暂向达成成就进度`箫管🐥雏来`以及`🦄助力用户`开放\n\
-    - 💾每个签名最多50字\n- 📆每周最多修改3次\n- 🔇请遵守社区规范，和谐友善，否则可能被禁用此功能"
-  pickup_footer: '------点击按钮设置你的个性签名------'
-  button_label: 设置签名
-  modal_title: 设置个性签名
-  modal_label: 在此输入你的新签名
-  modal_placeholder: 请输入你的个性签名...
-  success_message: "签名设置成功！\n当前签名：{signature}\n本周剩余修改次数：{remaining_times}次"
-  disabled_message: 你已被禁用个性签名功能，如有疑问请联系管理员。
-  cooldown_message: "修改次数已达本周上限，请等待先前修改超过7天后再试。\n当前签名：{signature}"
-  view_button_label: 查看我的签名
-  view_message: "你的当前签名是：\n{signature}"
-  no_signature_message: 你还没有设置个性签名。
-  no_permission_message: "设置个性签名需要语音时长达到 {required_time} 分钟或成为助力服务器成员。\n你当前的语音时长为
-    {current_time} 分钟。"
-  admin_disable_message: 已禁用 {user_mention} ({user_id}) 的个性签名功能。
-  admin_enable_message: 已启用 {user_mention} ({user_id}) 的个性签名功能。
-  admin_clear_success: 已清空 {user_mention} ({user_id}) 的个性签名。
-  admin_check_title: 用户签名信息查询
-  admin_check_no_record_message: '{user_mention} ({user_id}) 还没有设置过签名。'
-  admin_check_user_info_title: 用户信息
-  admin_check_status_title: 当前状态
-  admin_check_signature_title: 当前签名
-  admin_check_history_title: 修改记录
-  admin_check_history_format: "最近三次修改时间：\n1️⃣ {time1}\n2️⃣ {time2}\n3️⃣ {time3}"
-  admin_check_status_disabled: 🔴 已禁用
-  admin_check_status_normal: 🟢 正常
-  admin_check_time_unused: 未使用
-  admin_check_time_format: <t:{timestamp}:F> ({days}天前)
-  admin_check_no_signature: 无
