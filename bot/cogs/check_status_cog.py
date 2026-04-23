@@ -1,31 +1,31 @@
 # bot/cogs/check_status_cog.py
 import asyncio
-import discord
-from discord.ext import commands, tasks
-import os
-import tempfile
-import logging
-from datetime import datetime, timezone, timedelta
-import matplotlib.pyplot as plt
 import io
+import logging
+import os
 import re
+import tempfile
 from collections import defaultdict
-from bot.utils import config, check_channel_validity, CheckStatusDatabaseManager
+from datetime import datetime, timedelta, timezone
+
+import discord
+import matplotlib.pyplot as plt
+from discord.ext import commands, tasks
+
+from bot.utils import CheckStatusDatabaseManager, check_channel_validity, config
+from bot.utils.i18n import t
 
 
 class MemberPositionView(discord.ui.View):
     def __init__(self, bot, url):
         super().__init__()
         self.bot = bot
-
-        self.main_config = config.get_config('main')
-        self.logging_file = self.main_config['logging_file']
-
-        self.conf = config.get_config('checkstatus')
-        self.where_is_join_button_label = self.conf['where_is_join_button_label']
-
-        # Create a link button that directs to the user's channel
-        self.add_item(discord.ui.Button(label=self.where_is_join_button_label, url=url))
+        self.add_item(
+            discord.ui.Button(
+                label=t('checkstatus.where_is_join_button_label'),
+                url=url,
+            )
+        )
 
 
 class CheckStatusCog(commands.Cog):
@@ -37,26 +37,18 @@ class CheckStatusCog(commands.Cog):
             callback=self.where_is_context_menu,
         )
 
-        self.main_config = config.get_config('main')
-        self.db_path = self.main_config['db_path']
+        main_config = config.get_config('main')
+        self.db_path = main_config['db_path']
         self.db = CheckStatusDatabaseManager(self.db_path)
-        self.logging_file = self.main_config['logging_file']
-
-        self.conf = config.get_config('checkstatus')
-        # Add main config to self.conf so check_log can access keyword_log_file
-        self.conf.update(self.main_config)
-
-        self.where_is_not_found_message = self.conf['where_is_not_found_message']
-        self.where_is_title_message = self.conf['where_is_title_message']
-        self.current_channel_name_message = self.conf['current_channel_name_message']
-        self.current_channel_members_message = self.conf['current_channel_members_message']
+        self.logging_file = main_config['logging_file']
+        self.keyword_log_file = main_config.get('keyword_log_file', './data/keyword_detection.log')
+        self.room_log_file = main_config.get('room_log_file', './data/room_activity.log')
 
         self.bot.tree.add_command(self.where_is_menu)
         self.check_voice_status_task.start()
 
     async def cog_load(self):
-        # 建表必须先于 check_voice_status_task 首次执行, 否则 INSERT 会打到不存在的表。
-        # 之前建表在 on_ready listener 里, 与 before_loop 的 wait_until_ready 并发, 存在竞态。
+        # Table must be built before the 10-minute task fires; see P0-3a notes.
         await self.db.initialize_database()
 
     def cog_unload(self):
@@ -65,7 +57,7 @@ class CheckStatusCog(commands.Cog):
 
     @tasks.loop(minutes=10)
     async def check_voice_status_task(self):
-        """Checks the number of people and active channels in voice channels and records it in the database."""
+        """Record voice-channel occupancy every 10 minutes."""
         try:
             category_counts = {}
             total_people = 0
@@ -80,10 +72,8 @@ class CheckStatusCog(commands.Cog):
                             category_counts[channel.category.name]['channels'] += 1
                             total_channels += 1
                         total_people += len(channel.members)
-            # Remove categories with no active players or channels
             category_counts = {k: v for k, v in category_counts.items() if v['people'] > 0 or v['channels'] > 0}
 
-            # Record the data in the database
             await self.db.record_status(
                 datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
                 total_people,
@@ -91,7 +81,6 @@ class CheckStatusCog(commands.Cog):
             )
 
             logging.info(f"Voice status checked at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
         except Exception as e:
             logging.error(f"An error occurred while checking voice status: {str(e)}")
 
@@ -108,7 +97,6 @@ class CheckStatusCog(commands.Cog):
         """Generates line graphs for the number of people and channels on a specific date, month, or year."""
         await interaction.response.defer()
         try:
-            # 判断日期模式
             if re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
                 mode = "day"
             elif re.fullmatch(r"\d{4}-\d{2}", date):
@@ -116,13 +104,15 @@ class CheckStatusCog(commands.Cog):
             elif re.fullmatch(r"\d{4}", date):
                 mode = "year"
             else:
-                await interaction.followup.send("日期格式不支持，请使用 YYYY-MM-DD / YYYY-MM / YYYY。", ephemeral=True)
+                await interaction.followup.send(t('checkstatus.date_format_error'), ephemeral=True)
                 return
 
             rows = await self.db.fetch_status_by_date_prefix(date)
 
             if not rows:
-                await interaction.followup.send(f"No data found for the specified date: {date}", ephemeral=True)
+                await interaction.followup.send(
+                    t('checkstatus.no_data_for_date', date=date), ephemeral=True,
+                )
                 return
 
             timestamps = [datetime.strptime(row[0], '%Y-%m-%d %H:%M:%S') for row in rows]
@@ -137,11 +127,12 @@ class CheckStatusCog(commands.Cog):
                 return buf
 
             def offset_y(y: float) -> float:
-                # Slight nudge upward to avoid overlap with markers
                 return y + max(0.02, y * 0.001)
 
+            # matplotlib titles / axis labels remain in English; extracting them
+            # is a separate follow-up (P1-6 step 1 flagged; not pulling into
+            # locale this pass to keep the per-cog refactor focused).
             if mode == "day":
-                # 按时间序列画线，突出当日峰值
                 max_people = max(people_counts)
                 max_channels = max(channel_counts)
                 max_people_time = timestamps[people_counts.index(max_people)]
@@ -177,7 +168,6 @@ class CheckStatusCog(commands.Cog):
                 channels_buf = save_fig()
 
             elif mode == "month":
-                # 按天取峰值，红点标注每日最高
                 daily_people = defaultdict(int)
                 daily_channels = defaultdict(int)
                 for ts, p, c in zip(timestamps, people_counts, channel_counts):
@@ -187,7 +177,7 @@ class CheckStatusCog(commands.Cog):
 
                 days_sorted = sorted(daily_people.keys())
                 x_idx = list(range(len(days_sorted)))
-                day_labels = [d for d in days_sorted]  # 显示完整日期
+                day_labels = [d for d in days_sorted]
 
                 people_series = [daily_people[d] for d in days_sorted]
                 channels_series = [daily_channels[d] for d in days_sorted]
@@ -261,77 +251,75 @@ class CheckStatusCog(commands.Cog):
 
             await interaction.followup.send(files=[
                 discord.File(people_buf, filename='people_stats.png'),
-                discord.File(channels_buf, filename='channels_stats.png')
+                discord.File(channels_buf, filename='channels_stats.png'),
             ])
         except Exception as e:
-            await interaction.followup.send(f"An error occurred: {str(e)}", ephemeral=True)
+            await interaction.followup.send(
+                t('checkstatus.error_generic', error=str(e)), ephemeral=True,
+            )
 
     @discord.app_commands.command(name="check_log")
     @discord.app_commands.describe(
         x="Number of lines from the end of the log file to return.",
-        log_type="日志类型：1/main(主日志)、2/keyword(关键词检测)、3/room(房间活动)，默认为main"
+        log_type="日志类型：1/main(主日志)、2/keyword(关键词检测)、3/room(房间活动)，默认为main",
     )
     async def check_log(self, interaction: discord.Interaction, x: int, log_type: str = "main"):
         if not await check_channel_validity(interaction):
             return
 
-        # Normalize log_type: support both numbers and text
         log_type_map = {
             "1": "main",
             "2": "keyword",
             "3": "room",
             "main": "main",
             "keyword": "keyword",
-            "room": "room"
+            "room": "room",
         }
-
-        # Default to "main" if not provided
         normalized_type = log_type_map.get(log_type.lower() if log_type else "main", "main")
 
-        # Log type configuration mapping
         log_config = {
-            "main": {
-                "file": self.logging_file,
-                "name": "主要"
-            },
-            "keyword": {
-                "file": self.conf.get('keyword_log_file', './data/keyword_detection.log'),
-                "name": "关键词检测"
-            },
-            "room": {
-                "file": self.conf.get('room_log_file', './data/room_activity.log'),
-                "name": "房间活动"
-            }
+            "main":    {"file": self.logging_file,     "name": t('checkstatus.log_type_main')},
+            "keyword": {"file": self.keyword_log_file, "name": t('checkstatus.log_type_keyword')},
+            "room":    {"file": self.room_log_file,    "name": t('checkstatus.log_type_room')},
         }
 
-        config = log_config[normalized_type]
-        log_file = config["file"]
-        log_type_name = config["name"]
+        log_file = log_config[normalized_type]["file"]
+        log_type_name = log_config[normalized_type]["name"]
 
         try:
             with open(log_file, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
         except FileNotFoundError:
-            await interaction.response.send_message(f"{log_type_name}日志文件不存在。")
+            await interaction.response.send_message(
+                t('checkstatus.log_file_not_found', log_type_name=log_type_name)
+            )
             return
 
         if not lines:
-            await interaction.response.send_message(f"{log_type_name}日志文件为空。")
+            await interaction.response.send_message(
+                t('checkstatus.log_file_empty', log_type_name=log_type_name)
+            )
             return
 
         last_x_lines = ''.join(lines[-x:])
         if len(last_x_lines) > 1900:
-            # If the message is too long, write it to a temporary file and send the file
             with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as temp:
                 temp.write(last_x_lines.encode())
                 temp_file_name = temp.name
             await interaction.response.send_message(
-                f"{log_type_name}日志过长，以文件形式发送。",
-                file=discord.File(temp_file_name, filename=f"{log_type_name}_log.txt")
+                t('checkstatus.log_too_long', log_type_name=log_type_name),
+                file=discord.File(temp_file_name, filename=f"{log_type_name}_log.txt"),
             )
-            os.remove(temp_file_name)  # Delete the temporary file
+            os.remove(temp_file_name)
         else:
-            await interaction.response.send_message(f"**{log_type_name}日志最后 {x} 行**:\n```{last_x_lines}```")
+            await interaction.response.send_message(
+                t(
+                    'checkstatus.log_last_lines',
+                    log_type_name=log_type_name,
+                    x=x,
+                    lines=last_x_lines,
+                )
+            )
 
     @discord.app_commands.command(name="check_voice_status")
     async def check_voice_status(self, interaction: discord.Interaction):
@@ -351,17 +339,67 @@ class CheckStatusCog(commands.Cog):
                             category_counts[channel.category.name]['channels'] += 1
                             total_channels += 1
                         total_people += len(channel.members)
-            # Remove categories with no active players or channels
             category_counts = {k: v for k, v in category_counts.items() if v['people'] > 0 or v['channels'] > 0}
-            embed = discord.Embed(title="Voice Channel Statistics", color=discord.Color.blue())
+
+            embed = discord.Embed(title=t('checkstatus.voice_stats_title'), color=discord.Color.blue())
             for category, counts in category_counts.items():
-                embed.add_field(name=category, value=f"{counts['people']} people, {counts['channels']} active channels",
-                                inline=False)
-            embed.add_field(name="Total People in Voice Channels", value=f"{total_people} people", inline=False)
-            embed.add_field(name="Total Active Channels", value=f"{total_channels} channels", inline=False)
+                embed.add_field(
+                    name=category,
+                    value=t(
+                        'checkstatus.voice_stats_category_value',
+                        people=counts['people'],
+                        channels=counts['channels'],
+                    ),
+                    inline=False,
+                )
+            embed.add_field(
+                name=t('checkstatus.voice_stats_total_people_title'),
+                value=t('checkstatus.voice_stats_total_people_value', count=total_people),
+                inline=False,
+            )
+            embed.add_field(
+                name=t('checkstatus.voice_stats_total_channels_title'),
+                value=t('checkstatus.voice_stats_total_channels_value', count=total_channels),
+                inline=False,
+            )
             await interaction.followup.send(embed=embed)
         except Exception as e:
-            await interaction.followup.send(f"An error occurred: {str(e)}", ephemeral=True)
+            await interaction.followup.send(
+                t('checkstatus.error_generic', error=str(e)), ephemeral=True,
+            )
+
+    async def _send_where_is(self, interaction: discord.Interaction, member: discord.Member):
+        """Shared body for /where_is slash command and the Where Is context menu."""
+        if member.voice is None or member.voice.channel is None:
+            await interaction.followup.send(
+                t('checkstatus.where_is_not_found_message', name=member.display_name),
+                ephemeral=True,
+            )
+            return
+
+        logging.info(f"Checking position for {member.display_name} by {interaction.user.display_name}")
+
+        channel = member.voice.channel
+        members_in_channel = [m.display_name for m in channel.members]
+        vc_url_direct = f"https://discord.com/channels/{member.guild.id}/{channel.id}"
+
+        embed = discord.Embed(
+            title=t('checkstatus.where_is_title_message', name=member.display_name),
+            color=discord.Color.blue(),
+        )
+        embed.add_field(
+            name=t('checkstatus.current_channel_name_message'),
+            value=vc_url_direct,
+            inline=False,
+        )
+        embed.add_field(
+            name=t('checkstatus.current_channel_members_message'),
+            value="\n".join(members_in_channel),
+            inline=False,
+        )
+
+        view = MemberPositionView(self.bot, vc_url_direct)
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
     @discord.app_commands.command(name="where_is")
     @discord.app_commands.describe(member="The member to check the position for")
@@ -369,57 +407,18 @@ class CheckStatusCog(commands.Cog):
         """Returns the current channel of the member and a list of members within the channel."""
         await interaction.response.defer(ephemeral=True)
         try:
-            if member.voice is None or member.voice.channel is None:
-                await interaction.followup.send(self.where_is_not_found_message.format(name=member.display_name),
-                                                ephemeral=True)
-                return
-
-            logging.info(f"Checking position for {member.display_name} by {interaction.user.display_name}")
-
-            channel = member.voice.channel
-            members_in_channel = [m.display_name for m in channel.members]
-
-            guild_id = member.guild.id
-            channel_id = member.voice.channel.id
-            vc_url_direct = f"https://discord.com/channels/{guild_id}/{channel_id}"
-
-            embed = discord.Embed(title=self.where_is_title_message.format(name=member.display_name),
-                                  color=discord.Color.blue())
-            embed.add_field(name=self.current_channel_name_message, value="".join(vc_url_direct), inline=False)
-            embed.add_field(name=self.current_channel_members_message, value="\n".join(members_in_channel),
-                            inline=False)
-
-            view = MemberPositionView(self.bot, vc_url_direct)
-            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+            await self._send_where_is(interaction, member)
         except Exception as e:
-            await interaction.followup.send(f"An error occurred: {str(e)}", ephemeral=True)
+            await interaction.followup.send(
+                t('checkstatus.error_generic', error=str(e)), ephemeral=True,
+            )
 
     async def where_is_context_menu(self, interaction: discord.Interaction, member: discord.Member):
         """Find out where the member is in voice channels."""
         await interaction.response.defer(ephemeral=True)
         try:
-            if member.voice is None or member.voice.channel is None:
-                await interaction.followup.send(self.where_is_not_found_message.format(name=member.display_name),
-                                                ephemeral=True)
-                return
-
-            logging.info(f"Checking position for {member.display_name} by {interaction.user.display_name}")
-
-            channel = member.voice.channel
-            members_in_channel = [m.display_name for m in channel.members]
-
-            guild_id = member.guild.id
-            channel_id = member.voice.channel.id
-            vc_url_direct = f"https://discord.com/channels/{guild_id}/{channel_id}"
-
-            embed = discord.Embed(title=self.where_is_title_message.format(name=member.display_name),
-                                  color=discord.Color.blue())
-            embed.add_field(name=self.current_channel_name_message, value="".join(vc_url_direct), inline=False)
-            embed.add_field(name=self.current_channel_members_message, value="\n".join(members_in_channel),
-                            inline=False)
-
-            view = MemberPositionView(self.bot, vc_url_direct)
-            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+            await self._send_where_is(interaction, member)
         except Exception as e:
-            await interaction.followup.send(f"An error occurred: {str(e)}", ephemeral=True)
-
+            await interaction.followup.send(
+                t('checkstatus.error_generic', error=str(e)), ephemeral=True,
+            )
