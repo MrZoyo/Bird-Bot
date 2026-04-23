@@ -1,0 +1,30 @@
+# Slash command metadata (zh_CN) — P1-7
+#
+# Structure: <cog>.<command_or_group>[.params.<name>].description
+# - description: command description shown in the client's command picker
+# - params.<name>: describe() text for that parameter
+#
+# Command *names* are NOT localized (Discord slash `name` restricts to
+# ascii lower / digits / `_` / `-`). Only `description` / `params` are.
+#
+# Non-zh-CN clients see the English fallback inside
+# `locale_str("...", key=...)` in each cog decorator; this file is loaded
+# only when Discord asks for the zh-CN locale (via SlashTranslator).
+
+notebook:
+  notebook_log:
+    description: "为指定成员记录一条事件日志"
+    params:
+      event_object: "要记录的成员"
+      event_description: "事件描述"
+  notebook_member:
+    description: "列出指定成员的全部事件日志"
+    params:
+      member: "要查询日志的成员"
+  notebook_all:
+    description: "列出所有成员的事件日志"
+  notebook_delete:
+    description: "从成员日志中删除一条指定事件"
+    params:
+      member: "要删除事件的成员"
+      event_serial_number: "要删除事件的序号"

@@ -2,6 +2,7 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
+from discord.app_commands import locale_str
 from discord.ui import Button, View
 from bot.utils import config, check_channel_validity, NotebookDatabaseManager
 
@@ -151,10 +152,23 @@ class NotebookCog(commands.Cog):
     async def cog_load(self):
         await self.db.initialize_database()
 
-    @app_commands.command(name="notebook_log")
-    @app_commands.describe(event_object="The member to log",
-                           event_description="The description of the event"
-                           )
+    @app_commands.command(
+        name="notebook_log",
+        description=locale_str(
+            "Log an event for a specific member",
+            key="notebook.notebook_log.description",
+        ),
+    )
+    @app_commands.describe(
+        event_object=locale_str(
+            "The member to log",
+            key="notebook.notebook_log.params.event_object",
+        ),
+        event_description=locale_str(
+            "The description of the event",
+            key="notebook.notebook_log.params.event_description",
+        ),
+    )
     async def log_event(self, interaction: discord.Interaction, event_object: discord.Member, event_description: str):
         await interaction.response.defer()
 
@@ -172,8 +186,19 @@ class NotebookCog(commands.Cog):
     async def add_event_to_db(self, user_id, event_object, event_description):
         await self.db.insert_event_and_ensure_admin(user_id, event_object, event_description)
 
-    @app_commands.command(name="notebook_member")
-    @app_commands.describe(member="The member to fetch event logs for")
+    @app_commands.command(
+        name="notebook_member",
+        description=locale_str(
+            "List all event logs for a specific member",
+            key="notebook.notebook_member.description",
+        ),
+    )
+    @app_commands.describe(
+        member=locale_str(
+            "The member to fetch event logs for",
+            key="notebook.notebook_member.params.member",
+        ),
+    )
     async def check_member_event(self, interaction: discord.Interaction, member: discord.Member):
         """Lists all event logs for the specified member."""
         await interaction.response.defer()
@@ -202,7 +227,13 @@ class NotebookCog(commands.Cog):
     async def fetch_events_for_user(self, event_member):
         return await self.db.fetch_events_for_member(event_member)
 
-    @app_commands.command(name="notebook_all")
+    @app_commands.command(
+        name="notebook_all",
+        description=locale_str(
+            "List event logs for all members",
+            key="notebook.notebook_all.description",
+        ),
+    )
     async def check_all_event(self, interaction: discord.Interaction):
         """Lists all event logs."""
         await interaction.response.defer()
@@ -228,10 +259,23 @@ class NotebookCog(commands.Cog):
     async def fetch_all_events(self):
         return await self.db.fetch_event_summary_all()
 
-    @app_commands.command(name="notebook_delete")
-    @app_commands.describe(member="The member whose event is to be deleted",
-                           event_serial_number="The serial number of the event to be deleted"
-                           )
+    @app_commands.command(
+        name="notebook_delete",
+        description=locale_str(
+            "Delete a specific event from a member's log",
+            key="notebook.notebook_delete.description",
+        ),
+    )
+    @app_commands.describe(
+        member=locale_str(
+            "The member whose event is to be deleted",
+            key="notebook.notebook_delete.params.member",
+        ),
+        event_serial_number=locale_str(
+            "The serial number of the event to be deleted",
+            key="notebook.notebook_delete.params.event_serial_number",
+        ),
+    )
     async def delete_event(self, interaction: discord.Interaction, member: discord.Member, event_serial_number: int):
         """Deletes an event log for the specified member."""
         await interaction.response.defer()

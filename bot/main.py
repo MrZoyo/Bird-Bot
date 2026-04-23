@@ -6,6 +6,7 @@ import discord
 from discord.ext import commands
 
 from bot.utils import config
+from bot.utils.slash_translator import SlashTranslator
 
 
 COG_SPECS = [
@@ -273,6 +274,9 @@ async def sync_commands_once(bot):
 
 
 async def setup_hook(bot):
+    # Translator must be set before sync so Discord registers the localized
+    # descriptions for every slash command defined on any loaded cog.
+    await bot.tree.set_translator(SlashTranslator())
     await setup_bot(bot)
     await sync_commands_once(bot)
 
