@@ -52,9 +52,9 @@
 | P0 | P0-3c create_invitation 补 db manager | ✅ | 1 处清零（复用 RoleDatabaseManager） |
 | P0 | P0-3d voice_channel 补 db manager | ✅ | 12 处清零 + 顺手删 tickets_new_cog 死 import |
 | **P0 整体** | **P0 系列全部完成** | ✅ | `grep -rn "aiosqlite" bot/cogs/` 整个清零 |
-| P1 | P1-5 日志 rotation | ⬜ | 下一步（新冲刺起点） |
-| P1 | P1-2 ban_cog 迁 cog_load | ⬜ | 下一轮 |
-| P1 | P1-1 命令同步逻辑 | ⬜ | 下一轮 |
+| P1 | P1-5 日志 rotation | ✅ | 3 个 logger 统一 TimedRotatingFileHandler |
+| P1 | P1-2 ban_cog 迁 cog_load | ⬜ | 下一步 |
+| P1 | P1-1 命令同步逻辑 | ⬜ | 之后 |
 | P1+P2 | 配置系统 2.0（P1-6 + P1-4 + P2-3 + P2-5） | ⬜ | 绑定一次冲刺做 |
 | P1 | P1-7 Slash 元数据本地化 | ⬜ | 与配置 2.0 并行/紧接 |
 | P1 | P1-3 大 cog 拆包 | ⬜ | 配置 2.0 之后 |
@@ -265,3 +265,29 @@
 - 不要一次 commit 多个 P 任务的改动 —— 破坏 `git log --grep` 精确定位。
 - 不要跳过"写实施笔记"这一步 —— 将来审核/回溯的核心价值就是笔记，不是代码。
 - 不要 amend 已发布 commit 去改 progress —— 顺序向前走，记错了就新 commit 修正。
+
+---
+
+## P1-5 ✅ 日志 rotation（2026-04-23）
+
+**Commit grep**: `git log --grep='(P1-5)'`
+
+**动的文件**：
+- `bot/main.py`：3 个 logger（root / `keyword_detection` / `room_activity`）统一换 `TimedRotatingFileHandler(when='midnight', backupCount=<conf>, encoding='utf-8')`。用一个 `_rotating_handler(path)` 闭包共享 formatter + backupCount 设置，避免三处粘贴。
+- `bot/config/config_main.json.example` + `bot/config/config_main.json`：加可选键 `log_backup_count`（默认 14，`int(conf.get(...))`），运维可调。
+
+**放弃 `basicConfig` 的理由**：原本 main log 走 `logging.basicConfig(filename=...)`；basicConfig 的限制是只在 root logger 没 handler 时生效第一次，后续重复调用静默失败，且它只给 root 配一个 `FileHandler`，没法注入 rotation。改为显式 `root_logger.addHandler(_rotating_handler(...))`，三路日志用同一套参数。
+
+**行为等价性**：
+- 日志文件路径、format、level、`propagate=False`（keyword / room）均不变。
+- Root logger 从"basicConfig 的隐式单 handler"变成"显式单 rotating handler"，`logging.info(...)` 直接调用路径不变。
+- 首次运行现有 `./data/*.log` 会继续追加；午夜跨天时 `TimedRotatingFileHandler` 自动把旧内容挪到 `*.log.YYYY-MM-DD`，新写入回到 `*.log` 主文件。
+
+**验收**：
+- `python3 -m py_compile bot/main.py` 过。
+- `json.load` 两个 config 都能解析。
+- 功能验收需跑过一次 00:00 才能肉眼看到 rotation 产物；但由于行为是 stdlib 标准实现、参数三处统一、无竞争条件，无需测试服联调。
+
+**未做（后续任务范围）**：
+- 不覆盖 discord.py / aiosqlite 自己的 logger（它们默认 propagate 到 root → 会走 main.log rotation；如要独立拆分等 P2 再说）。
+- 没给 rotation 加"按大小 + 按时间"组合（`maxBytes`）。按大小限额是另一需求；目前纯按天够用。
