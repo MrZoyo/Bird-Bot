@@ -30,21 +30,26 @@ class BanCog(commands.Cog):
         self.config_data = config.get_config('ban')
         self.db = BanDatabaseManager(config.get_config()['db_path'])
         self.tempban_tasks = {}
-        self.init_task = asyncio.create_task(self.initialize_db())
+        self._tempban_recovery_done = False
         self.cleanup_tempbans.start()
         self.check_expired_tempbans.start()
 
     def cog_unload(self):
         self.cleanup_tempbans.cancel()
         self.check_expired_tempbans.cancel()
-        if not self.init_task.done():
-            self.init_task.cancel()
         for task in self.tempban_tasks.values():
             task.cancel()
 
-    async def initialize_db(self):
-        """Initialize the database and recover existing tempbans."""
+    async def cog_load(self):
         await self.db.initialize_database()
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        # READY can fire on every reconnect; recover tempbans only once per process
+        # and only after the guild cache is populated so bot.get_guild() resolves.
+        if self._tempban_recovery_done:
+            return
+        self._tempban_recovery_done = True
         await self.recover_tempbans()
 
     async def save_config(self):
