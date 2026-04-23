@@ -23,6 +23,14 @@
 
 **共 8 个 commit**（源码 + progress 各一次）：P0-4 / P0-1 / P0-2 / P0-3a / P0-3b / P0-3c / P0-3d + `docs: track progress after ...`
 
+**测试期顺手修的 bug（2026-04-23）**：
+- **`fix(role): readable fallback for Discord role hierarchy 403`** — 测试点星座按钮触发 `discord.errors.Forbidden (50013)` 裸 traceback。根因：Discord 的 role hierarchy 约束（Bot top_role 必须严格高于被操作 role；Administrator 不能越过此规则）。4 个 role View 都有同 pattern。
+  - 抽出 `bot/utils/role_helpers.py` 的 `safe_member_role_edit()` 统一处理；Forbidden 时 log 具体哪个 role 层级过高 + 给用户可读中文提示。
+  - 运维侧解法：把 Bot role 拖到所有功能性 role 之上（已由用户完成）。
+  - 代码侧兜底属锦上添花，为将来再次出现层级乱序提供快速诊断路径。
+  - 不是 P0 系列引入的 regression，是原代码未兜底的显性暴露。
+  - Commit grep: `git log --grep='hierarchy'`
+
 **未做的收尾工作（显性未做，供后续接手）**：
 - 功能层所有路径**未测试服验证**（代码改动面非常大，建议用户起测试服跑一轮 —— 尤其是 giveaway 的完整流程、voice_channel 的建房/锁/解/声音板/重启恢复）
 - `voice_channel_cog` 里 `save_channel_configs` 还在写 JSON 文件，未迁 DB —— 这是 P2-5 决策范围（判定 `channel_configs` 迁 DB），不属 P0
