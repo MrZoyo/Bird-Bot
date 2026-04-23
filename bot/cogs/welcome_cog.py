@@ -20,11 +20,18 @@ class WelcomeDMView(discord.ui.View):
 
         self.conf = config.get_config('welcome')
 
-        # Add the member count button
+        # The button template lives under welcome.yaml `dm:` subtree
+        # (same subtree as the rest of the DM copy). Reading from the
+        # top level silently fell back to the hardcoded "アルタ"
+        # placeholder on every real deploy — fixed in 2026-04-23.
+        dm_conf = self.conf.get('dm', {}) if isinstance(self.conf, dict) else {}
+        template = dm_conf.get('member_count_button') or \
+            "你是本服务器的第 {member_count} 名成员"
+
         button = discord.ui.Button(
             style=discord.ButtonStyle.gray,
-            label=self.conf.get('member_count_button').format(member_count=member_count) if self.conf.get('member_count_button') else f"你是アルタ的第 {member_count} 名成员",
-            disabled=True  # Make it non-clickable
+            label=template.format(member_count=member_count),
+            disabled=True,  # Make it non-clickable
         )
         self.add_item(button)
 
