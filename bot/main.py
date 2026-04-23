@@ -1,5 +1,6 @@
 import logging
 from importlib import import_module
+from logging.handlers import TimedRotatingFileHandler
 
 import discord
 from discord.ext import commands
@@ -199,39 +200,36 @@ async def setup_bot(bot):
     # Load configuration
     conf = config.get_config()
 
-    # Configure main logging
-    logging.basicConfig(
-        level=logging.INFO,
-        filename=conf['logging_file'],
-        filemode='a',
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        encoding='utf-8'
-    )
+    log_backup_count = int(conf.get('log_backup_count', 14))
+    log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+
+    def _rotating_handler(path: str) -> TimedRotatingFileHandler:
+        handler = TimedRotatingFileHandler(
+            path,
+            when='midnight',
+            backupCount=log_backup_count,
+            encoding='utf-8',
+        )
+        handler.setFormatter(log_formatter)
+        return handler
+
+    # Configure main logging on root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    root_logger.addHandler(_rotating_handler(conf['logging_file']))
 
     # Configure keyword detection logging
     keyword_logger = logging.getLogger('keyword_detection')
     keyword_logger.setLevel(logging.INFO)
-
-    # Create separate handler for keyword detection logs
     keyword_log_file = conf.get('keyword_log_file', './data/keyword_detection.log')
-    keyword_handler = logging.FileHandler(keyword_log_file, mode='a', encoding='utf-8')
-    keyword_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-    keyword_logger.addHandler(keyword_handler)
-
-    # Prevent keyword logs from appearing in main log
+    keyword_logger.addHandler(_rotating_handler(keyword_log_file))
     keyword_logger.propagate = False
 
     # Configure room activity logging
     room_logger = logging.getLogger('room_activity')
     room_logger.setLevel(logging.INFO)
-
-    # Create separate handler for room activity logs
     room_log_file = conf.get('room_log_file', './data/room_activity.log')
-    room_handler = logging.FileHandler(room_log_file, mode='a', encoding='utf-8')
-    room_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-    room_logger.addHandler(room_handler)
-
-    # Prevent room logs from appearing in main log
+    room_logger.addHandler(_rotating_handler(room_log_file))
     room_logger.propagate = False
 
     loaded_cogs = []

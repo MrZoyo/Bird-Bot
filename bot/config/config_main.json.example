@@ -6,6 +6,7 @@
     "logging_file": "./data/bot.log",
     "keyword_log_file": "./data/keyword_detection.log",
     "room_log_file": "./data/room_activity.log",
+    "log_backup_count": 14,
 	"db_path": "./data/bot.db",
     "guild_id": 1145141919810,
 	"_comment": "=====================================================================",
