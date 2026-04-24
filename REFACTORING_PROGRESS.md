@@ -58,7 +58,7 @@
 | P1+P2 | 配置系统 2.0（P1-6 + P1-4 + P2-3 + P2-5） | ✅ | step 0-9 全部完成（P1-4 最小版；pydantic 全量留 follow-up） |
 | P1 | P1-7 Slash 元数据本地化 | ✅ | SlashTranslator + 176 key commands.yaml |
 | P1 | P1-3 大 cog 拆包 | ✅ | tickets_new + privateroom + ban 三 pilot 全 ✅；service.py 统一评估留 follow-up |
-| P1 | P1-3b 全量 cog 包化 + games 聚合 | ⬜ | 扩展 P1-3 到剩下 13 个 cog；games/ 聚合目录；PLAN §P1-3b |
+| P1 | P1-3b 全量 cog 包化 + games 聚合 | 🔄 | 第一档 ✅（8 cog + `games/` 骨架，2026-04-24）；第二档（achievement / voice_channel / giveaway）+ 第三档（shop / role）待开；PLAN §P1-3b |
 | P1 | P1-3c tickets_new → tickets 历史命名清理 | ✅ | 282 处 grep 清零（代码层）；DB SQL 表名保留方案 A；migrate+seed LEGACY_NAME_MAP 落位 |
 | P1 | P1-8a tickets_new ticket-type CRUD 返回值校验 | ✅ | 三处接 `ok` + 失败分支走 locale；新增 3 个 failure key |
 | P1 | P1-8b giveaway initialize_database 迁 cog_load | ✅ | cog_load 先建表后 start task；on_ready 只留 load_giveaways |
@@ -915,6 +915,73 @@ README.md 原本存在双重入口——`Tickets_New_Cog` (当前) + `Tickets_Co
 
 3 个问题都属于 P1-3c commit 1/2 应该做但漏掉的。follow-up commit 对等地补齐。
 
+## P1-3b 第一档 ✅ 小 cog + games/ 聚合（2026-04-24 晚）
+
+**Commit grep**: `git log --grep='(P1-3b)'`
+
+**9 commit**（8 planned + 1 follow-up）：
+
+| # | Commit | 类型 | 内容 |
+|---:|---|---|---|
+| 1 | `4ca13d1` | refactor | backup（81 行，最小包：`__init__ + cog`） |
+| 2 | `a7ba9a3` | refactor | teamup_display（472 行，最小包）。初版**声称 drop header + `setup()` 但实际编辑在 `git add` 之后才落地**，见 commit 3 |
+| 3 | `27e7e68` | refactor | **P1-3b follow-up**: 真正把 `teamup_display/cog.py` 的 stale header 和 `async def setup(bot)` 删掉 |
+| 4 | `b8578b4` | refactor | game_dnd → `games/dnd/`（106 行，最小包，首次建 `games/` 聚合目录，顺手丢 dead `from ..utils import config` import） |
+| 5 | `eafc81f` | refactor | game_spymode → `games/spymode/`（323 行，标准包：`__init__ + cog + views`）。4 View 类（SpyModeView + 3 Button 子类）放 views.py；`from ..utils.i18n` 归一到 `from bot.utils.i18n` |
+| 6 | `a5afa80` | refactor | welcome（285 行，标准包，1 View）。PEP 8 import 重排 |
+| 7 | `0891d89` | refactor | notebook（311 行，标准包，2 View：ConfirmationView + EventPaginationView）。同名 `ConfirmationView` 在 achievement 也有，不冲突（不同模块） |
+| 8 | `d026b34` | refactor | check_status（465 行，标准包，1 View MemberPositionView）。where_is ContextMenu 通过 cog `__init__` / `cog_unload` 注册/摘除，跨模块仍 OK |
+| 9 | `332e7e7` | refactor | create_invitation（638 行，标准包，2 View：TeamInvitationView + DefaultRoomView）。`TeamInvitationView.room_full_button_callback` 通过 `bot.get_cog('CreateInvitationCog')` 回 cog；跨模块查找按 class name 工作。顺手丢 dead `import datetime` |
+| 10 | 本 commit | docs | PROGRESS + PLAN 更新（Tier 1 标 ✅，handoff 指向 Tier 2） |
+
+**骨架分档速记**（实际落地）：
+
+| cog | 行数 | 包骨架 | Views 放 | 备注 |
+|---|---:|---|---|---|
+| backup | 81 | 最小 | — | 纯 Cog |
+| teamup_display | 472 | 最小 | — | 纯 Cog，`TeamupDisplayCog.db_manager.xxx` 跨域被 create_invitation/voice_channel 调用 |
+| games/dnd | 106 | 最小 | — | 无 UI |
+| games/spymode | 323 | 标准 | views.py | SpyModeView + 3 Button |
+| welcome | 285 | 标准 | views.py | WelcomeDMView |
+| notebook | 311 | 标准 | views.py | ConfirmationView + EventPaginationView |
+| check_status | 465 | 标准 | views.py | MemberPositionView |
+| create_invitation | 638 | 标准 | views.py | TeamInvitationView + DefaultRoomView |
+
+**规划偏差 / errata**：
+
+- PLAN §P1-3b 第一档原估 5-8 commit，实际 9 commit（8 planned + 1 teamup_display follow-up）。follow-up 的根因是 teamup_display commit 里 Edit 工具对新 git-mv'd 文件首次编辑要先 Read 过——前两个 Edit 被拒再修但随后 `git add` 命令漏了 cog.py 的新改动。引入的教训：**`git mv` 后第一次 Edit 目标文件前，先 Read 一次**，避免"以为做完了但其实没 add"。
+- PLAN §P1-3b 第一档 pilot 模板 step 4 写"git mv 旧文件到 old_function/cogs/<name>_cog_pre_split.py"——本轮 **不**按这个做（前三个 P1-3 pilot 确实做了 pre_split 归档，但本档 8 个 cog 都是小/中规模，平铺文件本身就足够，老版本通过 git history 可以恢复。`old_function/` 目录保持为放已废弃功能用）。实际的 pilot 模板变成"`git mv` 到 `<name>/cog.py` + 补 `__init__.py`（+ 可能 views.py） + 编辑 main.py"三步即可。
+- `bot/cogs/games/__init__.py` 留空（0 字节）。PLAN §P1-3b 写"可选 games/_lib.py / games/common.py——当有第 3 个游戏、且出现可共享代码时再建"，本轮完全遵守，不预建空常量模块。
+
+**顺手做的轻量清理**（夹在 rename commit 里）：
+
+| cog | 清理内容 |
+|---|---|
+| 全部 8 | 删 stale `# bot/cogs/<name>_cog.py` 文件头注释 |
+| game_dnd | 删 dead `from ..utils import config` import（无调用点） |
+| game_spymode | `from ..utils.i18n` → `from bot.utils.i18n`（深一层后相对 import 路径变了，顺带规范成绝对） |
+| welcome | import 按 PEP 8 重排：stdlib / 3rd-party / local |
+| notebook | import 按 PEP 8 重排 |
+| create_invitation | 删 dead `import datetime`（无调用点） |
+
+**非 Tier 1 范围但被路过看到的已知 follow-up**（不在本档修）：
+
+- `bot/cogs/voice_channel_cog.py:459` comment "`# 获取create_invitation_cog的配置`" —— voice_channel 还没包化，该注释里的模块名引用是 Tier 2 会一并 revise 的 stale。留 Tier 2 一并看。
+- `REFACTORING_TEST_CHECKLIST.md` 未更新（仍引用老文件名）—— 测试清单同文档 scope，用户跑测试时自行 refactor。
+- `bot/cogs/__init__.py` 未新增 re-export —— 本档 COG_SPECS 是 string-based `module_path`，`__init__` 不需要 re-export；维持与 P1-3 三 pilot 相同 convention。
+
+**验证**（每个 pilot 跑一次）：
+
+- `python3 -m py_compile bot/cogs/<name>/*.py bot/main.py`：全部 ✅
+- `/tmp/yaml-venv/bin/python tools/check_locales.py`：556 t() + 170 locale_str 持续全 resolve ✅（Tier 1 没新增或删除 locale key，纯搬运）
+- stub-based runtime import smoke：每个新包的 class `__module__` 对 `bot.cogs.<name>.cog` 或 `bot.cogs.<name>.views` ✅
+
+**未做（测试服用户自行验证）**：
+
+- 8 个 cog 的功能金路径：backup_now、teamup_init、dnd_roll、spymode（流程）、on_member_join（触发 WelcomeDMView）、notebook_log / notebook_member / notebook_all / notebook_delete、check_log / check_voice_status / where_is、触发 TeamInvitationView 的 keyword 匹配 + room_full button。
+- 冷启启动日志中 "Loaded 16 cogs: …" 包含全部 16 个 feature。
+- 所有 persistent view 的 custom_id 无 regression（只有 create_invitation 的 `"room_full_button"` 是字符串字面量，不受 rename 影响）。
+
 ## P1-8 审核补遗（2026-04-24，第 11 轮审核）
 
 三条 hygiene pass，详见 PLAN §P1-8。按 "影响半径 × 代码量" 从小到大收尾。
@@ -1091,26 +1158,26 @@ python tools/seed_db.py            # channel_configs + ticket_types 灌 DB
 
 ### 路 A（推荐，2026-04-24 后续）：P1-3b 全量 cog 包化 + games 聚合
 
-**当前 `bot/cogs/` 清单**（2026-04-24 盘点）：
+**当前 `bot/cogs/` 清单**（2026-04-24 晚 Tier 1 收官后盘点）：
 
-| cog | 行数 | 类数 | 建议骨架 | 风险点 |
-|---|---:|---:|---|---|
-| tickets_new | 1910 | — | ✅ 已完成 | (P1-3c 中会改名为 tickets) |
-| privateroom | 1662 | — | ✅ 已完成 | — |
-| ban | 1418 | — | ✅ 已完成 | — |
-| role_cog | 1151 | 7 (4V+1M+1Cog) | 完整包 | — |
-| shop_cog | 1101 | 5 (2V+2M+1Cog) | 完整包 | **有 `bot.add_view` persistent view** (L647) |
-| giveaway_cog | 1062 | 5 (2V+1CV+1M+1Cog) | 完整包 | — |
-| voice_channel_cog | 1018 | 5 (3V+1M+1Cog) | 完整包 | — |
-| achievement_cog | 928 | 6 (5V+1Cog) | 标准包 | — |
-| create_invitation_cog | 638 | 3 (2V+1Cog) | 标准包 | — |
-| teamup_display_cog | 472 | 1 (Cog) | 最小包 | 无 UI |
-| check_status_cog | 465 | 2 (1V+1Cog) | 标准包 | Context Menu name 本地化遗留 |
-| game_spymode_cog | 323 | 5 (3Btn+1V+1Cog) | **games/spymode/** | — |
-| notebook_cog | 311 | 3 (2V+1Cog) | 标准包 | — |
-| welcome_cog | 285 | 2 (1V+1Cog) | 标准包 | — |
-| game_dnd_cog | 106 | 1 (Cog) | **games/dnd/**（最小包） | — |
-| backup_cog | 81 | 1 (Cog) | 最小包 | — |
+| cog | 行数 | 类数 | 建议骨架 | 风险点 | 状态 |
+|---|---:|---:|---|---|---|
+| tickets | 1910 | — | ✅ 已完成（P1-3 pilot + P1-3c rename） | — | ✅ |
+| privateroom | 1662 | — | ✅ 已完成（P1-3 pilot） | — | ✅ |
+| ban | 1418 | — | ✅ 已完成（P1-3 pilot） | — | ✅ |
+| role_cog | 1151 | 7 (4V+1M+1Cog) | 完整包 | — | ⬜ Tier 3 |
+| shop_cog | 1101 | 5 (2V+2M+1Cog) | 完整包 | **有 `bot.add_view` persistent view** (L647) | ⬜ Tier 3 |
+| giveaway_cog | 1062 | 5 (2V+1CV+1M+1Cog) | 完整包 | — | ⬜ Tier 2 |
+| voice_channel_cog | 1018 | 5 (3V+1M+1Cog) | 完整包 | — | ⬜ Tier 2 |
+| achievement_cog | 928 | 6 (5V+1Cog) | 标准包 | — | ⬜ Tier 2 |
+| create_invitation | 638 | 3 (2V+1Cog) | ✅ 标准包（Tier 1 `332e7e7`） | — | ✅ |
+| teamup_display | 472 | 1 (Cog) | ✅ 最小包（Tier 1 `a7ba9a3` + follow-up `27e7e68`） | — | ✅ |
+| check_status | 465 | 2 (1V+1Cog) | ✅ 标准包（Tier 1 `d026b34`） | — | ✅ |
+| games/spymode | 323 | 5 (3Btn+1V+1Cog) | ✅ **games/spymode/**（Tier 1 `eafc81f`） | — | ✅ |
+| notebook | 311 | 3 (2V+1Cog) | ✅ 标准包（Tier 1 `0891d89`） | — | ✅ |
+| welcome | 285 | 2 (1V+1Cog) | ✅ 标准包（Tier 1 `a5afa80`） | — | ✅ |
+| games/dnd | 106 | 1 (Cog) | ✅ **games/dnd/**（Tier 1 `b8578b4`） | — | ✅ |
+| backup | 81 | 1 (Cog) | ✅ 最小包（Tier 1 `4ca13d1`） | — | ✅ |
 
 **骨架三档**（详见 PLAN §P1-3b）：
 - **最小包**（`__init__ + cog.py`）：纯 Cog、无 UI。
@@ -1121,14 +1188,14 @@ python tools/seed_db.py            # channel_configs + ticket_types 灌 DB
 
 **建议执行顺序**（可分档收尾，不强求一次全做）：
 
-| 档 | 任务 | 预估 commit 数 | 预估时长 |
-|---|---|---:|---|
-| 1（热身 + games 定型） | backup → teamup_display → game_dnd→games/dnd → game_spymode→games/spymode → welcome → notebook → check_status → create_invitation | 8-10 | 3-4 小时 |
-| 2（中型 UI） | achievement → voice_channel → giveaway | 3-4 | 2-3 小时 |
-| 3（大 + persistent view） | shop（persistent view！）→ role | 2-3 | 2 小时 |
-| 收尾 | PROGRESS update + 可选 service 横扫评估 | 1-2 | 1 小时 |
+| 档 | 任务 | 预估 commit 数 | 实际 | 状态 |
+|---|---|---:|---:|---|
+| 1（热身 + games 定型） | backup → teamup_display → game_dnd→games/dnd → game_spymode→games/spymode → welcome → notebook → check_status → create_invitation | 8-10 | 9（8 planned + 1 follow-up） | ✅ 2026-04-24 |
+| 2（中型 UI） | achievement → voice_channel → giveaway | 3-4 | — | ⬜ |
+| 3（大 + persistent view） | shop（persistent view！）→ role | 2-3 | — | ⬜ |
+| 收尾 | PROGRESS update + 可选 service 横扫评估 | 1-2 | — | ⬜ |
 
-第一档强烈建议一次做完 —— 包括 `games/` 目录的骨架定型，这样第二档开始前"所有 cog 布局收敛"的节点已到。
+第一档已收官 —— `games/` 目录骨架定型完成（empty `__init__.py` 占位，按 PLAN 不预建 `_lib.py` / `common.py`）。Tier 2 可以开工，"所有 cog 布局收敛"的节点就等 Tier 2 + Tier 3 共 5 个大 cog。
 
 **每棒 pilot 模板**（复制照抄）：
 
@@ -1214,10 +1281,11 @@ P1-3 拆包完 ✅，P1-3c rename 也完成（2026-04-24）。建议**先做完 
 6. `ls bot/cogs/`（看当前 cog 布局）
 7. 决定路径：
    - **P1-8 hygiene pass 已全收官**（2026-04-24）：P1-8c ✅（`044b17c`）/ P1-8b ✅（`fc77465`）/ P1-8a ✅（`c62bb23`）；不必再展开 PLAN §P1-8，历史追溯才需要
-   - **P1-3c 已收官**（2026-04-24）：`6f41b63` / `afd3aff` + docs commit。详见本文件 §P1-3c。
-   - **下一棒推荐**：§P1-3b 第一档（8 个小 cog + games/ 定型）
+   - **P1-3c 已收官**（2026-04-24）：`6f41b63` / `afd3aff` + 2 docs commit。详见本文件 §P1-3c。
+   - **P1-3b 第一档已收官**（2026-04-24 晚）：8 cog + `games/` 骨架，9 commit（含 1 follow-up）。详见本文件 §P1-3b 第一档。
+   - **下一棒推荐**：§P1-3b 第二档（achievement → voice_channel → giveaway，3-4 commit）
 
-用户只说"继续"的话，默认接 **§P1-3b 第一档**（8 个小/中 cog 包化 + games/ 目录定型，8-10 commit）；说具体任务名则照做。
+用户只说"继续"的话，默认接 **§P1-3b 第二档**（achievement → voice_channel → giveaway 3 个中/大 cog 包化，3-4 commit；voice_channel 和 giveaway 是 P0-3d/P0-1 迁 manager 的老大家，迁 cog_load 已完成，拆包是纯 UI 层整理）；说具体任务名则照做。
 
 ### 本次 session 补充（2026-04-24 P1-8 hygiene pass 收官 session）
 
@@ -1263,3 +1331,41 @@ P1-3 拆包完 ✅，P1-3c rename 也完成（2026-04-24）。建议**先做完 
 **规划偏差（已在文档内嵌 errata）**：
 - PLAN §P1-3c "DB 表名已经是干净的（ticket_types）" 不准确 —— 实际有三张老表 `tickets_new` / `ticket_new_members` / `ticket_new_config`。实施时做决策表选方案 A（保留表名、只改代码层），避免扩大到 schema migration。
 - README.md 里发现 4 处早已存在的 slash 命令名误写（`/tickets_new_stats` 等——实际命令名从未带 `_new`）。P1-3c 顺手修，归属 README 自身历史文档 bug，不在原 PLAN 清单里。
+
+### P1-3b 第一档 session 补充（2026-04-24 晚 Tier 1 收官）
+
+**本轮 session**（10 commit：9 功能 + 1 docs）：
+
+| # | Commit | 类型 | 内容 |
+|---:|---|---|---|
+| 1 | `4ca13d1` | refactor | backup 最小包（81 行） |
+| 2 | `a7ba9a3` | refactor | teamup_display 最小包（472 行） —— 初版 header/`setup()` drop 声称但漏 add |
+| 3 | `27e7e68` | refactor | **P1-3b follow-up**：补齐 teamup_display 的 header/setup drop |
+| 4 | `b8578b4` | refactor | game_dnd → `games/dnd/`（106 行）+ 建 `games/` 空目录 |
+| 5 | `eafc81f` | refactor | game_spymode → `games/spymode/`（323 行，标准包） |
+| 6 | `a5afa80` | refactor | welcome 标准包（285 行） |
+| 7 | `0891d89` | refactor | notebook 标准包（311 行） |
+| 8 | `d026b34` | refactor | check_status 标准包（465 行） |
+| 9 | `332e7e7` | refactor | create_invitation 标准包（638 行） |
+| 10 | 本 commit | docs | PROGRESS + PLAN 更新（Tier 1 ✅，handoff 指 Tier 2） |
+
+**规划偏差 / session-level 教训**：
+
+- PLAN §P1-3b 第一档原估 5-8 commit，实际 9 commit（多 1 是 teamup_display follow-up，从 "git mv 后首次 Edit 目标文件前要先 Read" 的流程 slip 里产生）。
+- PLAN §P1-3b 的 pilot 模板里 step 4 写"`git mv` 旧文件到 `old_function/cogs/<name>_cog_pre_split.py`"——本档 **不**按此执行。前三个 P1-3 pilot（tickets_new / privateroom / ban）因体量大才做了 pre_split 归档；Tier 1 这 8 个都是 ≤638 行的小/中 cog，git history 本身就能提供历史恢复路径，额外 `pre_split` 副本只会让 `old_function/` 变成杂物间。**Tier 2 / Tier 3 按 cog 体量决定是否归档**。
+- `bot/cogs/games/__init__.py` 留空（0 字节），按 PLAN 要求。
+
+**顺手清的轻量代码卫生**（混在 rename commit 里，commit message 都点名）：
+
+- 全部 8 个 cog：删 stale `# bot/cogs/<name>_cog.py` header 注释
+- game_dnd：删 dead `from ..utils import config` import
+- game_spymode：`from ..utils.i18n` → `from bot.utils.i18n`（深一层绝对路径）
+- welcome / notebook：import PEP 8 重排
+- create_invitation：删 dead `import datetime`
+
+**顺手纠正的非 Tier 1 范围观察**（不在本档修，给 Tier 2 准备）：
+
+- `bot/cogs/voice_channel_cog.py:459` 注释 `# 获取create_invitation_cog的配置` 引用旧文件名 —— voice_channel 还没包化，Tier 2 一并 revise。
+- `REFACTORING_TEST_CHECKLIST.md` 未更新（未被 Tier 1 扫到）。
+
+**下一棒建议**：§P1-3b 第二档（achievement → voice_channel → giveaway）。voice_channel 迁 DB 已做（P0-3d），giveaway 建表迁 cog_load 已做（P1-8b），两家拆包都是纯 UI 层整理；achievement 是单 cog 5-View 的经典标准包，风险低。

@@ -203,15 +203,15 @@ bot/cogs/
 
 按"收益 / 风险"分三档，每档独立收尾（每档可以一次 PR / 一组 commit），**不强求一次全做完**：
 
-**第一档：小 cog + games（低风险、快速）** — 5-8 个 commit
-1. backup（81 行，最小包）—— 热身
-2. teamup_display（472 行，1 Cog，最小包）
-3. game_dnd → games/dnd/（106 行，最小包，但顺带建 games/ 目录）
-4. game_spymode → games/spymode/（323 行，标准包）
-5. welcome（285 行，标准包）
-6. notebook（311 行，标准包）
-7. check_status（465 行，标准包）
-8. create_invitation（638 行，标准包）
+**第一档：小 cog + games（低风险、快速）** — ✅ 2026-04-24（9 commit：8 planned + 1 follow-up）
+1. ✅ backup（81 行，最小包）—— 热身（`4ca13d1`）
+2. ✅ teamup_display（472 行，1 Cog，最小包）（`a7ba9a3` + follow-up `27e7e68`；初版 commit 描述声称 drop 了 header + `setup()` 但实际编辑在 `git add` 之后才落地，follow-up 真正补齐）
+3. ✅ game_dnd → games/dnd/（106 行，最小包，建 `games/` 目录 + 丢 dead `from ..utils import config` import）（`b8578b4`）
+4. ✅ game_spymode → games/spymode/（323 行，标准包）（`eafc81f`）
+5. ✅ welcome（285 行，标准包，顺手 PEP 8 import 重排）（`a5afa80`）
+6. ✅ notebook（311 行，标准包，2 View，同名 `ConfirmationView` 不与 achievement 冲突因为不同模块）（`0891d89`）
+7. ✅ check_status（465 行，标准包，where_is 右键菜单随 cog 在 `cog_load` 注册/卸载）（`d026b34`）
+8. ✅ create_invitation（638 行，标准包，`TeamInvitationView.room_full_button_callback` 通过 `bot.get_cog('CreateInvitationCog')` 回 cog 的调用链跨模块继续工作）（`332e7e7`）
 
 **第二档：中型 cog（UI 层明显）** — 3 个 commit
 9. achievement（928 行，5 View，标准包）
