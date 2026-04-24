@@ -61,7 +61,7 @@
 | P1 | P1-3b 全量 cog 包化 + games 聚合 | ⬜ | 扩展 P1-3 到剩下 13 个 cog；games/ 聚合目录；PLAN §P1-3b |
 | P1 | P1-3c tickets_new → tickets 历史命名清理 | ⬜ | 374 处 grep 命中；迁移脚本要加 LEGACY_NAME_MAP；PLAN §P1-3c |
 | P1 | P1-8a tickets_new ticket-type CRUD 返回值校验 | ⬜ | 第 11 轮审核；modals.py:361/392、views.py:329 漏检 `False`；PLAN §P1-8a |
-| P1 | P1-8b giveaway initialize_database 迁 cog_load | ⬜ | 第 11 轮审核；P1-2 收尾；on_ready vs task 启动竞态；PLAN §P1-8b |
+| P1 | P1-8b giveaway initialize_database 迁 cog_load | ✅ | cog_load 先建表后 start task；on_ready 只留 load_giveaways |
 | P1 | P1-8c feature flag 类型校验提示 / 行为对齐 | ✅ | `is_feature_enabled` 非 bool 改返 False，和 schema warning 对齐 |
 | P2 | P2-1 数据库连接复用 | ⬜ | 需 close() 生命周期前置 |
 | P2 | P2-2 Schema 迁移机制 | ⬜ | |
@@ -875,6 +875,29 @@ C. str "false" / "true" / int 1 / None          → 一律 False（不再回 def
 
 **顺手发现（未做）**：`config_schema.py:134` 的 warning 文案提 "got `<type>`"，不带 key 原值。如果用户真误写，日志里看到 `got str` 但不知道是 `"false"` / `"yes"` / `"1"`，排障得去翻 yaml —— 留作 P3-5 加 ruff 时顺手改。
 
+### P1-8b ✅ giveaway initialize_database 迁 cog_load（2026-04-24）
+
+**Commit grep**: `git log --grep='(P1-8b)'`
+
+**问题**：`giveaway_cog.__init__:438` 启动 `check_giveaways.start()`；`on_ready:1061` 才 `await self.db.initialize_database()`。READY 触发后两个协程并发放行，Python 不保证顺序——首 tick 若先于建表到达，SELECT/INSERT 直接 `sqlite3.OperationalError: no such table: giveaway`（表名单数，见 `giveaway_db.py:27`），被 `check_giveaways` 的 `except Exception` 静默吞为一行 log。
+
+**做法**（对齐 `check_status` / `voice_channel` / `ban`（P1-2）的 `cog_load` 模式）：
+
+| 位置 | 动作 |
+|---|---|
+| `giveaway_cog.py:437` | 新增 `async def cog_load(self)`: 先 `await self.db.initialize_database()`、再 `self.check_giveaways.start()` |
+| `giveaway_cog.py:438`（原 `self.check_giveaways.start()`） | 删，迁到 `cog_load` |
+| `giveaway_cog.py:1061`（原 on_ready `await self.db.initialize_database()`） | 删；保留 `await self.load_giveaways()`（guild cache 需 READY 后才稳） |
+
+**cog_unload 缺失**（独立 latent leak，不扩大 scope）：
+- `giveaway_cog` 原本**没有** `cog_unload`（与 `ban` P1-2 对齐后有所不同）；task 在 cog reload 时不会被 cancel。
+- 当前部署无 reload 命令 / hot-reload 路径，风险只在开发期；记为 follow-up。
+
+**验证**：
+- `python3 -m py_compile` 通过
+- `grep` 验收：`cog_load` 在 437、`on_ready` 在 1061、`__init__` 再无 `check_giveaways.start`、`on_ready` 再无 `initialize_database`
+- **未做（测试服）**：`rm bot.db` 冷启，首次 `check_giveaways` tick 日志无 `no such table` / `OperationalError`
+
 ### 剩余工作（跨会话接手）
 
 Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅；P1-4 dataclass schema + 静态 key 对齐 ✅；**P1-3 大 cog 拆包三 pilot 全 ✅**（tickets_new 2666 → 1910 行 + privateroom 1993 → 1655 行 + ban 1430 → 1418 行；主 cog 都缩减或至少 UI 层隔离到包子模块）。
@@ -934,10 +957,10 @@ python tools/seed_db.py            # channel_configs + ticket_types 灌 DB
 | 条目 | 位置 | 归属原 P | 严重度 | 状态 |
 |---|---|---|---|---|
 | P1-8a tickets_new ticket-type CRUD 未校验 DB 返回值 | `bot/cogs/tickets_new/modals.py:361/392`、`views.py:329` | P1-3 pilot + P2-5 未对齐 | 中（用户错觉成功） | ⬜ |
-| P1-8b giveaway `initialize_database` 迁 `cog_load` | `bot/cogs/giveaway_cog.py:438/558/1061` | P0-1 + P1-2 未收尾 | 中（启动期竞态，冷启可能炸） | ⬜ |
+| P1-8b giveaway `initialize_database` 迁 `cog_load` | `bot/cogs/giveaway_cog.py:438/558/1061` | P0-1 + P1-2 未收尾 | 中（启动期竞态，冷启可能炸） | ✅ `fc77465` |
 | P1-8c feature flag 类型校验提示 / 行为对齐 | `bot/utils/config_schema.py:132` vs `bot/utils/config.py:112` | P1-4 未对齐 | 低到中（静默启用误配的 cog） | ✅ `044b17c` |
 
-**执行顺序**：P1-8c（done）→ P1-8b（giveaway 单文件）→ P1-8a（三处 UX + locale，和 P1-3c sed 配合）。详见 PLAN §P1-8。
+**执行顺序**：P1-8c（done）→ P1-8b（done）→ P1-8a（三处 UX + locale，和 P1-3c sed 配合）。详见 PLAN §P1-8。
 
 `service.py` 抽离决定**后置** —— 包化完成后每家都有标准骨架，此时再横向评估 service 候选（本次 session 没动的原因：和三家保守 pilot 一致性更重要；全量包化后评估成本更低）。
 
@@ -1066,10 +1089,10 @@ P1-3 拆包完 ✅，现在技术上可以动 DB 层。但考虑用户决定 P1-
 6. `git log --grep='(P1-3 pilot)' --stat`（三 pilot 的 commit 粒度 / 增删量）
 7. `ls bot/cogs/`（看当前 cog 布局）
 8. 决定路径：
-   - **当前进行中**：P1-8 hygiene pass — P1-8c ✅（`044b17c`）/ P1-8b ⬜ / P1-8a ⬜ → 完再走 §P1-3c rename → §P1-3b 第一档
+   - **当前进行中**：P1-8 hygiene pass — P1-8c ✅（`044b17c`）/ P1-8b ✅（`fc77465`）/ P1-8a ⬜ → 完再走 §P1-3c rename → §P1-3b 第一档
    - 或按原计划：先 §P1-3c → §P1-3b 第一档，P1-8 并行穿插
 
-用户只说"继续"的话，默认接 **P1-8b**（giveaway 单文件；P1-8c 已完成）；说具体任务名则照做。
+用户只说"继续"的话，默认接 **P1-8a**（tickets_new 三处 CRUD 返回值校验 + failure locale key）；说具体任务名则照做。
 
 ### 本次 session 补充（2026-04-24 后续规划 commit）
 
