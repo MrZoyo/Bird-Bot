@@ -110,10 +110,13 @@ class Config:
         return features if isinstance(features, dict) else {}
 
     def is_feature_enabled(self, feature_name: str, default: bool = True) -> bool:
-        feature_value = self.get_feature_flags().get(feature_name, default)
-        if isinstance(feature_value, bool):
-            return feature_value
-        return default
+        features = self.get_feature_flags()
+        if feature_name not in features:
+            return default
+        value = features[feature_name]
+        if isinstance(value, bool):
+            return value
+        return False
 
     def reload_all(self) -> None:
         for config_name in list(self._configs.keys()):
