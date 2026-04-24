@@ -111,7 +111,7 @@ COG_SPECS = [
     {
         "feature": "ban",
         "cog_name": "BanCog",
-        "module_path": "bot.cogs.ban_cog",
+        "module_path": "bot.cogs.ban",
         "class_name": "BanCog",
         "required_configs": ["ban"],
     },
