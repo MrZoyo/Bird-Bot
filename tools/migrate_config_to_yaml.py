@@ -39,6 +39,14 @@ CLASSIFY_FILE = REPO_ROOT / 'tools' / 'field_classification.yaml'
 SEED_FILE = REPO_ROOT / 'tools' / 'migration_db_seed.json'
 REPORT_FILE = REPO_ROOT / 'tools' / 'migration_report.md'
 
+# V1.x → V2.x cog renames. Legacy source filenames stay as-is on the
+# operator's box (`config_tickets_new.json`); the script maps the derived
+# name to the new target so the output lands at `bot/config/tickets.yaml`
+# + `bot/locales/zh_CN/tickets.yaml` + the `tickets` key in the seed.
+LEGACY_NAME_MAP = {
+    'tickets_new': 'tickets',
+}
+
 # Keys whose values are Discord IDs / lists of IDs. Matched via substring
 # so `ban_notification_channel_id` / `ticket_channel_id` / `main_guild_id`
 # etc. fall under the `_id` bucket automatically. The bare names
@@ -386,8 +394,15 @@ def main() -> int:
 
     json_files = sorted(CONFIG_DIR.glob('config_*.json'))
     if args.only:
-        wanted = set(args.only)
-        json_files = [p for p in json_files if p.stem.removeprefix('config_') in wanted]
+        # Accept both the legacy source name and the post-rename target.
+        wanted = {LEGACY_NAME_MAP.get(n, n) for n in args.only}
+        json_files = [
+            p for p in json_files
+            if LEGACY_NAME_MAP.get(
+                p.stem.removeprefix('config_'),
+                p.stem.removeprefix('config_'),
+            ) in wanted
+        ]
         if not json_files:
             print(f"No matching configs for --only {sorted(wanted)}", file=sys.stderr)
             return 1
@@ -397,14 +412,16 @@ def main() -> int:
         return 1
 
     for json_path in json_files:
-        cog_name = json_path.stem.removeprefix('config_')
+        source_name = json_path.stem.removeprefix('config_')
+        cog_name = LEGACY_NAME_MAP.get(source_name, source_name)
         try:
             summary[cog_name] = migrate_cog(
                 cog_name, json_path, classification, seed, report_rows,
             )
-            print(f"  migrated {cog_name} ({summary[cog_name]})")
+            label = cog_name if source_name == cog_name else f"{source_name}→{cog_name}"
+            print(f"  migrated {label} ({summary[cog_name]})")
         except Exception as exc:  # noqa: BLE001 - one-shot tool, want a readable trace
-            print(f"  FAILED {cog_name}: {exc}", file=sys.stderr)
+            print(f"  FAILED {source_name}: {exc}", file=sys.stderr)
             raise
 
     if seed:

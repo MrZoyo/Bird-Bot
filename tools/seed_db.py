@@ -37,6 +37,13 @@ from typing import Any, Dict
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SEED_FILE = REPO_ROOT / 'tools' / 'migration_db_seed.json'
 
+# V1.x → V2.x cog renames. If an operator ran an older migrate script
+# (or hand-crafted a seed file) keyed under the legacy `tickets_new`
+# name, route it through the post-rename handler.
+LEGACY_NAME_MAP = {
+    'tickets_new': 'tickets',
+}
+
 # Import via the repo so we pick up the same DB managers the bot uses.
 sys.path.insert(0, str(REPO_ROOT))
 
@@ -107,18 +114,20 @@ async def run() -> int:
     }
 
     total = 0
-    for cog_name, payload in seed.items():
+    for source_name, payload in seed.items():
+        cog_name = LEGACY_NAME_MAP.get(source_name, source_name)
         handler = seed_handlers.get(cog_name)
         if handler is None:
             print(
-                f"Warning: no seed handler for '{cog_name}' "
+                f"Warning: no seed handler for '{source_name}' "
                 f"(keys={list(payload.keys())}); skipped.",
                 file=sys.stderr,
             )
             continue
         count = await handler(db_path, payload)
         total += count
-        print(f"  seeded {cog_name}: {count} row(s)")
+        label = cog_name if source_name == cog_name else f"{source_name}→{cog_name}"
+        print(f"  seeded {label}: {count} row(s)")
 
     print(f"Seeded {total} row(s) across {len(seed_handlers)} handler(s).")
     return 0
