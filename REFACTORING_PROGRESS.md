@@ -58,6 +58,8 @@
 | P1+P2 | 配置系统 2.0（P1-6 + P1-4 + P2-3 + P2-5） | ✅ | step 0-9 全部完成（P1-4 最小版；pydantic 全量留 follow-up） |
 | P1 | P1-7 Slash 元数据本地化 | ✅ | SlashTranslator + 176 key commands.yaml |
 | P1 | P1-3 大 cog 拆包 | ✅ | tickets_new + privateroom + ban 三 pilot 全 ✅；service.py 统一评估留 follow-up |
+| P1 | P1-3b 全量 cog 包化 + games 聚合 | ⬜ | 扩展 P1-3 到剩下 13 个 cog；games/ 聚合目录；PLAN §P1-3b |
+| P1 | P1-3c tickets_new → tickets 历史命名清理 | ⬜ | 374 处 grep 命中；迁移脚本要加 LEGACY_NAME_MAP；PLAN §P1-3c |
 | P2 | P2-1 数据库连接复用 | ⬜ | 需 close() 生命周期前置 |
 | P2 | P2-2 Schema 迁移机制 | ⬜ | |
 | P3 | P3-1 依赖管理统一 | ⬜ | |
@@ -832,18 +834,26 @@ description=locale_str(
 
 ### 剩余工作（跨会话接手）
 
-Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅；P1-4 dataclass schema + 静态 key 对齐 ✅；**P1-3 大 cog 拆包三 pilot 全 ✅**（tickets_new 2666 → 1910 行 + privateroom 1993 → 1655 行 + ban 1430 → 1418 行；主 cog 都缩减或至少 UI 层隔离到包子模块）。下一轮可接手的 follow-up：
+Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅；P1-4 dataclass schema + 静态 key 对齐 ✅；**P1-3 大 cog 拆包三 pilot 全 ✅**（tickets_new 2666 → 1910 行 + privateroom 1993 → 1655 行 + ban 1430 → 1418 行；主 cog 都缩减或至少 UI 层隔离到包子模块）。
 
-**🟡 important**：
-1. per-cog 配置 schema（shop / ban / tickets_new / voicechannel / privateroom 等）：`bot/utils/config_schema.py` 里 dataclass 形状锁死，让 `admin_roles: List[int]` / `ticket_types: Dict[str, TicketType]` 等固定 shape 字段不会静默腐烂。前提是 P1-4 的 _verify_main_config 最小版已在，所以扩展点清楚。
+**2026-04-24 后续规划**（用户决定）：P1-3 扩展为 **§P1-3b 全量 cog 包化 + games 聚合** + **§P1-3c tickets_new → tickets rename**（见 PLAN 对应章节）。service.py 抽离后置，等全量包化完成后再横扫评估。
 
-**🟢 nice-to-have**：
-1. **service.py 统一抽离**（三家一起做）：tickets_new / privateroom / ban 三 pilot 都保守没抽 service.py，留下三套 task loop + embed builder + permission check / duration parse 等。统一一轮抽出来，每家建 `service.py`：
-   - **tickets_new**: `is_admin_for_type` / admin CRUD / `format_admin_list` / `add_admins_to_ticket` 等 10 个方法 ~500-700 行
+下一轮可接手的 follow-up：
+
+**🟡 important**（全量包化序列）：
+1. **P1-3c**（先做）：`tickets_new → tickets` 历史命名清理，374 处 grep 命中，3 commit；详见 PLAN §P1-3c + 本文件底部 handoff。迁移脚本需要加 `LEGACY_NAME_MAP` 兼容老源头。
+2. **P1-3b 第一档**：backup / teamup_display / game_dnd / game_spymode / welcome / notebook / check_status / create_invitation 共 8 个 cog，全部是小/中 cog，骨架以最小包 + 标准包为主；games/ 目录在 game_dnd 那棒定型。
+3. **P1-3b 第二档**：achievement / voice_channel / giveaway 三个中大 cog。
+4. **P1-3b 第三档**：shop（**注意 persistent view**）+ role。
+5. per-cog 配置 schema（shop / ban / tickets / voicechannel / privateroom 等）：`bot/utils/config_schema.py` 里 dataclass 形状锁死，让 `admin_roles: List[int]` / `ticket_types: Dict[str, TicketType]` 等固定 shape 字段不会静默腐烂。可以在 P1-3b 对应包化 pilot 里一并加（顺水推舟），也可以最后统一做。
+
+**🟢 nice-to-have**（P1-3b 后横扫）：
+1. **service.py 统一抽离**（P1-3b 完成后评估）：所有 cog 都在标准包骨架下后，横扫哪些 cog 的 service 候选足够厚值得抽。三家已 pilot 的候选清单：
+   - **tickets_new/tickets**: `is_admin_for_type` / admin CRUD / `format_admin_list` / `add_admins_to_ticket` 等 10 个方法 ~500-700 行
    - **privateroom**: `calculate_discount` / `get_last_month_voice_hours` / `is_booster` / `check_and_send_renewal_reminders` + shop/renewal embed builder ~300 行
    - **ban**: `parse_duration` / `has_ban_permission` / `is_admin_channel_only_check` / `recover_tempbans` + `build_*_notification_embed` 等 ~370 行（详细清单见 P1-3 ban 那一节）
-   - 需要前置设计：跨 cog 的 state 管理（`self.tempban_tasks` dict / `self.conf` / `self.db` 之类）是每类 service 静态方法 + 参数注入，还是每家一个 `BanService(bot, db, config)` instance？先拿 ban 当 probe 试一个方向，另外两家照抄。
-2. P3-5 ruff（锁 P0-4 成果 + 未来裸 except 防线；也可以加 E722 以外的规则如 F401 unused imports、B904 raise from）。
+   - state 管理前置设计：静态方法 + 参数注入 vs 每家一个 `BanService(bot, db, config)` instance —— 先拿一家当 probe，确认模式后扫全量。
+2. P3-5 ruff（锁 P0-4 成果 + 未来裸 except 防线；也可以加 E722 以外的规则如 F401 unused imports、B904 raise from）。**时机**：P1-3b 完成后加 ruff，否则 rules 同时覆盖 `*_cog.py` 和 `<name>/cog.py` 两种布局会出无用 noise。
 3. P1-7 后续：`check_status.where_is_menu` 的 ContextMenu `name='Where Is'` 目前硬编码英文；Discord `ContextMenu.name` 不走 Translator 链，想本地化需要构造时手写 `name_localizations={Locale.chinese: '...'}` dict（与 slash name 的 ASCII 约束不同，Context Menu name 允许中文）。
 4. 各 pilot 留下的 i18n 漏网之鱼统一扫一遍（privateroom 里 5-6 条 + ban 里 ~10 条中文字面量；都是拆包前就存在，未扩大 scope）。做 P1-7 续篇时一并迁。
 5. `tickets_new_cog.py` 原先有 `import aiosqlite` 的死 import（Explore 在 P0-1 阶段就标记过，P1-3 tickets_new pilot 已顺手删）。ban / privateroom 没这个问题，不需要。
@@ -874,43 +884,142 @@ python tools/seed_db.py            # channel_configs + ticket_types 灌 DB
 
 ### 下一个可接手的任务（压缩 context / 新 session 直接看这里）
 
-**推荐（两条路，二选一）**：
+**最新方向**（2026-04-24 用户明确）：P1-3 三 pilot 已证明包化路径可行，用户决定把 **P1-3 的范围扩展到全量 cog**（让 `bot/cogs/` 下只剩包目录、不再有平面 `*_cog.py`），并**把 2 个游戏 cog 聚合到 `bot/cogs/games/`**，为未来加新游戏留扩展点。相关详细计划见 **REFACTORING_PLAN.md §P1-3b**。同时规划了 **§P1-3c**：把 `tickets_new` 这个 V1.6.5b 遗留命名清掉、改回 `tickets`，但迁移脚本要保留 `tickets_new → tickets` 的名字映射以兼容老部署的 `config_tickets_new.json` 源头。
+
+`service.py` 抽离决定**后置** —— 包化完成后每家都有标准骨架，此时再横向评估 service 候选（本次 session 没动的原因：和三家保守 pilot 一致性更重要；全量包化后评估成本更低）。
 
 ---
 
-### 路 A：P2-1 数据库连接复用（PLAN §P2-1）
+### 路 A（推荐，2026-04-24 后续）：P1-3b 全量 cog 包化 + games 聚合
 
-P1-3 拆包全 ✅，现在可以动 DB 层了（PLAN 明说 P1-3 之后再做 P2-1/P2-2）。
+**当前 `bot/cogs/` 清单**（2026-04-24 盘点）：
 
-**目标**：把每家 db manager 的 "每次 `aiosqlite.connect(path)` 建新连接 → 操作 → close" pattern 统一成**进程级共享连接池 / 单一长连接**。
+| cog | 行数 | 类数 | 建议骨架 | 风险点 |
+|---|---:|---:|---|---|
+| tickets_new | 1910 | — | ✅ 已完成 | (P1-3c 中会改名为 tickets) |
+| privateroom | 1662 | — | ✅ 已完成 | — |
+| ban | 1418 | — | ✅ 已完成 | — |
+| role_cog | 1151 | 7 (4V+1M+1Cog) | 完整包 | — |
+| shop_cog | 1101 | 5 (2V+2M+1Cog) | 完整包 | **有 `bot.add_view` persistent view** (L647) |
+| giveaway_cog | 1062 | 5 (2V+1CV+1M+1Cog) | 完整包 | — |
+| voice_channel_cog | 1018 | 5 (3V+1M+1Cog) | 完整包 | — |
+| achievement_cog | 928 | 6 (5V+1Cog) | 标准包 | — |
+| create_invitation_cog | 638 | 3 (2V+1Cog) | 标准包 | — |
+| teamup_display_cog | 472 | 1 (Cog) | 最小包 | 无 UI |
+| check_status_cog | 465 | 2 (1V+1Cog) | 标准包 | Context Menu name 本地化遗留 |
+| game_spymode_cog | 323 | 5 (3Btn+1V+1Cog) | **games/spymode/** | — |
+| notebook_cog | 311 | 3 (2V+1Cog) | 标准包 | — |
+| welcome_cog | 285 | 2 (1V+1Cog) | 标准包 | — |
+| game_dnd_cog | 106 | 1 (Cog) | **games/dnd/**（最小包） | — |
+| backup_cog | 81 | 1 (Cog) | 最小包 | — |
 
-**风险点**：SQLite 不是多进程/多线程并发友好；aiosqlite 在 WAL + single writer 模式下 OK，但需要统一 `Connection` 生命周期管理（`cog_load`/`cog_unload` 或 bot-level fixture）。现有 10+ 个 `*_db.py` manager 都要改 —— 但因为每家接口已经薄（全 async method），重构是机械的。
+**骨架三档**（详见 PLAN §P1-3b）：
+- **最小包**（`__init__ + cog.py`）：纯 Cog、无 UI。
+- **标准包**（`__init__ + cog + views.py`）：有 View 无 Modal（或 Modal ≤1）。
+- **完整包**（`__init__ + cog + views + modals [+embeds] [+service]`）：UI 层厚。
 
-**Explore 问清这些前置**：aiosqlite journal mode? WAL 已开？busy_timeout? 有没有 backup cog 在连另一个句柄？
+`service.py` 和 `embeds.py` 只在**有内容时才建**，不留空文件。
+
+**建议执行顺序**（可分档收尾，不强求一次全做）：
+
+| 档 | 任务 | 预估 commit 数 | 预估时长 |
+|---|---|---:|---|
+| 1（热身 + games 定型） | backup → teamup_display → game_dnd→games/dnd → game_spymode→games/spymode → welcome → notebook → check_status → create_invitation | 8-10 | 3-4 小时 |
+| 2（中型 UI） | achievement → voice_channel → giveaway | 3-4 | 2-3 小时 |
+| 3（大 + persistent view） | shop（persistent view！）→ role | 2-3 | 2 小时 |
+| 收尾 | PROGRESS update + 可选 service 横扫评估 | 1-2 | 1 小时 |
+
+第一档强烈建议一次做完 —— 包括 `games/` 目录的骨架定型，这样第二档开始前"所有 cog 布局收敛"的节点已到。
+
+**每棒 pilot 模板**（复制照抄）：
+
+```bash
+# 0. Explore agent cross-reference 报告（参考 ban pilot 那次的 prompt 结构），限 500 字
+#    包含：类清单 / 归属 / import 拓扑 / 循环依赖 / persistent view / t import 检查
+#    / slash 命令清单 / 风险点
+
+# 1. 建目录
+mkdir -p bot/cogs/<name>   # 或 bot/cogs/games/<name>
+
+# 2. 写 __init__.py + [views.py] + [modals.py] + [embeds.py] + cog.py
+#    照抄 ban / privateroom / tickets_new 三 pilot 的粒度
+
+# 3. 归档旧文件
+git mv bot/cogs/<name>_cog.py old_function/cogs/<name>_cog_pre_split.py
+# games 两个：
+# git mv bot/cogs/game_dnd_cog.py old_function/cogs/game_dnd_cog_pre_split.py
+# git mv bot/cogs/game_spymode_cog.py old_function/cogs/game_spymode_cog_pre_split.py
+
+# 4. 改 bot/main.py 的 COG_SPECS 对应 module_path
+#    普通：bot.cogs.<name>_cog → bot.cogs.<name>
+#    games: bot.cogs.game_dnd_cog → bot.cogs.games.dnd
+#           bot.cogs.game_spymode_cog → bot.cogs.games.spymode
+
+# 5. 三连验证
+python3 -m py_compile bot/cogs/<path>/*.py bot/main.py
+/tmp/yaml-venv/bin/python tools/check_locales.py
+python3 << 'PY'
+# stub-based import smoke —— 模板参考 ban pilot session 的 Python 片段
+# （也可以去 git log --grep='(P1-3 pilot)' 的 ban commit body 找）
+PY
+
+# 6. commit（两个）
+git commit -m "refactor(<name>): split cog into package (P1-3b)"
+# 如果顺手清了死代码 / latent bug，commit message 里列清单
+```
+
+**Commit 前置警告**：
+- **shop pilot 必须手工验证 persistent view**：`bot/cogs/shop_cog.py:647` 的 `self.bot.add_view(self.checkin_view)` 是 persistent 注册点。检查 CheckinEmbedView 的 `custom_id` 是不是纯字符串字面量（当前是，但必须在 commit 前再 grep 确认）；如果任何 custom_id 含类路径或动态值，迁移后老的 persistent view 记录会失效。
+- **games/ 目录的 `__init__.py`**：建一个空的（或 docstring 说明"游戏 cog 聚合点"）。当前不需要 re-export 任何东西。
+- **COG_SPECS 里的 `feature` / `cog_name` / `required_configs` 不变**，只改 `module_path`（参考三家 pilot 的 commit）。
 
 ---
 
-### 路 B：service.py 三家统一抽离（nice-to-have 升级为本次任务）
+### 路 B（并行/前置，推荐优先做）：P1-3c `tickets_new` → `tickets` rename
 
-P1-3 三 pilot 留下 ~1200-1500 行 service 候选代码（见"🟢 nice-to-have #1"详细清单）。前提是不急着动 DB 层的话。
+**为什么建议先做这个**：P1-3b 里还要做 tickets pilot 之外的 13 个 cog，但是 tickets 本身**已经是包**了，只是名字带 `_new`。先把名字改干净，后续 P1-3b 过程中就不用再顾虑它。
 
-**先拿 ban 当 probe** 做一套模式（静态方法 + 依赖参数注入 vs `BanService(bot, db, conf)` instance），敲定后 tickets_new / privateroom 照抄。
+**374 处 grep 命中**，分布在 11 个文件（`tickets_new` + `TicketsNew` 两种命名）。清单 / 重命名映射 / 迁移脚本兼容方案 **全部在 PLAN §P1-3c**。
 
-**收益可见**：三家 cog.py 合计瘦 ~1200 行，业务逻辑跟 interaction/UI 层分离，未来加单测也容易（纯函数不需要 mock interaction）。
+**关键点**：`tools/migrate_config_to_yaml.py` 和 `tools/seed_db.py` 必须加：
+
+```python
+LEGACY_NAME_MAP = {'tickets_new': 'tickets'}
+cog_name = LEGACY_NAME_MAP.get(cog_name, cog_name)
+```
+
+**3 commit**：
+1. `refactor(tickets_new→tickets): rename package, db manager, configs, locale (P1-3c)`
+2. `chore(migrate): add tickets_new→tickets legacy name mapping (P1-3c)`
+3. `docs: track progress after tickets_new rename (P1-3c)`
 
 ---
 
-### 流程模板（两条路都通用）
+### 路 C（冷板凳）：P2-1 数据库连接复用（PLAN §P2-1）
 
-1. **Explore 先 cross-reference**：拿清楚类 / 方法 / import / state 边界。限 500 字。
-2. 动手 → 每家一 commit（`refactor(<area>): ...`）+ 收尾 docs commit（`docs: track progress after ...`）。
-3. 验证：`py_compile` + stub-based runtime import + `tools/check_locales.py`。
-4. 每个 commit message 带 `(PX-Y)` tag 以便 `git log --grep`。
+P1-3 拆包完 ✅，现在技术上可以动 DB 层。但考虑用户决定 P1-3b 扩展包化，建议**先做完 P1-3b + P1-3c 再回来**动 DB —— 两条路互不冲突，但同时在做容易乱。
 
-**替代**（轻的）：P3-5 ruff —— 加 pyproject `[tool.ruff]` + `E722` 规则锁 P0-4 成果；零代码风险；1-2 小时搞定。
+如果要做：SQLite 连接复用的 Explore 前置参见 PLAN §P2-1。
 
-**新 session 接手流程**：
-1. `cat REFACTORING_PLAN.md | head -250`（过 P1-3 / P2-1 章节）
-2. `cat REFACTORING_PROGRESS.md | grep "^##\|^###"`（看已完成 P 任务索引）
-3. `git log --oneline -30`（最近 commit 节奏）
-4. `git log --grep='(P1-3'` 回溯三 pilot 全貌（7 commit）
+---
+
+### 最短新 session 启动清单
+
+1. `cat REFACTORING_PLAN.md | sed -n '130,400p'`（过 §P1-3 / §P1-3b / §P1-3c 三章）
+2. `sed -n '1,80p' REFACTORING_PROGRESS.md`（看表格 + 顶部概览）
+3. `sed -n '875,1000p' REFACTORING_PROGRESS.md`（看 handoff block）
+4. `git log --oneline -15`（最近节奏）
+5. `git log --grep='(P1-3 pilot)' --stat`（三 pilot 的 commit 粒度 / 增删量）
+6. `ls bot/cogs/`（看当前 cog 布局）
+7. 决定：先 §P1-3c（rename）还是先 §P1-3b 第一档（小 cog + games）。默认建议：**先 P1-3c，再 P1-3b 第一档**。
+
+用户只说"继续"的话，默认从 **P1-3c rename** 开始；说具体任务名则照做。
+
+### 本次 session 补充（2026-04-24 后续规划 commit）
+
+本次 session 只做**规划文档** ——代码层面没有改动，只补齐 PLAN §P1-3b / §P1-3c、更新 PROGRESS 表格 + handoff。这样做的目的是：context 压缩之后新 session 可以从 handoff 清单直接上手做 P1-3c 或 P1-3b 第一档。
+
+**未做（需要下次动代码时一并处理）**：
+- 任何 cog 的实际包化（13 个）
+- tickets_new → tickets 的 sed + `git mv` + 类名重命名 + 迁移脚本 LEGACY_NAME_MAP
+- service.py 抽离评估（全量包化完成后再扫）

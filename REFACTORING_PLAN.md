@@ -141,6 +141,220 @@
 6. `shop_cog.py`（1055 行）
 7. `role_cog.py`（1016 行）
 
+### P1-3b. 全量 cog 包化 + games 聚合（P1-3 续篇）
+
+**目标**：把**所有** cog 都变成包格式（不只是"大 cog"），让 `bot/cogs/` 下只剩目录、不再有平面 `*_cog.py`。两个游戏 cog 聚合到 `bot/cogs/games/`，为未来新增游戏留扩展点。
+
+**动机**：
+- **一致性**：P1-3 三 pilot（tickets_new / privateroom / ban）已证明包化机械可行；零散的 `*_cog.py` + `<name>/cog.py` 两套布局共存是历史债。
+- **扩展收益**：以后加新的 View / Modal 时，直接写进 `<name>/views.py` / `<name>/modals.py`，不用再新建散落的 `<name>_view.py`。
+- **游戏组**：`game_dnd_cog.py` + `game_spymode_cog.py` 现在是两个互不感知的文件；聚合到 `games/` 后未来加狼人杀 / 谁是卧底变种 / 21 点等只需在 `games/<name>/` 开新子目录，`main.py` 的 COG_SPECS 加一行。
+- **service.py 时机**：三家已拆 pilot 都保守没抽 service.py。全量包化后每家都有**完整标准骨架**（`__init__ + cog + 可选 views/modals/embeds/service`），此时再回头评估 service 抽离就是"加一个可选文件"而非"全局架构变更"—— 边界更清晰，评估 / 决策成本更低。本轮**不**强推抽 service，留给包化完成后的一次横向扫描。
+
+#### 目录布局
+
+```
+bot/cogs/
+├── __init__.py
+├── games/                      # 游戏聚合点（P1-3b 新增）
+│   ├── __init__.py
+│   ├── dnd/                    # 原 game_dnd_cog.py
+│   │   ├── __init__.py         # from .cog import DnDCog
+│   │   └── cog.py              # 106 行，无 UI，最小包
+│   └── spymode/                # 原 game_spymode_cog.py
+│       ├── __init__.py
+│       ├── views.py            # SpyModeView + 3 Button 子类
+│       └── cog.py              # SpyModeCog
+│   # 未来留空位：games/<next_game>/
+│   # 可选：games/_lib.py / games/common.py —— 当有第 3 个游戏、
+│   # 且出现可共享代码（如轮流制 turn manager / 玩家列表管理）
+│   # 时再建；本轮**不**预建空 common 模块。
+├── achievement/                # 928 行，5 View → views.py + cog.py
+├── backup/                     # 81 行，纯 Cog → 最小包（__init__ + cog.py）
+├── ban/                        ✅ 已完成
+├── check_status/               # 465 行，1 View → views.py + cog.py
+├── create_invitation/          # 638 行，2 View → views.py + cog.py
+├── giveaway/                   # 1062 行，2 View + 1 ConfirmView + 1 Modal → 全四件
+├── notebook/                   # 311 行，2 View → views.py + cog.py
+├── privateroom/                ✅ 已完成
+├── role/                       # 1151 行，4 View + 1 Modal → 全四件
+├── shop/                       # 1101 行，2 View + 2 Modal → 全四件；persistent view 要小心
+├── teamup_display/             # 472 行，纯 Cog → 最小包
+├── tickets_new/                ✅ 已完成
+├── voice_channel/              # 1018 行，3 View + 1 Modal → 全四件
+└── welcome/                    # 285 行，1 View → views.py + cog.py
+```
+
+#### 包骨架三档
+
+- **最小包**（只有 `__init__ + cog.py`）：纯 commands.Cog 子类、无 UI、无 Modal。适用：backup、game_dnd、teamup_display。
+- **标准包**（`__init__ + cog + views.py`）：有 View 无 Modal，或 Modal ≤ 1 且与 View 紧耦合的一并放 views.py。适用：welcome、notebook、check_status、create_invitation、achievement、game_spymode。
+- **完整包**（`__init__ + cog + views + modals [+ embeds]`）：UI 层厚，Modal ≥ 2 或 EmbedColors 常量类存在。适用：role、shop、giveaway、voice_channel。参照三 pilot。
+
+`service.py` 和 `embeds.py` 都**只在有内容时才建**。空文件不要留。
+
+#### 风险点
+
+- **shop_cog.py 有 persistent view**（`bot.add_view(self.checkin_view)` L647，CheckinEmbedView）。拆包时必须像 tickets_new pilot 一样检查 `custom_id` 是字符串字面量还是参数化。现在是字符串字面量（见 `shop_cog.py:113-135` custom_id），迁移安全，但要在对应 commit 里确认一次。
+- **game 聚合的 main.py 改动**：COG_SPECS 里 `module_path` 从 `bot.cogs.game_dnd_cog` 改成 `bot.cogs.games.dnd`；`bot.cogs.game_spymode_cog` → `bot.cogs.games.spymode`。这是两行改动，不涉及 `class_name`。
+- **import 深度**：从 `bot.cogs.xxx` 变成 `bot.cogs.games.xxx` 深一层。`sys.modules` cache 不影响，但是日志里的模块名会变（如果有地方 log 模块路径的话要注意）。
+
+#### 执行顺序建议
+
+按"收益 / 风险"分三档，每档独立收尾（每档可以一次 PR / 一组 commit），**不强求一次全做完**：
+
+**第一档：小 cog + games（低风险、快速）** — 5-8 个 commit
+1. backup（81 行，最小包）—— 热身
+2. teamup_display（472 行，1 Cog，最小包）
+3. game_dnd → games/dnd/（106 行，最小包，但顺带建 games/ 目录）
+4. game_spymode → games/spymode/（323 行，标准包）
+5. welcome（285 行，标准包）
+6. notebook（311 行，标准包）
+7. check_status（465 行，标准包）
+8. create_invitation（638 行，标准包）
+
+**第二档：中型 cog（UI 层明显）** — 3 个 commit
+9. achievement（928 行，5 View，标准包）
+10. voice_channel（1018 行，完整包）
+11. giveaway（1062 行，完整包）
+
+**第三档：大 cog + persistent view** — 2 个 commit
+12. shop（1101 行，完整包，**persistent view 迁移**）—— 放最后降低回归风险
+13. role（1151 行，完整包）
+
+**收尾**：
+- 更新 `bot/cogs/__init__.py`（若有 re-export）。
+- PROGRESS.md 把"剩余工作"清单逐项划掉，P1-3 表格 row 改成 "✅ 全量包化完成"。
+- **统一 service.py 评估**：再做一次横向扫描，看哪些 cog 抽 service 收益足够（参考 P1-3 ban 那一节的服务候选清单 pattern）。
+
+#### 单 pilot 模板（复制用）
+
+```
+# 1. Explore 报告（类清单 / 归属 / 循环 / persistent view / t import / slash 命令 / 风险点），限 500 字
+# 2. 建目录 + 按报告粘类
+mkdir -p bot/cogs/<name>
+# 3. 写 __init__.py / [views.py] / [modals.py] / [embeds.py] / cog.py
+# 4. git mv 旧文件到 old_function/cogs/<name>_cog_pre_split.py
+# 5. 改 bot/main.py 的 COG_SPECS 里对应 module_path
+# 6. 验证三连：
+python3 -m py_compile bot/cogs/<name>/*.py bot/main.py
+/tmp/yaml-venv/bin/python tools/check_locales.py
+#   + stub-based runtime import smoke（参考 P1-3 ban 那一节的 Python 片段）
+# 7. 两 commit：
+#    refactor(<name>): split cog into package (P1-3b)
+#    （如需更新 PROGRESS.md）docs: track progress after <name> pilot (P1-3b)
+```
+
+每棒 `(P1-3b)` tag 以便 `git log --grep='(P1-3b)'`。
+
+#### 与其它 P 任务的关系
+
+- **P2-1/P2-2（DB 层）**：跟包化互不冲突，可以并行（包化只动文件布局，DB manager 不变）。
+- **service.py 抽离**：**本轮后置**。包化完成后横向扫描更清晰。
+- **P3-5 ruff**：等包化完成后再加，否则 lint rules 会同时覆盖 `*_cog.py` 和 `<name>/cog.py` 两种布局的文件。
+
+### P1-3c. `tickets_new` → `tickets` 历史命名清理
+
+**目标**：去掉 `tickets_new` 这个 V1.6.5b legacy-cleanup 时代（"new" 是为了跟 `old_function/cogs/tickets_cog.*` 区分）留下来的半成品命名。所有运行时代码、配置、locale、DB manager、类名全部改回自然的 `tickets` / `TicketsCog` / `TicketsDatabaseManager`。
+
+**关键约束：旧版用户的迁移路径不能断**。老部署跑 `tools/migrate_config_to_yaml.py` 的时候，源头还是 `bot/config/config_tickets_new.json`（V1.x 时代的命名）。迁移脚本必须**把源名 `tickets_new` 映射到目标名 `tickets`**，源文件无需改名，目标产物用新名。
+
+#### 静态部分（代码 + 文件路径）
+
+`grep -rn 'tickets_new\|TicketsNew'` 在当前 repo（排除 `old_function/` + `.git/`）里 374 处命中，分布在 11 个文件 —— 其中 3 个包子模块的 `t('tickets_new.xxx')` 占大部分。清单：
+
+| 目标 | 当前 | 改成 |
+|---|---|---|
+| 包目录 | `bot/cogs/tickets_new/` | `bot/cogs/tickets/` |
+| 包内 4 个 .py | `TicketsNewCog` 类 / `t('tickets_new.xxx')` | `TicketsCog` / `t('tickets.xxx')` |
+| db manager | `bot/utils/tickets_new_db.py` | `bot/utils/tickets_db.py` |
+| db manager 类 | `TicketsNewDatabaseManager` | `TicketsDatabaseManager` |
+| `bot/utils/__init__.py` | `from .tickets_new_db import TicketsNewDatabaseManager` | `from .tickets_db import TicketsDatabaseManager` |
+| main.py COG_SPECS | 5 处 `tickets_new` / `TicketsNewCog` | `tickets` / `TicketsCog` |
+| config yaml | `bot/config/tickets_new.yaml` + `.example` | `bot/config/tickets.yaml` + `.example` |
+| locale yaml | `bot/locales/zh_CN/tickets_new.yaml` | `bot/locales/zh_CN/tickets.yaml` |
+| commands yaml 顶级 key | `tickets_new:` | `tickets:` |
+| `tools/field_classification.yaml` | `tickets_new:` | `tickets:` |
+| `tools/seed_db.py` | `seed_tickets_new` 函数 / `'tickets_new'` registry key / `TicketsNewDatabaseManager` import | 去掉 `_new` / 类改名 |
+| `tools/check_locales.py` | docstring 里 `tickets_new` 例子 | 改成 `tickets` 或任一其它包 |
+
+#### DB 表
+
+DB 表名已经是干净的：`ticket_types`（seed_db.py:67）、不带 `tickets_new_*` 前缀。不需要迁移 schema / 改 create table DDL。
+
+#### 迁移脚本的源→目标映射
+
+`tools/migrate_config_to_yaml.py` 当前流程：
+
+```python
+json_files = sorted(CONFIG_DIR.glob('config_*.json'))   # L387
+for p in json_files:
+    cog_name = p.stem.removeprefix('config_')           # L400 — derive from filename
+    # ... 产出 bot/config/<cog_name>.yaml 等
+```
+
+加名字映射表，在 derive 之后、产出之前：
+
+```python
+LEGACY_NAME_MAP = {
+    'tickets_new': 'tickets',   # V1.x → V2.x rename
+}
+...
+cog_name = p.stem.removeprefix('config_')
+cog_name = LEGACY_NAME_MAP.get(cog_name, cog_name)
+```
+
+这样**老用户源头仍然是 `config_tickets_new.json`**，脚本跑完产出 `bot/config/tickets.yaml` + `bot/locales/zh_CN/tickets.yaml`，无缝。新部署源头直接是 `config_tickets.json`，`LEGACY_NAME_MAP` 查不到返回 `tickets`，也 OK。
+
+同样的映射表在 `tools/seed_db.py` 里也要有（它读 `migration_db_seed.json` 里的条目名）：
+
+```python
+LEGACY_NAME_MAP = {'tickets_new': 'tickets'}
+...
+SEED_HANDLERS = {'tickets': seed_tickets, ...}  # 改名
+# 读取时先 map 再 dispatch
+payload_name = LEGACY_NAME_MAP.get(source_name, source_name)
+handler = SEED_HANDLERS.get(payload_name)
+```
+
+#### 运行时兼容 shim（可选）
+
+`bot/utils/config.py` 的 `get_config(name)` 可以加一个 deprecation shim：若 `name == 'tickets_new'`，log warn 一次然后 `name = 'tickets'`。好处：老代码路径（如果不小心有地方写死 `'tickets_new'` 没改到）不会立刻 NoneType 炸。一两个 minor release 后删。**这条可选**，因为全量 grep + replace 理论上能挖干净。
+
+#### 风险点
+
+- **Persistent view custom_id**：`tickets_new` 包里有 4 处 `bot.add_view(...)`。`custom_id` 是用户侧生成的字符串（如 `accept_ticket_{thread_id}`），**跟"tickets_new"命名没有绑定**。迁移安全，无需数据迁移。
+- **配置里的内嵌引用**：`bot/config/tickets_new.yaml` 内部 YAML 引用（锚点、`<<`）如果有的话要确认 —— 当前应当没有，确认后处理。
+- **locale key 全改**：130+ 处 `t('tickets_new.xxx')` 要批量 sed，小心不要误伤 `tickets_new.yaml` 内部的 sub-key 名（`tickets_new.messages.xxx` → `tickets.messages.xxx`）。`tools/check_locales.py` 跑完没 MISSING 才算对。
+
+#### 执行顺序
+
+**一次收尾**（避免半边新半边旧的混乱状态）。3 commit：
+
+1. `refactor(tickets_new→tickets): rename package, db manager, configs, locale (P1-3c)` —— 所有 repo 内的静态 rename，包括 `git mv` + sed 替换。
+2. `chore(migrate): add tickets_new→tickets legacy name mapping (P1-3c)` —— `migrate_config_to_yaml.py` + `seed_db.py` 里加 `LEGACY_NAME_MAP`。
+3. `docs: track progress after tickets_new rename (P1-3c)` —— PROGRESS.md 更新 + CLAUDE.md 如果有地方提到 `tickets_new` 也更新。
+
+**时机**：跟 P1-3b 可以**任一顺序**。实际上**先 rename 再包化剩下 13 个**更好：P1-3b 包化过程中不用再顾虑 `tickets_new` 包的存在，减少 mental overhead。
+
+#### 验证
+
+```bash
+# 0 条剩余的 tickets_new 引用（排除迁移脚本里的 LEGACY_NAME_MAP）
+grep -rn 'tickets_new\|TicketsNew' bot/ --include='*.py' --include='*.yaml'
+
+# locale 全 resolve
+/tmp/yaml-venv/bin/python tools/check_locales.py
+
+# 一次 stub-based import smoke
+python3 -c "from bot.cogs.tickets import TicketsCog; print(TicketsCog.__module__)"
+
+# 迁移脚本在老源头（伪造 config_tickets_new.json）跑完产出 tickets.yaml
+cp some_legacy_fixture/config_tickets_new.json bot/config/
+python tools/migrate_config_to_yaml.py --only tickets_new
+ls bot/config/tickets.yaml   # 应当存在
+```
+
 ### P1-4. 配置结构校验
 - **问题**：`self.conf['messages']['xxx']` 依赖运行时，配置漏 key 要触发命令时才炸。
 - **建议**：用 `pydantic.BaseModel` 或 `dataclass` 给每份 config 写 schema，启动时统一校验。启动失败总好过线上崩。
