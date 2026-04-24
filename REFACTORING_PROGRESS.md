@@ -57,7 +57,7 @@
 | P1 | P1-1 命令同步逻辑 | ✅ | sync 迁 setup_hook；on_ready 只留 presence/日志 |
 | P1+P2 | 配置系统 2.0（P1-6 + P1-4 + P2-3 + P2-5） | ✅ | step 0-9 全部完成（P1-4 最小版；pydantic 全量留 follow-up） |
 | P1 | P1-7 Slash 元数据本地化 | ✅ | SlashTranslator + 176 key commands.yaml |
-| P1 | P1-3 大 cog 拆包 | 🔄 | tickets_new + privateroom pilots ✅；ban 待做 |
+| P1 | P1-3 大 cog 拆包 | ✅ | tickets_new + privateroom + ban 三 pilot 全 ✅；service.py 统一评估留 follow-up |
 | P2 | P2-1 数据库连接复用 | ⬜ | 需 close() 生命周期前置 |
 | P2 | P2-2 Schema 迁移机制 | ⬜ | |
 | P3 | P3-1 依赖管理统一 | ⬜ | |
@@ -788,19 +788,65 @@ description=locale_str(
 - `tools/check_locales.py`：553 t() key + 170 locale_str key 全 resolve（与 tickets_new pilot 后相同，无 regression）。
 - **未做**：测试服 `/privateroom_init` → `/privateroom_setup` → 购买 → 续费 / 恢复全链路跑一遍（依赖 token / 真服务器 / seeded shop 余额）。
 
+### P1-3 ✅ 大 cog 拆包 pilot：ban（2026-04-24）
+
+**Commit grep**: `git log --grep='(ban):.*P1-3'`
+
+**做了什么**：`bot/cogs/ban_cog.py`（1430 行）按 tickets_new / privateroom 同模板拆成 `bot/cogs/ban/` 包。P1-3 三 pilot 全部收官：
+
+| 文件 | 类 | 行数 |
+|---|---|---|
+| `views.py` | `RejoinServerView` | 11 |
+| `cog.py` | `BanCog` + 2 `@tasks.loop` + 13 slash commands + 7 通知/调度方法 | 1418 |
+| `__init__.py` | re-export | 3 |
+
+**与前两棒的差异**：
+- **UI 层极薄**：只有 1 个 View（`RejoinServerView`，9 行；tempban DM 上一个静态 link button）。**0 Modal**，**0 EmbedColors**。所以没 modals.py 也没 embeds.py。
+- **没 lazy import**：无 modal → view 反向依赖（没 modal）。单向 `cog.py → views.py` 顶层 import 即可。
+- **没 persistent view**：`bot.add_view()` 从未调用；`RejoinServerView` 每次 `send_tempban_dm` 构造一次即用即弃。
+
+**保守选择：没抽 `service.py`**。这一棒原本是"评估抽 service"的候选点（handoff 块里明说），做了 Explore cross-reference 报告（见 session transcript），结论：
+
+- **值得抽**：`parse_duration` + `has_ban_permission` + `is_admin_channel_only_check` 三个纯/半纯函数 ~40 行；`recover_tempbans` + `check_expired_tempbans` 两个 task body ~70 行；`send_*_notification` / `send_*_dm` 四个 embed-builder + send 混合方法 ~200 行（只能分离 embed 构建 + 保留 channel.send 在 cog）。
+- **预计收益**：cog.py 从 1418 → ~1050 行（~-370 行）。
+- **拒绝抽的理由**：三棒保守一致性 > 单棒收益。前两棒（tickets_new / privateroom）都没抽 service，第三棒单独抽会破一致性；而且 `schedule_unban_with_db` 依赖 `self.tempban_tasks` 字典的状态，完全抽需要把字典也 move 到 service 或注入，跨类 state 管理边界要重新设计。更合理的是**三家一起**在一轮 follow-up 里按统一模式抽 service（见"🟢 nice-to-have"）。
+- service 候选方法清单见下（留给 follow-up）：
+  - **task-driven**：`recover_tempbans` (L84-151), `check_expired_tempbans` (L153-198), `cleanup_tempbans` (L531-536)
+  - **pure-ish 业务**：`parse_duration` (L225-248), `has_ban_permission` (L205-223), `is_admin_channel_only_check` (L70-82)
+  - **state-coupled**：`schedule_unban_with_db` (L501-529) — 依赖 `self.tempban_tasks`，抽要配字典转移或接口注入。
+  - **embed builder + send 混合**：`send_ban_notification` (L250-337), `send_mute_notification` (L339-393), `send_tempban_dm` (L395-449), `send_mute_dm` (L451-499) — 抽 `build_*_embed` 留 `channel.send` 在 cog。
+
+**顺手清的死代码**：
+- `from bot.utils import ... check_channel_validity ...` —— 该 cog 从来不用；注释里提了两次"same logic as check_channel_validity"但 import 进来的 symbol 从没被 call。
+- 文件底部 `async def setup(bot): await bot.add_cog(BanCog(bot))` —— `bot/main.py` 的 loader 是 `importlib.import_module + getattr + bot.add_cog(cls(bot))`，不走 discord.py 的 extension-style `setup()` 入口。Dead code from pre-COG_SPECS era。
+
+**已知小瑕疵（识别但未修）**：
+- 中文字面量硬编码：`ban_admin_list` L882 `(不存在)`、L904 同上、L925 同上；L943 `"🔗 邀请链接"` 字段名；`ban_set_invite_link` L1283 格式提示；`ban_list_tempbans` L1350/1356/1361 的 embed field 文案 + 页脚。共 ~10 条应走 `t()` 但没走。
+- 11 处 `except Exception as e:`（非 naked `except:`，不违反 P0-4 的 E722），可以再收窄成 `discord.Forbidden` / `asyncio.TimeoutError` 等具体异常 —— 留作 follow-up。
+
+**验证**：
+- `python -m py_compile` 三个 .py + main.py OK。
+- Runtime import smoke test（stub discord / bot.utils）：`BanCog.__module__ == 'bot.cogs.ban.cog'`，`RejoinServerView` 加载 OK。
+- `tools/check_locales.py`：553 t() + 170 locale_str key 全 resolve（与前两棒 pilot 后相同，无 regression）。
+- **未做**：测试服 `/ban` → `/tempban` → `/mute` → tempban 到期自动解封 + 重启恢复的完整链路跑一遍（依赖 token / 真 guild / seeded DB + 24h 以上的自然时间观察）。
+
 ### 剩余工作（跨会话接手）
 
-Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅；P1-4 dataclass schema + 静态 key 对齐 ✅；P1-3 tickets_new + privateroom pilot ✅。下一轮可接手的 follow-up：
+Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅；P1-4 dataclass schema + 静态 key 对齐 ✅；**P1-3 大 cog 拆包三 pilot 全 ✅**（tickets_new 2666 → 1910 行 + privateroom 1993 → 1655 行 + ban 1430 → 1418 行；主 cog 都缩减或至少 UI 层隔离到包子模块）。下一轮可接手的 follow-up：
 
 **🟡 important**：
-1. P1-3 最后一个 pilot：`ban_cog`（1430 行），套 tickets_new / privateroom 同模板。体量最小但 service 候选最厚（tempban 超时任务、解除逻辑、冻结期判断等）—— 可以在这一轮**顺便评估抽 `service.py`** 的收益。
-2. per-cog 配置 schema（shop / ban / tickets_new / voicechannel / privateroom 等）：可在 ban pilot 里一并加，把 `admin_roles: List[int]` / `ticket_types: Dict[str, TicketType]` 等固定形状字段锁死。
+1. per-cog 配置 schema（shop / ban / tickets_new / voicechannel / privateroom 等）：`bot/utils/config_schema.py` 里 dataclass 形状锁死，让 `admin_roles: List[int]` / `ticket_types: Dict[str, TicketType]` 等固定 shape 字段不会静默腐烂。前提是 P1-4 的 _verify_main_config 最小版已在，所以扩展点清楚。
 
 **🟢 nice-to-have**：
-1. P1-3 pilot 之后抽 `service.py`（tickets_new / privateroom / ban 三家一起评估），把 is_admin_for_type / admin CRUD / maintenance 方法搬离 cog。cog.py 里再有 500-1000 行可以下掉。
-2. P3-5 ruff（锁 P0-4 成果 + 未来裸 except 防线）。
+1. **service.py 统一抽离**（三家一起做）：tickets_new / privateroom / ban 三 pilot 都保守没抽 service.py，留下三套 task loop + embed builder + permission check / duration parse 等。统一一轮抽出来，每家建 `service.py`：
+   - **tickets_new**: `is_admin_for_type` / admin CRUD / `format_admin_list` / `add_admins_to_ticket` 等 10 个方法 ~500-700 行
+   - **privateroom**: `calculate_discount` / `get_last_month_voice_hours` / `is_booster` / `check_and_send_renewal_reminders` + shop/renewal embed builder ~300 行
+   - **ban**: `parse_duration` / `has_ban_permission` / `is_admin_channel_only_check` / `recover_tempbans` + `build_*_notification_embed` 等 ~370 行（详细清单见 P1-3 ban 那一节）
+   - 需要前置设计：跨 cog 的 state 管理（`self.tempban_tasks` dict / `self.conf` / `self.db` 之类）是每类 service 静态方法 + 参数注入，还是每家一个 `BanService(bot, db, config)` instance？先拿 ban 当 probe 试一个方向，另外两家照抄。
+2. P3-5 ruff（锁 P0-4 成果 + 未来裸 except 防线；也可以加 E722 以外的规则如 F401 unused imports、B904 raise from）。
 3. P1-7 后续：`check_status.where_is_menu` 的 ContextMenu `name='Where Is'` 目前硬编码英文；Discord `ContextMenu.name` 不走 Translator 链，想本地化需要构造时手写 `name_localizations={Locale.chinese: '...'}` dict（与 slash name 的 ASCII 约束不同，Context Menu name 允许中文）。
-4. privateroom pilot 里识别但未迁的 i18n 漏网之鱼（`RoomListView` L300-301 两条中文字面量、`setup_shop` / `reset_system` / `list_rooms` 的错误消息等 5-6 条），等下次触摸这些代码时一并迁到 `bot/locales/zh_CN/privateroom.yaml`。
+4. 各 pilot 留下的 i18n 漏网之鱼统一扫一遍（privateroom 里 5-6 条 + ban 里 ~10 条中文字面量；都是拆包前就存在，未扩大 scope）。做 P1-7 续篇时一并迁。
+5. `tickets_new_cog.py` 原先有 `import aiosqlite` 的死 import（Explore 在 P0-1 阶段就标记过，P1-3 tickets_new pilot 已顺手删）。ban / privateroom 没这个问题，不需要。
 
 ---
 
@@ -828,34 +874,43 @@ python tools/seed_db.py            # channel_configs + ticket_types 灌 DB
 
 ### 下一个可接手的任务（压缩 context / 新 session 直接看这里）
 
-**推荐**：**P1-3 pilot 最后一棒 — ban_cog**（1430 行）。tickets_new / privateroom pilot 已 ✅，同套 pattern 套 ban 即可：
+**推荐（两条路，二选一）**：
 
-```
-bot/cogs/ban/
-├── __init__.py
-├── modals.py     # ban reason / 解封 modal 们
-├── views.py      # 确认 / 管理 View
-└── cog.py        # BanCog（commands.Cog + tempban task + 业务方法）
-```
+---
 
-embeds.py 视情况（如果有 BanEmbedColors / embed builder 才做）。**这一棒建议同时评估抽 `service.py`** —— ban 的 tempban 超时 task、冻结期判断、ban 记录 CRUD 等业务层比 tickets_new / privateroom 都要厚，抽出来 cog.py 可能能瘦掉 400-600 行。先做 Explore report 看清 service 候选方法边界后再决定。
+### 路 A：P2-1 数据库连接复用（PLAN §P2-1）
 
-**流程模板**（和前两棒一致）：
-1. Explore agent 做 cross-reference 报告（类清单 / 归属 / import 拓扑 / 循环依赖 / persistent view / `t` import 检查 / slash 命令清单 / 风险点），限 500 字。
-2. 按报告逐类粘到新文件，补每个文件的 local imports；如有 modals↔views cycle 用 lazy import 解。
-3. `git mv bot/cogs/ban_cog.py old_function/cogs/ban_cog_pre_split.py`。
-4. `bot/main.py` `module_path` 改 `"bot.cogs.ban"`。
-5. py_compile + stub-based runtime smoke + `tools/check_locales.py` 三连验证。
-6. 两 commit：`refactor(ban): split cog into package (P1-3 pilot)` + `docs: track progress after P1-3 ban pilot`。
+P1-3 拆包全 ✅，现在可以动 DB 层了（PLAN 明说 P1-3 之后再做 P2-1/P2-2）。
 
-参考：`git log --grep='(P1-3 pilot)'` —— tickets_new（2666 行）+ privateroom（1993 行）两棒的 commit diff 直接照着动手。
+**目标**：把每家 db manager 的 "每次 `aiosqlite.connect(path)` 建新连接 → 操作 → close" pattern 统一成**进程级共享连接池 / 单一长连接**。
 
-**替代**（轻的）：P3-5 ruff —— 加 pyproject `[tool.ruff]` + `E722` 规则锁 P0-4 成果；零代码风险。
+**风险点**：SQLite 不是多进程/多线程并发友好；aiosqlite 在 WAL + single writer 模式下 OK，但需要统一 `Connection` 生命周期管理（`cog_load`/`cog_unload` 或 bot-level fixture）。现有 10+ 个 `*_db.py` manager 都要改 —— 但因为每家接口已经薄（全 async method），重构是机械的。
 
-**绝对不要**：跳过 P1-3 直接做 P2-1 / P2-2 —— PLAN 明说 P1-3 之后再动 DB 层，否则冲突严重。
+**Explore 问清这些前置**：aiosqlite journal mode? WAL 已开？busy_timeout? 有没有 backup cog 在连另一个句柄？
+
+---
+
+### 路 B：service.py 三家统一抽离（nice-to-have 升级为本次任务）
+
+P1-3 三 pilot 留下 ~1200-1500 行 service 候选代码（见"🟢 nice-to-have #1"详细清单）。前提是不急着动 DB 层的话。
+
+**先拿 ban 当 probe** 做一套模式（静态方法 + 依赖参数注入 vs `BanService(bot, db, conf)` instance），敲定后 tickets_new / privateroom 照抄。
+
+**收益可见**：三家 cog.py 合计瘦 ~1200 行，业务逻辑跟 interaction/UI 层分离，未来加单测也容易（纯函数不需要 mock interaction）。
+
+---
+
+### 流程模板（两条路都通用）
+
+1. **Explore 先 cross-reference**：拿清楚类 / 方法 / import / state 边界。限 500 字。
+2. 动手 → 每家一 commit（`refactor(<area>): ...`）+ 收尾 docs commit（`docs: track progress after ...`）。
+3. 验证：`py_compile` + stub-based runtime import + `tools/check_locales.py`。
+4. 每个 commit message 带 `(PX-Y)` tag 以便 `git log --grep`。
+
+**替代**（轻的）：P3-5 ruff —— 加 pyproject `[tool.ruff]` + `E722` 规则锁 P0-4 成果；零代码风险；1-2 小时搞定。
 
 **新 session 接手流程**：
-1. `cat REFACTORING_PLAN.md | head -200`（快速过 P1-3 章节）
+1. `cat REFACTORING_PLAN.md | head -250`（过 P1-3 / P2-1 章节）
 2. `cat REFACTORING_PROGRESS.md | grep "^##\|^###"`（看已完成 P 任务索引）
 3. `git log --oneline -30`（最近 commit 节奏）
-4. `git log --grep='(P1-6\.7)'` / `git log --grep='(P1-7'` / `git log --grep='(P1-3'` 等回溯某 P 的全貌
+4. `git log --grep='(P1-3'` 回溯三 pilot 全貌（7 commit）
