@@ -1,10 +1,8 @@
-# bot/cogs/game_dnd_cog.py
-from ..utils import config
+import random
+import re
 
 import discord
 from discord.ext import commands
-import random
-import re
 
 
 class DnDCog(commands.Cog):

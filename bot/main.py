@@ -34,7 +34,7 @@ COG_SPECS = [
     {
         "feature": "dnd",
         "cog_name": "DnDCog",
-        "module_path": "bot.cogs.game_dnd_cog",
+        "module_path": "bot.cogs.games.dnd",
         "class_name": "DnDCog",
         "required_configs": [],
     },
