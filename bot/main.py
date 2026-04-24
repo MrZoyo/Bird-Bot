@@ -13,7 +13,7 @@ COG_SPECS = [
     {
         "feature": "voicechannel",
         "cog_name": "VoiceStateCog",
-        "module_path": "bot.cogs.voice_channel_cog",
+        "module_path": "bot.cogs.voice_channel",
         "class_name": "VoiceStateCog",
         "required_configs": ["voicechannel"],
     },
