@@ -48,7 +48,7 @@ COG_SPECS = [
     {
         "feature": "achievements",
         "cog_name": "AchievementCog",
-        "module_path": "bot.cogs.achievement_cog",
+        "module_path": "bot.cogs.achievement",
         "class_name": "AchievementCog",
         "required_configs": ["achievements"],
     },
