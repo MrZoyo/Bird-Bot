@@ -721,7 +721,7 @@ description=locale_str(
 
 ---
 
-### P1-3 🔄 大 cog 拆包 pilot：tickets_new（2026-04-24）
+### P1-3 ✅ 大 cog 拆包 pilot：tickets_new（2026-04-24）
 
 **Commit grep**: `git log --grep='(P1-3'`
 
@@ -757,7 +757,7 @@ description=locale_str(
 **剩下 pilot**：
 - `ban_cog.py`（1430 行）—— 按同模式拆。views / modals 体量小，但 service 候选（ban 超时任务、冻结期判断等）明显；二轮再决定是否抽 service.py。
 
-### P1-3 🔄 大 cog 拆包 pilot：privateroom（2026-04-24）
+### P1-3 ✅ 大 cog 拆包 pilot：privateroom（2026-04-24）
 
 **Commit grep**: `git log --grep='privateroom.*P1-3'`
 
@@ -941,7 +941,7 @@ ticket_type_delete_failure: ❌ 删除失败，请联系管理员
 
 ### 剩余工作（跨会话接手）
 
-Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅；P1-4 dataclass schema + 静态 key 对齐 ✅；**P1-3 大 cog 拆包三 pilot 全 ✅**（tickets_new 2666 → 1910 行 + privateroom 1993 → 1655 行 + ban 1430 → 1418 行；主 cog 都缩减或至少 UI 层隔离到包子模块）。
+Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅；P1-4 dataclass schema + 静态 key 对齐 ✅；**P1-3 大 cog 拆包三 pilot 全 ✅**（tickets_new 2666 → 1910 行 + privateroom 1993 → 1655 行 + ban 1430 → 1418 行；主 cog 都缩减或至少 UI 层隔离到包子模块）；**P1-8 审核补遗 hygiene pass 全 ✅**（2026-04-24，P1-8a/b/c 三条合计 8 commit、~20 行净变，详见本文件 §P1-8）。
 
 **2026-04-24 后续规划**（用户决定）：P1-3 扩展为 **§P1-3b 全量 cog 包化 + games 聚合** + **§P1-3c tickets_new → tickets rename**（见 PLAN 对应章节）。service.py 抽离后置，等全量包化完成后再横扫评估。
 
@@ -1123,23 +1123,43 @@ P1-3 拆包完 ✅，现在技术上可以动 DB 层。但考虑用户决定 P1-
 ### 最短新 session 启动清单
 
 1. `cat REFACTORING_PLAN.md | sed -n '130,400p'`（过 §P1-3 / §P1-3b / §P1-3c 三章）
-2. `grep -n '^### P1-8' REFACTORING_PLAN.md` → 跳到 §P1-8（第 11 轮审核补遗，三条 hygiene）
-3. `sed -n '1,80p' REFACTORING_PROGRESS.md`（看表格 + 顶部概览）
-4. `sed -n '875,1000p' REFACTORING_PROGRESS.md`（看 handoff block 含 P1-8 速记）
-5. `git log --oneline -15`（最近节奏）
-6. `git log --grep='(P1-3 pilot)' --stat`（三 pilot 的 commit 粒度 / 增删量）
-7. `ls bot/cogs/`（看当前 cog 布局）
-8. 决定路径：
-   - **P1-8 hygiene pass 已全收官**：P1-8c ✅（`044b17c`）/ P1-8b ✅（`fc77465`）/ P1-8a ✅（`c62bb23`）
+2. `sed -n '1,80p' REFACTORING_PROGRESS.md`（看表格 + 顶部概览）
+3. `sed -n '875,1010p' REFACTORING_PROGRESS.md`（看 handoff block + "P1-8 全收官"速记）
+4. `git log --oneline -15`（最近节奏）
+5. `git log --grep='(P1-3 pilot)' --stat`（三 pilot 的 commit 粒度 / 增删量）
+6. `ls bot/cogs/`（看当前 cog 布局）
+7. 决定路径：
+   - **P1-8 hygiene pass 已全收官**（2026-04-24）：P1-8c ✅（`044b17c`）/ P1-8b ✅（`fc77465`）/ P1-8a ✅（`c62bb23`）；不必再展开 PLAN §P1-8，历史追溯才需要
    - **下一棒推荐**：§P1-3c rename (tickets_new → tickets) → §P1-3b 第一档（8 个小 cog + games/ 定型）
 
 用户只说"继续"的话，默认接 **§P1-3c**（rename 374 处 grep 命中 + 迁移脚本 LEGACY_NAME_MAP；3 commit）；说具体任务名则照做。
 
-### 本次 session 补充（2026-04-24 后续规划 commit）
+### 本次 session 补充（2026-04-24 P1-8 hygiene pass 收官 session）
 
-本次 session 只做**规划文档** ——代码层面没有改动，只补齐 PLAN §P1-3b / §P1-3c、更新 PROGRESS 表格 + handoff。这样做的目的是：context 压缩之后新 session 可以从 handoff 清单直接上手做 P1-3c 或 P1-3b 第一档。
+**上一轮 session**（commit `3e135d0`，同日早些时候）：只做规划文档 —— 补齐 PLAN §P1-3b / §P1-3c + 更新 PROGRESS handoff；**代码 0 行改动**。
 
-**未做（需要下次动代码时一并处理）**：
-- 任何 cog 的实际包化（13 个）
-- tickets_new → tickets 的 sed + `git mv` + 类名重命名 + 迁移脚本 LEGACY_NAME_MAP
-- service.py 抽离评估（全量包化完成后再扫）
+**本轮 session**（commits `9e56242` → `f75117d`，共 8 个）：把 P1-8 hygiene pass 全做完 + 两处 sibling latent bug 顺手落盘：
+
+| # | Commit | 类型 | 内容 |
+|---:|---|---|---|
+| 1 | `9e56242` | docs | 落盘 §P1-8 规划到 PLAN + PROGRESS（上轮 session 写了但未 commit） |
+| 2 | `de362ba` | fix | sibling 1: `tickets_new/views.py:278` `cog.conf.get('ticket_types')` → `cog.ticket_types`（P1-3 pilot 后遗留空下拉 bug）；sibling 2: `main.py` `CheckStatusCog`/`SpyModeCog` 虚假 `required_configs` 清空（`bot/config/` 无此 yaml，会被 `_get_missing_configs` 跳过加载） |
+| 3 | `044b17c` | fix | **P1-8c**：`is_feature_enabled` 非 bool 返 False，和 schema warning 对齐（4 行） |
+| 4 | `87ad4ec` | docs | P1-8c progress 笔记 |
+| 5 | `fc77465` | refactor | **P1-8b**：giveaway `initialize_database()` 迁 `cog_load`，避免 on_ready 和 task 建表竞态（+2 -2 行） |
+| 6 | `38f9b05` | docs | P1-8b progress 笔记 |
+| 7 | `c62bb23` | fix | **P1-8a**：tickets_new CRUD 三处接返回值 + False 分支走新 locale key；`rename_failure` / `upsert_failure` / `delete_failure` 三个新 key（+24 -3 行） |
+| 8 | `f75117d` | docs | P1-8a progress 笔记 + P1-8 整体收官总结 |
+
+**规划偏差（已在文档内嵌 errata）**：
+- PLAN §P1-8b 第 4 条原假设 "cog_unload 里已有的 cancel 不动"，实施时发现 `giveaway_cog` **没有** `cog_unload`。本轮不扩大 scope 新建，latent leak 留作 follow-up（部署无 reload 命令，只影响开发 hot reload）。PLAN §P1-8b 已加 errata 标注。
+
+**未做（测试服用户自行验证）**：
+- P1-8c：`main.yaml` 写 `features: {shop: "false"}` 冷启 → shop 未加载 + schema warning 出日志
+- P1-8b：`rm bot.db` 冷启 → 首 tick 无 `no such table: giveaway`
+- P1-8a：`chmod 400 bot.db` / rename 表 → 用户看到 "❌ 重命名/保存/删除失败，请联系管理员" 而非 "✅ ..."
+
+**P1-8 全收官后下一棒**（handoff 建议）：
+- §P1-3c rename (tickets_new → tickets)，374 处 grep + LEGACY_NAME_MAP，3 commit
+- 之后 §P1-3b 第一档（backup → teamup_display → game_dnd→games/dnd → game_spymode→games/spymode → welcome → notebook → check_status → create_invitation 共 8 cog，8-10 commit）
+- service.py 抽离评估、per-cog 配置 schema 锁形 —— 全量包化完成后再横扫
