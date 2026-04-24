@@ -27,7 +27,7 @@ COG_SPECS = [
     {
         "feature": "invitation",
         "cog_name": "CreateInvitationCog",
-        "module_path": "bot.cogs.create_invitation_cog",
+        "module_path": "bot.cogs.create_invitation",
         "class_name": "CreateInvitationCog",
         "required_configs": ["invitation"],
     },
