@@ -33,8 +33,8 @@ The bot's code is deeply optimised for low-performance devices, using asynchrono
   - [Giveaway_Cog](#giveaway_cog)
   - [Rating_Cog (Legacy)](#rating_cog)
   - [TeamupDisplay_Cog](#teamupdisplay_cog)
-  - [Tickets_New_Cog](#tickets_new_cog)
-  - [Tickets_Cog (Legacy)](#tickets_cog-legacy)
+  - [Tickets_Cog](#tickets_cog)
+  - [Tickets_Cog_Legacy](#tickets_cog-legacy)
   - [Ban_Cog](#ban_cog)
   - [Shop_Cog](#shop_cog)
   - [PrivateRoom_Cog](#privateroom_cog)
@@ -43,8 +43,8 @@ The bot's code is deeply optimised for low-performance devices, using asynchrono
 - [Utilities and Tools](#utilities-and-tools)
   - [config](#config)
   - [channel_validator](#channel_validator)
-  - [tickets_new_db](#tickets_new_db)
   - [tickets_db](#tickets_db)
+  - [tickets_db_legacy](#tickets_db-legacy)
   - [file_utils](#file_utils)
   - [media_handler](#media_handler)
   - [shop_db](#shop_db)
@@ -71,12 +71,12 @@ discord.py, aiosqlite, aiohttp, requests, aiofiles, pillow, matplotlib, tqdm, Py
 4. Copy only the required `*.yaml.example` files in `bot/config/`, rename them to `*.yaml`, and fill in the values. Run-time configs are YAML (since config 2.0); the archived `config_*.json.example` templates under `old_function/config/` are kept for historical reference only.
 5. In `main.yaml`, use `features` to enable only the modules you need.
 6. Disabled modules, or modules without a valid config file, will be skipped during startup and their commands will not be registered.
-7. If migrating from a pre-config-2.0 deployment: run `python tools/migrate_config_to_yaml.py` to produce YAML + locale files from your existing `config_*.json`, review `tools/migration_report.md`, then run `python tools/seed_db.py` to load `voicechannel.channel_configs` / `tickets_new.ticket_types` into the database (these were JSON-subtree-turned-DB-tables in P2-5). See `REFACTORING_PROGRESS.md` "Upgrade 协议" for the full sequence.
+7. If migrating from a pre-config-2.0 deployment: run `python tools/migrate_config_to_yaml.py` to produce YAML + locale files from your existing `config_*.json`, review `tools/migration_report.md`, then run `python tools/seed_db.py` to load `voicechannel.channel_configs` / `tickets.ticket_types` into the database (these were JSON-subtree-turned-DB-tables in P2-5; note: legacy `config_tickets_new.json` sources are auto-mapped to the new `tickets` name by the migrate script's `LEGACY_NAME_MAP`). See `REFACTORING_PROGRESS.md` "Upgrade 协议" for the full sequence.
 8. In the Discord Developer Portal, enable the privileged intents required by this bot. The current runtime requests `Intents.all()`, so the safe setup is to enable `Server Members Intent`, `Presence Intent`, and `Message Content Intent`.
 9. Run `python run.py`. If you are using a Linux server, you can use `nohup python3 run.py &` to run the bot in the background.
 10. Invite the bot to your server and give it the necessary permissions.(Required permissions: bot, application command, administrator)
 11. For updating the bot, you can use the `git pull` command to update the bot to the latest version, then rerun `uv pip sync requirements.lock`.
-12. For `tickets_new_cog`, use `/tickets_init` to initialize the ticket system. Please check function introduction for more details.
+12. For the Tickets cog, use `/tickets_init` to initialize the ticket system. Please check function introduction for more details.
 
 ---
 ## Function Introduction
@@ -269,7 +269,7 @@ Real-time teamup information display system for organizing team activities.
 - `/teamup_type_delete [channel] [channel_id]`: Delete game type configuration. Use channel selection or channel ID (for deleted channels).
 - `/teamup_type_list`: View all game type configurations
 
-### Tickets_New_Cog
+### Tickets_Cog
 **🆕 Recommended ticket system** using Discord's native thread architecture for enhanced performance and user experience.
 
 **Key Features:**
@@ -291,15 +291,15 @@ Real-time teamup information display system for organizing team activities.
 
 **Commands:**
 - `/tickets_init`: Initialize the new ticket system
-- `/tickets_new_stats`: Display comprehensive ticket statistics
+- `/tickets_stats`: Display comprehensive ticket statistics
 - `/tickets_admin_list`: Show current admin configuration
 - `/tickets_admin_add_role <role>`: Add admin role with type selection
 - `/tickets_admin_remove_role <role>`: Remove admin role from system
 - `/tickets_admin_add_user <user>`: Add individual admin user
 - `/tickets_admin_remove_user <user>`: Remove individual admin user
-- `/tickets_new_add_user <user>`: Add user to current ticket
-- `/tickets_new_accept`: Accept current ticket (admin only)
-- `/tickets_new_close <reason>`: Close current ticket with reason
+- `/tickets_add_user <user>`: Add user to current ticket
+- `/tickets_accept`: Accept current ticket (admin only)
+- `/tickets_close <reason>`: Close current ticket with reason
 - `/tickets_refresh_buttons`: Refresh all ticket button states
 - `/tickets_refresh_main`: Refresh main ticket creation page
 
@@ -464,15 +464,15 @@ Unified validation system supporting both Context and Interaction objects.
 - **Voice state checking** utilities for voice-dependent features
 - **Flexible validation** supporting multiple Discord API patterns
 
-### tickets_new_db
-Comprehensive database manager for the new thread-based ticket system.
+### tickets_db
+Comprehensive database manager for the thread-based ticket system (renamed from `tickets_new_db` in P1-3c).
 - **Thread-based ticket management** with full CRUD operations
 - **Member tracking** with addition timestamps and relationship management
 - **Statistics collection** for reporting and analytics
 - **Configuration storage** in database for dynamic updates
 
-### tickets_db
-Legacy database manager for the original channel-based ticket system.
+### tickets_db_legacy
+Legacy database manager for the original channel-based ticket system (archived to `old_function/`).
 - **Channel-based ticket** management for compatibility
 - **Archive functionality** for ticket data preservation
 - **Statistics tracking** for legacy system monitoring

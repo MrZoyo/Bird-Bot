@@ -253,7 +253,13 @@ python3 -m py_compile bot/cogs/<name>/*.py bot/main.py
 - **service.py 抽离**：**本轮后置**。包化完成后横向扫描更清晰。
 - **P3-5 ruff**：等包化完成后再加，否则 lint rules 会同时覆盖 `*_cog.py` 和 `<name>/cog.py` 两种布局的文件。
 
-### P1-3c. `tickets_new` → `tickets` 历史命名清理
+### P1-3c. `tickets_new` → `tickets` 历史命名清理 ✅ 2026-04-24
+
+> **状态**：已完成。3 commit：`6f41b63`（静态 rename）+ `afd3aff`（LEGACY_NAME_MAP）+ docs。详见 PROGRESS §P1-3c。
+>
+> **实施偏差（errata）**：本章原假设"DB 表名已经是干净的（`ticket_types`）、不需要迁移 schema"。实施时发现 `tickets_db.py`（原 `tickets_new_db.py`）里还有三张老表 `tickets_new` / `ticket_new_members` / `ticket_new_config`（30+ SQL 引用）。决定采用方案 A：只改代码层命名，DB 表名保留不动，零数据迁移风险；schema 改名留给 P2-2 Schema 迁移机制或后续专打。
+>
+> **规模差异**：PLAN 原估 374 处 grep 命中，实际 282 处（bot/ + tools/，排除文档）；差异主要是 PLAN 初次 grep 包含了 REFACTORING_*.md 自身的历史记录，实施时那些是记述性内容不动。
 
 **目标**：去掉 `tickets_new` 这个 V1.6.5b legacy-cleanup 时代（"new" 是为了跟 `old_function/cogs/tickets_cog.*` 区分）留下来的半成品命名。所有运行时代码、配置、locale、DB manager、类名全部改回自然的 `tickets` / `TicketsCog` / `TicketsDatabaseManager`。
 

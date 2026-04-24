@@ -59,7 +59,7 @@
 | P1 | P1-7 Slash 元数据本地化 | ✅ | SlashTranslator + 176 key commands.yaml |
 | P1 | P1-3 大 cog 拆包 | ✅ | tickets_new + privateroom + ban 三 pilot 全 ✅；service.py 统一评估留 follow-up |
 | P1 | P1-3b 全量 cog 包化 + games 聚合 | ⬜ | 扩展 P1-3 到剩下 13 个 cog；games/ 聚合目录；PLAN §P1-3b |
-| P1 | P1-3c tickets_new → tickets 历史命名清理 | ⬜ | 374 处 grep 命中；迁移脚本要加 LEGACY_NAME_MAP；PLAN §P1-3c |
+| P1 | P1-3c tickets_new → tickets 历史命名清理 | ✅ | 282 处 grep 清零（代码层）；DB SQL 表名保留方案 A；migrate+seed LEGACY_NAME_MAP 落位 |
 | P1 | P1-8a tickets_new ticket-type CRUD 返回值校验 | ✅ | 三处接 `ok` + 失败分支走 locale；新增 3 个 failure key |
 | P1 | P1-8b giveaway initialize_database 迁 cog_load | ✅ | cog_load 先建表后 start task；on_ready 只留 load_giveaways |
 | P1 | P1-8c feature flag 类型校验提示 / 行为对齐 | ✅ | `is_feature_enabled` 非 bool 改返 False，和 schema warning 对齐 |
@@ -835,6 +835,76 @@ description=locale_str(
 - `tools/check_locales.py`：553 t() + 170 locale_str key 全 resolve（与前两棒 pilot 后相同，无 regression）。
 - **未做**：测试服 `/ban` → `/tempban` → `/mute` → tempban 到期自动解封 + 重启恢复的完整链路跑一遍（依赖 token / 真 guild / seeded DB + 24h 以上的自然时间观察）。
 
+## P1-3c ✅ tickets_new → tickets 历史命名清理（2026-04-24）
+
+**Commit grep**: `git log --grep='(P1-3c)'`
+
+**三条 commit**（按计划一次收尾）：
+1. `6f41b63 refactor(tickets_new→tickets): rename package, db manager, configs, locale (P1-3c)` —— 代码层 rename。
+2. `afd3aff chore(migrate): add tickets_new→tickets legacy name mapping (P1-3c)` —— 迁移脚本 shim。
+3. `<本 commit>` docs 更新（PROGRESS + PLAN + CLAUDE + README）。
+
+**代码层改动**（282 处 grep 命中 → 0）：
+
+| 目标 | 当前 → 改成 |
+|---|---|
+| 包目录 | `bot/cogs/tickets_new/` → `bot/cogs/tickets/` |
+| 类名 | `TicketsNewCog` → `TicketsCog` |
+| DB manager | `bot/utils/tickets_new_db.py` / `TicketsNewDatabaseManager` → `tickets_db.py` / `TicketsDatabaseManager` |
+| 配置 YAML | `bot/config/tickets_new.yaml(.example)` → `tickets.yaml(.example)` |
+| locale yaml | `bot/locales/zh_CN/tickets_new.yaml` → `tickets.yaml` |
+| 191 处 `t('tickets_new.*')` + 23 处 `key="tickets_new.*"` | `t('tickets.*')` / `key="tickets.*"` |
+| `get_config('tickets_new')` / `save_config('tickets_new', ...)` | `'tickets'` |
+| `bot/main.py` COG_SPECS（feature/cog_name/module_path/class_name/required_configs 5 处） | 全对齐 `tickets` |
+| `bot/utils/__init__.py` re-export | `from .tickets_db import TicketsDatabaseManager` |
+| `bot/locales/zh_CN/commands.yaml` + `tools/field_classification.yaml` 顶级 key | `tickets:` |
+| `tools/seed_db.py` 函数 `seed_tickets_new` + registry key | `seed_tickets` / `'tickets'` |
+
+**DB 表名保留（方案 A 明确决策）**：
+
+PLAN §P1-3c 原假设"DB 表名已经是干净的（ticket_types）"，实施时发现 `tickets_db.py` 里还有**三张老表名**：`tickets_new`、`ticket_new_members`、`ticket_new_config`（30+ 处 SQL 引用）。决策表：
+
+| 方案 | 选择？ | 理由 |
+|---|---|---|
+| A. 只改代码层，DB 表名保留 | ✅ 选 | 老部署零数据迁移风险；3 commit 范围内收尾；schema 改名留给 P2-2 专打 |
+| B. 同步改 DB 表名 + auto-migrate | ❌ | 扩大到 4-5 commit，引入 ALTER TABLE RENAME 分支，需物光/满 DB 验证 |
+| C. 暂停 P1-3c 等 P2-2 | ❌ | 代码层 rename 和 schema 互不阻塞，推迟没收益 |
+
+SQL 表名残留（保留，不违反 P1-3c 目标）：
+- `CREATE TABLE IF NOT EXISTS tickets_new (...)` / `... ticket_new_members` / `... ticket_new_config` 三张 DDL
+- 对应 INSERT/SELECT/UPDATE/DELETE 语句里的表名（30 次）
+- `FOREIGN KEY (thread_id) REFERENCES tickets_new(thread_id)` 一条 FK 约束
+
+**LEGACY_NAME_MAP 设计**（commit 2）：
+
+- `tools/migrate_config_to_yaml.py`：`cog_name = LEGACY_NAME_MAP.get(source_name, source_name)`。源文件仍叫 `config_tickets_new.json`，产物用新名 `tickets.yaml`。`--only tickets_new` 和 `--only tickets` 都解析到目标 `tickets`。
+- `tools/seed_db.py`：迭代 seed 时 `cog_name = LEGACY_NAME_MAP.get(source_name, source_name)` 再去 `seed_handlers.get`。老手工 seed 文件用 `tickets_new` key 也能走到 `seed_tickets` handler。
+- 打印时显式 `tickets_new→tickets` 让运维看到 shim 命中。
+
+**顺手清的 README 锚点冲突**：
+
+README.md 原本存在双重入口——`Tickets_New_Cog` (当前) + `Tickets_Cog (Legacy)` (archived to old_function) / `tickets_new_db` + `tickets_db` (legacy)。P1-3c rename 会让新名字和 legacy 锚点冲突。处理方式：
+- 新主入口 `Tickets_Cog` / `tickets_db` 取代原 `Tickets_New_Cog` / `tickets_new_db`。
+- legacy 入口加 `_Legacy` / `_legacy` 后缀避免 anchor 碰撞：`Tickets_Cog_Legacy` / `tickets_db_legacy`。
+- 同时修了 README 的 `/tickets_new_stats` / `/tickets_new_accept` 等 4 处 slash 命令误写（实际命令名本来就是 `/tickets_*` 不带 `_new`，这是 README 自身的历史文档 bug）。
+
+**CLAUDE.md 更新 3 处**：cog 描述 `tickets_new_cog.py` → `tickets/cog.py`；db manager 描述改名；legacy 迁移史段落补"formerly `TicketsNewCog`; renamed in P1-3c, V2.x"的注脚。
+
+**运行时兼容 shim 不加**（PLAN 标可选；用户选了"不加"）：`bot/utils/config.py.get_config('tickets_new')` 不做自动映射。全量 grep 已确保代码层无 `tickets_new` 残留（仅 SQL 表名 + 历史注释保留）。future regression 直接 KeyError / missing config，比 silent warn 更快暴露。
+
+**验收**：
+- `python3 -m py_compile` 全文件 OK
+- `tools/check_locales.py`: 556 t() + 170 locale_str key 全 resolve ✅
+- stub-based import smoke: `TicketsCog.__module__ == 'bot.cogs.tickets.cog'` ✅，`TicketsDatabaseManager.__module__ == 'bot.utils.tickets_db'` ✅
+- **未做**（测试服）：
+  - `/tickets_init` → 创建 ticket type → 提交工单 → accept → close 全链路（依赖真 Discord + token + 干净 bot.db）
+  - 冷启带老 `config_tickets_new.json` 跑 `migrate_config_to_yaml.py`，确认产物落位 `tickets.yaml`
+
+**未做（follow-up 记录）**：
+- `REFACTORING_TEST_CHECKLIST.md` L103 `1.5 tickets_new_cog` 测试条目未改 —— 属历史测试清单，描述某历史时期的清查；本轮不扩大文档 scope。有用户跑全量测试时一并清理。
+- DB 三张表 `tickets_new` / `ticket_new_members` / `ticket_new_config` 仍带旧名 —— 留 P2-2 Schema 迁移机制或 P1-3c 收尾二轮处理。
+- old_function/ 里的 `tickets_new_cog_pre_split.py` / `tickets_cog.py` 等历史归档**不动**（CLAUDE.md 约定"old_function 只承载已废弃代码"，rename 不应触及）。
+
 ## P1-8 审核补遗（2026-04-24，第 11 轮审核）
 
 三条 hygiene pass，详见 PLAN §P1-8。按 "影响半径 × 代码量" 从小到大收尾。
@@ -939,17 +1009,19 @@ ticket_type_delete_failure: ❌ 删除失败，请联系管理员
 
 3 源码 commit + 3 docs commit + 2 WIP 落盘 commit(`9e56242` docs + `de362ba` fix sibling) = 8 commit。P1-8 表格全 ✅。下一棒建议走 **P1-3c** rename（374 处 grep + LEGACY_NAME_MAP，3 commit）→ **P1-3b 第一档**（8 个小 cog + games/ 定型，8-10 commit）。
 
+> **Update 2026-04-24（晚些时候）**：P1-3c 已完成（`6f41b63` / `afd3aff` / 本 docs commit）。下一棒默认走 **P1-3b 第一档**。
+
 ### 剩余工作（跨会话接手）
 
-Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅；P1-4 dataclass schema + 静态 key 对齐 ✅；**P1-3 大 cog 拆包三 pilot 全 ✅**（tickets_new 2666 → 1910 行 + privateroom 1993 → 1655 行 + ban 1430 → 1418 行；主 cog 都缩减或至少 UI 层隔离到包子模块）；**P1-8 审核补遗 hygiene pass 全 ✅**（2026-04-24，P1-8a/b/c 三条合计 8 commit、~20 行净变，详见本文件 §P1-8）。
+Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅；P1-4 dataclass schema + 静态 key 对齐 ✅；**P1-3 大 cog 拆包三 pilot 全 ✅**（tickets_new 2666 → 1910 行 + privateroom 1993 → 1655 行 + ban 1430 → 1418 行；主 cog 都缩减或至少 UI 层隔离到包子模块）；**P1-8 审核补遗 hygiene pass 全 ✅**（2026-04-24，P1-8a/b/c 三条合计 8 commit、~20 行净变，详见本文件 §P1-8）；**P1-3c tickets_new → tickets rename ✅**（2026-04-24，3 commit，代码层 282 处 grep 清零，DB 三张表名按方案 A 保留留给 P2-2）。
 
-**2026-04-24 后续规划**（用户决定）：P1-3 扩展为 **§P1-3b 全量 cog 包化 + games 聚合** + **§P1-3c tickets_new → tickets rename**（见 PLAN 对应章节）。service.py 抽离后置，等全量包化完成后再横扫评估。
+**2026-04-24 后续规划**（用户决定）：P1-3 扩展为 **§P1-3b 全量 cog 包化 + games 聚合** + **§P1-3c tickets_new → tickets rename**（见 PLAN 对应章节）。service.py 抽离后置，等全量包化完成后再横扫评估。P1-3c 已收官，只剩 P1-3b。
 
 下一轮可接手的 follow-up：
 
 **🟡 important**（全量包化序列）：
-1. **P1-3c**（先做）：`tickets_new → tickets` 历史命名清理，374 处 grep 命中，3 commit；详见 PLAN §P1-3c + 本文件底部 handoff。迁移脚本需要加 `LEGACY_NAME_MAP` 兼容老源头。
-2. **P1-3b 第一档**：backup / teamup_display / game_dnd / game_spymode / welcome / notebook / check_status / create_invitation 共 8 个 cog，全部是小/中 cog，骨架以最小包 + 标准包为主；games/ 目录在 game_dnd 那棒定型。
+1. ~~**P1-3c**（先做）~~：✅ 已完成（2026-04-24，3 commit `6f41b63` / `afd3aff` / 本 docs commit）。
+2. **P1-3b 第一档**（**当前下一棒**）：backup / teamup_display / game_dnd / game_spymode / welcome / notebook / check_status / create_invitation 共 8 个 cog，全部是小/中 cog，骨架以最小包 + 标准包为主；games/ 目录在 game_dnd 那棒定型。
 3. **P1-3b 第二档**：achievement / voice_channel / giveaway 三个中大 cog。
 4. **P1-3b 第三档**：shop（**注意 persistent view**）+ role。
 5. per-cog 配置 schema（shop / ban / tickets / voicechannel / privateroom 等）：`bot/utils/config_schema.py` 里 dataclass 形状锁死，让 `admin_roles: List[int]` / `ticket_types: Dict[str, TicketType]` 等固定 shape 字段不会静默腐烂。可以在 P1-3b 对应包化 pilot 里一并加（顺水推舟），也可以最后统一做。
@@ -1001,7 +1073,7 @@ python tools/seed_db.py            # channel_configs + ticket_types 灌 DB
 | P1-8b giveaway `initialize_database` 迁 `cog_load` | `bot/cogs/giveaway_cog.py:438/558/1061` | P0-1 + P1-2 未收尾 | 中（启动期竞态，冷启可能炸） | ✅ `fc77465` |
 | P1-8c feature flag 类型校验提示 / 行为对齐 | `bot/utils/config_schema.py:132` vs `bot/utils/config.py:112` | P1-4 未对齐 | 低到中（静默启用误配的 cog） | ✅ `044b17c` |
 
-**P1-8 全收官** ✅。下一棒：P1-3c `tickets_new` → `tickets` rename（详见下方 handoff 路 B） → P1-3b 第一档（8 个小 cog + games/ 定型）。
+**P1-8 全收官** ✅。下一棒：~~P1-3c `tickets_new` → `tickets` rename~~（2026-04-24 已完成，见本文件 §P1-3c） → **P1-3b 第一档**（8 个小 cog + games/ 定型，当前 handoff）。
 
 `service.py` 抽离决定**后置** —— 包化完成后每家都有标准骨架，此时再横向评估 service 候选（本次 session 没动的原因：和三家保守 pilot 一致性更重要；全量包化后评估成本更低）。
 
@@ -1114,7 +1186,9 @@ cog_name = LEGACY_NAME_MAP.get(cog_name, cog_name)
 
 ### 路 C（冷板凳）：P2-1 数据库连接复用（PLAN §P2-1）
 
-P1-3 拆包完 ✅，现在技术上可以动 DB 层。但考虑用户决定 P1-3b 扩展包化，建议**先做完 P1-3b + P1-3c 再回来**动 DB —— 两条路互不冲突，但同时在做容易乱。
+P1-3 拆包完 ✅，P1-3c rename 也完成（2026-04-24）。建议**先做完 P1-3b 再回来**动 DB —— 两条路互不冲突，但同时在做容易乱。
+
+(P2-2 Schema 迁移机制 若要承接 P1-3c 留下的 DB 表名 `tickets_new` / `ticket_new_*` 清理，可以作为 P2-2 的第一个实际 payload)
 
 如果要做：SQLite 连接复用的 Explore 前置参见 PLAN §P2-1。
 
@@ -1130,9 +1204,10 @@ P1-3 拆包完 ✅，现在技术上可以动 DB 层。但考虑用户决定 P1-
 6. `ls bot/cogs/`（看当前 cog 布局）
 7. 决定路径：
    - **P1-8 hygiene pass 已全收官**（2026-04-24）：P1-8c ✅（`044b17c`）/ P1-8b ✅（`fc77465`）/ P1-8a ✅（`c62bb23`）；不必再展开 PLAN §P1-8，历史追溯才需要
-   - **下一棒推荐**：§P1-3c rename (tickets_new → tickets) → §P1-3b 第一档（8 个小 cog + games/ 定型）
+   - **P1-3c 已收官**（2026-04-24）：`6f41b63` / `afd3aff` + docs commit。详见本文件 §P1-3c。
+   - **下一棒推荐**：§P1-3b 第一档（8 个小 cog + games/ 定型）
 
-用户只说"继续"的话，默认接 **§P1-3c**（rename 374 处 grep 命中 + 迁移脚本 LEGACY_NAME_MAP；3 commit）；说具体任务名则照做。
+用户只说"继续"的话，默认接 **§P1-3b 第一档**（8 个小/中 cog 包化 + games/ 目录定型，8-10 commit）；说具体任务名则照做。
 
 ### 本次 session 补充（2026-04-24 P1-8 hygiene pass 收官 session）
 
@@ -1160,6 +1235,19 @@ P1-3 拆包完 ✅，现在技术上可以动 DB 层。但考虑用户决定 P1-
 - P1-8a：`chmod 400 bot.db` / rename 表 → 用户看到 "❌ 重命名/保存/删除失败，请联系管理员" 而非 "✅ ..."
 
 **P1-8 全收官后下一棒**（handoff 建议）：
-- §P1-3c rename (tickets_new → tickets)，374 处 grep + LEGACY_NAME_MAP，3 commit
-- 之后 §P1-3b 第一档（backup → teamup_display → game_dnd→games/dnd → game_spymode→games/spymode → welcome → notebook → check_status → create_invitation 共 8 cog，8-10 commit）
+- ~~§P1-3c rename~~ ✅ 2026-04-24 完成（`6f41b63` / `afd3aff` + docs commit）
+- 当前下一棒：§P1-3b 第一档（backup → teamup_display → game_dnd→games/dnd → game_spymode→games/spymode → welcome → notebook → check_status → create_invitation 共 8 cog，8-10 commit）
 - service.py 抽离评估、per-cog 配置 schema 锁形 —— 全量包化完成后再横扫
+
+### P1-3c rename session 补充（2026-04-24 晚些时候）
+
+**本轮 session**（3 commit）：
+| # | Commit | 类型 | 内容 |
+|---:|---|---|---|
+| 1 | `6f41b63` | refactor | P1-3c 静态 rename：`tickets_new/` → `tickets/`、`TicketsNewCog` → `TicketsCog`、t() key 批量 + 191 处、commands.yaml/COG_SPECS 对齐。DB 三张老表名按方案 A 保留（决策见 §P1-3c） |
+| 2 | `afd3aff` | chore | migrate_config_to_yaml.py + seed_db.py 加 `LEGACY_NAME_MAP = {'tickets_new': 'tickets'}`，兼容老部署 `config_tickets_new.json` 源头 |
+| 3 | 本 commit | docs | PROGRESS §P1-3c 笔记 + 表格 ✅ + handoff 更新；CLAUDE.md 3 处；README.md 锚点冲突修正 + 4 处 slash 命令误写顺手清 |
+
+**规划偏差（已在文档内嵌 errata）**：
+- PLAN §P1-3c "DB 表名已经是干净的（ticket_types）" 不准确 —— 实际有三张老表 `tickets_new` / `ticket_new_members` / `ticket_new_config`。实施时做决策表选方案 A（保留表名、只改代码层），避免扩大到 schema migration。
+- README.md 里发现 4 处早已存在的 slash 命令名误写（`/tickets_new_stats` 等——实际命令名从未带 `_new`）。P1-3c 顺手修，归属 README 自身历史文档 bug，不在原 PLAN 清单里。
