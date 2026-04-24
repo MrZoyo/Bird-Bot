@@ -60,6 +60,9 @@
 | P1 | P1-3 大 cog 拆包 | ✅ | tickets_new + privateroom + ban 三 pilot 全 ✅；service.py 统一评估留 follow-up |
 | P1 | P1-3b 全量 cog 包化 + games 聚合 | ⬜ | 扩展 P1-3 到剩下 13 个 cog；games/ 聚合目录；PLAN §P1-3b |
 | P1 | P1-3c tickets_new → tickets 历史命名清理 | ⬜ | 374 处 grep 命中；迁移脚本要加 LEGACY_NAME_MAP；PLAN §P1-3c |
+| P1 | P1-8a tickets_new ticket-type CRUD 返回值校验 | ⬜ | 第 11 轮审核；modals.py:361/392、views.py:329 漏检 `False`；PLAN §P1-8a |
+| P1 | P1-8b giveaway initialize_database 迁 cog_load | ⬜ | 第 11 轮审核；P1-2 收尾；on_ready vs task 启动竞态；PLAN §P1-8b |
+| P1 | P1-8c feature flag 类型校验提示 / 行为对齐 | ⬜ | 第 11 轮审核；config_schema warning 说 false、`is_feature_enabled` 回退 default；PLAN §P1-8c |
 | P2 | P2-1 数据库连接复用 | ⬜ | 需 close() 生命周期前置 |
 | P2 | P2-2 Schema 迁移机制 | ⬜ | |
 | P3 | P3-1 依赖管理统一 | ⬜ | |
@@ -171,9 +174,9 @@
 **内部顺序（按文档风险排序）**：
 
 1. ✅ **P0-3a check_status** — 完成（2026-04-23）
-2. ⬜ **P0-3b notebook**（342 行，小，练手）— 下一步
-3. ⬜ **P0-3c create_invitation**（606 行）
-4. ⬜ **P0-3d voice_channel**（1094 行，最大，需评估新 `voice_channel_db.py` 还是扩展既有 manager）
+2. ✅ **P0-3b notebook** — 完成（2026-04-23）
+3. ✅ **P0-3c create_invitation** — 完成（2026-04-23）
+4. ✅ **P0-3d voice_channel** — 完成（2026-04-23）
 
 **终局验收**：`grep -rn "aiosqlite.connect" bot/cogs/` 为空。
 
@@ -886,6 +889,16 @@ python tools/seed_db.py            # channel_configs + ticket_types 灌 DB
 
 **最新方向**（2026-04-24 用户明确）：P1-3 三 pilot 已证明包化路径可行，用户决定把 **P1-3 的范围扩展到全量 cog**（让 `bot/cogs/` 下只剩包目录、不再有平面 `*_cog.py`），并**把 2 个游戏 cog 聚合到 `bot/cogs/games/`**，为未来加新游戏留扩展点。相关详细计划见 **REFACTORING_PLAN.md §P1-3b**。同时规划了 **§P1-3c**：把 `tickets_new` 这个 V1.6.5b 遗留命名清掉、改回 `tickets`，但迁移脚本要保留 `tickets_new → tickets` 的名字映射以兼容老部署的 `config_tickets_new.json` 源头。
 
+**P1-8 审核补遗（2026-04-24 新增，第 11 轮审核发现）**：三条之前 P 任务的遗漏尾巴，改动面都很小但都有可观测的错位行为。建议作为 **P1-3b 启动前的 hygiene pass** 一次收尾（三条共 ~3 commit、~20 行代码改动）：
+
+| 条目 | 位置 | 归属原 P | 严重度 |
+|---|---|---|---|
+| P1-8a tickets_new ticket-type CRUD 未校验 DB 返回值 | `bot/cogs/tickets_new/modals.py:361/392`、`views.py:329` | P1-3 pilot + P2-5 未对齐 | 中（用户错觉成功） |
+| P1-8b giveaway `initialize_database` 迁 `cog_load` | `bot/cogs/giveaway_cog.py:438/558/1061` | P0-1 + P1-2 未收尾 | 中（启动期竞态，冷启可能炸） |
+| P1-8c feature flag 类型校验提示 / 行为对齐 | `bot/utils/config_schema.py:132` vs `bot/utils/config.py:112` | P1-4 未对齐 | 低到中（静默启用误配的 cog） |
+
+**推荐顺序**：P1-8c（4 行）→ P1-8b（giveaway 单文件）→ P1-8a（三处 UX + locale，和 P1-3c sed 配合）。详见 PLAN §P1-8。
+
 `service.py` 抽离决定**后置** —— 包化完成后每家都有标准骨架，此时再横向评估 service 候选（本次 session 没动的原因：和三家保守 pilot 一致性更重要；全量包化后评估成本更低）。
 
 ---
@@ -1006,14 +1019,17 @@ P1-3 拆包完 ✅，现在技术上可以动 DB 层。但考虑用户决定 P1-
 ### 最短新 session 启动清单
 
 1. `cat REFACTORING_PLAN.md | sed -n '130,400p'`（过 §P1-3 / §P1-3b / §P1-3c 三章）
-2. `sed -n '1,80p' REFACTORING_PROGRESS.md`（看表格 + 顶部概览）
-3. `sed -n '875,1000p' REFACTORING_PROGRESS.md`（看 handoff block）
-4. `git log --oneline -15`（最近节奏）
-5. `git log --grep='(P1-3 pilot)' --stat`（三 pilot 的 commit 粒度 / 增删量）
-6. `ls bot/cogs/`（看当前 cog 布局）
-7. 决定：先 §P1-3c（rename）还是先 §P1-3b 第一档（小 cog + games）。默认建议：**先 P1-3c，再 P1-3b 第一档**。
+2. `grep -n '^### P1-8' REFACTORING_PLAN.md` → 跳到 §P1-8（第 11 轮审核补遗，三条 hygiene）
+3. `sed -n '1,80p' REFACTORING_PROGRESS.md`（看表格 + 顶部概览）
+4. `sed -n '875,1000p' REFACTORING_PROGRESS.md`（看 handoff block 含 P1-8 速记）
+5. `git log --oneline -15`（最近节奏）
+6. `git log --grep='(P1-3 pilot)' --stat`（三 pilot 的 commit 粒度 / 增删量）
+7. `ls bot/cogs/`（看当前 cog 布局）
+8. 决定路径：
+   - **推荐**：先 §P1-8c → §P1-8b → §P1-8a（三条 hygiene，~20 行）→ §P1-3c rename → §P1-3b 第一档
+   - 或按原计划：先 §P1-3c → §P1-3b 第一档，P1-8 并行穿插
 
-用户只说"继续"的话，默认从 **P1-3c rename** 开始；说具体任务名则照做。
+用户只说"继续"的话，默认从 **P1-8c**（最小改动）起步；说具体任务名则照做。
 
 ### 本次 session 补充（2026-04-24 后续规划 commit）
 
