@@ -888,7 +888,7 @@ README.md 原本存在双重入口——`Tickets_New_Cog` (当前) + `Tickets_Co
 - legacy 入口加 `_Legacy` / `_legacy` 后缀避免 anchor 碰撞：`Tickets_Cog_Legacy` / `tickets_db_legacy`。
 - 同时修了 README 的 `/tickets_new_stats` / `/tickets_new_accept` 等 4 处 slash 命令误写（实际命令名本来就是 `/tickets_*` 不带 `_new`，这是 README 自身的历史文档 bug）。
 
-**CLAUDE.md 更新 3 处**：cog 描述 `tickets_new_cog.py` → `tickets/cog.py`；db manager 描述改名；legacy 迁移史段落补"formerly `TicketsNewCog`; renamed in P1-3c, V2.x"的注脚。
+**CLAUDE.md 本地同步（不入 git）**：CLAUDE.md 在 `.gitignore:109` 里，每个开发者按需本地定制。P1-3c 期间同步把本地副本里的 3 处 `tickets_new` / `TicketsNewCog` 提及改到新名（cog 描述、db manager 描述、legacy 迁移史注脚），但**这些改动不随 commit 分发**。如果团队里其它成员仓库有自己的 CLAUDE.md，需要本地手动同步；或者未来把 CLAUDE.md 从 .gitignore 移出后重新入库。
 
 **运行时兼容 shim 不加**（PLAN 标可选；用户选了"不加"）：`bot/utils/config.py.get_config('tickets_new')` 不做自动映射。全量 grep 已确保代码层无 `tickets_new` 残留（仅 SQL 表名 + 历史注释保留）。future regression 直接 KeyError / missing config，比 silent warn 更快暴露。
 
@@ -904,6 +904,16 @@ README.md 原本存在双重入口——`Tickets_New_Cog` (当前) + `Tickets_Co
 - `REFACTORING_TEST_CHECKLIST.md` L103 `1.5 tickets_new_cog` 测试条目未改 —— 属历史测试清单，描述某历史时期的清查；本轮不扩大文档 scope。有用户跑全量测试时一并清理。
 - DB 三张表 `tickets_new` / `ticket_new_members` / `ticket_new_config` 仍带旧名 —— 留 P2-2 Schema 迁移机制或 P1-3c 收尾二轮处理。
 - old_function/ 里的 `tickets_new_cog_pre_split.py` / `tickets_cog.py` 等历史归档**不动**（CLAUDE.md 约定"old_function 只承载已废弃代码"，rename 不应触及）。
+
+**Follow-up commit `790367e`（2026-04-24 晚，外部审核发现）**：3 条 P1-3c 初版漏掉的 latent bug：
+
+| # | 问题 | 后果（未修时） | 修复 |
+|---:|---|---|---|
+| 1 | `bot/config/main.yaml.example:30` 仍写 `tickets_new: true` | 运维从模板拷贝 → `features.tickets_new: false` 时静默被新代码忽略 → `features.tickets` 缺失走 default=True → 以为禁用的 cog 实际被加载 | 模板改 `tickets: true` |
+| 2 | migrate 脚本未 rename `main.features.tickets_new` | 老部署 `config_main.json` 的 `features.tickets_new` 产出到 `main.yaml` 后仍是旧 key；同上静默 bug | `_rename_legacy_feature_keys()` 在 `cog_name=='main'` 时对 `features` 做 in-place rename，new 赢 legacy |
+| 3 | migrate 的 `--only` + per-file dispatch 两处 map 后，同时存在 `config_tickets.json`（legacy channel-based，schema 不同）和 `config_tickets_new.json`（thread-based）会 silently overwrite，按 sort 谁后谁赢 | 老部署若两种 JSON 并存，会覆盖错的那份到 `tickets.yaml` | duplicate target pre-check，collision 直接 exit 1 + 报告冲突文件 |
+
+3 个问题都属于 P1-3c commit 1/2 应该做但漏掉的。follow-up commit 对等地补齐。
 
 ## P1-8 审核补遗（2026-04-24，第 11 轮审核）
 
@@ -1246,7 +1256,9 @@ P1-3 拆包完 ✅，P1-3c rename 也完成（2026-04-24）。建议**先做完 
 |---:|---|---|---|
 | 1 | `6f41b63` | refactor | P1-3c 静态 rename：`tickets_new/` → `tickets/`、`TicketsNewCog` → `TicketsCog`、t() key 批量 + 191 处、commands.yaml/COG_SPECS 对齐。DB 三张老表名按方案 A 保留（决策见 §P1-3c） |
 | 2 | `afd3aff` | chore | migrate_config_to_yaml.py + seed_db.py 加 `LEGACY_NAME_MAP = {'tickets_new': 'tickets'}`，兼容老部署 `config_tickets_new.json` 源头 |
-| 3 | 本 commit | docs | PROGRESS §P1-3c 笔记 + 表格 ✅ + handoff 更新；CLAUDE.md 3 处；README.md 锚点冲突修正 + 4 处 slash 命令误写顺手清 |
+| 3 | `9273394` | docs | PROGRESS §P1-3c 笔记 + 表格 ✅ + handoff 更新；PLAN §P1-3c 加 ✅ + errata；README 锚点冲突修正 + 4 处 slash 命令误写顺手清。CLAUDE.md 也改了 3 处但它是 gitignored，不随 commit 分发 |
+| 4 | `790367e` | fix | P1-3c follow-up：3 个 latent bug（`main.yaml.example` features key 未同步；migrate 脚本未 rename `main.features.tickets_new`；duplicate target detection 缺失）|
+| 5 | 本 commit | docs | 修正 §P1-3c 里"CLAUDE.md 更新"的叙述，明确 gitignored 不入 git |
 
 **规划偏差（已在文档内嵌 errata）**：
 - PLAN §P1-3c "DB 表名已经是干净的（ticket_types）" 不准确 —— 实际有三张老表 `tickets_new` / `ticket_new_members` / `ticket_new_config`。实施时做决策表选方案 A（保留表名、只改代码层），避免扩大到 schema migration。
