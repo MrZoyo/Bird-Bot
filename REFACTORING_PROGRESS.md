@@ -57,7 +57,7 @@
 | P1 | P1-1 命令同步逻辑 | ✅ | sync 迁 setup_hook；on_ready 只留 presence/日志 |
 | P1+P2 | 配置系统 2.0（P1-6 + P1-4 + P2-3 + P2-5） | ✅ | step 0-9 全部完成（P1-4 最小版；pydantic 全量留 follow-up） |
 | P1 | P1-7 Slash 元数据本地化 | ✅ | SlashTranslator + 176 key commands.yaml |
-| P1 | P1-3 大 cog 拆包 | 🔄 | tickets_new pilot ✅；privateroom / ban 待做 |
+| P1 | P1-3 大 cog 拆包 | 🔄 | tickets_new + privateroom pilots ✅；ban 待做 |
 | P2 | P2-1 数据库连接复用 | ⬜ | 需 close() 生命周期前置 |
 | P2 | P2-2 Schema 迁移机制 | ⬜ | |
 | P3 | P3-1 依赖管理统一 | ⬜ | |
@@ -750,21 +750,57 @@ description=locale_str(
 - **未做**：测试服 `/tickets_init` → 创建 → accept → close 全链路跑一遍（依赖 token / DB / 真服务器）。下次触摸 tickets 流程 前建议跑一次。
 
 **剩下 pilot**：
-- `privateroom_cog.py`（1993 行）—— 按同模式拆。views 在私密房状态面板里；modals 在房间设置；service 候选也不抽。
 - `ban_cog.py`（1430 行）—— 按同模式拆。views / modals 体量小，但 service 候选（ban 超时任务、冻结期判断等）明显；二轮再决定是否抽 service.py。
+
+### P1-3 🔄 大 cog 拆包 pilot：privateroom（2026-04-24）
+
+**Commit grep**: `git log --grep='privateroom.*P1-3'`
+
+**做了什么**：`bot/cogs/privateroom_cog.py`（1993 行）按 tickets_new 同模板拆成 `bot/cogs/privateroom/` 包：
+
+| 文件 | 类 | 行数 |
+|---|---|---|
+| `modals.py` | `PurchaseModal` | 85 |
+| `views.py` | `ConfirmPurchaseView` / `PrivateRoomShopView` / `ResetConfirmView` / `RoomListView` | 254 |
+| `cog.py` | `PrivateRoomCog` + task loops + 业务方法 | 1655 |
+| `__init__.py` | re-export | 3 |
+
+**与 tickets_new pilot 的差异**：
+- **没 `embeds.py`**：原文件没 `EmbedColors` 常量类，也没独立的 embed builder function，所有 `discord.Embed(...)` 都是 cog method 里 inline 构造。没得抽。
+- **没 lazy import**：`PurchaseModal.on_submit` 只回调 `self.cog.create_private_room` / `process_advance_renewal` / `restore_private_room` 等 cog 方法，**完全不引用任何 view**。views → modals 是唯一方向（`ConfirmPurchaseView.confirm_callback` 创建 `PurchaseModal`），顶层 `from .modals import PurchaseModal` 即可。
+- **service 候选更薄**：没 tickets_new 那种 `is_admin_for_type` / admin CRUD 那一坨明显的业务层；基本就是 shop + privateroom DB 交互 + 折扣计算，留在 cog 里问题不大。
+
+**Persistent view**：本 cog **没调 `bot.add_view(...)`**（grep 确认）—— 所有 `PrivateRoomShopView` / `ConfirmPurchaseView` 都是 ephemeral（每次 interaction 重新 `view=PrivateRoomShopView(self)`）。`custom_id` 用字符串字面量（`confirm_purchase` / `purchase_privateroom` 等），跨模块也不破链。
+
+**顺手清的**：cog.py 的 import 块去掉两个死 import：
+- `import json` —— 全文件零引用。
+- `from typing import List` —— 只在一条 docstring 文案里出现（`"List all active private rooms"`），不是类型注解。
+- 保留了 `Optional / Dict / Tuple / Any` —— 都在真实 annotation 里。
+
+**已知小瑕疵（识别但未修）**：
+- `RoomListView.format_page` L300-301 两条中文裸字面量（`"用户 ID: {user_id}"` / `"未找到 (ID: {room_id})"`）—— 其它地方全走 `t()`，这两条没迁。
+- `cog.py setup_shop` L503 裸字面量 `"指定的频道必须是文字频道。"`、`reset_system` L467 `f"重置系统时出错: {e}"`、`list_rooms` L1565 `"目前没有活跃的私人房间。"` / `f"获取房间列表时出错: {e}"` 几条错误/提示消息未走 i18n。
+- 这些都是拆包前就存在的问题，P1-7 配的 `t()` 迁移 sprint 里也没覆盖。留作 follow-up，本 pilot 不扩大 scope。
+
+**验证**：
+- `python -m py_compile` 四个 .py + main.py OK。
+- Runtime import smoke test（stub discord / bot.utils）：`PrivateRoomCog.__module__ == 'bot.cogs.privateroom.cog'`，4 view + 1 modal 类全部可导入。
+- `tools/check_locales.py`：553 t() key + 170 locale_str key 全 resolve（与 tickets_new pilot 后相同，无 regression）。
+- **未做**：测试服 `/privateroom_init` → `/privateroom_setup` → 购买 → 续费 / 恢复全链路跑一遍（依赖 token / 真服务器 / seeded shop 余额）。
 
 ### 剩余工作（跨会话接手）
 
-Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅；P1-4 dataclass schema + 静态 key 对齐 ✅；P1-3 tickets_new pilot ✅。下一轮可接手的 follow-up：
+Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅；P1-4 dataclass schema + 静态 key 对齐 ✅；P1-3 tickets_new + privateroom pilot ✅。下一轮可接手的 follow-up：
 
 **🟡 important**：
-1. P1-3 剩下两个 pilot：`privateroom_cog`（1993 行）+ `ban_cog`（1430 行），套 tickets_new 同模板。
-2. per-cog 配置 schema（shop / ban / tickets_new / voicechannel / privateroom 等）：可在 P1-3 剩下 pilot 里一并加，把 `admin_roles: List[int]` / `ticket_types: Dict[str, TicketType]` 等固定形状字段锁死。
+1. P1-3 最后一个 pilot：`ban_cog`（1430 行），套 tickets_new / privateroom 同模板。体量最小但 service 候选最厚（tempban 超时任务、解除逻辑、冻结期判断等）—— 可以在这一轮**顺便评估抽 `service.py`** 的收益。
+2. per-cog 配置 schema（shop / ban / tickets_new / voicechannel / privateroom 等）：可在 ban pilot 里一并加，把 `admin_roles: List[int]` / `ticket_types: Dict[str, TicketType]` 等固定形状字段锁死。
 
 **🟢 nice-to-have**：
 1. P1-3 pilot 之后抽 `service.py`（tickets_new / privateroom / ban 三家一起评估），把 is_admin_for_type / admin CRUD / maintenance 方法搬离 cog。cog.py 里再有 500-1000 行可以下掉。
 2. P3-5 ruff（锁 P0-4 成果 + 未来裸 except 防线）。
 3. P1-7 后续：`check_status.where_is_menu` 的 ContextMenu `name='Where Is'` 目前硬编码英文；Discord `ContextMenu.name` 不走 Translator 链，想本地化需要构造时手写 `name_localizations={Locale.chinese: '...'}` dict（与 slash name 的 ASCII 约束不同，Context Menu name 允许中文）。
+4. privateroom pilot 里识别但未迁的 i18n 漏网之鱼（`RoomListView` L300-301 两条中文字面量、`setup_shop` / `reset_system` / `list_rooms` 的错误消息等 5-6 条），等下次触摸这些代码时一并迁到 `bot/locales/zh_CN/privateroom.yaml`。
 
 ---
 
@@ -792,20 +828,27 @@ python tools/seed_db.py            # channel_configs + ticket_types 灌 DB
 
 ### 下一个可接手的任务（压缩 context / 新 session 直接看这里）
 
-**推荐**：**P1-3 pilot 复制到 privateroom_cog**（1993 行）。tickets_new pilot 已 ✅，同套 pattern 复制即可：
+**推荐**：**P1-3 pilot 最后一棒 — ban_cog**（1430 行）。tickets_new / privateroom pilot 已 ✅，同套 pattern 套 ban 即可：
 
 ```
-bot/cogs/privateroom/
+bot/cogs/ban/
 ├── __init__.py
-├── embeds.py     # 颜色常量 / embed builders
-├── modals.py     # 房间设置 modal 们
-├── views.py      # 控制面板 View / 状态面板 View
-└── cog.py        # PrivateRoomCog（commands.Cog + 业务方法）
+├── modals.py     # ban reason / 解封 modal 们
+├── views.py      # 确认 / 管理 View
+└── cog.py        # BanCog（commands.Cog + tempban task + 业务方法）
 ```
 
-先花 5-10 分钟做 Explore agent cross-reference 报告（类 → 方法依赖图），再按 tickets_new 同模式逐类粘。参考 commit `git log --grep='(P1-3 pilot)'` 看 tickets_new 怎么做的；modals ↔ views cycle 的 lazy import 手法可能要用。
+embeds.py 视情况（如果有 BanEmbedColors / embed builder 才做）。**这一棒建议同时评估抽 `service.py`** —— ban 的 tempban 超时 task、冻结期判断、ban 记录 CRUD 等业务层比 tickets_new / privateroom 都要厚，抽出来 cog.py 可能能瘦掉 400-600 行。先做 Explore report 看清 service 候选方法边界后再决定。
 
-**接着**：ban_cog.py（1430 行）—— 同样 pattern，但 ban 命令的业务逻辑 service-like method 比 tickets_new 还要厚（临时 ban 超时 task、解除逻辑等），抽 service.py 的收益显著。可以在 ban pilot 里**顺便评估要不要抽**。
+**流程模板**（和前两棒一致）：
+1. Explore agent 做 cross-reference 报告（类清单 / 归属 / import 拓扑 / 循环依赖 / persistent view / `t` import 检查 / slash 命令清单 / 风险点），限 500 字。
+2. 按报告逐类粘到新文件，补每个文件的 local imports；如有 modals↔views cycle 用 lazy import 解。
+3. `git mv bot/cogs/ban_cog.py old_function/cogs/ban_cog_pre_split.py`。
+4. `bot/main.py` `module_path` 改 `"bot.cogs.ban"`。
+5. py_compile + stub-based runtime smoke + `tools/check_locales.py` 三连验证。
+6. 两 commit：`refactor(ban): split cog into package (P1-3 pilot)` + `docs: track progress after P1-3 ban pilot`。
+
+参考：`git log --grep='(P1-3 pilot)'` —— tickets_new（2666 行）+ privateroom（1993 行）两棒的 commit diff 直接照着动手。
 
 **替代**（轻的）：P3-5 ruff —— 加 pyproject `[tool.ruff]` + `E722` 规则锁 P0-4 成果；零代码风险。
 
