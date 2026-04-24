@@ -62,7 +62,7 @@
 | P1 | P1-3c tickets_new → tickets 历史命名清理 | ⬜ | 374 处 grep 命中；迁移脚本要加 LEGACY_NAME_MAP；PLAN §P1-3c |
 | P1 | P1-8a tickets_new ticket-type CRUD 返回值校验 | ⬜ | 第 11 轮审核；modals.py:361/392、views.py:329 漏检 `False`；PLAN §P1-8a |
 | P1 | P1-8b giveaway initialize_database 迁 cog_load | ⬜ | 第 11 轮审核；P1-2 收尾；on_ready vs task 启动竞态；PLAN §P1-8b |
-| P1 | P1-8c feature flag 类型校验提示 / 行为对齐 | ⬜ | 第 11 轮审核；config_schema warning 说 false、`is_feature_enabled` 回退 default；PLAN §P1-8c |
+| P1 | P1-8c feature flag 类型校验提示 / 行为对齐 | ✅ | `is_feature_enabled` 非 bool 改返 False，和 schema warning 对齐 |
 | P2 | P2-1 数据库连接复用 | ⬜ | 需 close() 生命周期前置 |
 | P2 | P2-2 Schema 迁移机制 | ⬜ | |
 | P3 | P3-1 依赖管理统一 | ⬜ | |
@@ -835,6 +835,46 @@ description=locale_str(
 - `tools/check_locales.py`：553 t() + 170 locale_str key 全 resolve（与前两棒 pilot 后相同，无 regression）。
 - **未做**：测试服 `/ban` → `/tempban` → `/mute` → tempban 到期自动解封 + 重启恢复的完整链路跑一遍（依赖 token / 真 guild / seeded DB + 24h 以上的自然时间观察）。
 
+## P1-8 审核补遗（2026-04-24，第 11 轮审核）
+
+三条 hygiene pass，详见 PLAN §P1-8。按 "影响半径 × 代码量" 从小到大收尾。
+
+**WIP 先落盘的两个 sibling commit**（属审核路径上顺手发现，不在 P1-8a/b/c 范围）：
+
+| Commit | 改动 | 原因 |
+|---|---|---|
+| `de362ba fix: two latent bugs ...` | `tickets_new/views.py:278` `cog.conf.get('ticket_types')` → `cog.ticket_types` | P1-3 pilot 拆包后 cog.py:33 已 `pop('ticket_types', None)`，views.py 这一处漏改 → `TypeSelectView` 下拉永远空 |
+| 同上 | `main.py` COG_SPECS: `CheckStatusCog` / `SpyModeCog` 的 `required_configs` 从 `["checkstatus"]` / `["spymode"]` 清空 | `bot/config/` 里没有这俩 yaml，`_get_missing_configs` 会把两个 cog 跳掉 → `/check_status` 和 spymode 游戏加载不了 |
+
+### P1-8c ✅ feature flag 类型校验行为对齐（2026-04-24）
+
+**Commit grep**: `git log --grep='(P1-8c)'`
+
+**问题**：`config_schema.py:132` warning 说 "will be ignored as false"；但 `config.py:112` `is_feature_enabled` 对非 bool 值回退 `default=True`（两个调用点 `main.py:234` / `achievement_cog.py:506` 都传 default=True）。运维写 `features: {shop: "false"}`（字符串）会让日志记 warning 但 shop 仍被加载——警告与行为相反。
+
+**做法**：`is_feature_enabled` 三个显式分支：
+- key 不在 features dict → 返回 `default`（维持原"key 缺失"语义，两个调用点不变）
+- 值是 bool → 返回 bool 值
+- 值存在但非 bool → **返回 `False`**（和 warning 对齐）
+
+只改"key 存在但类型错"这一分支方向。调用点盘查 `grep -rn 'is_feature_enabled' bot/`：两个调用点（`main.py:234` / `achievement_cog.py:506`）都用隐式 `default=True`，语义未变。
+
+**smoke**（`yaml-venv` 直接 import `bot/utils/config.py`，猴子替 `get_feature_flags`）：
+
+```
+A. key 缺失：default=True → True；default=False → False  （透传）
+B. bool True / False                            → 原值
+C. str "false" / "true" / int 1 / None          → 一律 False（不再回 default=True）
+```
+
+**未做（测试服）**：
+- `main.yaml` 写 `features: {shop: "false"}` 冷启，确认 shop cog 未加载 + schema warning 出日志
+- 正常布尔 / 不写 flag 两条回归路径
+
+改动面只 4 行净变，行为变化严格局限于 "key 存在但类型错" 分支。
+
+**顺手发现（未做）**：`config_schema.py:134` 的 warning 文案提 "got `<type>`"，不带 key 原值。如果用户真误写，日志里看到 `got str` 但不知道是 `"false"` / `"yes"` / `"1"`，排障得去翻 yaml —— 留作 P3-5 加 ruff 时顺手改。
+
 ### 剩余工作（跨会话接手）
 
 Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅；P1-4 dataclass schema + 静态 key 对齐 ✅；**P1-3 大 cog 拆包三 pilot 全 ✅**（tickets_new 2666 → 1910 行 + privateroom 1993 → 1655 行 + ban 1430 → 1418 行；主 cog 都缩减或至少 UI 层隔离到包子模块）。
@@ -889,15 +929,15 @@ python tools/seed_db.py            # channel_configs + ticket_types 灌 DB
 
 **最新方向**（2026-04-24 用户明确）：P1-3 三 pilot 已证明包化路径可行，用户决定把 **P1-3 的范围扩展到全量 cog**（让 `bot/cogs/` 下只剩包目录、不再有平面 `*_cog.py`），并**把 2 个游戏 cog 聚合到 `bot/cogs/games/`**，为未来加新游戏留扩展点。相关详细计划见 **REFACTORING_PLAN.md §P1-3b**。同时规划了 **§P1-3c**：把 `tickets_new` 这个 V1.6.5b 遗留命名清掉、改回 `tickets`，但迁移脚本要保留 `tickets_new → tickets` 的名字映射以兼容老部署的 `config_tickets_new.json` 源头。
 
-**P1-8 审核补遗（2026-04-24 新增，第 11 轮审核发现）**：三条之前 P 任务的遗漏尾巴，改动面都很小但都有可观测的错位行为。建议作为 **P1-3b 启动前的 hygiene pass** 一次收尾（三条共 ~3 commit、~20 行代码改动）：
+**P1-8 审核补遗（2026-04-24，第 11 轮审核）**：三条之前 P 任务的遗漏尾巴，改动面都很小但都有可观测的错位行为。作为 P1-3b 启动前的 hygiene pass：
 
-| 条目 | 位置 | 归属原 P | 严重度 |
-|---|---|---|---|
-| P1-8a tickets_new ticket-type CRUD 未校验 DB 返回值 | `bot/cogs/tickets_new/modals.py:361/392`、`views.py:329` | P1-3 pilot + P2-5 未对齐 | 中（用户错觉成功） |
-| P1-8b giveaway `initialize_database` 迁 `cog_load` | `bot/cogs/giveaway_cog.py:438/558/1061` | P0-1 + P1-2 未收尾 | 中（启动期竞态，冷启可能炸） |
-| P1-8c feature flag 类型校验提示 / 行为对齐 | `bot/utils/config_schema.py:132` vs `bot/utils/config.py:112` | P1-4 未对齐 | 低到中（静默启用误配的 cog） |
+| 条目 | 位置 | 归属原 P | 严重度 | 状态 |
+|---|---|---|---|---|
+| P1-8a tickets_new ticket-type CRUD 未校验 DB 返回值 | `bot/cogs/tickets_new/modals.py:361/392`、`views.py:329` | P1-3 pilot + P2-5 未对齐 | 中（用户错觉成功） | ⬜ |
+| P1-8b giveaway `initialize_database` 迁 `cog_load` | `bot/cogs/giveaway_cog.py:438/558/1061` | P0-1 + P1-2 未收尾 | 中（启动期竞态，冷启可能炸） | ⬜ |
+| P1-8c feature flag 类型校验提示 / 行为对齐 | `bot/utils/config_schema.py:132` vs `bot/utils/config.py:112` | P1-4 未对齐 | 低到中（静默启用误配的 cog） | ✅ `044b17c` |
 
-**推荐顺序**：P1-8c（4 行）→ P1-8b（giveaway 单文件）→ P1-8a（三处 UX + locale，和 P1-3c sed 配合）。详见 PLAN §P1-8。
+**执行顺序**：P1-8c（done）→ P1-8b（giveaway 单文件）→ P1-8a（三处 UX + locale，和 P1-3c sed 配合）。详见 PLAN §P1-8。
 
 `service.py` 抽离决定**后置** —— 包化完成后每家都有标准骨架，此时再横向评估 service 候选（本次 session 没动的原因：和三家保守 pilot 一致性更重要；全量包化后评估成本更低）。
 
@@ -1026,10 +1066,10 @@ P1-3 拆包完 ✅，现在技术上可以动 DB 层。但考虑用户决定 P1-
 6. `git log --grep='(P1-3 pilot)' --stat`（三 pilot 的 commit 粒度 / 增删量）
 7. `ls bot/cogs/`（看当前 cog 布局）
 8. 决定路径：
-   - **推荐**：先 §P1-8c → §P1-8b → §P1-8a（三条 hygiene，~20 行）→ §P1-3c rename → §P1-3b 第一档
+   - **当前进行中**：P1-8 hygiene pass — P1-8c ✅（`044b17c`）/ P1-8b ⬜ / P1-8a ⬜ → 完再走 §P1-3c rename → §P1-3b 第一档
    - 或按原计划：先 §P1-3c → §P1-3b 第一档，P1-8 并行穿插
 
-用户只说"继续"的话，默认从 **P1-8c**（最小改动）起步；说具体任务名则照做。
+用户只说"继续"的话，默认接 **P1-8b**（giveaway 单文件；P1-8c 已完成）；说具体任务名则照做。
 
 ### 本次 session 补充（2026-04-24 后续规划 commit）
 
