@@ -20,7 +20,7 @@ COG_SPECS = [
     {
         "feature": "welcome",
         "cog_name": "WelcomeCog",
-        "module_path": "bot.cogs.welcome_cog",
+        "module_path": "bot.cogs.welcome",
         "class_name": "WelcomeCog",
         "required_configs": ["welcome"],
     },
