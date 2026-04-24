@@ -434,7 +434,8 @@ class GiveawayCog(commands.Cog):
         self.giveaway_win_private_message = t('giveaway.giveaway_win_private_message')
         self.giveaway_fail_message = t('giveaway.giveaway_fail_message')
 
-        # Start the background task
+    async def cog_load(self):
+        await self.db.initialize_database()
         self.check_giveaways.start()
 
     async def draw_winners(self, giveaway_id, winner_number):
@@ -1058,5 +1059,4 @@ class GiveawayCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        await self.db.initialize_database()
         await self.load_giveaways()
