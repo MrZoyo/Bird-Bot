@@ -169,19 +169,19 @@ bot/cogs/
 │   # 可选：games/_lib.py / games/common.py —— 当有第 3 个游戏、
 │   # 且出现可共享代码（如轮流制 turn manager / 玩家列表管理）
 │   # 时再建；本轮**不**预建空 common 模块。
-├── achievement/                # 928 行，5 View → views.py + cog.py
+├── achievement/                ✅ 已完成（Tier 2，928 行，5 View → views.py + cog.py）
 ├── backup/                     # 81 行，纯 Cog → 最小包（__init__ + cog.py）
 ├── ban/                        ✅ 已完成
 ├── check_status/               # 465 行，1 View → views.py + cog.py
 ├── create_invitation/          # 638 行，2 View → views.py + cog.py
-├── giveaway/                   # 1062 行，2 View + 1 ConfirmView + 1 Modal → 全四件
+├── giveaway/                   ✅ 已完成（Tier 2，1062 行，3 View + 1 Modal → 全四件）
 ├── notebook/                   # 311 行，2 View → views.py + cog.py
 ├── privateroom/                ✅ 已完成
 ├── role/                       # 1151 行，4 View + 1 Modal → 全四件
 ├── shop/                       # 1101 行，2 View + 2 Modal → 全四件；persistent view 要小心
 ├── teamup_display/             # 472 行，纯 Cog → 最小包
 ├── tickets/                    ✅ 已完成（含 P1-3c rename）
-├── voice_channel/              # 1018 行，3 View + 1 Modal → 全四件
+├── voice_channel/              ✅ 已完成（Tier 2，1018 行，2 View + 1 Modal → 全四件；drop 1 dead 模块级 View）
 └── welcome/                    # 285 行，1 View → views.py + cog.py
 ```
 
@@ -213,10 +213,10 @@ bot/cogs/
 7. ✅ check_status（465 行，标准包，where_is 右键菜单随 cog 在 `cog_load` 注册/卸载）（`d026b34`）
 8. ✅ create_invitation（638 行，标准包，`TeamInvitationView.room_full_button_callback` 通过 `bot.get_cog('CreateInvitationCog')` 回 cog 的调用链跨模块继续工作）（`332e7e7`）
 
-**第二档：中型 cog（UI 层明显）** — 3 个 commit
-9. achievement（928 行，5 View，标准包）
-10. voice_channel（1018 行，完整包）
-11. giveaway（1062 行，完整包）
+**第二档：中型 cog（UI 层明显）** — ✅ 2026-04-24（3 commit，计划内收官）
+9. ✅ achievement（928 行，5 View，标准包）（`b716f3b`）
+10. ✅ voice_channel（1018 行，完整包；drop 模块级死 `DeleteChannelConfirmView`；修 stale `create_invitation_cog` comment）（`4fddadc`）
+11. ✅ giveaway（1062 行，完整包；3 View 入 views.py + 1 Modal 入 modals.py；cog.py 收敛到 671 行）（`f164ec1`）
 
 **第三档：大 cog + persistent view** — 2 个 commit
 12. shop（1101 行，完整包，**persistent view 迁移**）—— 放最后降低回归风险
