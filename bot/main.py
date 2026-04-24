@@ -62,7 +62,7 @@ COG_SPECS = [
     {
         "feature": "spymode",
         "cog_name": "SpyModeCog",
-        "module_path": "bot.cogs.game_spymode_cog",
+        "module_path": "bot.cogs.games.spymode",
         "class_name": "SpyModeCog",
         "required_configs": [],
     },
