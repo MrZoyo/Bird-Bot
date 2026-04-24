@@ -118,7 +118,7 @@ COG_SPECS = [
     {
         "feature": "teamup_display",
         "cog_name": "TeamupDisplayCog",
-        "module_path": "bot.cogs.teamup_display_cog",
+        "module_path": "bot.cogs.teamup_display",
         "class_name": "TeamupDisplayCog",
         "required_configs": ["teamup_display"],
     },
