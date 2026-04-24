@@ -60,7 +60,7 @@
 | P1 | P1-3 大 cog 拆包 | ✅ | tickets_new + privateroom + ban 三 pilot 全 ✅；service.py 统一评估留 follow-up |
 | P1 | P1-3b 全量 cog 包化 + games 聚合 | ⬜ | 扩展 P1-3 到剩下 13 个 cog；games/ 聚合目录；PLAN §P1-3b |
 | P1 | P1-3c tickets_new → tickets 历史命名清理 | ⬜ | 374 处 grep 命中；迁移脚本要加 LEGACY_NAME_MAP；PLAN §P1-3c |
-| P1 | P1-8a tickets_new ticket-type CRUD 返回值校验 | ⬜ | 第 11 轮审核；modals.py:361/392、views.py:329 漏检 `False`；PLAN §P1-8a |
+| P1 | P1-8a tickets_new ticket-type CRUD 返回值校验 | ✅ | 三处接 `ok` + 失败分支走 locale；新增 3 个 failure key |
 | P1 | P1-8b giveaway initialize_database 迁 cog_load | ✅ | cog_load 先建表后 start task；on_ready 只留 load_giveaways |
 | P1 | P1-8c feature flag 类型校验提示 / 行为对齐 | ✅ | `is_feature_enabled` 非 bool 改返 False，和 schema warning 对齐 |
 | P2 | P2-1 数据库连接复用 | ⬜ | 需 close() 生命周期前置 |
@@ -898,6 +898,47 @@ C. str "false" / "true" / int 1 / None          → 一律 False（不再回 def
 - `grep` 验收：`cog_load` 在 437、`on_ready` 在 1061、`__init__` 再无 `check_giveaways.start`、`on_ready` 再无 `initialize_database`
 - **未做（测试服）**：`rm bot.db` 冷启，首次 `check_giveaways` tick 日志无 `no such table` / `OperationalError`
 
+### P1-8a ✅ tickets_new ticket-type CRUD 返回值校验（2026-04-24）
+
+**Commit grep**: `git log --grep='(P1-8a)'`
+
+**问题**：`tickets_new/modals.py:361`（rename）、`:392`（upsert）、`tickets_new/views.py:329`（delete）各自 `await db_manager.<method>()` 但不接返回值。三个 manager 方法 (`tickets_new_db.py:94/117/151`) 的实现是 `try/except` + `return False`——SQLite 写入失败（锁 / 磁盘满 / schema 异常）时 `commit` 被 except 吞、方法 return False，但原代码继续跳到 `_refresh_ticket_types()` + 发 "✅ ..."，用户错觉成功。
+
+**根因**：P1-3 pilot 拆 `tickets_new_cog` 成包时照抄原逻辑（原逻辑没检查）；manager 的 `return False` 语义是 P2-5 迁 `ticket_types` 到 DB 时才引入——两条路没合上。
+
+**改点**：
+
+| 位置 | 操作 |
+|---|---|
+| `modals.py:361` rename | `ok = await rename_ticket_type(...)` + `if not ok: send(ticket_type_rename_failure) + return` |
+| `modals.py:392` upsert | `ok = await upsert_ticket_type(...)` + `if not ok: send(ticket_type_upsert_failure) + return` |
+| `views.py:329` delete | `ok = await remove_ticket_type(...)` + `if not ok: send(ticket_type_delete_failure) + return` |
+
+**新增 locale key**（`bot/locales/zh_CN/tickets_new.yaml` 的 `messages:` 子树）：
+```yaml
+ticket_type_rename_failure: ❌ 重命名失败，请联系管理员
+ticket_type_upsert_failure: ❌ 保存失败，请联系管理员
+ticket_type_delete_failure: ❌ 删除失败，请联系管理员
+```
+
+**范围约束**：failure 文案从 hardcoded 改走 locale 只针对 "manager return False 的静默失败路径"。两个 catch-all `except Exception` 里原本的 hardcoded `"❌ 操作失败"` / `"❌ 删除失败"` 文案**不在本补丁范围**（异常路径不同于 return False 路径），留给 P1-7 i18n 补遗或 P1-3c rename 时扫。
+
+**P1-3c rename 前置说明**：新 key 走 `tickets_new.messages.*`，因 rename 尚未完成；P1-3c sed 会把 `tickets_new.*` → `tickets.*` 一并扫到，不构成阻塞。
+
+**验证**：
+- `python3 -m py_compile` modals + views OK
+- `tools/check_locales.py`：556 t() + 170 locale_str key 全 resolve（比之前多 3 个 failure key）
+- **未做（测试服）**：`chmod 400 bot.db` 或临时 rename 表重现失败路径，看用户端从 "✅" 变成 "❌ ...请联系管理员"
+
+### P1-8 全收官（2026-04-24）
+
+三条 hygiene pass 全绿：
+- `044b17c` P1-8c - `is_feature_enabled` 非 bool 返回 False
+- `fc77465` P1-8b - giveaway `initialize_database` 迁 `cog_load`
+- `c62bb23` P1-8a - tickets_new CRUD 三处接返回值
+
+3 源码 commit + 3 docs commit + 2 WIP 落盘 commit(`9e56242` docs + `de362ba` fix sibling) = 8 commit。P1-8 表格全 ✅。下一棒建议走 **P1-3c** rename（374 处 grep + LEGACY_NAME_MAP，3 commit）→ **P1-3b 第一档**（8 个小 cog + games/ 定型，8-10 commit）。
+
 ### 剩余工作（跨会话接手）
 
 Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅；P1-4 dataclass schema + 静态 key 对齐 ✅；**P1-3 大 cog 拆包三 pilot 全 ✅**（tickets_new 2666 → 1910 行 + privateroom 1993 → 1655 行 + ban 1430 → 1418 行；主 cog 都缩减或至少 UI 层隔离到包子模块）。
@@ -956,11 +997,11 @@ python tools/seed_db.py            # channel_configs + ticket_types 灌 DB
 
 | 条目 | 位置 | 归属原 P | 严重度 | 状态 |
 |---|---|---|---|---|
-| P1-8a tickets_new ticket-type CRUD 未校验 DB 返回值 | `bot/cogs/tickets_new/modals.py:361/392`、`views.py:329` | P1-3 pilot + P2-5 未对齐 | 中（用户错觉成功） | ⬜ |
+| P1-8a tickets_new ticket-type CRUD 未校验 DB 返回值 | `bot/cogs/tickets_new/modals.py:361/392`、`views.py:329` | P1-3 pilot + P2-5 未对齐 | 中（用户错觉成功） | ✅ `c62bb23` |
 | P1-8b giveaway `initialize_database` 迁 `cog_load` | `bot/cogs/giveaway_cog.py:438/558/1061` | P0-1 + P1-2 未收尾 | 中（启动期竞态，冷启可能炸） | ✅ `fc77465` |
 | P1-8c feature flag 类型校验提示 / 行为对齐 | `bot/utils/config_schema.py:132` vs `bot/utils/config.py:112` | P1-4 未对齐 | 低到中（静默启用误配的 cog） | ✅ `044b17c` |
 
-**执行顺序**：P1-8c（done）→ P1-8b（done）→ P1-8a（三处 UX + locale，和 P1-3c sed 配合）。详见 PLAN §P1-8。
+**P1-8 全收官** ✅。下一棒：P1-3c `tickets_new` → `tickets` rename（详见下方 handoff 路 B） → P1-3b 第一档（8 个小 cog + games/ 定型）。
 
 `service.py` 抽离决定**后置** —— 包化完成后每家都有标准骨架，此时再横向评估 service 候选（本次 session 没动的原因：和三家保守 pilot 一致性更重要；全量包化后评估成本更低）。
 
@@ -1089,10 +1130,10 @@ P1-3 拆包完 ✅，现在技术上可以动 DB 层。但考虑用户决定 P1-
 6. `git log --grep='(P1-3 pilot)' --stat`（三 pilot 的 commit 粒度 / 增删量）
 7. `ls bot/cogs/`（看当前 cog 布局）
 8. 决定路径：
-   - **当前进行中**：P1-8 hygiene pass — P1-8c ✅（`044b17c`）/ P1-8b ✅（`fc77465`）/ P1-8a ⬜ → 完再走 §P1-3c rename → §P1-3b 第一档
-   - 或按原计划：先 §P1-3c → §P1-3b 第一档，P1-8 并行穿插
+   - **P1-8 hygiene pass 已全收官**：P1-8c ✅（`044b17c`）/ P1-8b ✅（`fc77465`）/ P1-8a ✅（`c62bb23`）
+   - **下一棒推荐**：§P1-3c rename (tickets_new → tickets) → §P1-3b 第一档（8 个小 cog + games/ 定型）
 
-用户只说"继续"的话，默认接 **P1-8a**（tickets_new 三处 CRUD 返回值校验 + failure locale key）；说具体任务名则照做。
+用户只说"继续"的话，默认接 **§P1-3c**（rename 374 处 grep 命中 + 迁移脚本 LEGACY_NAME_MAP；3 commit）；说具体任务名则照做。
 
 ### 本次 session 补充（2026-04-24 后续规划 commit）
 
