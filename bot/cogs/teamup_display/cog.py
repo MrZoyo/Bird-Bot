@@ -1,4 +1,3 @@
-# bot/cogs/teamup_display_cog.py
 import logging
 import re
 from datetime import datetime
@@ -467,7 +466,3 @@ class TeamupDisplayCog(commands.Cog):
         
         embed.description = "\n".join(type_list)
         return embed
-
-
-async def setup(bot):
-    await bot.add_cog(TeamupDisplayCog(bot))
