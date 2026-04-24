@@ -293,7 +293,7 @@ teamup_display:
   teamup_type_list:
     description: "列出所有游戏类型配置"
 
-tickets_new:
+tickets:
   tickets_init:
     description: "初始化工单系统"
     params:

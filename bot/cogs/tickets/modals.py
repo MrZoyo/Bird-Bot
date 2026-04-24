@@ -9,14 +9,14 @@ from .embeds import EmbedColors
 
 class TicketConfirmModal(discord.ui.Modal):
     def __init__(self, cog, type_name: str, type_data: dict):
-        super().__init__(title=t('tickets_new.messages.ticket_modal_confirm_title').format(type_name=type_name))
+        super().__init__(title=t('tickets.messages.ticket_modal_confirm_title').format(type_name=type_name))
         self.cog = cog
         self.type_name = type_name
         self.type_data = type_data
 
         self.confirm_input = discord.ui.TextInput(
-            label=t('tickets_new.messages.ticket_modal_confirm_label').format(type_name=type_name),
-            placeholder=t('tickets_new.messages.ticket_modal_confirm_placeholder'),
+            label=t('tickets.messages.ticket_modal_confirm_label').format(type_name=type_name),
+            placeholder=t('tickets.messages.ticket_modal_confirm_placeholder'),
             max_length=10,
             required=True
         )
@@ -25,7 +25,7 @@ class TicketConfirmModal(discord.ui.Modal):
     async def on_submit(self, interaction: discord.Interaction):
         if self.confirm_input.value.lower() != "yes":
             await interaction.response.send_message(
-                t('tickets_new.messages.ticket_confirmation_failed'),
+                t('tickets.messages.ticket_confirmation_failed'),
                 ephemeral=True
             )
             return
@@ -39,13 +39,13 @@ class TicketConfirmModal(discord.ui.Modal):
 
 class AddUserModal(discord.ui.Modal):
     def __init__(self, cog, thread_id: int):
-        super().__init__(title=t('tickets_new.messages.add_user_modal_title'))
+        super().__init__(title=t('tickets.messages.add_user_modal_title'))
         self.cog = cog
         self.thread_id = thread_id
 
         self.user_input = discord.ui.TextInput(
-            label=t('tickets_new.messages.add_user_modal_label'),
-            placeholder=t('tickets_new.messages.add_user_modal_placeholder'),
+            label=t('tickets.messages.add_user_modal_label'),
+            placeholder=t('tickets.messages.add_user_modal_placeholder'),
             max_length=20,
             required=True
         )
@@ -58,7 +58,7 @@ class AddUserModal(discord.ui.Modal):
 
             if not user:
                 await interaction.response.send_message(
-                    t('tickets_new.messages.add_user_not_found'),
+                    t('tickets.messages.add_user_not_found'),
                     ephemeral=True
                 )
                 return
@@ -67,7 +67,7 @@ class AddUserModal(discord.ui.Modal):
             _, is_closed = await self.cog.db_manager.check_ticket_status(self.thread_id)
             if is_closed:
                 await interaction.response.send_message(
-                    t('tickets_new.messages.ticket_closed_no_modify'),
+                    t('tickets.messages.ticket_closed_no_modify'),
                     ephemeral=True
                 )
                 return
@@ -79,7 +79,7 @@ class AddUserModal(discord.ui.Modal):
 
             if not success:
                 await interaction.response.send_message(
-                    t('tickets_new.messages.add_user_already_added'),
+                    t('tickets.messages.add_user_already_added'),
                     ephemeral=True
                 )
                 return
@@ -91,8 +91,8 @@ class AddUserModal(discord.ui.Modal):
 
             # Create success embed
             embed = discord.Embed(
-                title=t('tickets_new.messages.add_user_success_title'),
-                description=t('tickets_new.messages.add_user_success_content').format(
+                title=t('tickets.messages.add_user_success_title'),
+                description=t('tickets.messages.add_user_success_content').format(
                     user=user.mention,
                     adder=interaction.user.mention
                 ),
@@ -107,8 +107,8 @@ class AddUserModal(discord.ui.Modal):
             # Send DM to added user with jump button
             try:
                 dm_embed = discord.Embed(
-                    title=t('tickets_new.messages.add_user_dm_title'),
-                    description=t('tickets_new.messages.add_user_dm_content').format(thread=thread.mention if thread else f"<#{self.thread_id}>"),
+                    title=t('tickets.messages.add_user_dm_title'),
+                    description=t('tickets.messages.add_user_dm_content').format(thread=thread.mention if thread else f"<#{self.thread_id}>"),
                     color=EmbedColors.ADD_USER
                 )
 
@@ -116,7 +116,7 @@ class AddUserModal(discord.ui.Modal):
                 dm_view = discord.ui.View()
                 jump_button = discord.ui.Button(
                     style=discord.ButtonStyle.link,
-                    label=t('tickets_new.messages.ticket_jump_button'),
+                    label=t('tickets.messages.ticket_jump_button'),
                     url=f"https://discord.com/channels/{thread.guild.id}/{thread.id}" if thread else f"https://discord.com/channels/{interaction.guild.id}/{self.thread_id}"
                 )
                 dm_view.add_item(jump_button)
@@ -127,26 +127,26 @@ class AddUserModal(discord.ui.Modal):
 
         except ValueError:
             await interaction.response.send_message(
-                t('tickets_new.messages.add_user_invalid_id'),
+                t('tickets.messages.add_user_invalid_id'),
                 ephemeral=True
             )
         except Exception as e:
             logging.error(f"Error in AddUserModal: {e}")
             await interaction.response.send_message(
-                t('tickets_new.messages.add_user_error').format(error=str(e)),
+                t('tickets.messages.add_user_error').format(error=str(e)),
                 ephemeral=True
             )
 
 
 class CloseTicketModal(discord.ui.Modal):
     def __init__(self, cog, thread_id: int):
-        super().__init__(title=t('tickets_new.messages.close_modal_title'))
+        super().__init__(title=t('tickets.messages.close_modal_title'))
         self.cog = cog
         self.thread_id = thread_id
 
         self.reason_input = discord.ui.TextInput(
-            label=t('tickets_new.messages.close_modal_label'),
-            placeholder=t('tickets_new.messages.close_modal_placeholder'),
+            label=t('tickets.messages.close_modal_label'),
+            placeholder=t('tickets.messages.close_modal_placeholder'),
             style=discord.TextStyle.paragraph,
             max_length=500,
             required=True
@@ -167,7 +167,7 @@ class CloseTicketModal(discord.ui.Modal):
             thread = interaction.guild.get_thread(self.thread_id)
             if thread and thread.archived:
                 await interaction.response.send_message(
-                    t('tickets_new.messages.ticket_already_closed'),
+                    t('tickets.messages.ticket_already_closed'),
                     ephemeral=True
                 )
                 return
@@ -179,15 +179,15 @@ class CloseTicketModal(discord.ui.Modal):
 
             if not success:
                 await interaction.response.send_message(
-                    t('tickets_new.messages.ticket_close_stats_error'),
+                    t('tickets.messages.ticket_close_stats_error'),
                     ephemeral=True
                 )
                 return
 
             # Create close embed (for in-thread display)
             embed = discord.Embed(
-                title=t('tickets_new.messages.close_dm_title'),
-                description=t('tickets_new.messages.close_dm_content').format(
+                title=t('tickets.messages.close_dm_title'),
+                description=t('tickets.messages.close_dm_content').format(
                     closer=interaction.user.mention,
                     reason=reason
                 ),
@@ -233,8 +233,8 @@ class CloseTicketModal(discord.ui.Modal):
                 if creator:
                     try:
                         dm_embed = discord.Embed(
-                            title=t('tickets_new.messages.close_dm_title'),
-                            description=t('tickets_new.messages.close_dm_content').format(
+                            title=t('tickets.messages.close_dm_title'),
+                            description=t('tickets.messages.close_dm_content').format(
                                 closer=interaction.user.mention,
                                 reason=reason
                             ),
@@ -245,7 +245,7 @@ class CloseTicketModal(discord.ui.Modal):
                         dm_view = discord.ui.View()
                         jump_button = discord.ui.Button(
                             style=discord.ButtonStyle.link,
-                            label=t('tickets_new.messages.ticket_jump_button'),
+                            label=t('tickets.messages.ticket_jump_button'),
                             url=f"https://discord.com/channels/{interaction.guild.id}/{self.thread_id}"
                         )
                         dm_view.add_item(jump_button)
@@ -260,12 +260,12 @@ class CloseTicketModal(discord.ui.Modal):
             try:
                 if not interaction.response.is_done():
                     await interaction.response.send_message(
-                        t('tickets_new.messages.ticket_close_error'),
+                        t('tickets.messages.ticket_close_error'),
                         ephemeral=True
                     )
                 else:
                     await interaction.followup.send(
-                        t('tickets_new.messages.ticket_close_error'),
+                        t('tickets.messages.ticket_close_error'),
                         ephemeral=True
                     )
             except discord.HTTPException:
@@ -274,7 +274,7 @@ class CloseTicketModal(discord.ui.Modal):
 
 class TicketTypeModal(discord.ui.Modal):
     def __init__(self, cog, edit_type=None):
-        title = t('tickets_new.messages.ticket_type_modal_edit_title').format(type_name=edit_type) if edit_type else t('tickets_new.messages.ticket_type_modal_title')
+        title = t('tickets.messages.ticket_type_modal_edit_title').format(type_name=edit_type) if edit_type else t('tickets.messages.ticket_type_modal_title')
         super().__init__(title=title)
         self.cog = cog
         self.edit_type = edit_type
@@ -283,8 +283,8 @@ class TicketTypeModal(discord.ui.Modal):
         existing_data = cog.ticket_types.get(edit_type, {}) if edit_type else {}
 
         self.type_name = discord.ui.TextInput(
-            label=t('tickets_new.messages.ticket_type_name_label'),
-            placeholder=t('tickets_new.messages.ticket_type_name_placeholder'),
+            label=t('tickets.messages.ticket_type_name_label'),
+            placeholder=t('tickets.messages.ticket_type_name_placeholder'),
             default=(edit_type or "")[:50],  # Ensure default doesn't exceed max_length
             required=True,
             max_length=50
@@ -292,8 +292,8 @@ class TicketTypeModal(discord.ui.Modal):
         self.add_item(self.type_name)
 
         self.description = discord.ui.TextInput(
-            label=t('tickets_new.messages.ticket_type_description_label'),
-            placeholder=t('tickets_new.messages.ticket_type_description_placeholder'),
+            label=t('tickets.messages.ticket_type_description_label'),
+            placeholder=t('tickets.messages.ticket_type_description_placeholder'),
             default=existing_data.get('description', '')[:100],  # Ensure default doesn't exceed max_length
             required=True,
             max_length=100
@@ -301,8 +301,8 @@ class TicketTypeModal(discord.ui.Modal):
         self.add_item(self.description)
 
         self.guide = discord.ui.TextInput(
-            label=t('tickets_new.messages.ticket_type_guide_label'),
-            placeholder=t('tickets_new.messages.ticket_type_guide_placeholder'),
+            label=t('tickets.messages.ticket_type_guide_label'),
+            placeholder=t('tickets.messages.ticket_type_guide_placeholder'),
             style=discord.TextStyle.paragraph,
             default=existing_data.get('guide', '')[:1000],  # Ensure default doesn't exceed max_length
             required=True,
@@ -311,8 +311,8 @@ class TicketTypeModal(discord.ui.Modal):
         self.add_item(self.guide)
 
         self.button_color = discord.ui.TextInput(
-            label=t('tickets_new.messages.ticket_type_color_label'),
-            placeholder=t('tickets_new.messages.ticket_type_color_placeholder'),
+            label=t('tickets.messages.ticket_type_color_label'),
+            placeholder=t('tickets.messages.ticket_type_color_placeholder'),
             default=existing_data.get('button_color', 'b')[:10],  # Ensure default doesn't exceed max_length
             required=False,
             max_length=10
@@ -334,7 +334,7 @@ class TicketTypeModal(discord.ui.Modal):
             # Check if editing or creating new.
             # Pre-refactor this block mutated self.cog.ticket_types in place
             # then called db_manager.save_config('ticket_types', ...) — a
-            # method that never existed on TicketsNewDatabaseManager — and
+            # method that never existed on TicketsDatabaseManager — and
             # overwrote self.cog.conf with db_manager.get_config()'s 3-field
             # result, wiping messages / admin_* / channel ids from memory.
             # The whole command silently failed through discord.py's error
@@ -363,7 +363,7 @@ class TicketTypeModal(discord.ui.Modal):
                 )
                 if not ok:
                     await interaction.response.send_message(
-                        t('tickets_new.messages.ticket_type_rename_failure'),
+                        t('tickets.messages.ticket_type_rename_failure'),
                         ephemeral=True,
                     )
                     return
@@ -398,7 +398,7 @@ class TicketTypeModal(discord.ui.Modal):
                 ok = await self.cog.db_manager.upsert_ticket_type(type_name, type_data)
                 if not ok:
                     await interaction.response.send_message(
-                        t('tickets_new.messages.ticket_type_upsert_failure'),
+                        t('tickets.messages.ticket_type_upsert_failure'),
                         ephemeral=True,
                     )
                     return

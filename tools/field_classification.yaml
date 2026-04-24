@@ -137,7 +137,7 @@ role:
   # step-7 role_cog refactor splits `*_name[*].name` → locale as a
   # targeted follow-up.
 
-tickets_new:
+tickets:
   db:
     - ticket_types              # migrated into DB (P2-5 judgment)
   # admin roles / user / channel ids — fill after migration_report shows them

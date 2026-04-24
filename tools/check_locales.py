@@ -57,7 +57,7 @@ _LOCALE_STR_KEY_RE = re.compile(
 def extract_cog_keys() -> Tuple[Set[str], Set[str]]:
     """Return (t_keys, locale_str_keys) found under ``bot/cogs/`` (recursive).
 
-    Uses rglob so that split-cog packages (e.g. ``bot/cogs/tickets_new/``)
+    Uses rglob so that split-cog packages (e.g. ``bot/cogs/tickets/``)
     are scanned as thoroughly as flat cog modules — `t()` calls inside
     ``cog.py`` / ``views.py`` / ``modals.py`` of a package must all count.
     """

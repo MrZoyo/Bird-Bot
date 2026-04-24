@@ -1,4 +1,4 @@
-# bot/utils/tickets_new_db.py
+# bot/utils/tickets_db.py
 import json
 import sqlite3
 import aiosqlite
@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Optional, List, Tuple, Dict
 
 
-class TicketsNewDatabaseManager:
+class TicketsDatabaseManager:
     def __init__(self, db_path: str):
         self.db_path = db_path
 
@@ -77,7 +77,7 @@ class TicketsNewDatabaseManager:
         """Return all ticket types as ``{type_name: type_data_dict}``.
 
         Matches the shape the cog previously saw under
-        ``self.conf['ticket_types']`` so reads elsewhere in tickets_new_cog
+        ``self.conf['ticket_types']`` so reads elsewhere in the tickets cog
         stay literal (``ticket_types[name]['description']`` etc.).
         """
         async with aiosqlite.connect(self.db_path) as db:

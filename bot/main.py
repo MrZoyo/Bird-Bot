@@ -88,11 +88,11 @@ COG_SPECS = [
         "required_configs": [],
     },
     {
-        "feature": "tickets_new",
-        "cog_name": "TicketsNewCog",
-        "module_path": "bot.cogs.tickets_new",
-        "class_name": "TicketsNewCog",
-        "required_configs": ["tickets_new"],
+        "feature": "tickets",
+        "cog_name": "TicketsCog",
+        "module_path": "bot.cogs.tickets",
+        "class_name": "TicketsCog",
+        "required_configs": ["tickets"],
     },
     {
         "feature": "shop",

@@ -2,7 +2,7 @@
 from .config import config
 from .i18n import t
 from .privateroom_db import PrivateRoomDatabaseManager
-from .tickets_new_db import TicketsNewDatabaseManager
+from .tickets_db import TicketsDatabaseManager
 from .media_handler import MediaHandler
 from .file_utils import generate_file_tree, format_size
 from .shop_db import ShopDatabaseManager
@@ -19,7 +19,7 @@ from .role_helpers import safe_member_role_edit
 __all__ = [
     'config',
     't',
-    'TicketsNewDatabaseManager',
+    'TicketsDatabaseManager',
     'MediaHandler',
     'generate_file_tree',
     'format_size',

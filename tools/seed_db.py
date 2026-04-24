@@ -15,7 +15,7 @@ The upgrade protocol is, strictly:
 
 Skipping this step would leave the two DB-backed maps empty:
   - voicechannel.channel_configs → auto-create rooms stop working
-  - tickets_new.ticket_types     → every ticket type disappears
+  - tickets.ticket_types     → every ticket type disappears
 
 What this script does not do (by design):
   - It does not auto-discover seed data; operators must have run the
@@ -42,7 +42,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from bot.utils.config import config  # noqa: E402
 from bot.utils.voice_channel_db import VoiceChannelDatabaseManager  # noqa: E402
-from bot.utils.tickets_new_db import TicketsNewDatabaseManager  # noqa: E402
+from bot.utils.tickets_db import TicketsDatabaseManager  # noqa: E402
 
 
 async def seed_voicechannel(db_path: str, payload: Dict[str, Any]) -> int:
@@ -62,12 +62,12 @@ async def seed_voicechannel(db_path: str, payload: Dict[str, Any]) -> int:
     return count
 
 
-async def seed_tickets_new(db_path: str, payload: Dict[str, Any]) -> int:
-    """Load tickets_new.ticket_types into the ticket_types table."""
+async def seed_tickets(db_path: str, payload: Dict[str, Any]) -> int:
+    """Load tickets.ticket_types into the ticket_types table."""
     ticket_types = payload.get('ticket_types', {}) or {}
     if not ticket_types:
         return 0
-    db = TicketsNewDatabaseManager(db_path)
+    db = TicketsDatabaseManager(db_path)
     await db.initialize_database()
     count = 0
     for type_name, type_data in ticket_types.items():
@@ -103,7 +103,7 @@ async def run() -> int:
     # whenever a new cog gains DB-bound fields during future migrations.
     seed_handlers = {
         'voicechannel': seed_voicechannel,
-        'tickets_new': seed_tickets_new,
+        'tickets': seed_tickets,
     }
 
     total = 0

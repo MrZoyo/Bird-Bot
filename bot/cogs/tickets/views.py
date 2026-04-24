@@ -56,7 +56,7 @@ class TicketCreateView(discord.ui.View):
         except Exception as e:
             logging.error(f"Error in create_ticket_callback: {e}")
             await interaction.response.send_message(
-                t('tickets_new.messages.ticket_thread_create_error'),
+                t('tickets.messages.ticket_thread_create_error'),
                 ephemeral=True
             )
 
@@ -71,7 +71,7 @@ class TicketThreadView(discord.ui.View):
         # Accept button
         accept_button = discord.ui.Button(
             style=discord.ButtonStyle.success,
-            label=t('tickets_new.messages.ticket_accept_button_disabled') if is_accepted else t('tickets_new.messages.ticket_accept_button'),
+            label=t('tickets.messages.ticket_accept_button_disabled') if is_accepted else t('tickets.messages.ticket_accept_button'),
             custom_id=f'accept_ticket_{thread_id}',
             disabled=is_accepted
         )
@@ -81,7 +81,7 @@ class TicketThreadView(discord.ui.View):
         # Add user button
         add_user_button = discord.ui.Button(
             style=discord.ButtonStyle.secondary,
-            label=t('tickets_new.messages.ticket_add_user_button'),
+            label=t('tickets.messages.ticket_add_user_button'),
             custom_id=f'add_user_{thread_id}'
         )
         add_user_button.callback = self.add_user_callback
@@ -90,7 +90,7 @@ class TicketThreadView(discord.ui.View):
         # Close button
         close_button = discord.ui.Button(
             style=discord.ButtonStyle.danger,
-            label=t('tickets_new.messages.ticket_close_button'),
+            label=t('tickets.messages.ticket_close_button'),
             custom_id=f'close_ticket_{thread_id}'
         )
         close_button.callback = self.close_callback
@@ -108,7 +108,7 @@ class TicketThreadView(discord.ui.View):
         try:
             if not await self.cog.is_admin_for_type(interaction.user, self.type_name):
                 await interaction.response.send_message(
-                    t('tickets_new.messages.ticket_admin_only'),
+                    t('tickets.messages.ticket_admin_only'),
                     ephemeral=True
                 )
                 return
@@ -116,15 +116,15 @@ class TicketThreadView(discord.ui.View):
             success = await self.cog.db_manager.accept_ticket(self.thread_id, interaction.user.id)
             if not success:
                 await interaction.response.send_message(
-                    t('tickets_new.messages.ticket_already_accepted'),
+                    t('tickets.messages.ticket_already_accepted'),
                     ephemeral=True
                 )
                 return
 
             # Create accepted embed
             embed = discord.Embed(
-                title=t('tickets_new.messages.ticket_accepted_title'),
-                description=t('tickets_new.messages.ticket_accepted_content').format(user=interaction.user.mention),
+                title=t('tickets.messages.ticket_accepted_title'),
+                description=t('tickets.messages.ticket_accepted_content').format(user=interaction.user.mention),
                 color=EmbedColors.ACCEPT
             )
 
@@ -147,8 +147,8 @@ class TicketThreadView(discord.ui.View):
                 if creator:
                     try:
                         dm_embed = discord.Embed(
-                            title=t('tickets_new.messages.ticket_accepted_dm_title'),
-                            description=t('tickets_new.messages.ticket_accepted_dm_content').format(user=interaction.user.mention),
+                            title=t('tickets.messages.ticket_accepted_dm_title'),
+                            description=t('tickets.messages.ticket_accepted_dm_content').format(user=interaction.user.mention),
                             color=EmbedColors.ACCEPT
                         )
 
@@ -156,7 +156,7 @@ class TicketThreadView(discord.ui.View):
                         dm_view = discord.ui.View()
                         jump_button = discord.ui.Button(
                             style=discord.ButtonStyle.link,
-                            label=t('tickets_new.messages.ticket_jump_button'),
+                            label=t('tickets.messages.ticket_jump_button'),
                             url=f"https://discord.com/channels/{interaction.guild.id}/{self.thread_id}"
                         )
                         dm_view.add_item(jump_button)
@@ -168,7 +168,7 @@ class TicketThreadView(discord.ui.View):
         except Exception as e:
             logging.error(f"Error in accept_callback: {e}")
             await interaction.response.send_message(
-                t('tickets_new.messages.ticket_accept_get_info_error'),
+                t('tickets.messages.ticket_accept_get_info_error'),
                 ephemeral=True
             )
 
@@ -193,8 +193,8 @@ class AdminTypeSelectView(discord.ui.View):
 
         options = [
             discord.SelectOption(
-                label=t('tickets_new.messages.global_ticket_select_label'),
-                description=t('tickets_new.messages.global_ticket_select_description'),
+                label=t('tickets.messages.global_ticket_select_label'),
+                description=t('tickets.messages.global_ticket_select_description'),
                 value="global"
             )
         ]
@@ -209,7 +209,7 @@ class AdminTypeSelectView(discord.ui.View):
             )
 
         select = discord.ui.Select(
-            placeholder=t('tickets_new.messages.ticket_type_select_placeholder'),
+            placeholder=t('tickets.messages.ticket_type_select_placeholder'),
             min_values=1,
             max_values=1,
             options=options
@@ -227,7 +227,7 @@ class AdminTypeSelectView(discord.ui.View):
             target = await self.cog.bot.fetch_user(self.target_id)
 
         if not target:
-            await interaction.followup.send(t('tickets_new.messages.target_not_found'), ephemeral=True)
+            await interaction.followup.send(t('tickets.messages.target_not_found'), ephemeral=True)
             return
 
         if selected_type == "global":
@@ -288,7 +288,7 @@ class TypeSelectView(discord.ui.View):
 
         if options:
             select = discord.ui.Select(
-                placeholder=t('tickets_new.messages.ticket_type_select_placeholder'),
+                placeholder=t('tickets.messages.ticket_type_select_placeholder'),
                 options=options[:25]  # Discord limit
             )
             select.callback = self.select_callback
@@ -329,14 +329,14 @@ class DeleteConfirmView(discord.ui.View):
                 ok = await self.cog.db_manager.remove_ticket_type(self.type_name)
                 if not ok:
                     await interaction.response.send_message(
-                        t('tickets_new.messages.ticket_type_delete_failure'),
+                        t('tickets.messages.ticket_type_delete_failure'),
                         ephemeral=True,
                     )
                     return
                 await self.cog._refresh_ticket_types()
 
                 await interaction.response.send_message(
-                    t('tickets_new.messages.ticket_type_delete_success').format(type_name=self.type_name),
+                    t('tickets.messages.ticket_type_delete_success').format(type_name=self.type_name),
                     ephemeral=True
                 )
 
