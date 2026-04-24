@@ -326,7 +326,13 @@ class DeleteConfirmView(discord.ui.View):
             # broken save_config('ticket_types', ...) / self.conf
             # clobber from get_config().
             if self.type_name in self.cog.ticket_types:
-                await self.cog.db_manager.remove_ticket_type(self.type_name)
+                ok = await self.cog.db_manager.remove_ticket_type(self.type_name)
+                if not ok:
+                    await interaction.response.send_message(
+                        t('tickets_new.messages.ticket_type_delete_failure'),
+                        ephemeral=True,
+                    )
+                    return
                 await self.cog._refresh_ticket_types()
 
                 await interaction.response.send_message(

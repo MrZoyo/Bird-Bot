@@ -79,6 +79,9 @@ messages:
   ticket_type_edit_title: 选择要修改的工单类型
   ticket_type_delete_title: 选择要删除的工单类型
   ticket_type_delete_success: '已删除工单类型: {type_name}'
+  ticket_type_rename_failure: ❌ 重命名失败，请联系管理员
+  ticket_type_upsert_failure: ❌ 保存失败，请联系管理员
+  ticket_type_delete_failure: ❌ 删除失败，请联系管理员
   admin_list_title: 管理员配置
   admin_list_roles: '管理员身份组:'
   admin_list_users: '管理员用户:'

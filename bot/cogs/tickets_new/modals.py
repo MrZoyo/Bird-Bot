@@ -358,9 +358,15 @@ class TicketTypeModal(discord.ui.Modal):
                     'admin_roles': list(old_data.get('admin_roles', [])),
                     'admin_users': list(old_data.get('admin_users', [])),
                 }
-                await self.cog.db_manager.rename_ticket_type(
+                ok = await self.cog.db_manager.rename_ticket_type(
                     self.edit_type, type_name, type_data,
                 )
+                if not ok:
+                    await interaction.response.send_message(
+                        t('tickets_new.messages.ticket_type_rename_failure'),
+                        ephemeral=True,
+                    )
+                    return
 
                 action = "edit"
                 old_name = self.edit_type
@@ -389,7 +395,13 @@ class TicketTypeModal(discord.ui.Modal):
                     'admin_roles': existing_admin_data.get('admin_roles', []),
                     'admin_users': existing_admin_data.get('admin_users', []),
                 }
-                await self.cog.db_manager.upsert_ticket_type(type_name, type_data)
+                ok = await self.cog.db_manager.upsert_ticket_type(type_name, type_data)
+                if not ok:
+                    await interaction.response.send_message(
+                        t('tickets_new.messages.ticket_type_upsert_failure'),
+                        ephemeral=True,
+                    )
+                    return
 
                 action = "edit" if self.edit_type else "add"
                 old_name = self.edit_type if self.edit_type else None
