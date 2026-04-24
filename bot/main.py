@@ -104,7 +104,7 @@ COG_SPECS = [
     {
         "feature": "privateroom",
         "cog_name": "PrivateRoomCog",
-        "module_path": "bot.cogs.privateroom_cog",
+        "module_path": "bot.cogs.privateroom",
         "class_name": "PrivateRoomCog",
         "required_configs": ["privateroom", "role"],
     },
