@@ -332,6 +332,9 @@ def migrate_cog(
         cog_name, clean, classification.get(cog_name, {}),
     )
 
+    if cog_name == 'main':
+        _rename_legacy_feature_keys(yaml_part)
+
     for key, routing, source in rows:
         report_rows.append((cog_name, key, routing, source))
 
@@ -351,6 +354,30 @@ def migrate_cog(
         'locale_keys': len(locale_part),
         'db_keys': len(db_part),
     }
+
+
+def _rename_legacy_feature_keys(yaml_part: Dict[str, Any]) -> None:
+    """Apply LEGACY_NAME_MAP to main.features in-place.
+
+    Without this, a legacy deployment that still reads `config_main.json`
+    with `features: {"tickets_new": true}` would produce
+    `main.yaml` carrying a stale `tickets_new` key. The bot code (after
+    P1-3c) reads `features.tickets`; the stale key is silently ignored,
+    and because `is_feature_enabled` defaults to True for a missing key,
+    the cog would load even if the operator explicitly wrote
+    `tickets_new: false` intending to disable it.
+
+    If both keys are already present (mixed-state config), the new name
+    wins and the legacy one is dropped.
+    """
+    features = yaml_part.get('features')
+    if not isinstance(features, dict):
+        return
+    for legacy, current in LEGACY_NAME_MAP.items():
+        if legacy in features:
+            if current not in features:
+                features[current] = features[legacy]
+            del features[legacy]
 
 
 def write_report(rows: List[Tuple[str, str, str, str]], summary: Dict[str, Dict[str, int]]) -> None:
@@ -409,6 +436,29 @@ def main() -> int:
 
     if not json_files:
         print("No config_*.json files found under bot/config/", file=sys.stderr)
+        return 1
+
+    # Reject ambiguous input up front: if two source files collapse to the
+    # same target (typical case — legacy `config_tickets_new.json` coexists
+    # with a hand-crafted `config_tickets.json`), we refuse rather than
+    # silently let sort order decide which structure wins.
+    target_to_sources: Dict[str, List[str]] = {}
+    for json_path in json_files:
+        source = json_path.stem.removeprefix('config_')
+        target = LEGACY_NAME_MAP.get(source, source)
+        target_to_sources.setdefault(target, []).append(source)
+    conflicts = {t: srcs for t, srcs in target_to_sources.items() if len(srcs) > 1}
+    if conflicts:
+        for target, srcs in conflicts.items():
+            print(
+                f"ERROR: multiple source files map to '{target}': "
+                f"{', '.join(f'config_{s}.json' for s in srcs)}",
+                file=sys.stderr,
+            )
+        print(
+            "Move the obsolete one(s) out of bot/config/ before rerunning.",
+            file=sys.stderr,
+        )
         return 1
 
     for json_path in json_files:

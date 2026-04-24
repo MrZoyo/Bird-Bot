@@ -27,7 +27,7 @@ features:
   giveaway: true
   role: true
   backup: true
-  tickets_new: true
+  tickets: true
   shop: true
   privateroom: true
   ban: true
