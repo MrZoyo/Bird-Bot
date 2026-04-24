@@ -69,7 +69,7 @@ COG_SPECS = [
     {
         "feature": "giveaway",
         "cog_name": "GiveawayCog",
-        "module_path": "bot.cogs.giveaway_cog",
+        "module_path": "bot.cogs.giveaway",
         "class_name": "GiveawayCog",
         "required_configs": ["giveaway"],
     },
