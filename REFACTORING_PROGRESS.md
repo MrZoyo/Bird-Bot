@@ -1207,14 +1207,25 @@ python tools/seed_db.py            # channel_configs + ticket_types 灌 DB
 # 1. 建目录
 mkdir -p bot/cogs/<name>   # 或 bot/cogs/games/<name>
 
-# 2. 写 __init__.py + [views.py] + [modals.py] + [embeds.py] + cog.py
-#    照抄 ban / privateroom / tickets_new 三 pilot 的粒度
-
-# 3. 归档旧文件
-git mv bot/cogs/<name>_cog.py old_function/cogs/<name>_cog_pre_split.py
+# 2. git mv 旧文件到新包（保留 git rename 识别，后续 git log --follow 能跟到 cog.py）
+git mv bot/cogs/<name>_cog.py bot/cogs/<name>/cog.py
 # games 两个：
-# git mv bot/cogs/game_dnd_cog.py old_function/cogs/game_dnd_cog_pre_split.py
-# git mv bot/cogs/game_spymode_cog.py old_function/cogs/game_spymode_cog_pre_split.py
+# git mv bot/cogs/game_dnd_cog.py bot/cogs/games/dnd/cog.py
+# git mv bot/cogs/game_spymode_cog.py bot/cogs/games/spymode/cog.py
+#
+# 默认不归档到 old_function/。Tier 1 八棒（backup / teamup_display / game_dnd /
+# game_spymode / welcome / notebook / check_status / create_invitation）都直接
+# git mv，没造 pre_split 副本——git history 本身足够。归档到 old_function/ 的
+# 判断标准是"原文件体量大（≥1400 行）且被切成 4-5 个兄弟 .py，整文件历史不再
+# 连续"，参考 P1-3 三 pilot（tickets_new / privateroom / ban）的做法。
+# Tier 2 的 giveaway / voice_channel 在这个门槛上，Tier 3 的 shop / role 也是，
+# 本档按"原文件被拆成 ≥3 个兄弟 .py 就归档"简单规则判断即可。
+
+# 3. 写 __init__.py + [views.py] + [modals.py] + [embeds.py]
+#    照抄 ban / privateroom / tickets 三 pilot 的粒度
+#    注意：Edit 新 cog.py 之前先 Read 一次 —— git mv 产物对 Edit 工具而言是
+#    "未读文件"，首次 Edit 会被拒；被拒后如果 patched 才 Read，后续 git add
+#    容易漏掉补的编辑（参考 Tier 1 teamup_display follow-up commit `27e7e68`）。
 
 # 4. 改 bot/main.py 的 COG_SPECS 对应 module_path
 #    普通：bot.cogs.<name>_cog → bot.cogs.<name>

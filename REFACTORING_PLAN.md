@@ -180,7 +180,7 @@ bot/cogs/
 ├── role/                       # 1151 行，4 View + 1 Modal → 全四件
 ├── shop/                       # 1101 行，2 View + 2 Modal → 全四件；persistent view 要小心
 ├── teamup_display/             # 472 行，纯 Cog → 最小包
-├── tickets_new/                ✅ 已完成
+├── tickets/                    ✅ 已完成（含 P1-3c rename）
 ├── voice_channel/              # 1018 行，3 View + 1 Modal → 全四件
 └── welcome/                    # 285 行，1 View → views.py + cog.py
 ```
@@ -231,10 +231,18 @@ bot/cogs/
 
 ```
 # 1. Explore 报告（类清单 / 归属 / 循环 / persistent view / t import / slash 命令 / 风险点），限 500 字
-# 2. 建目录 + 按报告粘类
+# 2. 建目录
 mkdir -p bot/cogs/<name>
-# 3. 写 __init__.py / [views.py] / [modals.py] / [embeds.py] / cog.py
-# 4. git mv 旧文件到 old_function/cogs/<name>_cog_pre_split.py
+# 3. git mv 旧文件到新包（git 会自动识别为 rename，保留历史）
+git mv bot/cogs/<name>_cog.py bot/cogs/<name>/cog.py
+#    归档到 old_function/ 仅在"体量大且拆分幅度大"时考虑 —— Tier 1 八棒实测不需要；
+#    P1-3 三 pilot（tickets_new / privateroom / ban，均 >1400 行 + 拆成 4-5 文件）
+#    做了 pre_split 归档是因为原文件被切成了多个兄弟 .py，整文件历史不再连续。
+#    小/中 cog 直接 git mv，git log --follow 可以跟到 cog.py；不要额外造副本。
+# 4. 写 __init__.py / [views.py] / [modals.py] / [embeds.py]
+#    Edit 新包里 cog.py 前先 Read 一次 —— git mv 产物在 Edit 工具里属于未读文件，
+#    否则首次 Edit 会被拒，后续漏 add 的风险变高（参考 Tier 1 teamup_display
+#    follow-up 的 commit history）。
 # 5. 改 bot/main.py 的 COG_SPECS 里对应 module_path
 # 6. 验证三连：
 python3 -m py_compile bot/cogs/<name>/*.py bot/main.py
