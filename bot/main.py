@@ -83,7 +83,7 @@ COG_SPECS = [
     {
         "feature": "backup",
         "cog_name": "BackupCog",
-        "module_path": "bot.cogs.backup_cog",
+        "module_path": "bot.cogs.backup",
         "class_name": "BackupCog",
         "required_configs": [],
     },
