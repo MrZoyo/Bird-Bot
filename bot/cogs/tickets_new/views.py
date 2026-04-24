@@ -275,7 +275,7 @@ class TypeSelectView(discord.ui.View):
         self.cog = cog
         self.action = action  # 'edit' or 'delete'
 
-        if not cog.conf.get('ticket_types'):
+        if not cog.ticket_types:
             return
 
         options = []

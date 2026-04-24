@@ -43,7 +43,7 @@ COG_SPECS = [
         "cog_name": "CheckStatusCog",
         "module_path": "bot.cogs.check_status_cog",
         "class_name": "CheckStatusCog",
-        "required_configs": ["checkstatus"],
+        "required_configs": [],
     },
     {
         "feature": "achievements",
@@ -64,7 +64,7 @@ COG_SPECS = [
         "cog_name": "SpyModeCog",
         "module_path": "bot.cogs.game_spymode_cog",
         "class_name": "SpyModeCog",
-        "required_configs": ["spymode"],
+        "required_configs": [],
     },
     {
         "feature": "giveaway",
