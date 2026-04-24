@@ -55,7 +55,7 @@ COG_SPECS = [
     {
         "feature": "notebook",
         "cog_name": "NotebookCog",
-        "module_path": "bot.cogs.notebook_cog",
+        "module_path": "bot.cogs.notebook",
         "class_name": "NotebookCog",
         "required_configs": [],
     },
