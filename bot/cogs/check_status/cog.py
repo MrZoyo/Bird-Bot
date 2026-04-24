@@ -1,4 +1,3 @@
-# bot/cogs/check_status_cog.py
 import asyncio
 import io
 import logging
@@ -16,17 +15,7 @@ from discord.ext import commands, tasks
 from bot.utils import CheckStatusDatabaseManager, check_channel_validity, config
 from bot.utils.i18n import t
 
-
-class MemberPositionView(discord.ui.View):
-    def __init__(self, bot, url):
-        super().__init__()
-        self.bot = bot
-        self.add_item(
-            discord.ui.Button(
-                label=t('checkstatus.where_is_join_button_label'),
-                url=url,
-            )
-        )
+from .views import MemberPositionView
 
 
 class CheckStatusCog(commands.Cog):

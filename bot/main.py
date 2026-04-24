@@ -41,7 +41,7 @@ COG_SPECS = [
     {
         "feature": "checkstatus",
         "cog_name": "CheckStatusCog",
-        "module_path": "bot.cogs.check_status_cog",
+        "module_path": "bot.cogs.check_status",
         "class_name": "CheckStatusCog",
         "required_configs": [],
     },
