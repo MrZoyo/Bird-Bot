@@ -58,7 +58,7 @@
 | P1+P2 | 配置系统 2.0（P1-6 + P1-4 + P2-3 + P2-5） | ✅ | step 0-9 全部完成（P1-4 最小版；pydantic 全量留 follow-up） |
 | P1 | P1-7 Slash 元数据本地化 | ✅ | SlashTranslator + 176 key commands.yaml |
 | P1 | P1-3 大 cog 拆包 | ✅ | tickets_new + privateroom + ban 三 pilot 全 ✅；service.py 统一评估留 follow-up |
-| P1 | P1-3b 全量 cog 包化 + games 聚合 | 🔄 | 第一档 ✅（8 cog + `games/` 骨架，2026-04-24）；第二档 ✅（achievement / voice_channel / giveaway，2026-04-24 晚）；第三档（shop / role）待开；PLAN §P1-3b |
+| P1 | P1-3b 全量 cog 包化 + games 聚合 | ✅ | 三档全收官；`bot/cogs/` 顶层只剩包目录 + `__init__.py` |
 | P1 | P1-3c tickets_new → tickets 历史命名清理 | ✅ | 282 处 grep 清零（代码层）；DB SQL 表名保留方案 A；migrate+seed LEGACY_NAME_MAP 落位 |
 | P1 | P1-8a tickets_new ticket-type CRUD 返回值校验 | ✅ | 三处接 `ok` + 失败分支走 locale；新增 3 个 failure key |
 | P1 | P1-8b giveaway initialize_database 迁 cog_load | ✅ | cog_load 先建表后 start task；on_ready 只留 load_giveaways |
@@ -1202,7 +1202,7 @@ python tools/seed_db.py            # channel_configs + ticket_types 灌 DB
 | P1-8b giveaway `initialize_database` 迁 `cog_load` | `bot/cogs/giveaway_cog.py:438/558/1061` | P0-1 + P1-2 未收尾 | 中（启动期竞态，冷启可能炸） | ✅ `fc77465` |
 | P1-8c feature flag 类型校验提示 / 行为对齐 | `bot/utils/config_schema.py:132` vs `bot/utils/config.py:112` | P1-4 未对齐 | 低到中（静默启用误配的 cog） | ✅ `044b17c` |
 
-**P1-8 全收官** ✅。后续节奏：~~P1-3c `tickets_new` → `tickets` rename~~（2026-04-24 已完成）→ ~~P1-3b 第一档（8 个小 cog + games/ 定型）~~（2026-04-24 晚，9 commit）→ ~~P1-3b 第二档（achievement / voice_channel / giveaway）~~（2026-04-24 晚，3 commit）→ **P1-3b 第三档**（shop + role，**注意 shop 的 persistent view**，当前 handoff）。
+**P1-8 全收官** ✅。后续节奏：~~P1-3c `tickets_new` → `tickets` rename~~（2026-04-24 已完成）→ ~~P1-3b 第一档（8 个小 cog + games/ 定型）~~（2026-04-24 晚，9 commit）→ ~~P1-3b 第二档（achievement / voice_channel / giveaway）~~（2026-04-24 晚，3 commit）→ ~~P1-3b 第三档（shop + role）~~（2026-04-25 完成）。
 
 `service.py` 抽离决定**后置** —— 包化完成后每家都有标准骨架，此时再横向评估 service 候选（本次 session 没动的原因：和三家保守 pilot 一致性更重要；全量包化后评估成本更低）。
 
@@ -1217,8 +1217,8 @@ python tools/seed_db.py            # channel_configs + ticket_types 灌 DB
 | tickets | 1910 | — | ✅ 已完成（P1-3 pilot + P1-3c rename） | — | ✅ |
 | privateroom | 1662 | — | ✅ 已完成（P1-3 pilot） | — | ✅ |
 | ban | 1418 | — | ✅ 已完成（P1-3 pilot） | — | ✅ |
-| role_cog | 1151 | 7 (4V+1M+1Cog) | 完整包 | — | ⬜ Tier 3 |
-| shop_cog | 1101 | 5 (2V+2M+1Cog) | 完整包 | **有 `bot.add_view` persistent view** (L647) | ⬜ Tier 3 |
+| role | 1151 | 7 (5V+1M+1Cog) | ✅ 完整包（Tier 3） | — | ✅ |
+| shop | 1101 | 5 (2V+2M+1Cog) | ✅ 完整包（Tier 3） | persistent view 已核：`custom_id` 三个稳定字面量 | ✅ |
 | giveaway | 1062 | — | ✅ 完整包（Tier 2 `f164ec1`） | — | ✅ |
 | voice_channel | 1018 | — | ✅ 完整包（Tier 2 `4fddadc`；drop 1 dead 模块级 View） | — | ✅ |
 | achievement | 928 | — | ✅ 标准包（Tier 2 `b716f3b`） | — | ✅ |
@@ -1244,10 +1244,10 @@ python tools/seed_db.py            # channel_configs + ticket_types 灌 DB
 |---|---|---:|---:|---|
 | 1（热身 + games 定型） | backup → teamup_display → game_dnd→games/dnd → game_spymode→games/spymode → welcome → notebook → check_status → create_invitation | 8-10 | 9（8 planned + 1 follow-up） | ✅ 2026-04-24 |
 | 2（中型 UI） | achievement → voice_channel → giveaway | 3-4 | 3 | ✅ 2026-04-24 晚 |
-| 3（大 + persistent view） | shop（persistent view！）→ role | 2-3 | — | ⬜ |
-| 收尾 | PROGRESS update + 可选 service 横扫评估 | 1-2 | — | ⬜ |
+| 3（大 + persistent view） | shop（persistent view！）→ role | 2-3 | 2 | ✅ 2026-04-25 |
+| 收尾 | PROGRESS update + 可选 service 横扫评估 | 1-2 | 进行中 | 🔄 |
 
-第一档已收官 —— `games/` 目录骨架定型完成（empty `__init__.py` 占位，按 PLAN 不预建 `_lib.py` / `common.py`）。第二档收官 —— 3 个中大 cog 全部进包，顺手 drop 掉 `voice_channel` 里一个模块级死 `DeleteChannelConfirmView`（其 enhanced inner class 一直在覆盖它，但没人实例化模块级版本）。Tier 3 只剩 shop（persistent view）+ role 两个大 cog。
+第一档已收官 —— `games/` 目录骨架定型完成（empty `__init__.py` 占位，按 PLAN 不预建 `_lib.py` / `common.py`）。第二档收官 —— 3 个中大 cog 全部进包，顺手 drop 掉 `voice_channel` 里一个模块级死 `DeleteChannelConfirmView`（其 enhanced inner class 一直在覆盖它，但没人实例化模块级版本）。第三档收官 —— shop / role 均已进包，P1-3b 全量包化完成。
 
 **每棒 pilot 模板**（复制照抄）：
 
@@ -1347,9 +1347,10 @@ P1-3 拆包完 ✅，P1-3c rename 也完成（2026-04-24）。建议**先做完 
    - **P1-3c 已收官**（2026-04-24）：`6f41b63` / `afd3aff` + 2 docs commit。详见本文件 §P1-3c。
    - **P1-3b 第一档已收官**（2026-04-24 晚）：8 cog + `games/` 骨架，9 commit（含 1 follow-up）。详见本文件 §P1-3b 第一档。
    - **P1-3b 第二档已收官**（2026-04-24 晚）：achievement / voice_channel / giveaway 共 3 commit。详见本文件 §P1-3b 第二档。
-   - **下一棒推荐**：§P1-3b 第三档（shop + role，2-3 commit；shop 要 guard persistent view）。
+   - **P1-3b 第三档已收官**（2026-04-25）：shop + role 完整包。
+   - **下一棒推荐**：service.py 横扫评估，或进入 P2-1 数据库连接复用。
 
-用户只说"继续"的话，默认接 **§P1-3b 第三档**（shop + role，2-3 commit）。**shop 必须先确认 persistent view**：`shop_cog.py:647` 的 `bot.add_view(self.checkin_view)` 是 persistent 注册点，包化前要 grep 它的 `custom_id` 是不是字符串字面量（如果含动态值或类路径，老 persistent view 记录会失效、已发的 checkin embed 按钮全无响应）；当前是字符串字面量，但 commit 前再核一遍是 cheapest insurance。role 1151 行、4 View + 1 Modal 全走 `bot.get_cog` 访问 cog，静态耦合轻，没有 persistent view；照 giveaway `f164ec1` 同模板走即可。说具体任务名则照做。
+用户只说"继续"的话，默认先做 **service.py 横扫评估**（只调研、不急着抽），然后再决定是否进入 P2-1 数据库连接复用。P1-3b 的 shop/role 已完成；shop persistent view 的 `custom_id` 已核为 `checkin_daily` / `checkin_makeup` / `checkin_query` 三个稳定字面量。
 
 ### 本次 session 补充（2026-04-24 P1-8 hygiene pass 收官 session）
 
@@ -1433,3 +1434,21 @@ P1-3 拆包完 ✅，P1-3c rename 也完成（2026-04-24）。建议**先做完 
 - `REFACTORING_TEST_CHECKLIST.md` 未更新（未被 Tier 1 扫到）。
 
 **下一棒建议**：§P1-3b 第二档（achievement → voice_channel → giveaway）。voice_channel 迁 DB 已做（P0-3d），giveaway 建表迁 cog_load 已做（P1-8b），两家拆包都是纯 UI 层整理；achievement 是单 cog 5-View 的经典标准包，风险低。
+
+### P1-3b 第三档 session 补充（2026-04-25）
+
+**本轮 session**（2 个源码/归档 commit + 本 progress 更新）：
+
+| # | 类型 | 内容 |
+|---:|---|---|
+| 1 | `c774018` refactor | shop → `bot/cogs/shop/` 完整包：`cog.py` 492 行、`views.py` 465 行、`modals.py` 164 行；role → `bot/cogs/role/` 完整包：`cog.py` 639 行、`views.py` 479 行、`modals.py` 55 行；`bot/main.py` module path 同步到 `bot.cogs.shop` / `bot.cogs.role` |
+| 2 | `a1ceefa` chore | 归档 pre-split 副本到 `old_function/cogs/shop_cog_pre_split.py` / `old_function/cogs/role_cog_pre_split.py` |
+
+**实施笔记**：
+- shop persistent view 已核：`CheckinEmbedView` 三个按钮 `custom_id` 是 `checkin_daily` / `checkin_makeup` / `checkin_query` 字符串字面量，不依赖模块路径。
+- shop 迁深一层后修正了 `resources/images/checkin.png` 的相对路径：`../../resources` → `../../../resources`。
+- role 拆分粒度：`SignatureModal` 入 `modals.py`；`AchievementRoleView` / `StarSignView` / `MBTIView` / `GenderView` / `SignatureView` 入 `views.py`；`_escape_markdown_table_cell` 留 `cog.py`。
+- 验证：`python3 -m compileall bot/cogs/shop bot/cogs/role bot/main.py` ✅；`/tmp/yaml-venv/bin/python tools/check_locales.py` ✅；`find bot/cogs -maxdepth 1 -type f -name '*_cog.py'` 为空。
+- 普通 import smoke 未完成：系统 Python 缺 `discord`，`/tmp/yaml-venv` 缺 `aiosqlite`；Windows `.venv/Scripts/python.exe` 在当前 WSL sandbox 下无法启动。未据此判定运行期通过，留测试服冷启验证。
+
+**下一棒建议**：先做 service.py 横扫评估，列候选和收益，不直接抽；如果收益不够，转 P2-1 数据库连接复用的生命周期设计。

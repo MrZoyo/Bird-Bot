@@ -195,7 +195,7 @@ bot/cogs/
 
 #### 风险点
 
-- **shop_cog.py 有 persistent view**（`bot.add_view(self.checkin_view)` L647，CheckinEmbedView）。拆包时必须像 tickets_new pilot 一样检查 `custom_id` 是字符串字面量还是参数化。现在是字符串字面量（见 `shop_cog.py:113-135` custom_id），迁移安全，但要在对应 commit 里确认一次。
+- **shop_cog.py 有 persistent view**（`bot.add_view(self.checkin_view)` L647，CheckinEmbedView）。第三档实施时已确认 `custom_id` 是 `checkin_daily` / `checkin_makeup` / `checkin_query` 三个字符串字面量；迁移安全。
 - **game 聚合的 main.py 改动**：COG_SPECS 里 `module_path` 从 `bot.cogs.game_dnd_cog` 改成 `bot.cogs.games.dnd`；`bot.cogs.game_spymode_cog` → `bot.cogs.games.spymode`。这是两行改动，不涉及 `class_name`。
 - **import 深度**：从 `bot.cogs.xxx` 变成 `bot.cogs.games.xxx` 深一层。`sys.modules` cache 不影响，但是日志里的模块名会变（如果有地方 log 模块路径的话要注意）。
 
@@ -218,13 +218,13 @@ bot/cogs/
 10. ✅ voice_channel（1018 行，完整包；drop 模块级死 `DeleteChannelConfirmView`；修 stale `create_invitation_cog` comment）（`4fddadc`）
 11. ✅ giveaway（1062 行，完整包；3 View 入 views.py + 1 Modal 入 modals.py；cog.py 收敛到 671 行）（`f164ec1`）
 
-**第三档：大 cog + persistent view** — 2 个 commit
-12. shop（1101 行，完整包，**persistent view 迁移**）—— 放最后降低回归风险
-13. role（1151 行，完整包）
+**第三档：大 cog + persistent view** — ✅ 2026-04-25（1 个合并 refactor + 1 个 pre-split 归档，progress 单独更新）
+12. ✅ shop（1101 行，完整包，**persistent view 已核**；迁深一层后修正 `resources/images/checkin.png` 相对路径）
+13. ✅ role（1151 行，完整包）
 
 **收尾**：
 - 更新 `bot/cogs/__init__.py`（若有 re-export）。
-- PROGRESS.md 把"剩余工作"清单逐项划掉，P1-3 表格 row 改成 "✅ 全量包化完成"。
+- PROGRESS.md 把"剩余工作"清单逐项划掉，P1-3 表格 row 改成 "✅ 全量包化完成"。（已完成）
 - **统一 service.py 评估**：再做一次横向扫描，看哪些 cog 抽 service 收益足够（参考 P1-3 ban 那一节的服务候选清单 pattern）。
 
 #### 单 pilot 模板（复制用）
