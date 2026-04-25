@@ -1,7 +1,9 @@
 # bot/utils/voice_channel_db.py
-import aiosqlite
+import asyncio
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
+import aiosqlite
 
 from .db_lifecycle import BaseDatabaseManager
 
@@ -27,6 +29,42 @@ class VoiceChannelDatabaseManager(BaseDatabaseManager):
 
     def __init__(self, db_path: str):
         self.db_path = db_path
+        self._persistent_connection: Optional[aiosqlite.Connection] = None
+        self._persistent_connection_lock = asyncio.Lock()
+
+    async def _execute_write(self, sql: str, parameters: Tuple[Any, ...] = ()) -> None:
+        async with self._get_persistent_connection_lock():
+            db = await self._get_persistent_connection()
+            cursor = None
+            try:
+                cursor = await db.execute(sql, parameters)
+                await db.commit()
+            except Exception:
+                await db.rollback()
+                raise
+            finally:
+                if cursor is not None:
+                    await cursor.close()
+
+    async def _fetchone(
+        self, sql: str, parameters: Tuple[Any, ...] = ()
+    ) -> Optional[Tuple]:
+        async with self._get_persistent_connection_lock():
+            db = await self._get_persistent_connection()
+            cursor = await db.execute(sql, parameters)
+            try:
+                return await cursor.fetchone()
+            finally:
+                await cursor.close()
+
+    async def _fetchall(self, sql: str, parameters: Tuple[Any, ...] = ()) -> List[Tuple]:
+        async with self._get_persistent_connection_lock():
+            db = await self._get_persistent_connection()
+            cursor = await db.execute(sql, parameters)
+            try:
+                return await cursor.fetchall()
+            finally:
+                await cursor.close()
 
     async def initialize_database(self) -> None:
         """Create the voice channel tables and migrate any missing columns.
@@ -34,45 +72,57 @@ class VoiceChannelDatabaseManager(BaseDatabaseManager):
         Kept here because the live schema has grown over time; migrations
         are done in-place so existing deployments don't need to rebuild.
         """
-        async with aiosqlite.connect(self.db_path) as db:
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS temp_channels (
-                    channel_id INTEGER PRIMARY KEY,
-                    creator_id INTEGER NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    control_panel_message_id INTEGER,
-                    control_panel_channel_id INTEGER,
-                    is_soundboard_enabled BOOLEAN DEFAULT 1,
-                    current_room_type TEXT DEFAULT 'public'
-                );
-            ''')
+        async with self._get_persistent_connection_lock():
+            db = await self._get_persistent_connection()
+            try:
+                cursor = await db.execute('''
+                    CREATE TABLE IF NOT EXISTS temp_channels (
+                        channel_id INTEGER PRIMARY KEY,
+                        creator_id INTEGER NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        control_panel_message_id INTEGER,
+                        control_panel_channel_id INTEGER,
+                        is_soundboard_enabled BOOLEAN DEFAULT 1,
+                        current_room_type TEXT DEFAULT 'public'
+                    );
+                ''')
+                await cursor.close()
 
-            cursor = await db.execute("PRAGMA table_info(temp_channels)")
-            existing_columns = {row[1] for row in await cursor.fetchall()}
-            await cursor.close()
+                cursor = await db.execute("PRAGMA table_info(temp_channels)")
+                try:
+                    existing_columns = {row[1] for row in await cursor.fetchall()}
+                finally:
+                    await cursor.close()
 
-            columns_to_add = [
-                ("control_panel_message_id", "INTEGER"),
-                ("control_panel_channel_id", "INTEGER"),
-                ("is_soundboard_enabled", "BOOLEAN DEFAULT 1"),
-                ("current_room_type", "TEXT DEFAULT 'public'"),
-            ]
-            for col_name, col_type in columns_to_add:
-                if col_name not in existing_columns:
-                    logging.info(f"[MIGRATION] Adding column {col_name} to temp_channels")
-                    await db.execute(f"ALTER TABLE temp_channels ADD COLUMN {col_name} {col_type}")
+                columns_to_add = [
+                    ("control_panel_message_id", "INTEGER"),
+                    ("control_panel_channel_id", "INTEGER"),
+                    ("is_soundboard_enabled", "BOOLEAN DEFAULT 1"),
+                    ("current_room_type", "TEXT DEFAULT 'public'"),
+                ]
+                for col_name, col_type in columns_to_add:
+                    if col_name not in existing_columns:
+                        logging.info(f"[MIGRATION] Adding column {col_name} to temp_channels")
+                        cursor = await db.execute(
+                            f"ALTER TABLE temp_channels ADD COLUMN {col_name} {col_type}"
+                        )
+                        await cursor.close()
 
-            # channel_configs: the "entry-channel → auto-room template" map
-            # that used to live under voicechannel.channel_configs in JSON.
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS channel_configs (
-                    channel_id INTEGER PRIMARY KEY,
-                    name_prefix TEXT NOT NULL,
-                    type TEXT NOT NULL
-                );
-            ''')
+                # channel_configs: the "entry-channel → auto-room template" map
+                # that used to live under voicechannel.channel_configs in JSON.
+                cursor = await db.execute('''
+                    CREATE TABLE IF NOT EXISTS channel_configs (
+                        channel_id INTEGER PRIMARY KEY,
+                        name_prefix TEXT NOT NULL,
+                        type TEXT NOT NULL
+                    );
+                ''')
+                await cursor.close()
 
-            await db.commit()
+                await db.commit()
+            except Exception:
+                await db.rollback()
+                raise
 
     # ---- channel_configs CRUD ------------------------------------------
 
@@ -84,12 +134,9 @@ class VoiceChannelDatabaseManager(BaseDatabaseManager):
         ``self.channel_configs[channel_id]['name_prefix' | 'type']``
         unchanged after this migration.
         """
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.execute(
-                'SELECT channel_id, name_prefix, type FROM channel_configs'
-            )
-            rows = await cursor.fetchall()
-            await cursor.close()
+        rows = await self._fetchall(
+            'SELECT channel_id, name_prefix, type FROM channel_configs'
+        )
         return {
             row[0]: {'name_prefix': row[1], 'type': row[2]}
             for row in rows
@@ -103,26 +150,22 @@ class VoiceChannelDatabaseManager(BaseDatabaseManager):
         Used by /set_create_room_channel. Runs as a single statement so
         concurrent toggles are race-free.
         """
-        async with aiosqlite.connect(self.db_path) as db:
-            await db.execute(
-                '''
-                INSERT INTO channel_configs (channel_id, name_prefix, type)
-                VALUES (?, ?, ?)
-                ON CONFLICT(channel_id) DO UPDATE SET
-                    name_prefix = excluded.name_prefix,
-                    type = excluded.type
-                ''',
-                (channel_id, name_prefix, room_type),
-            )
-            await db.commit()
+        await self._execute_write(
+            '''
+            INSERT INTO channel_configs (channel_id, name_prefix, type)
+            VALUES (?, ?, ?)
+            ON CONFLICT(channel_id) DO UPDATE SET
+                name_prefix = excluded.name_prefix,
+                type = excluded.type
+            ''',
+            (channel_id, name_prefix, room_type),
+        )
 
     async def delete_channel_config(self, channel_id: int) -> None:
-        async with aiosqlite.connect(self.db_path) as db:
-            await db.execute(
-                'DELETE FROM channel_configs WHERE channel_id = ?',
-                (channel_id,),
-            )
-            await db.commit()
+        await self._execute_write(
+            'DELETE FROM channel_configs WHERE channel_id = ?',
+            (channel_id,),
+        )
 
     async def insert_temp_channel(
         self,
@@ -131,87 +174,65 @@ class VoiceChannelDatabaseManager(BaseDatabaseManager):
         soundboard_enabled: bool,
         room_type: str,
     ) -> None:
-        async with aiosqlite.connect(self.db_path) as db:
-            await db.execute(
-                'INSERT INTO temp_channels '
-                '(channel_id, creator_id, is_soundboard_enabled, current_room_type) '
-                'VALUES (?, ?, ?, ?)',
-                (channel_id, creator_id, 1 if soundboard_enabled else 0, room_type),
-            )
-            await db.commit()
+        await self._execute_write(
+            'INSERT INTO temp_channels '
+            '(channel_id, creator_id, is_soundboard_enabled, current_room_type) '
+            'VALUES (?, ?, ?, ?)',
+            (channel_id, creator_id, 1 if soundboard_enabled else 0, room_type),
+        )
 
     async def set_room_type(self, channel_id: int, room_type: str) -> None:
-        async with aiosqlite.connect(self.db_path) as db:
-            await db.execute(
-                'UPDATE temp_channels SET current_room_type = ? WHERE channel_id = ?',
-                (room_type, channel_id),
-            )
-            await db.commit()
+        await self._execute_write(
+            'UPDATE temp_channels SET current_room_type = ? WHERE channel_id = ?',
+            (room_type, channel_id),
+        )
 
     async def set_soundboard(self, channel_id: int, enabled: bool) -> None:
-        async with aiosqlite.connect(self.db_path) as db:
-            await db.execute(
-                'UPDATE temp_channels SET is_soundboard_enabled = ? WHERE channel_id = ?',
-                (1 if enabled else 0, channel_id),
-            )
-            await db.commit()
+        await self._execute_write(
+            'UPDATE temp_channels SET is_soundboard_enabled = ? WHERE channel_id = ?',
+            (1 if enabled else 0, channel_id),
+        )
 
     async def set_control_panel(
         self, channel_id: int, panel_message_id: int, panel_channel_id: int
     ) -> None:
-        async with aiosqlite.connect(self.db_path) as db:
-            await db.execute(
-                'UPDATE temp_channels '
-                'SET control_panel_message_id = ?, control_panel_channel_id = ? '
-                'WHERE channel_id = ?',
-                (panel_message_id, panel_channel_id, channel_id),
-            )
-            await db.commit()
+        await self._execute_write(
+            'UPDATE temp_channels '
+            'SET control_panel_message_id = ?, control_panel_channel_id = ? '
+            'WHERE channel_id = ?',
+            (panel_message_id, panel_channel_id, channel_id),
+        )
 
     async def clear_control_panel(self, channel_id: int) -> None:
-        async with aiosqlite.connect(self.db_path) as db:
-            await db.execute(
-                'UPDATE temp_channels '
-                'SET control_panel_message_id = NULL, control_panel_channel_id = NULL '
-                'WHERE channel_id = ?',
-                (channel_id,),
-            )
-            await db.commit()
+        await self._execute_write(
+            'UPDATE temp_channels '
+            'SET control_panel_message_id = NULL, control_panel_channel_id = NULL '
+            'WHERE channel_id = ?',
+            (channel_id,),
+        )
 
     async def delete_temp_channel(self, channel_id: int) -> None:
-        async with aiosqlite.connect(self.db_path) as db:
-            await db.execute(
-                'DELETE FROM temp_channels WHERE channel_id = ?',
-                (channel_id,),
-            )
-            await db.commit()
+        await self._execute_write(
+            'DELETE FROM temp_channels WHERE channel_id = ?',
+            (channel_id,),
+        )
 
     async def exists(self, channel_id: int) -> bool:
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.execute(
-                'SELECT 1 FROM temp_channels WHERE channel_id = ?',
-                (channel_id,),
-            )
-            result = await cursor.fetchone()
-            await cursor.close()
+        result = await self._fetchone(
+            'SELECT 1 FROM temp_channels WHERE channel_id = ?',
+            (channel_id,),
+        )
         return result is not None
 
     async def fetch_all_channel_ids(self) -> List[int]:
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.execute('SELECT channel_id FROM temp_channels')
-            rows = await cursor.fetchall()
-            await cursor.close()
+        rows = await self._fetchall('SELECT channel_id FROM temp_channels')
         return [row[0] for row in rows]
 
     async def fetch_all_records(self) -> List[Tuple]:
         """All columns, ordered newest-first. Used by /check_temp_channel_records."""
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.execute(
-                'SELECT * FROM temp_channels ORDER BY created_at DESC'
-            )
-            rows = await cursor.fetchall()
-            await cursor.close()
-        return rows
+        return await self._fetchall(
+            'SELECT * FROM temp_channels ORDER BY created_at DESC'
+        )
 
     async def fetch_control_panels(self) -> List[Tuple]:
         """Rows with a control panel message attached; used to restore views on startup.
@@ -219,13 +240,9 @@ class VoiceChannelDatabaseManager(BaseDatabaseManager):
         Columns: (channel_id, creator_id, control_panel_message_id,
         is_soundboard_enabled, current_room_type).
         """
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.execute('''
-                SELECT channel_id, creator_id, control_panel_message_id,
-                       is_soundboard_enabled, current_room_type
-                FROM temp_channels
-                WHERE control_panel_message_id IS NOT NULL
-            ''')
-            rows = await cursor.fetchall()
-            await cursor.close()
-        return rows
+        return await self._fetchall('''
+            SELECT channel_id, creator_id, control_panel_message_id,
+                   is_soundboard_enabled, current_room_type
+            FROM temp_channels
+            WHERE control_panel_message_id IS NOT NULL
+        ''')
