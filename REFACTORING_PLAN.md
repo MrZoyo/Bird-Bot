@@ -897,13 +897,15 @@ def is_feature_enabled(self, feature_name: str, default: bool = True) -> bool:
 ## P2：中期改进
 
 ### P2-1. 数据库连接复用
+> **状态（2026-04-25）**：P2-1a 生命周期基础设施已完成：所有现有 DB/DB-like manager 继承 `BaseDatabaseManager`；`DCGameServerHelperBot.close()` 会先让 discord.py 卸载 cog / 触发 `cog_unload()`，再关闭 cog 直接持有的 manager。长连接复用尚未开始，P2-1 整体仍进行中。
+
 - **问题**：所有 db 方法都 `async with aiosqlite.connect(...)`，每次新建连接。签到、成就统计、语音计时等高频路径开销偏大。
 - **前置条件（必做）**：当前各 manager 没有统一的 `close()` 方法，`bot/main.py` 也没有资源回收钩子（只有 `run_bot()` 起 bot，没有 `on_close` / `close()` 调用）。如果直接改成长连接，进程退出时连接不会干净关闭，SQLite WAL/journal 可能残留。
 - **建议（按顺序）**：
-  1. 先设计生命周期：为所有 `*DatabaseManager` 统一补 `async def close(self)`；基类或 protocol 化。
-  2. 在 bot 关闭钩子里（`commands.Bot.close` 重载 或 discord.py 的 `on_disconnect` 语义）遍历所有 cog，对持有 manager 的执行 `close()`。
+  1. ✅ 先设计生命周期：为所有 `*DatabaseManager` 统一补 `async def close(self)`；基类或 protocol 化。
+  2. ✅ 在 bot 关闭钩子里（`commands.Bot.close` 重载 或 discord.py 的 `on_disconnect` 语义）遍历所有 cog，对持有 manager 的执行 `close()`。
   3. 再把 `async with aiosqlite.connect(...)` 改成长连接模式（`initialize_database` 打开 / `close()` 释放）。
-  4. 高频路径先验证：achievements、shop、voice 三个。
+  4. 高频路径先验证：achievements、shop、voice 三个。下一步建议先用 `VoiceChannelDatabaseManager` 做小面 probe，再动 achievement/shop。
 - **替代方案**：如果不想维护生命周期，可评估 `aiosqlite.Connection` 池化库。
 
 ### P2-2. Schema 迁移机制

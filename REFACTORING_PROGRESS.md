@@ -64,7 +64,7 @@
 | P1 | P1-8a tickets_new ticket-type CRUD 返回值校验 | ✅ | 三处接 `ok` + 失败分支走 locale；新增 3 个 failure key |
 | P1 | P1-8b giveaway initialize_database 迁 cog_load | ✅ | cog_load 先建表后 start task；on_ready 只留 load_giveaways |
 | P1 | P1-8c feature flag 类型校验提示 / 行为对齐 | ✅ | `is_feature_enabled` 非 bool 改返 False，和 schema warning 对齐 |
-| P2 | P2-1 数据库连接复用 | ⬜ | 需 close() 生命周期前置 |
+| P2 | P2-1 数据库连接复用 | 🔄 | P2-1a 生命周期基础设施 ✅；长连接复用未开始 |
 | P2 | P2-2 Schema 迁移机制 | ⬜ | |
 | P3 | P3-1 依赖管理统一 | ⬜ | |
 | P3 | P3-2 硬编码路径梳理 | ⬜ | |
@@ -87,7 +87,9 @@
 - `a1ceefa chore(old_function): archive shop role pre-split cogs (P1-3b)`
 - `777d3e2 docs: track progress after P1-3b Tier 3`
 
-**下一棒默认**：优先进入 **P2-1 数据库连接复用** 的生命周期设计；开工前必须先设计 `close()` 生命周期和 bot 关闭钩子。若仍想继续 service.py，则建议只在 ban probe 稳定后再评估 tickets / privateroom，且 tickets 需先决定 `ticket_types/conf` 归属，privateroom 需先决定购买 / 续费流程状态边界。
+**P2-1a 生命周期基础设施已完成**：所有现有 DB manager 继承 `BaseDatabaseManager`，默认 `close()` 仍是 no-op；`DCGameServerHelperBot.close()` 会捕获当前 cog 上的 manager，先交给 discord.py 正常卸载 cog / 触发 `cog_unload()` 停后台 task，再关闭 manager。
+
+**下一棒默认**：继续 P2-1，但不要直接全量替换连接。建议先做一个小面持久连接 probe（优先 `VoiceChannelDatabaseManager`，表面较小且有后台/按钮路径），确认 base 连接 helper + close 行为后，再动高频大面 `AchievementDatabaseManager` / `ShopDatabaseManager`。
 
 **环境验证规则**：环境 / import / 启动验证必须提权到沙箱外跑真实环境。项目 Windows `.venv` 已用 `ensurepip` 补出 pip，并通过 `./.venv/Scripts/python.exe -m pip install -r requirements.lock` 按 lock 补齐依赖（含 `ruamel-yaml==0.19.1`）；本轮 project venv import smoke 已通过。后续如果项目 venv 再缺包，直接补环境，不只记录缺失。
 
@@ -1369,9 +1371,10 @@ P1-3 / P1-3b 拆包完 ✅，P1-3c rename 也完成（2026-04-24），service.py
    - **P1-3b 第二档已收官**（2026-04-24 晚）：achievement / voice_channel / giveaway 共 3 commit。详见本文件 §P1-3b 第二档。
    - **P1-3b 第三档已收官**（2026-04-25）：shop + role 完整包。
    - **P1-3d service.py 横扫 + ban probe 已收官**（2026-04-25）：详见本文件 §P1-3d。
-   - **下一棒默认**：进入 P2-1 数据库连接复用生命周期设计。
+   - **P2-1a 生命周期基础设施已收官**（2026-04-25）：详见本文件 §P2-1a。
+   - **下一棒默认**：继续 P2-1b 小面持久连接 probe。
 
-用户只说"继续"的话，默认进入 **P2-1 数据库连接复用生命周期设计**。开工前先定 manager `close()`、bot shutdown hook、task loop 停止顺序；不要直接把所有 manager 改成常驻连接。
+用户只说"继续"的话，默认继续 **P2-1 数据库连接复用**。生命周期基础设施已完成，下一步做小面持久连接 probe；不要直接把所有 manager 改成常驻连接。
 
 ### 本次 session 补充（2026-04-24 P1-8 hygiene pass 收官 session）
 
@@ -1496,5 +1499,29 @@ P1-3 / P1-3b 拆包完 ✅，P1-3c rename 也完成（2026-04-24），service.py
 - 最终 project venv 验证：`./.venv/Scripts/python.exe -m compileall bot` ✅；`./.venv/Scripts/python.exe -X utf8 tools/check_locales.py` ✅（不加 `-X utf8` 时 Windows GBK stdout 会在打印 ✅ 时假失败）
 
 **后续建议**：
-- 下一步默认转 **P2-1 数据库连接复用** 的生命周期设计，先定 manager `close()` 与 bot shutdown hook。
+- 下一步默认转 **P2-1 数据库连接复用** 的生命周期设计，先定 manager `close()` 与 bot shutdown hook。（已执行，见 §P2-1a）
 - 如果继续 service.py，建议先不批量抽 tickets / privateroom；等 ban probe 跑过测试服后，再分别设计 `TicketsService` 的 `ticket_types/conf` 所有权和 `PrivateRoomService` 的购买 / 续费状态边界。
+
+### P2-1a 数据库生命周期基础设施（2026-04-25）
+
+**做了什么**：
+- 新增 `bot/utils/db_lifecycle.py`：
+  - `BaseDatabaseManager.close()` 默认 no-op，先建立生命周期合同，不改变现有 per-call `aiosqlite.connect` 行为。
+  - `collect_database_managers_from_cogs()` 从 cog 直接属性收集 manager，并按对象 id 去重。
+  - `close_database_managers()` 逐个 await `close()`，单个 manager 关闭失败只记录日志，不阻断其它资源释放。
+- 现有 11 个 DB/DB-like manager 全部继承 `BaseDatabaseManager`：achievement / ban / check_status / giveaway / notebook / privateroom / role / shop / tickets / voice_channel / teamup_display。
+- `bot/main.py` 新增 `DCGameServerHelperBot(commands.Bot)`；`close()` 先捕获当前 cog 上的 manager，再调用 `super().close()`。discord.py 会在 `super().close()` 中 remove cog 并触发 `cog_unload()`，所以后台 task 先停，随后再关闭 manager。
+
+**刻意没做**：
+- 没把任何 manager 改成长连接；P2-1 仍是 🔄，不是 ✅。
+- 没递归扫描 View / Modal 内部临时创建的 manager。下一阶段不要先转换这些散落 manager；优先转换 cog 直接持有、生命周期能被 bot close 捕获的 manager。
+
+**验证（沙箱外，项目 `.venv`）**：
+- `./.venv/Scripts/python.exe -m compileall bot` ✅
+- `./.venv/Scripts/python.exe -X utf8 tools/check_locales.py` ✅
+- `git diff --check` ✅
+- 不联网 Bot.close smoke ✅：dummy cog 的事件顺序为 `['cog_unload', 'manager_close']`，确认 task/cog unload 早于 manager close。
+
+**下一棒建议**：
+- 继续 P2-1b：先做一个小面持久连接 probe。推荐 `VoiceChannelDatabaseManager`，因为表面比 achievement/shop 小，且覆盖后台 cleanup、按钮回调和控制面板恢复路径。
+- probe 成功后再动 `AchievementDatabaseManager`（最高频，但 SQL 面大）和 `ShopDatabaseManager`（签到/余额路径多）。
