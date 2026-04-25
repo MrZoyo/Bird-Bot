@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import re
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -12,6 +11,16 @@ from discord.ext import commands, tasks
 from bot.utils import BanDatabaseManager, config
 from bot.utils.i18n import t
 
+from .service import (
+    build_ban_notification_embed,
+    build_mute_dm_embed,
+    build_mute_notification_embed,
+    build_tempban_dm_embed,
+    is_admin_channel,
+    is_valid_discord_invite_link,
+    member_has_ban_permission,
+    parse_duration,
+)
 from .views import RejoinServerView
 
 
@@ -61,17 +70,9 @@ class BanCog(commands.Cog):
 
     async def is_admin_channel_only_check(self, interaction: discord.Interaction) -> bool:
         """Check if the interaction is in admin channel without sending error message"""
-        # Reuse the same logic as check_channel_validity but return boolean only
-        # This avoids duplicating the channel ID extraction and comparison logic
         main_config = config.get_config('main')
         admin_channel_id = main_config.get('admin_channel_id')
-
-        if not admin_channel_id:
-            return False
-
-        # Same logic as check_channel_validity line 18-19 and 28
-        channel_id = interaction.channel_id
-        return channel_id == admin_channel_id
+        return is_admin_channel(interaction.channel_id, admin_channel_id)
 
     async def recover_tempbans(self):
         """Recover active tempbans from database after bot restart."""
@@ -196,48 +197,11 @@ class BanCog(commands.Cog):
 
     async def has_ban_permission(self, interaction: discord.Interaction) -> bool:
         """Check if user has permission to use ban commands"""
-        member = interaction.user
-
-        # Check if user has administrator permission
-        if member.guild_permissions.administrator:
-            return True
-
-        # Check admin roles
-        admin_roles = self.config_data.get('admin_roles', [])
-        if any(role.id in admin_roles for role in member.roles):
-            return True
-
-        # Check admin users
-        admin_users = self.config_data.get('admin_users', [])
-        if member.id in admin_users:
-            return True
-
-        return False
+        return member_has_ban_permission(interaction.user, self.config_data)
 
     def parse_duration(self, duration_str: str) -> Optional[timedelta]:
         """Parse duration string (e.g., '1d', '2h', '30m') to timedelta"""
-        pattern = r'^(\d+)([mhdw])$'
-        match = re.match(pattern, duration_str.lower())
-
-        if not match:
-            return None
-
-        amount, unit = match.groups()
-        amount = int(amount)
-
-        if amount == 0:
-            return None
-
-        if unit == 'm':
-            return timedelta(minutes=amount)
-        elif unit == 'h':
-            return timedelta(hours=amount)
-        elif unit == 'd':
-            return timedelta(days=amount)
-        elif unit == 'w':
-            return timedelta(weeks=amount)
-
-        return None
+        return parse_duration(duration_str)
 
     async def send_ban_notification(self, user: discord.User, reason: str, duration: Optional[str] = None,
                                     unban_time: Optional[datetime] = None):
@@ -265,58 +229,13 @@ class BanCog(commands.Cog):
             logging.error(f"Bot lacks Embed Links permission in channel {channel_id}")
             return
 
-
-        # Create embed
-        if duration:
-            title = t('ban.tempban_notification_title')
-            description = t('ban.tempban_notification_description')
-        else:
-            title = t('ban.ban_notification_title')
-            description = t('ban.ban_notification_description')
-
-        embed = discord.Embed(
-            title=title,
-            description=description.format(user=user.mention),
-            color=discord.Color.red(),
-            timestamp=discord.utils.utcnow()
+        embed = build_ban_notification_embed(
+            self.bot.user,
+            user,
+            reason,
+            duration,
+            unban_time,
         )
-
-        # Set bot avatar as thumbnail
-        if self.bot.user.avatar:
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
-
-        # Add user avatar to footer
-        embed.set_footer(
-            text=f"User: {user.display_name}",
-            icon_url=user.display_avatar.url
-        )
-
-        # Add fields
-        embed.add_field(
-            name=t('ban.reason_field'),
-            value=reason or t('ban.no_reason'),
-            inline=False
-        )
-
-        if duration:
-            embed.add_field(
-                name=t('ban.duration_field'),
-                value=duration,
-                inline=True
-            )
-
-            if unban_time:
-                embed.add_field(
-                    name=t('ban.unban_time_field'),
-                    value=f"<t:{int(unban_time.timestamp())}:F>",
-                    inline=True
-                )
-        else:
-            embed.add_field(
-                name=t('ban.duration_field'),
-                value=t('ban.permanent'),
-                inline=True
-            )
 
         try:
             await channel.send(embed=embed)
@@ -338,45 +257,12 @@ class BanCog(commands.Cog):
         if not channel:
             return
 
-
-        # Create embed
-        title = t('ban.mute_notification_title')
-        description = t('ban.mute_notification_description')
-
-        embed = discord.Embed(
-            title=title,
-            description=description.format(user=user.mention),
-            color=discord.Color.yellow(),
-            timestamp=discord.utils.utcnow()
-        )
-
-        # Set bot avatar as thumbnail
-        if self.bot.user.avatar:
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
-
-        # Add user avatar to footer
-        embed.set_footer(
-            text=f"User: {user.display_name}",
-            icon_url=user.display_avatar.url
-        )
-
-        # Add fields
-        embed.add_field(
-            name=t('ban.mute_reason_field'),
-            value=reason or t('ban.no_reason'),
-            inline=False
-        )
-
-        embed.add_field(
-            name=t('ban.mute_duration_field'),
-            value=duration,
-            inline=True
-        )
-
-        embed.add_field(
-            name=t('ban.mute_end_time_field'),
-            value=f"<t:{int(unmute_time.timestamp())}:F>",
-            inline=True
+        embed = build_mute_notification_embed(
+            self.bot.user,
+            user,
+            reason,
+            duration,
+            unmute_time,
         )
 
         try:
@@ -387,43 +273,7 @@ class BanCog(commands.Cog):
     async def send_tempban_dm(self, user: discord.User, guild: discord.Guild, reason: str, duration: str, unban_time: datetime):
         """Send tempban notification DM to user"""
         try:
-
-            # Create embed for DM
-            embed = discord.Embed(
-                title=t('ban.tempban_dm_title'),
-                description=t('ban.tempban_dm_description').format(guild_name=guild.name),
-                color=discord.Color.orange(),
-                timestamp=discord.utils.utcnow()
-            )
-
-            # Set guild icon as thumbnail
-            if guild.icon:
-                embed.set_thumbnail(url=guild.icon.url)
-
-            # Add fields
-            embed.add_field(
-                name=t('ban.tempban_dm_reason_field'),
-                value=reason,
-                inline=False
-            )
-
-            embed.add_field(
-                name=t('ban.tempban_dm_duration_field'),
-                value=duration,
-                inline=True
-            )
-
-            embed.add_field(
-                name=t('ban.tempban_dm_unban_time_field'),
-                value=f"<t:{int(unban_time.timestamp())}:F>",
-                inline=True
-            )
-
-            # Set footer
-            embed.set_footer(
-                text=t('ban.tempban_dm_footer'),
-                icon_url=user.display_avatar.url
-            )
+            embed = build_tempban_dm_embed(user, guild, reason, duration, unban_time)
 
             # Create view with rejoin button if invite link is set
             view = None
@@ -443,43 +293,7 @@ class BanCog(commands.Cog):
     async def send_mute_dm(self, user: discord.User, guild: discord.Guild, reason: str, duration: str, unmute_time: datetime):
         """Send mute notification DM to user"""
         try:
-
-            # Create embed for DM
-            embed = discord.Embed(
-                title=t('ban.mute_dm_title'),
-                description=t('ban.mute_dm_description').format(guild_name=guild.name),
-                color=discord.Color.yellow(),
-                timestamp=discord.utils.utcnow()
-            )
-
-            # Set guild icon as thumbnail
-            if guild.icon:
-                embed.set_thumbnail(url=guild.icon.url)
-
-            # Add fields
-            embed.add_field(
-                name=t('ban.mute_dm_reason_field'),
-                value=reason,
-                inline=False
-            )
-
-            embed.add_field(
-                name=t('ban.mute_dm_duration_field'),
-                value=duration,
-                inline=True
-            )
-
-            embed.add_field(
-                name=t('ban.mute_dm_unmute_time_field'),
-                value=f"<t:{int(unmute_time.timestamp())}:F>",
-                inline=True
-            )
-
-            # Set footer
-            embed.set_footer(
-                text=t('ban.mute_dm_footer'),
-                icon_url=user.display_avatar.url
-            )
+            embed = build_mute_dm_embed(user, guild, reason, duration, unmute_time)
 
             # Send DM
             await user.send(embed=embed)
@@ -1270,9 +1084,9 @@ class BanCog(commands.Cog):
             return
 
         # Validate invite link format (basic check)
-        if not (invite_link.startswith('https://discord.gg/') or invite_link.startswith('https://discord.com/invite/')):
+        if not is_valid_discord_invite_link(invite_link):
             await interaction.response.send_message(
-                "请提供有效的Discord邀请链接 (格式: https://discord.gg/xxx 或 https://discord.com/invite/xxx)",
+                t('ban.invalid_invite_link'),
                 ephemeral=False
             )
             return

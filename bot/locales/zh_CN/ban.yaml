@@ -55,6 +55,7 @@ rejoin_button_label: 🏠 重新加入服务器
 invite_link_set: '邀请链接已设置为: {link}'
 invite_link_removed: 邀请链接已移除。
 invite_link_not_set: 未设置邀请链接。
+invalid_invite_link: '请提供有效的Discord邀请链接 (格式: https://discord.gg/xxx 或 https://discord.com/invite/xxx)'
 member_not_found: ❌ 在服务器中找不到该成员。请确保用户在服务器中并重试。
 mute_dm_title: 🔇 你已被禁言
 mute_dm_description: 你在 **{guild_name}** 被禁言。
