@@ -91,7 +91,9 @@
 
 **P2-1b voice 持久连接 probe 已完成**：`BaseDatabaseManager` 提供 opt-in 持久连接 helper；`VoiceChannelDatabaseManager` 复用单个 `aiosqlite.Connection`，每个 SQL 方法用 manager 级 `asyncio.Lock` 序列化，`initialize_database()` 打开连接、`close()` 释放连接。其它 manager 还没有切长连接。
 
-**下一棒默认**：继续 P2-1c，但不要全量替换。建议在 voice probe 跑过测试服后，再选择 `AchievementDatabaseManager`（高频但 SQL 面大）或 `ShopDatabaseManager`（签到/余额路径多）做下一刀。
+**当前测试策略（2026-04-25 用户决定）**：先把重构主线全部做完，再从头逐个功能做测试服全量验证；当前不因单个 probe 未跑测试服而阻塞后续重构。
+
+**下一棒默认**：继续 P2-1c，但不要全量替换。下一刀在 `AchievementDatabaseManager`（高频但 SQL 面大）或 `ShopDatabaseManager`（签到/余额路径多）里二选一。
 
 **环境验证规则**：环境 / import / 启动验证必须提权到沙箱外跑真实环境。项目 Windows `.venv` 已用 `ensurepip` 补出 pip，并通过 `./.venv/Scripts/python.exe -m pip install -r requirements.lock` 按 lock 补齐依赖（含 `ruamel-yaml==0.19.1`）；本轮 project venv import smoke 已通过。后续如果项目 venv 再缺包，直接补环境，不只记录缺失。
 
@@ -1169,7 +1171,7 @@ ticket_type_delete_failure: ❌ 删除失败，请联系管理员
 
 Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅；P1-4 dataclass schema + 静态 key 对齐 ✅；**P1-3 大 cog 拆包三 pilot 全 ✅**（tickets_new 2666 → 1910 行 + privateroom 1993 → 1655 行 + ban 1430 → 1418 行；主 cog 都缩减或至少 UI 层隔离到包子模块）；**P1-8 审核补遗 hygiene pass 全 ✅**（2026-04-24，P1-8a/b/c 三条合计 8 commit、~20 行净变，详见本文件 §P1-8）；**P1-3c tickets_new → tickets rename ✅**（2026-04-24，3 commit，代码层 282 处 grep 清零，DB 三张表名按方案 A 保留留给 P2-2）。
 
-**2026-04-24 后续规划**（用户决定）：P1-3 扩展为 **§P1-3b 全量 cog 包化 + games 聚合** + **§P1-3c tickets_new → tickets rename**（见 PLAN 对应章节）。该规划已于 2026-04-25 全部收官；service.py 横扫也已完成 ban probe；P2-1a 生命周期基础设施和 P2-1b voice 持久连接 probe 也已完成。当前默认下一棒是 P2-1c：测试服观察 voice probe 后，再选 achievement/shop 做下一刀。
+**2026-04-24 后续规划**（用户决定）：P1-3 扩展为 **§P1-3b 全量 cog 包化 + games 聚合** + **§P1-3c tickets_new → tickets rename**（见 PLAN 对应章节）。该规划已于 2026-04-25 全部收官；service.py 横扫也已完成 ban probe；P2-1a 生命周期基础设施和 P2-1b voice 持久连接 probe 也已完成。当前默认下一棒是 P2-1c：不等待单点测试服观察，继续选 achievement/shop 做下一刀；全部重构完成后再统一全量功能测试。
 
 下一轮可接手的 follow-up：
 
@@ -1352,7 +1354,7 @@ cog_name = LEGACY_NAME_MAP.get(cog_name, cog_name)
 
 ### 下一候选：P2-1 数据库连接复用（PLAN §P2-1）
 
-P1-3 / P1-3b 拆包完 ✅，P1-3c rename 也完成（2026-04-24），service.py 横扫 + ban probe 也完成（2026-04-25），P2-1a 生命周期基础设施和 P2-1b `VoiceChannelDatabaseManager` 持久连接 probe 也完成（2026-04-25）。现在继续 P2-1c：先在测试服观察 voice probe，再选 `AchievementDatabaseManager` 或 `ShopDatabaseManager` 做下一刀。
+P1-3 / P1-3b 拆包完 ✅，P1-3c rename 也完成（2026-04-24），service.py 横扫 + ban probe 也完成（2026-04-25），P2-1a 生命周期基础设施和 P2-1b `VoiceChannelDatabaseManager` 持久连接 probe 也完成（2026-04-25）。现在继续 P2-1c：不等待单点测试服观察，直接选 `AchievementDatabaseManager` 或 `ShopDatabaseManager` 做下一刀；全部重构完成后再统一全量功能测试。
 
 (P2-2 Schema 迁移机制 若要承接 P1-3c 留下的 DB 表名 `tickets_new` / `ticket_new_*` 清理，可以作为 P2-2 的第一个实际 payload)
 
@@ -1375,9 +1377,9 @@ P1-3 / P1-3b 拆包完 ✅，P1-3c rename 也完成（2026-04-24），service.py
    - **P1-3d service.py 横扫 + ban probe 已收官**（2026-04-25）：详见本文件 §P1-3d。
    - **P2-1a 生命周期基础设施已收官**（2026-04-25）：详见本文件 §P2-1a。
    - **P2-1b voice 持久连接 probe 已收官**（2026-04-25）：详见本文件 §P2-1b。
-   - **下一棒默认**：继续 P2-1c，先测试服观察 voice probe，再选 achievement/shop。
+   - **下一棒默认**：继续 P2-1c，直接选 achievement/shop；功能测试整体后置到重构全部完成后。
 
-用户只说"继续"的话，默认继续 **P2-1 数据库连接复用**。生命周期基础设施和 voice 小面 probe 已完成；下一步不要直接把所有 manager 改成常驻连接，先选择 `AchievementDatabaseManager` 或 `ShopDatabaseManager` 做单 manager probe。
+用户只说"继续"的话，默认继续 **P2-1 数据库连接复用**。生命周期基础设施和 voice 小面 probe 已完成；下一步不要直接把所有 manager 改成常驻连接，先选择 `AchievementDatabaseManager` 或 `ShopDatabaseManager` 做单 manager probe。功能测试不穿插阻塞重构，统一留到全部重构结束后从头验证。
 
 ### 本次 session 补充（2026-04-24 P1-8 hygiene pass 收官 session）
 
@@ -1503,7 +1505,7 @@ P1-3 / P1-3b 拆包完 ✅，P1-3c rename 也完成（2026-04-24），service.py
 
 **后续建议**：
 - 下一步默认转 **P2-1 数据库连接复用** 的生命周期设计，先定 manager `close()` 与 bot shutdown hook。（已执行，见 §P2-1a）
-- 如果继续 service.py，建议先不批量抽 tickets / privateroom；等 ban probe 跑过测试服后，再分别设计 `TicketsService` 的 `ticket_types/conf` 所有权和 `PrivateRoomService` 的购买 / 续费状态边界。
+- 如果继续 service.py，建议先不批量抽 tickets / privateroom；等重构主线再次回到 service 层时，再分别设计 `TicketsService` 的 `ticket_types/conf` 所有权和 `PrivateRoomService` 的购买 / 续费状态边界。相关功能测试统一放到全部重构完成后。
 
 ### P2-1a 数据库生命周期基础设施（2026-04-25）
 
@@ -1527,7 +1529,7 @@ P1-3 / P1-3b 拆包完 ✅，P1-3c rename 也完成（2026-04-24），service.py
 
 **下一棒建议**：
 - P2-1b 建议已执行：`VoiceChannelDatabaseManager` 小面持久连接 probe 完成，覆盖后台 cleanup、按钮回调和控制面板恢复路径的 manager 层。
-- probe 跑过测试服后再动 `AchievementDatabaseManager`（最高频，但 SQL 面大）和 `ShopDatabaseManager`（签到/余额路径多）。
+- 不等待单点测试服观察，继续推进 `AchievementDatabaseManager`（最高频，但 SQL 面大）或 `ShopDatabaseManager`（签到/余额路径多）；全量功能测试统一后置。
 
 ### P2-1b voice DB 持久连接 probe（2026-04-25）
 
@@ -1548,5 +1550,5 @@ P1-3 / P1-3b 拆包完 ✅，P1-3c rename 也完成（2026-04-24），service.py
 - 临时 sqlite voice DB smoke ✅：`initialize_database()`、`upsert/list/delete channel_configs`、`insert/update/fetch/delete temp_channels`、旧表补列迁移、连接复用、`close()` 释放后重开。
 
 **下一棒建议**：
-- 先在测试服覆盖 voice_channel 的建房、删除空房、控制面板按钮、bot 重启恢复 View。
-- 再继续 P2-1c：`AchievementDatabaseManager` 或 `ShopDatabaseManager` 二选一，优先只迁一个 manager，保持可回滚面小。
+- 继续 P2-1c：`AchievementDatabaseManager` 或 `ShopDatabaseManager` 二选一，优先只迁一个 manager，保持可回滚面小。
+- voice_channel 的建房、删除空房、控制面板按钮、bot 重启恢复 View 等功能测试统一放到全部重构完成后的全量测试清单里。

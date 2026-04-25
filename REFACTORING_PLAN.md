@@ -143,7 +143,7 @@
 
 ### P1-3b. 全量 cog 包化 + games 聚合（P1-3 续篇）
 
-> **状态（2026-04-25）**：已完成。三档全部收官，`bot/cogs/` 顶层只剩包目录和 `__init__.py`。后续 `service.py` 横扫也已做第一刀 probe；P2-1a 生命周期基础设施和 P2-1b `VoiceChannelDatabaseManager` 持久连接 probe 也已完成。下一步默认继续 P2-1c：测试服观察 voice probe 后，再选 achievement/shop 做下一刀。
+> **状态（2026-04-25）**：已完成。三档全部收官，`bot/cogs/` 顶层只剩包目录和 `__init__.py`。后续 `service.py` 横扫也已做第一刀 probe；P2-1a 生命周期基础设施和 P2-1b `VoiceChannelDatabaseManager` 持久连接 probe 也已完成。下一步默认继续 P2-1c：不等待单点测试服观察，直接选 achievement/shop 做下一刀；全部重构完成后再统一全量功能测试。
 
 **目标**：把**所有** cog 都变成包格式（不只是"大 cog"），让 `bot/cogs/` 下只剩目录、不再有平面 `*_cog.py`。两个游戏 cog 聚合到 `bot/cogs/games/`，为未来新增游戏留扩展点。
 
@@ -905,7 +905,7 @@ def is_feature_enabled(self, feature_name: str, default: bool = True) -> bool:
   1. ✅ 先设计生命周期：为所有 `*DatabaseManager` 统一补 `async def close(self)`；基类或 protocol 化。
   2. ✅ 在 bot 关闭钩子里（`commands.Bot.close` 重载 或 discord.py 的 `on_disconnect` 语义）遍历所有 cog，对持有 manager 的执行 `close()`。
   3. 🔄 再把 `async with aiosqlite.connect(...)` 改成长连接模式（`initialize_database` 打开 / `close()` 释放）：voice 已完成，achievement/shop 未动。
-  4. 高频路径先验证：voice ✅；achievements、shop 待做。下一步建议等 voice probe 测试服跑过后，再动 achievement/shop。
+  4. 高频路径先验证：voice ✅；achievements、shop 待做。按当前策略，功能测试整体后置到全部重构完成后；下一步继续动 achievement/shop。
 - **替代方案**：如果不想维护生命周期，可评估 `aiosqlite.Connection` 池化库。
 
 ### P2-2. Schema 迁移机制
@@ -1082,7 +1082,7 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 
 ## 推进顺序建议
 
-> **当前状态**：下列 P0/P1 主线已基本执行完；下一步以 PROGRESS.md 的“当前接手点”为准。service.py 横扫已完成 ban probe，P2-1a 生命周期基础设施已完成，P2-1b `VoiceChannelDatabaseManager` 持久连接 probe 已完成；当前默认继续 P2-1c：测试服观察 voice probe 后，再选 `AchievementDatabaseManager` 或 `ShopDatabaseManager` 做下一刀。
+> **当前状态**：下列 P0/P1 主线已基本执行完；下一步以 PROGRESS.md 的“当前接手点”为准。service.py 横扫已完成 ban probe，P2-1a 生命周期基础设施已完成，P2-1b `VoiceChannelDatabaseManager` 持久连接 probe 已完成；当前默认继续 P2-1c：不等待单点测试服观察，直接选 `AchievementDatabaseManager` 或 `ShopDatabaseManager` 做下一刀。用户已决定全部重构完成后再从头逐个功能测试。
 
 1. **本轮冲刺（P0）**：P0-4（裸 except 治理，范围清晰、改动小、风险低）→ P0-1（giveaway 抽 db）→ P0-2（privateroom 规范化）→ P0-3（其余 cog 补 db manager，内部以 `check_status` 为首）。
 2. **下一轮（P1，小步）**：P1-5（日志 rotation）、P1-2（ban_cog 迁 cog_load）、P1-1（命令同步）—— 三个都是改动小、受益长期。
