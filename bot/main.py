@@ -76,7 +76,7 @@ COG_SPECS = [
     {
         "feature": "role",
         "cog_name": "RoleCog",
-        "module_path": "bot.cogs.role_cog",
+        "module_path": "bot.cogs.role",
         "class_name": "RoleCog",
         "required_configs": ["role", "achievements"],
     },
@@ -97,7 +97,7 @@ COG_SPECS = [
     {
         "feature": "shop",
         "cog_name": "ShopCog",
-        "module_path": "bot.cogs.shop_cog",
+        "module_path": "bot.cogs.shop",
         "class_name": "ShopCog",
         "required_configs": ["shop"],
     },
