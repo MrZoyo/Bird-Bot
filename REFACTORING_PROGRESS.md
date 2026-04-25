@@ -1167,7 +1167,7 @@ ticket_type_delete_failure: ❌ 删除失败，请联系管理员
 
 Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅；P1-4 dataclass schema + 静态 key 对齐 ✅；**P1-3 大 cog 拆包三 pilot 全 ✅**（tickets_new 2666 → 1910 行 + privateroom 1993 → 1655 行 + ban 1430 → 1418 行；主 cog 都缩减或至少 UI 层隔离到包子模块）；**P1-8 审核补遗 hygiene pass 全 ✅**（2026-04-24，P1-8a/b/c 三条合计 8 commit、~20 行净变，详见本文件 §P1-8）；**P1-3c tickets_new → tickets rename ✅**（2026-04-24，3 commit，代码层 282 处 grep 清零，DB 三张表名按方案 A 保留留给 P2-2）。
 
-**2026-04-24 后续规划**（用户决定）：P1-3 扩展为 **§P1-3b 全量 cog 包化 + games 聚合** + **§P1-3c tickets_new → tickets rename**（见 PLAN 对应章节）。该规划已于 2026-04-25 全部收官；service.py 横扫也已完成 ban probe，当前默认下一棒是 P2-1 数据库连接复用生命周期设计。
+**2026-04-24 后续规划**（用户决定）：P1-3 扩展为 **§P1-3b 全量 cog 包化 + games 聚合** + **§P1-3c tickets_new → tickets rename**（见 PLAN 对应章节）。该规划已于 2026-04-25 全部收官；service.py 横扫也已完成 ban probe；P2-1a 生命周期基础设施也已完成。当前默认下一棒是 P2-1b 小面持久连接 probe。
 
 下一轮可接手的 follow-up：
 
@@ -1350,11 +1350,11 @@ cog_name = LEGACY_NAME_MAP.get(cog_name, cog_name)
 
 ### 下一候选：P2-1 数据库连接复用（PLAN §P2-1）
 
-P1-3 / P1-3b 拆包完 ✅，P1-3c rename 也完成（2026-04-24），service.py 横扫 + ban probe 也完成（2026-04-25）。现在可以回来评估 DB 层，进入 P2-1 数据库连接复用前先做生命周期设计。
+P1-3 / P1-3b 拆包完 ✅，P1-3c rename 也完成（2026-04-24），service.py 横扫 + ban probe 也完成（2026-04-25），P2-1a 生命周期基础设施也完成（2026-04-25）。现在继续 P2-1b：先做 `VoiceChannelDatabaseManager` 持久连接小面 probe。
 
 (P2-2 Schema 迁移机制 若要承接 P1-3c 留下的 DB 表名 `tickets_new` / `ticket_new_*` 清理，可以作为 P2-2 的第一个实际 payload)
 
-如果要做：SQLite 连接复用的 Explore 前置参见 PLAN §P2-1。
+如果要做：SQLite 连接复用的 Explore 前置参见 PLAN §P2-1；生命周期前置已完成，不要回头重复做。
 
 ---
 
