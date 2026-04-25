@@ -6,8 +6,10 @@ import logging
 from datetime import datetime
 from typing import Optional, List, Tuple, Dict
 
+from .db_lifecycle import BaseDatabaseManager
 
-class TicketsDatabaseManager:
+
+class TicketsDatabaseManager(BaseDatabaseManager):
     def __init__(self, db_path: str):
         self.db_path = db_path
 
@@ -592,4 +594,3 @@ class TicketsDatabaseManager:
         except Exception as e:
             logging.error(f"Error updating ticket message ID: {e}")
             return False
-

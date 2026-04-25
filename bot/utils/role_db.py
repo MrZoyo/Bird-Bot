@@ -4,8 +4,10 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional, Dict, List, Tuple, Any
 
+from .db_lifecycle import BaseDatabaseManager
 
-class RoleDatabaseManager:
+
+class RoleDatabaseManager(BaseDatabaseManager):
     def __init__(self, db_path: str):
         self.db_path = db_path
 

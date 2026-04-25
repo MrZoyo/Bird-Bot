@@ -5,8 +5,10 @@ import discord
 from datetime import datetime
 from typing import Optional, List, Tuple
 
+from .db_lifecycle import BaseDatabaseManager
 
-class BanDatabaseManager:
+
+class BanDatabaseManager(BaseDatabaseManager):
     def __init__(self, db_path: str):
         self.db_path = db_path
 

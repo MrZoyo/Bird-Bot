@@ -3,8 +3,10 @@ import aiosqlite
 import logging
 from typing import Dict, List, Optional, Tuple
 
+from .db_lifecycle import BaseDatabaseManager
 
-class VoiceChannelDatabaseManager:
+
+class VoiceChannelDatabaseManager(BaseDatabaseManager):
     """Voice channel state tables.
 
     Two tables live here:

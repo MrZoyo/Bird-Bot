@@ -3,8 +3,10 @@ import aiosqlite
 from datetime import datetime
 from typing import List, Optional, Tuple
 
+from .db_lifecycle import BaseDatabaseManager
 
-class NotebookDatabaseManager:
+
+class NotebookDatabaseManager(BaseDatabaseManager):
     """Administrative event log (tables ``event_logs`` + ``admins``).
 
     ``event_logs.count`` is a per-``event_member`` monotonically increasing

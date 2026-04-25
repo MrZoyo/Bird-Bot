@@ -1,6 +1,11 @@
 # bot/utils/__init__.py
 from .config import config
 from .i18n import t
+from .db_lifecycle import (
+    BaseDatabaseManager,
+    close_database_managers,
+    collect_database_managers_from_cogs,
+)
 from .privateroom_db import PrivateRoomDatabaseManager
 from .tickets_db import TicketsDatabaseManager
 from .media_handler import MediaHandler
@@ -19,6 +24,9 @@ from .role_helpers import safe_member_role_edit
 __all__ = [
     'config',
     't',
+    'BaseDatabaseManager',
+    'close_database_managers',
+    'collect_database_managers_from_cogs',
     'TicketsDatabaseManager',
     'MediaHandler',
     'generate_file_tree',

@@ -5,8 +5,10 @@ from datetime import datetime, timezone
 import logging
 from typing import Optional, List, Dict, Tuple
 
+from .db_lifecycle import BaseDatabaseManager
 
-class TeamupDisplayManager:
+
+class TeamupDisplayManager(BaseDatabaseManager):
     """Database operations manager for teamup display board functionality"""
     
     def __init__(self, db_path: str):

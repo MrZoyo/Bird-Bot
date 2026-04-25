@@ -4,8 +4,10 @@ import datetime
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
+from .db_lifecycle import BaseDatabaseManager
 
-class GiveawayDatabaseManager:
+
+class GiveawayDatabaseManager(BaseDatabaseManager):
     """Database operations for the giveaway system.
 
     Tables owned here:

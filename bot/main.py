@@ -5,7 +5,11 @@ from logging.handlers import TimedRotatingFileHandler
 import discord
 from discord.ext import commands
 
-from bot.utils import config
+from bot.utils import (
+    close_database_managers,
+    collect_database_managers_from_cogs,
+    config,
+)
 from bot.utils.slash_translator import SlashTranslator
 
 
@@ -125,6 +129,19 @@ COG_SPECS = [
 ]
 
 
+class DCGameServerHelperBot(commands.Bot):
+    async def close(self) -> None:
+        # commands.Bot.close() unloads cogs first, which triggers cog_unload()
+        # and cancels background task loops. Keep the cog instances so their
+        # DB managers can be closed after those tasks stop.
+        database_managers = collect_database_managers_from_cogs(self.cogs.values())
+
+        try:
+            await super().close()
+        finally:
+            await close_database_managers(database_managers)
+
+
 def _get_missing_configs(config_names):
     missing_configs = []
     for config_name in config_names:
@@ -149,7 +166,7 @@ def create_bot():
     intents.guilds = True
     intents.voice_states = True
 
-    bot = commands.Bot(command_prefix="!", intents=intents)
+    bot = DCGameServerHelperBot(command_prefix="!", intents=intents)
 
     @bot.event
     async def on_ready():

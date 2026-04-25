@@ -5,8 +5,10 @@ import logging
 from collections import defaultdict
 from typing import Optional, Dict, List, Any
 
+from .db_lifecycle import BaseDatabaseManager
 
-class ShopDatabaseManager:
+
+class ShopDatabaseManager(BaseDatabaseManager):
     def __init__(self, db_path: str, config: dict = None):
         self.db_path = db_path
         self.config = config or {}
@@ -647,4 +649,3 @@ class ShopDatabaseManager:
             except Exception as e:
                 logging.error(f"Error getting today first checkin user: {e}")
                 return None
-

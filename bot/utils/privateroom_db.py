@@ -5,8 +5,10 @@ from datetime import datetime, timedelta
 import logging
 from typing import Dict, List, Optional, Tuple, Any
 
+from .db_lifecycle import BaseDatabaseManager
 
-class PrivateRoomDatabaseManager:
+
+class PrivateRoomDatabaseManager(BaseDatabaseManager):
     def __init__(self, db_path: str):
         self.db_path = db_path
 

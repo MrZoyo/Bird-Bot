@@ -2,8 +2,10 @@
 import aiosqlite
 from typing import List, Tuple
 
+from .db_lifecycle import BaseDatabaseManager
 
-class CheckStatusDatabaseManager:
+
+class CheckStatusDatabaseManager(BaseDatabaseManager):
     """Voice-channel status samples (table ``status``).
 
     One row per scheduled sample (every 10 minutes by default) with the total
