@@ -143,7 +143,7 @@
 
 ### P1-3b. 全量 cog 包化 + games 聚合（P1-3 续篇）
 
-> **状态（2026-04-25）**：已完成。三档全部收官，`bot/cogs/` 顶层只剩包目录和 `__init__.py`。下一步不再继续包化，默认做 `service.py` 横扫评估；若跳过评估，则进入 P2-1 数据库连接复用的生命周期设计。
+> **状态（2026-04-25）**：已完成。三档全部收官，`bot/cogs/` 顶层只剩包目录和 `__init__.py`。后续 `service.py` 横扫也已做第一刀 probe：ban 的纯 helper + Embed builder 已抽到 `bot/cogs/ban/service.py`；下一步默认进入 P2-1 数据库连接复用的生命周期设计。
 
 **目标**：把**所有** cog 都变成包格式（不只是"大 cog"），让 `bot/cogs/` 下只剩目录、不再有平面 `*_cog.py`。两个游戏 cog 聚合到 `bot/cogs/games/`，为未来新增游戏留扩展点。
 
@@ -151,7 +151,7 @@
 - **一致性**：P1-3 三 pilot（tickets_new / privateroom / ban）已证明包化机械可行；零散的 `*_cog.py` + `<name>/cog.py` 两套布局共存是历史债。
 - **扩展收益**：以后加新的 View / Modal 时，直接写进 `<name>/views.py` / `<name>/modals.py`，不用再新建散落的 `<name>_view.py`。
 - **游戏组**：`game_dnd_cog.py` + `game_spymode_cog.py` 现在是两个互不感知的文件；聚合到 `games/` 后未来加狼人杀 / 谁是卧底变种 / 21 点等只需在 `games/<name>/` 开新子目录，`main.py` 的 COG_SPECS 加一行。
-- **service.py 时机**：三家已拆 pilot 都保守没抽 service.py。全量包化后每家都有**完整标准骨架**（`__init__ + cog + 可选 views/modals/embeds/service`），此时再回头评估 service 抽离就是"加一个可选文件"而非"全局架构变更"—— 边界更清晰，评估 / 决策成本更低。本轮**不**强推抽 service，留给包化完成后的一次横向扫描。
+- **service.py 时机**：三家已拆 pilot 都保守没抽 service.py。全量包化后每家都有**完整标准骨架**（`__init__ + cog + 可选 views/modals/embeds/service`），此时再回头评估 service 抽离就是"加一个可选文件"而非"全局架构变更"—— 边界更清晰，评估 / 决策成本更低。2026-04-25 已完成横扫并选择 ban 做第一刀 probe。
 
 #### 目录布局
 
@@ -227,7 +227,7 @@ bot/cogs/
 **收尾**：
 - 更新 `bot/cogs/__init__.py`（若有 re-export）。
 - PROGRESS.md 把"剩余工作"清单逐项划掉，P1-3 表格 row 改成 "✅ 全量包化完成"。（已完成）
-- **统一 service.py 评估**：再做一次横向扫描，看哪些 cog 抽 service 收益足够（参考 P1-3 ban 那一节的服务候选清单 pattern）。
+- **统一 service.py 评估**：已做横扫；ban 作为 probe 抽出 `service.py`。tickets / privateroom 仍是候选，但需要先设计各自状态归属，不建议盲目批量抽。
 
 #### 单 pilot 模板（复制用）
 
@@ -260,7 +260,7 @@ python3 -m py_compile bot/cogs/<name>/*.py bot/main.py
 #### 与其它 P 任务的关系
 
 - **P2-1/P2-2（DB 层）**：跟包化互不冲突，可以并行（包化只动文件布局，DB manager 不变）。
-- **service.py 抽离**：**本轮后置**。包化完成后横向扫描更清晰。
+- **service.py 抽离**：包化完成后已做横向扫描；ban 已作为第一刀 probe。tickets / privateroom 后续需要先定状态归属再抽。
 - **P3-5 ruff**：等包化完成后再加，否则 lint rules 会同时覆盖 `*_cog.py` 和 `<name>/cog.py` 两种布局的文件。
 
 ### P1-3c. `tickets_new` → `tickets` 历史命名清理 ✅ 2026-04-24
@@ -1080,7 +1080,7 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 
 ## 推进顺序建议
 
-> **当前状态**：下列 P0/P1 主线已基本执行完；下一步以 PROGRESS.md 的“当前接手点”为准。当前默认是 `service.py` 横扫评估，其次才是 P2-1。
+> **当前状态**：下列 P0/P1 主线已基本执行完；下一步以 PROGRESS.md 的“当前接手点”为准。service.py 横扫已完成 ban probe，当前默认进入 P2-1 数据库连接复用的生命周期设计。
 
 1. **本轮冲刺（P0）**：P0-4（裸 except 治理，范围清晰、改动小、风险低）→ P0-1（giveaway 抽 db）→ P0-2（privateroom 规范化）→ P0-3（其余 cog 补 db manager，内部以 `check_status` 为首）。
 2. **下一轮（P1，小步）**：P1-5（日志 rotation）、P1-2（ban_cog 迁 cog_load）、P1-1（命令同步）—— 三个都是改动小、受益长期。
