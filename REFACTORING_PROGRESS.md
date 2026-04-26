@@ -64,7 +64,7 @@
 | P1 | P1-8a tickets_new ticket-type CRUD 返回值校验 | ✅ | 三处接 `ok` + 失败分支走 locale；新增 3 个 failure key |
 | P1 | P1-8b giveaway initialize_database 迁 cog_load | ✅ | cog_load 先建表后 start task；on_ready 只留 load_giveaways |
 | P1 | P1-8c feature flag 类型校验提示 / 行为对齐 | ✅ | `is_feature_enabled` 非 bool 改返 False，和 schema warning 对齐 |
-| P2 | P2-1 数据库连接复用 | 🔄 | P2-1a 生命周期基础设施 ✅；P2-1b voice ✅；P2-1c achievement ✅；shop 未动 |
+| P2 | P2-1 数据库连接复用 | ✅ | 生命周期基础设施 + voice / achievement / shop 高频 manager 持久连接均完成 |
 | P2 | P2-2 Schema 迁移机制 | ⬜ | |
 | P3 | P3-1 依赖管理统一 | ⬜ | |
 | P3 | P3-2 硬编码路径梳理 | ⬜ | |
@@ -91,11 +91,13 @@
 
 **P2-1b voice 持久连接 probe 已完成**：`BaseDatabaseManager` 提供 opt-in 持久连接 helper；`VoiceChannelDatabaseManager` 复用单个 `aiosqlite.Connection`，每个 SQL 方法用 manager 级 `asyncio.Lock` 序列化，`initialize_database()` 打开连接、`close()` 释放连接。
 
-**P2-1c achievement 持久连接 probe 已完成**：`AchievementDatabaseManager` 复用单个 `aiosqlite.Connection`，manager 级 `asyncio.Lock` 串行化所有 SQL；初始化建表、常规成就读写、月度榜单、语音 session、manual operation、shop 签到联查都走同一持久连接 helper。写失败会 `rollback()`，cursor 显式关闭。`ShopDatabaseManager` 还未迁移。
+**P2-1c achievement 持久连接 probe 已完成**：`AchievementDatabaseManager` 复用单个 `aiosqlite.Connection`，manager 级 `asyncio.Lock` 串行化所有 SQL；初始化建表、常规成就读写、月度榜单、语音 session、manual operation、shop 签到联查都走同一持久连接 helper。写失败会 `rollback()`，cursor 显式关闭。
+
+**P2-1d shop 持久连接 probe 已完成**：`ShopDatabaseManager` 复用单个 `aiosqlite.Connection`，签到、余额、补签、transaction history、checkin embed 相关路径都走同一 manager 级 lock。余额+流水、补签+streak 重算这类多 SQL 路径保持在同一事务内，避免 public 方法嵌套锁导致死锁。
 
 **当前测试策略（2026-04-25 用户决定）**：先把重构主线全部做完，再从头逐个功能做测试服全量验证；当前不因单个 probe 未跑测试服而阻塞后续重构。
 
-**下一棒默认**：继续 P2-1d，但不要全量替换。下一刀迁 `ShopDatabaseManager`（签到/余额/补签路径多），保持可回滚面小。
+**下一棒默认**：进入 P2-2 schema 迁移机制。P2-1 收口范围是 voice / achievement / shop 三个高频 manager；低频 manager 暂不强行迁长连接，等 profiling 或功能改动时再单独处理。
 
 **环境验证规则**：环境 / import / 启动验证必须提权到沙箱外跑真实环境。项目 Windows `.venv` 已用 `ensurepip` 补出 pip，并通过 `./.venv/Scripts/python.exe -m pip install -r requirements.lock` 按 lock 补齐依赖（含 `ruamel-yaml==0.19.1`）；本轮 project venv import smoke 已通过。后续如果项目 venv 再缺包，直接补环境，不只记录缺失。
 
@@ -1173,7 +1175,7 @@ ticket_type_delete_failure: ❌ 删除失败，请联系管理员
 
 Config 2.0 sprint **整体收官**（step 0-9 全 ✅）；P1-7 slash 元数据本地化 ✅；P1-4 dataclass schema + 静态 key 对齐 ✅；**P1-3 大 cog 拆包三 pilot 全 ✅**（tickets_new 2666 → 1910 行 + privateroom 1993 → 1655 行 + ban 1430 → 1418 行；主 cog 都缩减或至少 UI 层隔离到包子模块）；**P1-8 审核补遗 hygiene pass 全 ✅**（2026-04-24，P1-8a/b/c 三条合计 8 commit、~20 行净变，详见本文件 §P1-8）；**P1-3c tickets_new → tickets rename ✅**（2026-04-24，3 commit，代码层 282 处 grep 清零，DB 三张表名按方案 A 保留留给 P2-2）。
 
-**2026-04-24 后续规划**（用户决定）：P1-3 扩展为 **§P1-3b 全量 cog 包化 + games 聚合** + **§P1-3c tickets_new → tickets rename**（见 PLAN 对应章节）。该规划已于 2026-04-25 全部收官；service.py 横扫也已完成 ban probe；P2-1a 生命周期基础设施、P2-1b voice 持久连接 probe、P2-1c achievement 持久连接 probe 也已完成。当前默认下一棒是 P2-1d：不等待单点测试服观察，继续迁 `ShopDatabaseManager`；全部重构完成后再统一全量功能测试。
+**2026-04-24 后续规划**（用户决定）：P1-3 扩展为 **§P1-3b 全量 cog 包化 + games 聚合** + **§P1-3c tickets_new → tickets rename**（见 PLAN 对应章节）。该规划已于 2026-04-25 全部收官；service.py 横扫也已完成 ban probe；P2-1 数据库连接复用高频路径也已完成。当前默认下一棒是 P2-2 schema 迁移机制；全部重构完成后再统一全量功能测试。
 
 下一轮可接手的 follow-up：
 
@@ -1354,13 +1356,13 @@ cog_name = LEGACY_NAME_MAP.get(cog_name, cog_name)
 
 ---
 
-### 下一候选：P2-1 数据库连接复用（PLAN §P2-1）
+### 下一候选：P2-2 Schema 迁移机制（PLAN §P2-2）
 
-P1-3 / P1-3b 拆包完 ✅，P1-3c rename 也完成（2026-04-24），service.py 横扫 + ban probe 也完成（2026-04-25），P2-1a 生命周期基础设施、P2-1b `VoiceChannelDatabaseManager` 持久连接 probe、P2-1c `AchievementDatabaseManager` 持久连接 probe 也都完成（2026-04-25）。现在继续 P2-1d：不等待单点测试服观察，迁 `ShopDatabaseManager` 做下一刀；全部重构完成后再统一全量功能测试。
+P1-3 / P1-3b 拆包完 ✅，P1-3c rename 也完成（2026-04-24），service.py 横扫 + ban probe 也完成（2026-04-25），P2-1 数据库连接复用高频路径（voice / achievement / shop）也完成（2026-04-25）。现在默认进入 P2-2：先设计轻量 schema_version / migrations 机制，不等待单点测试服观察；全部重构完成后再统一全量功能测试。
 
 (P2-2 Schema 迁移机制 若要承接 P1-3c 留下的 DB 表名 `tickets_new` / `ticket_new_*` 清理，可以作为 P2-2 的第一个实际 payload)
 
-如果要做：SQLite 连接复用的 Explore 前置参见 PLAN §P2-1；生命周期前置已完成，不要回头重复做。
+如果要做：SQLite schema 迁移机制参见 PLAN §P2-2；不要回头重复做 P2-1 生命周期 / 长连接 probe。
 
 ---
 
@@ -1369,8 +1371,9 @@ P1-3 / P1-3b 拆包完 ✅，P1-3c rename 也完成（2026-04-24），service.py
 1. `sed -n '43,90p' REFACTORING_PROGRESS.md`（看总表 + 当前接手点）
 2. `git log --oneline -10`（确认最近有 P1-3d ban service probe + docs commit）
 3. `find bot/cogs -maxdepth 1 -type f -print`（应只剩 `bot/cogs/__init__.py`）
-4. `sed -n '897,920p' REFACTORING_PLAN.md`（看 P2-1 DB 连接复用设计，若准备继续 shop）
-5. 决定路径：
+4. `sed -n '897,920p' REFACTORING_PLAN.md`（确认 P2-1 已收官）
+5. `sed -n '912,930p' REFACTORING_PLAN.md`（看 P2-2 schema 迁移机制）
+6. 决定路径：
    - **P1-8 hygiene pass 已全收官**（2026-04-24）：P1-8c ✅（`044b17c`）/ P1-8b ✅（`fc77465`）/ P1-8a ✅（`c62bb23`）；不必再展开 PLAN §P1-8，历史追溯才需要
    - **P1-3c 已收官**（2026-04-24）：`6f41b63` / `afd3aff` + 2 docs commit。详见本文件 §P1-3c。
    - **P1-3b 第一档已收官**（2026-04-24 晚）：8 cog + `games/` 骨架，9 commit（含 1 follow-up）。详见本文件 §P1-3b 第一档。
@@ -1380,9 +1383,10 @@ P1-3 / P1-3b 拆包完 ✅，P1-3c rename 也完成（2026-04-24），service.py
    - **P2-1a 生命周期基础设施已收官**（2026-04-25）：详见本文件 §P2-1a。
    - **P2-1b voice 持久连接 probe 已收官**（2026-04-25）：详见本文件 §P2-1b。
    - **P2-1c achievement 持久连接 probe 已收官**（2026-04-25）：详见本文件 §P2-1c。
-   - **下一棒默认**：继续 P2-1d，迁 `ShopDatabaseManager`；功能测试整体后置到重构全部完成后。
+   - **P2-1d shop 持久连接 probe 已收官**（2026-04-25）：详见本文件 §P2-1d。
+   - **下一棒默认**：进入 P2-2 schema 迁移机制；功能测试整体后置到重构全部完成后。
 
-用户只说"继续"的话，默认继续 **P2-1 数据库连接复用**。生命周期基础设施、voice 小面 probe、achievement probe 已完成；下一步不要直接把所有 manager 改成常驻连接，先迁 `ShopDatabaseManager` 做单 manager probe。功能测试不穿插阻塞重构，统一留到全部重构结束后从头验证。
+用户只说"继续"的话，默认进入 **P2-2 Schema 迁移机制**。P2-1 高频 manager 长连接已完成；低频 manager 暂不强行迁。功能测试不穿插阻塞重构，统一留到全部重构结束后从头验证。
 
 ### 本次 session 补充（2026-04-24 P1-8 hygiene pass 收官 session）
 
@@ -1531,8 +1535,8 @@ P1-3 / P1-3b 拆包完 ✅，P1-3c rename 也完成（2026-04-24），service.py
 - 不联网 Bot.close smoke ✅：dummy cog 的事件顺序为 `['cog_unload', 'manager_close']`，确认 task/cog unload 早于 manager close。
 
 **下一棒建议**：
-- P2-1b / P2-1c 建议已执行：`VoiceChannelDatabaseManager` 和 `AchievementDatabaseManager` 持久连接 probe 完成。
-- 不等待单点测试服观察，继续推进 `ShopDatabaseManager`（签到/余额/补签路径多）；全量功能测试统一后置。
+- P2-1b / P2-1c / P2-1d 建议已执行：`VoiceChannelDatabaseManager`、`AchievementDatabaseManager` 和 `ShopDatabaseManager` 持久连接 probe 完成。
+- P2-1 高频路径已收官；下一步进入 P2-2 schema 迁移机制，全量功能测试统一后置。
 
 ### P2-1b voice DB 持久连接 probe（2026-04-25）
 
@@ -1554,7 +1558,7 @@ P1-3 / P1-3b 拆包完 ✅，P1-3c rename 也完成（2026-04-24），service.py
 
 **下一棒建议**：
 - P2-1c 已执行：`AchievementDatabaseManager` 持久连接 probe 完成。
-- 继续 P2-1d：迁 `ShopDatabaseManager`，优先只迁一个 manager，保持可回滚面小。
+- P2-1d 已执行：`ShopDatabaseManager` 持久连接 probe 完成。
 - voice_channel 的建房、删除空房、控制面板按钮、bot 重启恢复 View 等功能测试统一放到全部重构完成后的全量测试清单里。
 
 ### P2-1c achievement DB 持久连接 probe（2026-04-25）
@@ -1566,7 +1570,7 @@ P1-3 / P1-3b 拆包完 ✅，P1-3c rename 也完成（2026-04-24），service.py
 - 调用面不变，achievement cog / shop 联查路径不需要改。
 
 **刻意没做**：
-- 没迁 `ShopDatabaseManager`，避免一次性把签到、余额、补签和 embed panel 路径全部卷进同一个改动。
+- 当轮没迁 `ShopDatabaseManager`，避免一次性把签到、余额、补签和 embed panel 路径全部卷进同一个改动；P2-1d 已单独迁完。
 - 没引入连接池；继续沿用 manager 单连接 + lock 的渐进式策略。
 
 **验证（沙箱外，项目 `.venv`）**：
@@ -1577,5 +1581,29 @@ P1-3 / P1-3b 拆包完 ✅，P1-3c rename 也完成（2026-04-24），service.py
 - 临时 sqlite achievement DB smoke ✅：初始化建表、成就/月度成就写入、leaderboard/rank、voice session、manual operation、shop 签到联查、负例 rollback、连接复用、`close()` 释放后重开。
 
 **下一棒建议**：
-- 继续 P2-1d：迁 `ShopDatabaseManager`，覆盖签到、余额、补签、transaction history、checkin embed 相关路径。
+- P2-1d 已执行：`ShopDatabaseManager` 持久连接 probe 完成。
 - achievement 的真实 Discord 命令与按钮测试统一放到全部重构完成后的全量测试清单里。
+
+### P2-1d shop DB 持久连接 probe（2026-04-25）
+
+**做了什么**：
+- `ShopDatabaseManager` 初始化时创建 manager 级 `asyncio.Lock`，并 opt-in 使用 `BaseDatabaseManager` 的持久连接 helper。
+- `initialize_database()`、余额、签到、补签、transaction history、checkin embed panel 相关读写都改为复用同一个 `aiosqlite.Connection`。
+- `update_user_balance_with_record()` 改为余额更新 + transaction 记录同一事务；`add_makeup_record()` 改为补签记录 + streak 重算同一事务，避免持久连接下 public 方法嵌套锁导致死锁。
+- 写失败显式 `rollback()`；cursor 通过内部 helper 显式关闭。
+
+**刻意没做**：
+- 没迁低频 manager（ban/tickets/notebook 等）。P2-1 收口范围是 voice / achievement / shop 三个高频 manager；其它 manager 等 profiling 或功能改动时再单独迁。
+- 没引入连接池；继续沿用 manager 单连接 + lock。
+
+**验证（沙箱外，项目 `.venv`）**：
+- `./.venv/Scripts/python.exe -m compileall bot` ✅
+- `./.venv/Scripts/python.exe -X utf8 tools/check_locales.py` ✅
+- `./.venv/Scripts/python.exe -m pip check` ✅
+- `git diff --check` ✅
+- 临时 sqlite shop DB smoke ✅：初始化建表、余额读写、余额+流水事务、负例 rollback、签到重复检测、补签 slot、streak 重算、transaction history/count、checkin embed 创建/统计/reset/deactivate、连接复用、`close()` 释放后重开。
+- 临时 sqlite achievement/shop interop smoke ✅：shop 签到 + 补签后，achievement 的 `get_user_achievements()`、月度签到数据、签到总数 / 连签榜单均能读到一致数据。
+
+**下一棒建议**：
+- P2-1 高频路径已收官。下一步进入 P2-2 schema 迁移机制，先设计轻量 `schema_version` / 手写 migrations 链。
+- shop 的真实 Discord 签到、补签、余额、embed panel 功能测试统一放到全部重构完成后的全量测试清单里。
