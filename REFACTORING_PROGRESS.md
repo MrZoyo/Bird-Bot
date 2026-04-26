@@ -66,6 +66,7 @@
 | P1 | P1-8c feature flag 类型校验提示 / 行为对齐 | ✅ | `is_feature_enabled` 非 bool 改返 False，和 schema warning 对齐 |
 | P2 | P2-1 数据库连接复用 | ✅ | 生命周期基础设施 + voice / achievement / shop 高频 manager 持久连接均完成 |
 | P2 | P2-2 Schema 迁移机制 | ✅ | `schema_version` + 手写 migrations helper；首批接入 voice / privateroom / ban |
+| P2 | P2-3 `save_config` 写回统一策略 | ✅ | 统一 YAML writer + 当前写回路径核对完成 |
 | P3 | P3-1 依赖管理统一 | ⬜ | |
 | P3 | P3-2 硬编码路径梳理 | ⬜ | |
 | P3 | P3-3 清理空 bot.db | ⬜ | |
@@ -99,7 +100,14 @@
 
 **当前测试策略（2026-04-25 用户决定）**：先把重构主线全部做完，再从头逐个功能做测试服全量验证；当前不因单个 probe 未跑测试服而阻塞后续重构。
 
-**下一棒默认**：进入 P2-3 `save_config` 写回统一策略。P2-1 收口范围是 voice / achievement / shop 三个高频 manager；低频 manager 暂不强行迁长连接，等 profiling 或功能改动时再单独处理。
+**P2-3 `save_config` 写回统一策略已完成**：
+- `bot/utils/config.py` 已有统一 `async save_config()`：ruamel round-trip、sibling tempfile、`os.replace`、写后 reload。本轮补了按 config name 串行化和 `deepcopy` 写入快照，避免管理员命令并发保存时 dump 到正在变动的对象。
+- YAML 写回现行路径已核对：ban / tickets / invitation / role 均走 `await config.save_config(...)`；tickets 的 `self.conf` 会剔除 `ticket_types`，避免把 DB 子树写回 YAML。
+- 已迁 DB 路径已核对：voice channel configs 不再有 `save_channel_configs`；ticket types 走 `TicketsDatabaseManager` 的 `list/upsert/rename/remove_ticket_type`，`tools/seed_db.py` 与 `tools/field_classification.yaml` 同步。
+- 本轮额外把 `CreateInvitationCog.save_config()` 改为保存后回填 `self.conf`、`self.ignore_user_ids`、`self.ignore_channel_ids`，和 ban/tickets 的 reload 行为对齐。
+- 提权验证已通过：`./.venv/Scripts/python.exe -m compileall bot`、`./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`、`./.venv/Scripts/python.exe -m pip check`、`git diff --check`、`save_config` 临时目录 smoke。
+
+**下一棒默认**：进入 P3-1 依赖管理统一。当前依赖状态是 `requirements.txt` / `requirements.lock` / `pyproject.toml` / `uv.lock` / `.python-version` 并存，下一步先盘点真实安装源与 lock 生成链，再决定是否把依赖统一到 `pyproject.toml` + uv。
 
 **环境验证规则**：环境 / import / 启动验证必须提权到沙箱外跑真实环境。项目 Windows `.venv` 已用 `ensurepip` 补出 pip，并通过 `./.venv/Scripts/python.exe -m pip install -r requirements.lock` 按 lock 补齐依赖（含 `ruamel-yaml==0.19.1`）；本轮 project venv import smoke 已通过。后续如果项目 venv 再缺包，直接补环境，不只记录缺失。
 

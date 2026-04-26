@@ -918,6 +918,19 @@ def is_feature_enabled(self, feature_name: str, default: bool = True) -> bool:
 
 ### P2-3. `save_config` 写回统一策略
 
+> **状态（2026-04-26）**：已完成。配置 2.0 阶段已完成主体迁移；当前包化后的真实路径已重新核对。`bot/utils/config.py` 统一 `async save_config()` 已存在，本轮补了按 config name 串行化和写入快照，避免并发保存时 `ruamel.yaml` dump 共享可变对象。YAML 写回路径现在是 `bot/cogs/ban/cog.py`、`bot/cogs/tickets/cog.py`、`bot/cogs/create_invitation/cog.py`、`bot/cogs/role/cog.py`；DB 路径是 `bot/cogs/voice_channel/*` 的 channel configs 与 `bot/cogs/tickets/*` 的 ticket types。提权验证已通过：compileall、locale check、pip check、`git diff --check`、`save_config` 临时目录 smoke。
+
+**现行代码核对表（包化后真实路径）**
+
+| 位置 | 当前状态 |
+|---|---|
+| `bot/cogs/ban/cog.py` `save_config` | YAML；调用 `await config.save_config('ban', self.config_data)`，并回填 reload 后快照 |
+| `bot/cogs/tickets/cog.py` `save_config` | YAML；调用 `await config.save_config('tickets', self.conf)`，并确保 `ticket_types` 不回写 YAML |
+| `bot/cogs/create_invitation/cog.py` `save_config` | YAML；调用 `await config.save_config('invitation', self.conf)`，本轮补齐 reload 后本地引用回填 |
+| `bot/cogs/role/cog.py` `/signature_set_requirement` | YAML；`async def` 内已 `await config.save_config('role', self.role_config)`，旧 AttributeError 路径已不存在 |
+| `bot/cogs/voice_channel/*` channel configs | DB；旧 `save_channel_configs` 路径已不存在 |
+| `bot/cogs/tickets/*` ticket types | DB；`TicketsDatabaseManager` 提供 `list/upsert/rename/remove_ticket_type`，旧 `db_manager.save_config('ticket_types', ...)` 路径已不存在 |
+
 **问题范围（全仓库 5 处运行中的写回 + 2 处隐藏 bug）**
 
 | 位置 | 状态 |
