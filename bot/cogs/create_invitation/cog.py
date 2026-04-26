@@ -314,7 +314,9 @@ class CreateInvitationCog(commands.Cog):
         (ruamel round-trip + tempfile + os.replace). The old manual
         JSON I/O path is gone; a single source of truth lives in YAML.
         """
-        await config.save_config('invitation', self.conf)
+        self.conf = await config.save_config('invitation', self.conf)
+        self.ignore_user_ids = self.conf['ignore_user_ids']
+        self.ignore_channel_ids = self.conf['ignore_channel_ids']
 
     @app_commands.command(
         name="invt_checkignorelist",

@@ -1,5 +1,6 @@
 # bot/utils/config.py
 import asyncio
+import copy
 import os
 import tempfile
 from pathlib import Path
@@ -29,6 +30,7 @@ class Config:
             cls._instance = super().__new__(cls)
             cls._instance._configs: Dict[str, Any] = {}
             cls._instance._locales: Dict[Tuple[str, str], Any] = {}
+            cls._instance._save_locks: Dict[str, asyncio.Lock] = {}
         return cls._instance
 
     # ---- Path helpers ---------------------------------------------------
@@ -122,6 +124,13 @@ class Config:
         for config_name in list(self._configs.keys()):
             self.reload_config(config_name)
 
+    def _save_lock(self, config_name: str) -> asyncio.Lock:
+        lock = self._save_locks.get(config_name)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._save_locks[config_name] = lock
+        return lock
+
     # ---- Locale (i18n) --------------------------------------------------
 
     def _default_locale(self) -> str:
@@ -188,30 +197,32 @@ class Config:
         yaml_path = self.get_yaml_path(config_name)
         yaml_path.parent.mkdir(parents=True, exist_ok=True)
 
-        payload = data if data is not None else self._configs.get(config_name, {})
+        async with self._save_lock(config_name):
+            payload = data if data is not None else self._configs.get(config_name, {})
+            snapshot = copy.deepcopy(payload)
 
-        def _write() -> None:
-            fd, tmp_path = tempfile.mkstemp(
-                prefix=f'.{config_name}.',
-                suffix='.yaml',
-                dir=str(yaml_path.parent),
-            )
-            try:
-                with os.fdopen(fd, 'w', encoding='utf-8') as f:
-                    _new_yaml().dump(payload, f)
-                os.replace(tmp_path, yaml_path)
-            except Exception:
+            def _write() -> None:
+                fd, tmp_path = tempfile.mkstemp(
+                    prefix=f'.{config_name}.',
+                    suffix='.yaml',
+                    dir=str(yaml_path.parent),
+                )
                 try:
-                    os.unlink(tmp_path)
-                except OSError:
-                    pass
-                raise
+                    with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                        _new_yaml().dump(snapshot, f)
+                    os.replace(tmp_path, yaml_path)
+                except Exception:
+                    try:
+                        os.unlink(tmp_path)
+                    except OSError:
+                        pass
+                    raise
 
-        await asyncio.to_thread(_write)
+            await asyncio.to_thread(_write)
 
-        if reload:
-            self.load_config(config_name=config_name)
-        return self._configs.get(config_name, {})
+            if reload:
+                self.load_config(config_name=config_name)
+            return self._configs.get(config_name, {})
 
 
 # Create a singleton instance
