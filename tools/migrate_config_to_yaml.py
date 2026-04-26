@@ -5,7 +5,7 @@ Per REFACTORING_PLAN.md §P1-6 step 5. Run once on the operator's box
 during the upgrade protocol:
 
     git pull
-    uv pip sync requirements.lock
+    uv sync
     python tools/migrate_config_to_yaml.py
     # review tools/migration_report.md
     python tools/seed_db.py    # (once step 7 lands this tool)

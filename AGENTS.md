@@ -7,7 +7,7 @@
 - 数据：主库 `bot.db` 位于仓库根目录；备份在 `backup/`；旧实验代码在 `old_function/` 和 `old_test/`。
 
 ## 构建、运行与开发命令
-- 安装依赖：`pip install -r requirements.txt`（建议虚拟环境）。
+- 安装依赖：`uv sync`（建议虚拟环境；依赖源在 `pyproject.toml`，锁定版本在 `uv.lock`）。
 - 本地运行：`python run.py`（确保已配置好 token、频道/角色 ID）。
 - 可选语法快检：`python -m compileall bot`。
 - 动数据库前先备份：复制 `bot.db` 或在运行中的机器人使用 `/backup_now`。

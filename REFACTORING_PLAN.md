@@ -510,7 +510,7 @@ tools/
 所有迁移脚本位于新版代码的 `tools/` 下。正确顺序如下，**不能反过来**：
 
 1. `git pull` 拉新版代码（包含迁移脚本 + 新 `config.py` + 新依赖声明）。
-2. `uv pip sync requirements.lock` 更新依赖（装上 `ruamel.yaml`）。
+2. `uv sync` 更新依赖（装上 `ruamel.yaml`）。
 3. **不要立刻启动 bot**。先跑 `python tools/migrate_config_to_yaml.py` 生成 YAML + locale 文件 + `tools/migration_db_seed.json` + `tools/migration_report.md`。跑完**必读 report** 做人工 review（`unclassified` 字段必须逐个决策）。
 4. **跑 `python tools/seed_db.py`** 把 `migration_db_seed.json` 里的 DB 类字段（`voicechannel.channel_configs` / `tickets_new.ticket_types` 等，按 P2-5 判定）灌进数据库。**这一步是必须的**，跳过会导致下一步启动后这些字段是空的（自动创建房间入口丢光、所有 ticket types 丢光）。
 5. 重启 bot。新 `config.py` 读 YAML；DB 已经 seed；旧 JSON 留在原位作 fallback 安全网，直到本 PR 步骤 9 才彻底清理。
@@ -521,7 +521,7 @@ tools/
 - 如果 seed 出错，显式脚本容易打印清楚；bootstrap 错误容易被 cog 初始化流程吞掉。
 - 运维日志里一行 `python tools/seed_db.py` 能清晰对应"迁移过"这个事件。
 
-**`get_config` 过渡期兼容**：步骤 3 的 `get_config` 保留 JSON fallback —— 保护窗口**严格限定为"步骤 2 之后、步骤 9 之前"**，即 `uv pip sync requirements.lock` 已装好 `ruamel.yaml`、但还有 cog 没迁完 YAML 的过渡阶段。**不保护"步骤 1 和 2 之间"**：那段时间 `ruamel.yaml` 没装，新 `config.py` 顶部 `import ruamel.yaml` 会直接 `ImportError`，连 fallback 分支都进不去 —— 这个窗口靠升级协议明确"先 sync 再启动 bot"来规避，**不做代码层 `ImportError` lazy import 兜底**（兜底会让启动失败点变模糊，运维定位反而更麻烦）。步骤 9 才彻底删 JSON 分支。
+**`get_config` 过渡期兼容**：步骤 3 的 `get_config` 保留 JSON fallback —— 保护窗口**严格限定为"步骤 2 之后、步骤 9 之前"**，即 `uv sync` 已装好 `ruamel.yaml`、但还有 cog 没迁完 YAML 的过渡阶段。**不保护"步骤 1 和 2 之间"**：那段时间 `ruamel.yaml` 没装，新 `config.py` 顶部 `import ruamel.yaml` 会直接 `ImportError`，连 fallback 分支都进不去 —— 这个窗口靠升级协议明确"先 sync 再启动 bot"来规避，**不做代码层 `ImportError` lazy import 兜底**（兜底会让启动失败点变模糊，运维定位反而更麻烦）。步骤 9 才彻底删 JSON 分支。
 
 **步骤 1：硬编码文案抽取（前置，必做）**
 
@@ -558,17 +558,15 @@ grep -nE '(\.(send|send_message|edit_original_response)|\.followup\.send|Embed|a
 
 **Agent 兜底（强烈建议）**：每个 cog 手工处理完、准备提交前，用 `general-purpose` 或 `Explore` agent 对该文件再扫一遍。prompt 要点："列出该文件里所有**未经过 `t()`** 但会抵达 discord.py 用户可见出口的字符串，包括 f-string、字符串拼接、条件表达式、多行 triple-quote、通过中间变量传递的字面量。"grep 对复合字符串的 recall 差，agent 在这一块明显更强；加这遍能显著减少漏抽，对密集文案 cog（`privateroom_cog` / `tickets_new_cog` / `welcome_cog`）尤其重要。
 
-**步骤 2：引入依赖（闭环）**
+**步骤 2：引入依赖（闭环，P3-1 后状态）**
 
-当前仓库的安装入口是 `README.md:62` 的 `uv pip sync requirements.lock`，直接依赖清单在 `requirements.txt`，lock 文件由 `uv pip compile requirements.txt -o requirements.lock` 生成。任何**只改 `pyproject.toml`** 的做法都会漏装依赖，新版代码在老环境里直接 `ImportError: ruamel`。
+P1-6 当时先把 `ruamel.yaml` 加进 `requirements.txt` / `requirements.lock`，避免新 `config.py` 在老环境里 `ImportError: ruamel`。P3-1 已把依赖入口收口到 `pyproject.toml` + `uv.lock`，因此后续依赖更新的规则改为：
 
-必须同步更新的三份文件：
+1. `pyproject.toml`：维护直接依赖。（**不**追加 `python-dotenv`：P2-4 已撤销，token 继续走 `main.yaml`，见 P1-6 设计决策表 F 条。）
+2. `uv.lock`：用 `uv lock` 刷新 canonical lock。
+3. `requirements.lock`：仅作为兼容导出，由 `uv export --format requirements.txt --no-hashes --no-emit-project --frozen --output-file requirements.lock` 从 `uv.lock` 生成，不能手改。
 
-1. `requirements.txt`：加一行 `ruamel.yaml`。（**不**追加 `python-dotenv`：P2-4 已撤销，token 继续走 `main.yaml`，见 P1-6 设计决策表 F 条。）
-2. `requirements.lock`：**在 PR 内重新生成**。`uv pip compile requirements.txt -o requirements.lock` 跑一遍并 commit 产物（当前 `requirements.lock:3-76` 明确没有 `ruamel.yaml`，不更新就挂）。
-3. `pyproject.toml` 的 `[project].dependencies`：和 P3-1 合并做。暂时 P3-1 没动的话，本步骤先只改 `requirements.txt`/`lock` 两份就够，不要留下三处声明漂移。
-
-`README.md` 的 Setup 第 2 步 `uv pip sync requirements.lock` 保持不变，升级协议就是"拉代码 + sync lock + 跑迁移器"，顺序写进步骤 0 的"老部署升级协议"。
+`README.md` 的 Setup 第 2 步改为 `uv sync`；升级协议仍是"拉代码 + sync lock + 跑迁移器"，但 lock 来源已经是 uv project 模式。
 
 **步骤 3：改造 `bot/utils/config.py`**
 
@@ -673,7 +671,7 @@ grep -nE '(\.(send|send_message|edit_original_response)|\.followup\.send|Embed|a
 - 运行时缺 key 只有触发到才暴露 → 必须跟 P1-4 schema 校验同 PR 合并，启动即拦截。
 - YAML 缩进敏感，一个空格启动失败；CI 加 `python -c "from ruamel.yaml import YAML; YAML().load(open('...'))"` 对每个 yaml 预检。
 - 迁移脚本的启发式分类必有漏网（中文字段名、非 `_message` 结尾的文案字段）→ 产出 `migration_report.md` 强制人工 review。
-- 老部署升级顺序（完整 5 步，详见步骤 0"老部署升级协议"）：**`git pull` → `uv pip sync requirements.lock` → `python tools/migrate_config_to_yaml.py` → `python tools/seed_db.py` → 重启 bot**。脚本本身在新版代码里，**不能**在拉代码前跑。**漏掉 `seed_db.py` 这一步，启动后 `voicechannel.channel_configs` 和 `tickets_new.ticket_types` 会是空的**（P2-5 已判定这两项迁 DB），表现为"自动创建房间入口全没了、所有 ticket type 全没了"。新 `config.py` 保留 JSON fallback 作为安全网，但 fallback 只管 YAML 类配置，DB 类配置没 seed 就是空的 —— 安全网救不回来。
+- 老部署升级顺序（完整 5 步，详见步骤 0"老部署升级协议"）：**`git pull` → `uv sync` → `python tools/migrate_config_to_yaml.py` → `python tools/seed_db.py` → 重启 bot**。脚本本身在新版代码里，**不能**在拉代码前跑。**漏掉 `seed_db.py` 这一步，启动后 `voicechannel.channel_configs` 和 `tickets_new.ticket_types` 会是空的**（P2-5 已判定这两项迁 DB），表现为"自动创建房间入口全没了、所有 ticket type 全没了"。新 `config.py` 保留 JSON fallback 作为安全网，但 fallback 只管 YAML 类配置，DB 类配置没 seed 就是空的 —— 安全网救不回来。
 - **一次性 PR 范围大**，所有 cog 都动。按 cog 切小 commit，review 阶段逐 cog 过；否则 2000+ 行 diff 一次性 review 容易漏。
 
 #### 验收
@@ -1034,8 +1032,10 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 ## P3：工程化与整洁度
 
 ### P3-1. 依赖管理统一
-- **现状**：`requirements.txt`（无锁版本）+ `requirements.lock` + `pyproject.toml`（dependencies 空）+ `uv.lock` + `.python-version` 并存。
+- **重构前现状**：`requirements.txt`（无锁版本）+ `requirements.lock` + `pyproject.toml`（dependencies 空）+ `uv.lock` + `.python-version` 并存。
 - **建议**：把依赖统一迁到 `pyproject.toml` 的 `[project].dependencies`，用 uv 管理；`requirements.txt` 退役或自动导出。
+- **本轮执行策略（2026-04-26）**：`pyproject.toml` 接管人工维护的直接依赖；`uv.lock` 成为 canonical lock；`requirements.txt` 退役；`requirements.lock` 仅作为兼容导出产物保留，由 `uv export` 从 `uv.lock` 生成，不能手改。`PySimpleGUI` 保持 `<5`，避免依赖入口重构时夹带 4.x → 6.x 行为变化。
+- **完成状态（2026-04-26）**：已落地。`.gitignore` 不再忽略 `uv.lock`；README / AGENTS / 迁移脚本 docstring 已同步 `uv sync`；当前 Windows `.venv` 已按兼容 `requirements.lock` 同步。验证：`uv lock --check`、`uv sync --frozen --dry-run --python 3.12.3`、Windows venv `pip install -r requirements.lock` + `pip check`、直接依赖 import smoke、`compileall bot`、locale check、`git diff --check`。
 
 ### P3-2. 硬编码路径梳理
 - **例**：`backup_cog.py` 的 `./backup/db_backup`；`ban_cog.py` 的 `./bot/config/config_ban.json`。

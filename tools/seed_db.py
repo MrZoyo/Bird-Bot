@@ -8,7 +8,7 @@ Companion to tools/migrate_config_to_yaml.py (see REFACTORING_PLAN.md
 The upgrade protocol is, strictly:
 
     git pull
-    uv pip sync requirements.lock
+    uv sync
     python tools/migrate_config_to_yaml.py
     python tools/seed_db.py         # <-- this script
     # restart bot
