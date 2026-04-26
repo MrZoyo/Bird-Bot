@@ -110,12 +110,12 @@
 **P3-1 依赖管理统一已完成**：
 - `pyproject.toml` 现在维护直接依赖；`uv.lock` 已生成并从 `.gitignore` 放行，作为 canonical lock 进入 git。
 - `requirements.txt` 已退役删除；`requirements.lock` 仅作为兼容导出，由 `uv export --format requirements.txt --no-hashes --no-emit-project --frozen --output-file requirements.lock` 从 `uv.lock` 生成。
-- README / AGENTS / `tools/migrate_config_to_yaml.py` / `tools/seed_db.py` 的安装与升级协议已从 `uv pip sync requirements.lock` 同步为 `uv sync`。
+- README / AGENTS / `tools/migrate_config_to_yaml.py` / `tools/seed_db.py` 的安装与升级协议已同步为 `uv sync`。
 - `PySimpleGUI` 在 `pyproject.toml` 约束为 `<5`，避免依赖入口重构夹带 4.x → 6.x 大版本变化；本轮 lock 仍保持 `pysimplegui==4.60.5.1`。
 - 本地工作区是 Windows `.venv` 暴露在 WSL 下；`uv sync --frozen --dry-run --python 3.12.3` 通过，但提示会替换 `.venv`。本轮未实际运行 `uv sync` 改这个环境，而是用 `./.venv/Scripts/python.exe -m pip install -r requirements.lock` 按兼容锁同步现有 Windows venv。
 - 提权验证已通过：`uv lock --check`、`uv sync --frozen --dry-run --python 3.12.3`、`./.venv/Scripts/python.exe -m pip install -r requirements.lock`、`./.venv/Scripts/python.exe -m pip check`、直接依赖 import smoke、`./.venv/Scripts/python.exe -m compileall bot`、`./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`、`git diff --check`。
 
-**下一棒默认**：进入 P3-2 硬编码路径梳理。优先按 `rg -n "\./|bot/config|backup/|data/|Path\\(|open\\(" bot tools run.py` 粗扫实际路径依赖，再区分"配置路径 / 仓库相对路径 / 运行时数据路径 / 历史归档路径"；不要把 P3-3 的空 `bot.db` 删除混进 P3-2。
+**下一棒默认**：进入 P3-2 硬编码路径梳理。优先按 `rg -n "\./|bot/config|backup/|data/|Path\\(|open\\(" bot tools run.py` 粗扫实际路径依赖，再区分"配置路径 / 仓库相对路径 / 运行时数据路径 / 历史归档路径"；当前已确认的 active 例子是 `bot/cogs/backup/cog.py` 里的 `./backup/db_backup` / `./backup/db_backup_manual`。不要把 P3-3 的空 `bot.db` 删除混进 P3-2。旧章节里残留的 `*_cog.py` 文件名属于历史记录，不作为下一步 active path。
 
 **环境验证规则**：环境 / import / 启动验证必须提权到沙箱外跑真实环境。项目 Windows `.venv` 已用 `ensurepip` 补出 pip，并通过 `./.venv/Scripts/python.exe -m pip install -r requirements.lock` 按 lock 补齐依赖（含 `ruamel-yaml==0.19.1`）；本轮 project venv import smoke 已通过。后续如果项目 venv 再缺包，直接补环境，不只记录缺失。
 
