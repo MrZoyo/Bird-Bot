@@ -107,4 +107,5 @@ Desktop.ini
 /archives
 /.claude
 CLAUDE.md
-uv.lock
+
+# P3-1: uv.lock is the canonical dependency lock and must be tracked.

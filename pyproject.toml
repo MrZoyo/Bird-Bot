@@ -1,6 +1,17 @@
 [project]
 name = "dcgameserverhelper"
 version = "0.1.0"
-description = "Add your description here"
+description = "Discord game server helper bot"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "aiofiles",
+    "aiohttp",
+    "aiosqlite",
+    "discord.py>=2.3.2",
+    "matplotlib",
+    "pillow",
+    "PySimpleGUI<5",
+    "requests",
+    "ruamel.yaml",
+    "tqdm",
+]
