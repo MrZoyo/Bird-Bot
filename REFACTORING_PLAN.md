@@ -143,7 +143,7 @@
 
 ### P1-3b. 全量 cog 包化 + games 聚合（P1-3 续篇）
 
-> **状态（2026-04-25）**：已完成。三档全部收官，`bot/cogs/` 顶层只剩包目录和 `__init__.py`。后续 `service.py` 横扫也已做第一刀 probe；P2-1 数据库连接复用高频路径（voice / achievement / shop）也已完成。下一步默认进入 P2-2 schema 迁移机制；全部重构完成后再统一全量功能测试。
+> **状态（2026-04-26）**：已完成。三档全部收官，`bot/cogs/` 顶层只剩包目录和 `__init__.py`。后续 `service.py` 横扫也已做第一刀 probe；P2-1 数据库连接复用高频路径（voice / achievement / shop）和 P2-2 schema 迁移机制基础设施也已完成。下一步默认进入 P2-3 `save_config` 写回统一策略；全部重构完成后再统一全量功能测试。
 
 **目标**：把**所有** cog 都变成包格式（不只是"大 cog"），让 `bot/cogs/` 下只剩目录、不再有平面 `*_cog.py`。两个游戏 cog 聚合到 `bot/cogs/games/`，为未来新增游戏留扩展点。
 
@@ -909,10 +909,12 @@ def is_feature_enabled(self, feature_name: str, default: bool = True) -> bool:
 - **替代方案**：如果不想维护生命周期，可评估 `aiosqlite.Connection` 池化库。
 
 ### P2-2. Schema 迁移机制
+> **状态（2026-04-26）**：已完成基础设施和首批真实 payload。新增 `schema_version` 表 + 手写 migration helper，首批接入 voice / privateroom / ban 三处已有 schema 变更。后续任何列变更 / 表重建都应新增 namespace migration，不再在 `initialize_database()` 里裸写 ad hoc `ALTER TABLE`。
+
 - **问题**：所有表仅靠 `CREATE TABLE IF NOT EXISTS`，列变更没有迁移路径。
 - **建议**：
-  - 简单方案：加 `schema_version` 表 + 手写迁移函数链。
-  - 中等方案：引入 `yoyo-migrations` 或 `alembic`（sqlite 支持有限需评估）。
+  - ✅ 简单方案：加 `schema_version` 表 + 手写迁移函数链。
+  - 暂不引入 `yoyo-migrations` 或 `alembic`；当前 SQLite 单库 + 手写 migrations 更易审计，后续迁移量明显变大再评估。
 
 ### P2-3. `save_config` 写回统一策略
 
@@ -1082,7 +1084,7 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 
 ## 推进顺序建议
 
-> **当前状态**：下列 P0/P1 主线已基本执行完；下一步以 PROGRESS.md 的“当前接手点”为准。service.py 横扫已完成 ban probe，P2-1 数据库连接复用高频路径（voice / achievement / shop）已完成；当前默认进入 P2-2 schema 迁移机制。用户已决定全部重构完成后再从头逐个功能测试。
+> **当前状态**：下列 P0/P1 主线已基本执行完；下一步以 PROGRESS.md 的“当前接手点”为准。service.py 横扫已完成 ban probe，P2-1 数据库连接复用高频路径（voice / achievement / shop）已完成，P2-2 schema 迁移机制基础设施和首批 payload 已完成；当前默认进入 P2-3 `save_config` 写回统一策略。用户已决定全部重构完成后再从头逐个功能测试。
 
 1. **本轮冲刺（P0）**：P0-4（裸 except 治理，范围清晰、改动小、风险低）→ P0-1（giveaway 抽 db）→ P0-2（privateroom 规范化）→ P0-3（其余 cog 补 db manager，内部以 `check_status` 为首）。
 2. **下一轮（P1，小步）**：P1-5（日志 rotation）、P1-2（ban_cog 迁 cog_load）、P1-1（命令同步）—— 三个都是改动小、受益长期。
@@ -1090,7 +1092,7 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
    - 启动前必须完成：**P2-5 的判定表**（决定哪些字段迁 DB）。
    - 并行或紧接完成：**P1-7（Slash 元数据本地化）**。
 4. **大 cog 拆包（P1-3）**：放在配置系统 2.0 之后，或与 P1-6 绑同一 PR（拆包时顺手换 YAML，一次 review 双收益）。不要在 P1-6 之前单独拆。
-5. **长期（剩余 P2/P3）**：结合功能迭代穿插。P2-1 高频 manager 长连接已收官；下一步推进 P2-2 schema 迁移机制。
+5. **长期（剩余 P2/P3）**：结合功能迭代穿插。P2-1 高频 manager 长连接和 P2-2 schema migration 基础设施已收官；下一步推进 P2-3 `save_config` 写回统一策略。
 
 ---
 
