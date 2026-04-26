@@ -1,11 +1,15 @@
 # bot/utils/voice_channel_db.py
 import asyncio
-import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 import aiosqlite
 
 from .db_lifecycle import BaseDatabaseManager
+from .schema_migrations import (
+    SchemaMigration,
+    add_column_if_missing,
+    apply_schema_migrations,
+)
 
 
 class VoiceChannelDatabaseManager(BaseDatabaseManager):
@@ -67,11 +71,7 @@ class VoiceChannelDatabaseManager(BaseDatabaseManager):
                 await cursor.close()
 
     async def initialize_database(self) -> None:
-        """Create the voice channel tables and migrate any missing columns.
-
-        Kept here because the live schema has grown over time; migrations
-        are done in-place so existing deployments don't need to rebuild.
-        """
+        """Create the voice channel tables and apply schema migrations."""
         async with self._get_persistent_connection_lock():
             db = await self._get_persistent_connection()
             try:
@@ -88,26 +88,6 @@ class VoiceChannelDatabaseManager(BaseDatabaseManager):
                 ''')
                 await cursor.close()
 
-                cursor = await db.execute("PRAGMA table_info(temp_channels)")
-                try:
-                    existing_columns = {row[1] for row in await cursor.fetchall()}
-                finally:
-                    await cursor.close()
-
-                columns_to_add = [
-                    ("control_panel_message_id", "INTEGER"),
-                    ("control_panel_channel_id", "INTEGER"),
-                    ("is_soundboard_enabled", "BOOLEAN DEFAULT 1"),
-                    ("current_room_type", "TEXT DEFAULT 'public'"),
-                ]
-                for col_name, col_type in columns_to_add:
-                    if col_name not in existing_columns:
-                        logging.info(f"[MIGRATION] Adding column {col_name} to temp_channels")
-                        cursor = await db.execute(
-                            f"ALTER TABLE temp_channels ADD COLUMN {col_name} {col_type}"
-                        )
-                        await cursor.close()
-
                 # channel_configs: the "entry-channel → auto-room template" map
                 # that used to live under voicechannel.channel_configs in JSON.
                 cursor = await db.execute('''
@@ -119,10 +99,39 @@ class VoiceChannelDatabaseManager(BaseDatabaseManager):
                 ''')
                 await cursor.close()
 
+                await apply_schema_migrations(
+                    db,
+                    namespace='voice_channel',
+                    migrations=[
+                        SchemaMigration(
+                            version=1,
+                            description='add temp channel runtime columns',
+                            migrate=self._migrate_temp_channel_runtime_columns,
+                        ),
+                    ],
+                )
                 await db.commit()
             except Exception:
                 await db.rollback()
                 raise
+
+    async def _migrate_temp_channel_runtime_columns(
+        self,
+        db: aiosqlite.Connection,
+    ) -> None:
+        columns_to_add = [
+            ("control_panel_message_id", "INTEGER"),
+            ("control_panel_channel_id", "INTEGER"),
+            ("is_soundboard_enabled", "BOOLEAN DEFAULT 1"),
+            ("current_room_type", "TEXT DEFAULT 'public'"),
+        ]
+        for column_name, column_definition in columns_to_add:
+            await add_column_if_missing(
+                db,
+                table_name='temp_channels',
+                column_name=column_name,
+                column_definition=column_definition,
+            )
 
     # ---- channel_configs CRUD ------------------------------------------
 

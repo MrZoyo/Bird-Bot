@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Optional, List, Tuple
 
 from .db_lifecycle import BaseDatabaseManager
+from .schema_migrations import SchemaMigration, apply_schema_migrations
 
 
 class BanDatabaseManager(BaseDatabaseManager):
@@ -15,33 +16,35 @@ class BanDatabaseManager(BaseDatabaseManager):
     async def initialize_database(self) -> None:
         """Create necessary database tables if they don't exist."""
         async with aiosqlite.connect(self.db_path) as db:
-            # Check if table exists and if it has the old constraint
-            cursor = await db.execute('''
-                SELECT sql FROM sqlite_master 
-                WHERE type='table' AND name='tempbans'
+            # Create new table with correct schema. Existing tables keep their
+            # current definition and are handled by the migrations below.
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS tempbans (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    guild_id INTEGER NOT NULL,
+                    banned_by INTEGER NOT NULL,
+                    reason TEXT NOT NULL,
+                    banned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    unban_at TIMESTAMP NOT NULL,
+                    is_active BOOLEAN NOT NULL DEFAULT 1,
+                    delete_message_days INTEGER DEFAULT 0,
+                    UNIQUE(user_id, guild_id)
+                )
             ''')
-            existing_schema = await cursor.fetchone()
-            
-            if existing_schema and 'UNIQUE(user_id, guild_id, is_active)' in existing_schema[0]:
-                # Need to migrate the table
-                await self._migrate_tempbans_table(db)
-            else:
-                # Create new table with correct schema
-                await db.execute('''
-                    CREATE TABLE IF NOT EXISTS tempbans (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_id INTEGER NOT NULL,
-                        guild_id INTEGER NOT NULL,
-                        banned_by INTEGER NOT NULL,
-                        reason TEXT NOT NULL,
-                        banned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        unban_at TIMESTAMP NOT NULL,
-                        is_active BOOLEAN NOT NULL DEFAULT 1,
-                        delete_message_days INTEGER DEFAULT 0,
-                        UNIQUE(user_id, guild_id)
-                    )
-                ''')
-            
+
+            await apply_schema_migrations(
+                db,
+                namespace='ban',
+                migrations=[
+                    SchemaMigration(
+                        version=1,
+                        description='drop is_active from tempbans unique constraint',
+                        migrate=self._migrate_tempbans_unique_constraint,
+                    ),
+                ],
+            )
+
             # Create index for faster queries
             await db.execute('''
                 CREATE INDEX IF NOT EXISTS idx_tempbans_active 
@@ -50,7 +53,27 @@ class BanDatabaseManager(BaseDatabaseManager):
             
             await db.commit()
 
-    async def _migrate_tempbans_table(self, db) -> None:
+    async def _migrate_tempbans_unique_constraint(
+        self,
+        db: aiosqlite.Connection,
+    ) -> None:
+        cursor = await db.execute('''
+            SELECT sql FROM sqlite_master
+            WHERE type='table' AND name='tempbans'
+        ''')
+        try:
+            existing_schema = await cursor.fetchone()
+        finally:
+            await cursor.close()
+
+        if not existing_schema:
+            return
+        if 'UNIQUE(user_id, guild_id, is_active)' not in existing_schema[0]:
+            return
+
+        await self._migrate_tempbans_table(db)
+
+    async def _migrate_tempbans_table(self, db: aiosqlite.Connection) -> None:
         """Migrate tempbans table to new schema without is_active in unique constraint."""
         # Create new table with correct schema
         await db.execute('''

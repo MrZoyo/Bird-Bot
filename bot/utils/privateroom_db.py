@@ -6,6 +6,11 @@ import logging
 from typing import Dict, List, Optional, Tuple, Any
 
 from .db_lifecycle import BaseDatabaseManager
+from .schema_migrations import (
+    SchemaMigration,
+    add_column_if_missing,
+    apply_schema_migrations,
+)
 
 
 class PrivateRoomDatabaseManager(BaseDatabaseManager):
@@ -45,15 +50,30 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
                 )
             ''')
 
-            # Add renewal_reminder_sent column to existing privateroom_rooms table if not exists
-            try:
-                await db.execute('ALTER TABLE privateroom_rooms ADD COLUMN renewal_reminder_sent INTEGER DEFAULT 0')
-                await db.commit()
-            except aiosqlite.OperationalError:
-                # Column already exists (duplicate column name)
-                pass
+            await apply_schema_migrations(
+                db,
+                namespace='privateroom',
+                migrations=[
+                    SchemaMigration(
+                        version=1,
+                        description='add renewal reminder flag',
+                        migrate=self._migrate_renewal_reminder_flag,
+                    ),
+                ],
+            )
 
             await db.commit()
+
+    async def _migrate_renewal_reminder_flag(
+        self,
+        db: aiosqlite.Connection,
+    ) -> None:
+        await add_column_if_missing(
+            db,
+            table_name='privateroom_rooms',
+            column_name='renewal_reminder_sent',
+            column_definition='INTEGER DEFAULT 0',
+        )
 
     async def get_config_value(self, key: str) -> Optional[str]:
         """从配置表中获取一个值"""
