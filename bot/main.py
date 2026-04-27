@@ -58,13 +58,6 @@ COG_SPECS = [
         "required_configs": ["achievements"],
     },
     {
-        "feature": "notebook",
-        "cog_name": "NotebookCog",
-        "module_path": "bot.cogs.notebook",
-        "class_name": "NotebookCog",
-        "required_configs": [],
-    },
-    {
         "feature": "spymode",
         "cog_name": "SpyModeCog",
         "module_path": "bot.cogs.games.spymode",

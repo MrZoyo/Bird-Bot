@@ -23,7 +23,6 @@ features:
   dnd: true
   checkstatus: true
   achievements: true
-  notebook: true
   spymode: true
   giveaway: true
   role: true

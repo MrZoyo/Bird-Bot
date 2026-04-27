@@ -19,7 +19,7 @@
 
 - [x] 🔴 **Bot 冷启动无 ImportError**
   - 操作：重启 bot，观察启动日志
-  - 预期：不出现 `ImportError: No module named 'giveaway_db'`（或 check_status / notebook / voice_channel_db）之类的错误
+- 预期：不出现 `ImportError: No module named 'giveaway_db'`（或 check_status / voice_channel_db）之类的错误
   - 意义：验证 `bot/utils/__init__.py` 的新增导出都对
 
 - [x] 🔴 **启动日志里**无 `no such table`**之类异常**
@@ -340,43 +340,9 @@
 
 ---
 
-## 5. P0-3b notebook 改动
+## 5. P0-3b notebook 改动（P3-8 已移除）
 
-> **commit**：`git log --grep='(P0-3b)'`
-> 7 处 SQL 全迁到 thin wrappers。管理员事件日志系统。
-
-- [ ] 🔴 **`/notebook_log @member <description>`**
-  - 操作：用账号 A 执行 `/notebook_log @target_member some description`
-  - 预期：
-    - 弹 Confirm/Cancel 按钮
-    - 点 Confirm 后显示 "Event logged"
-    - `event_logs` 表新增一条（count 为该 member 的 +1）
-    - 如果账号 A 不在 `admins` 表，首次 log 后自动加入（**这是 P0-3b 迁移保留的原子语义**）
-
-- [ ] 🔴 **`/notebook_member @member` 查询某成员日志**
-  - 操作：已为某 member 至少 log 过一次的情况下
-  - 预期：分页显示所有 log，每条含 Log Number / Add Time / Operator / Event Description
-
-- [ ] 🔴 **`/notebook_all` 查看所有成员汇总**
-  - 操作：执行
-  - 预期：分页显示 `(last_event_time, logged_member, logged_times)` 列表，按最新时间倒序
-
-- [ ] 🔴 **`/notebook_delete @member <serial>` 删除日志**
-  - 前置：某 member 有至少 2 条日志
-  - 操作：删其中 1 条
-  - 预期：
-    - 弹确认 embed
-    - 确认后显示 "Event deleted"
-    - 该条从 DB 消失（其他 serial 不受影响）
-
-- [ ] 🟡 **非 admin 账号查询**
-  - 前置：账号 B 从未 `/notebook_log` 过（不在 admins 表）
-  - 操作：账号 B 跑 `/notebook_member` 或 `/notebook_all`
-  - 预期：显示 "Only Admin can use this command"
-
-- [ ] 🟡 **Confirm 后 Cancel 按钮状态**
-  - 操作：`/notebook_log`，点 Confirm
-  - 预期：消息更新为 "Event logged."，按钮全部消失（被 remove）
+NotebookCog 已在 P3-8 从 runtime 移除，不再作为测试服全量验证项目。历史数据表 `event_logs` / `admins` 默认保留，不在本清单中测试清表或迁移。
 
 ---
 

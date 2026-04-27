@@ -179,24 +179,6 @@ giveaway:
       giveaway_id: "抽奖 ID"
       message: "要发送给中奖者的消息"
 
-notebook:
-  notebook_log:
-    description: "为指定成员记录一条事件日志"
-    params:
-      event_object: "要记录的成员"
-      event_description: "事件描述"
-  notebook_member:
-    description: "列出指定成员的全部事件日志"
-    params:
-      member: "要查询日志的成员"
-  notebook_all:
-    description: "列出所有成员的事件日志"
-  notebook_delete:
-    description: "从成员日志中删除一条指定事件"
-    params:
-      member: "要删除事件的成员"
-      event_serial_number: "要删除事件的序号"
-
 privateroom:
   privateroom_init:
     description: "初始化私人房间系统（仅管理员）"

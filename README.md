@@ -28,7 +28,6 @@ The bot's code is deeply optimised for low-performance devices, using asynchrono
   - [Check_Status_Cog](#check_status_cog)
   - [Achievement_Cog](#achievement_cog)
   - [Role_Cog](#role_cog)
-  - [Notebook_Cog](#notebook_cog)
   - [Backup_Cog](#backup_cog)
   - [Giveaway_Cog](#giveaway_cog)
   - [Rating_Cog (Legacy)](#rating_cog)
@@ -193,22 +192,6 @@ Comprehensive role assignment system with multiple assignment categories.
 - `/signature_clear <user_id>`: Clear user's signature and history
 - `/signature_set_requirement <minutes>`: Set voice time requirement for signatures
 - `/signature_check <user_id>`: Check user's signature information
-
-### Notebook_Cog
-Administrative event logging system for tracking member incidents and administrative actions.
-
-**Features:**
-- **Admin permission system** with database tracking of authorized users
-- **Event logging** with timestamps and serial numbering
-- **Member-specific event histories** with paginated viewing
-- **Event deletion capabilities** for record management
-- **Channel-restricted usage** for security
-
-**Commands:**
-- `/notebook_log <member> <event>`: Log an event for a specific member (admin only)
-- `/notebook_member <member>`: View event log for a specific member (admin only)
-- `/notebook_all`: View event logs for all members in the server (admin only)
-- `/notebook_delete <member> <event_serial_number>`: Delete a specific event from member's log (admin only)
 
 ### Backup_Cog
 Automated database backup system with scheduled and manual backup capabilities.
