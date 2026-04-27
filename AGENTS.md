@@ -10,6 +10,7 @@
 - 安装依赖：`uv sync`（建议虚拟环境；依赖源在 `pyproject.toml`，锁定版本在 `uv.lock`）。
 - 本地运行：`python run.py`（确保已配置好 token、频道/角色 ID）。
 - 可选语法快检：`python -m compileall bot`。
+- 自动化单测：`python -m pytest`（需要 `uv sync --extra test`；当前覆盖部分纯 DB manager）。
 - 动数据库前先备份：复制 `data/bot.db` 或在运行中的机器人使用 `/backup_now`。
 
 ## 代码风格与命名约定
@@ -18,7 +19,7 @@
 - 配置键、JSON、数据库列名用 lower_snake_case；避免硬编码 ID，优先读配置。
 
 ## 测试指引
-- 无现成自动化测试；在测试服实际跑机器人，逐条验证涉及的命令与按钮。
+- 已有少量 `pytest` 自动化测试覆盖纯 DB manager；涉及真实 Discord 交互时仍需在测试服逐条验证命令与按钮。
 - 影响数据库的改动优先用临时库或备份库验证，防止污染正式数据。
 - 涉及连签/余额/补签逻辑时，覆盖重复点击、额度用尽、余额不足等边界场景。
 
