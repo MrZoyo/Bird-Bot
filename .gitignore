@@ -39,6 +39,7 @@ bot-env/
 .settings/
 
 # Project specific
+/bot.db
 data/*.db
 data/*.log
 backup/db_backup/*
