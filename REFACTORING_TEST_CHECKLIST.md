@@ -27,10 +27,11 @@
 - `tests/test_shop_db.py`：余额、流水、签到、补签、签到面板统计。
 - `tests/test_achievement_db.py`：成就计数、排行榜、语音 session、手动操作、签到联查。
 - `tests/test_log_helpers.py`：日志 `name (id)` helper。
+- `tests/test_migrate_config_to_yaml_temp.py`：临时升级 smoke，验证旧 JSON config 可转换为新 YAML / locale / DB seed。
 
 必须先过：
 - [x] `./.venv/Scripts/python.exe -m pytest -q`
-  - 预期：全部通过；当前基线是 `17 passed`，允许出现 discord.py 的 `audioop` deprecation warning。
+  - 预期：全部通过；当前基线是 `18 passed`，允许出现 discord.py 的 `audioop` deprecation warning。
 - [x] `./.venv/Scripts/python.exe -m ruff check bot tests`
   - 预期：0 error；当前只启用 `E722`，用于防裸 `except:` 回归。
 - [x] `./.venv/Scripts/python.exe -m compileall bot tests`
