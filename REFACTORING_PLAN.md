@@ -261,7 +261,7 @@ python3 -m py_compile bot/cogs/<name>/*.py bot/main.py
 
 - **P2-1/P2-2（DB 层）**：跟包化互不冲突，可以并行（包化只动文件布局，DB manager 不变）。
 - **service.py 抽离**：包化完成后已做横向扫描；ban 已作为第一刀 probe。tickets / privateroom 后续需要先定状态归属再抽。
-- **P3-5 ruff**：等包化完成后再加，否则 lint rules 会同时覆盖 `*_cog.py` 和 `<name>/cog.py` 两种布局的文件。
+- **P3-5 ruff**：已在包化完成后落地最小 `E722` 规则；全量 E/F/W/B 规则另按 lint debt 推进。
 
 ### P1-3c. `tickets_new` → `tickets` 历史命名清理 ✅ 2026-04-24
 
@@ -1054,6 +1054,8 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 
 ### P3-5. 引入 ruff / linter 配置
 - `pyproject.toml` 加 `[tool.ruff]`，默认启用 `E`、`F`、`W`、`B`（bugbear），特别是 `E722`（bare-except）锁死 P0-4 成果。
+- **本轮执行策略（2026-04-27）**：先只启用 `E722`，把 P0-4 的裸 `except:` 治理成果机器锁死；`E/F/W/B` 全量规则先不打开，避免把 linter 引入变成全仓库风格债清算。后续如要扩大规则集，单独按 lint debt 任务推进。
+- **完成状态（2026-04-27）**：已落地。`pyproject.toml` 增加 `lint` extra（`ruff>=0.8.0`）、Ruff 配置（`target-version = "py312"`、`line-length = 120`、排除 `old_function` / `old_test`、`select = ["E722"]`）；`uv.lock` 已锁定 `ruff==0.15.12`。README / AGENTS 已同步 lint 安装和检查命令。验证：Windows venv `ruff check bot tests`、pytest、compileall、locale check、pip check、`uv lock --check`、`uv sync --frozen --dry-run --extra test --extra lint --python 3.12.3`、runtime `requirements.lock` 重新导出无差异、`git diff --check`。
 
 ### P3-6. 归档目录清理规划
 - **现状**：`old_function/`、`old_test/`、`old_updates.md` 随时间膨胀。
@@ -1133,7 +1135,7 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
    - 启动前必须完成：**P2-5 的判定表**（决定哪些字段迁 DB）。
    - 并行或紧接完成：**P1-7（Slash 元数据本地化）**。
 4. **大 cog 拆包（P1-3）**：放在配置系统 2.0 之后，或与 P1-6 绑同一 PR（拆包时顺手换 YAML，一次 review 双收益）。不要在 P1-6 之前单独拆。
-5. **当前 P3 收尾**：先完成 P3-4 最小自动化测试骨架；随后处理 P3-8 NotebookCog 移除，避免全量功能测试清单继续包含待废弃功能；再按需要推进 P3-5 ruff、P3-6 归档目录清理、P3-7 日志 id/name 双记录。
+5. **当前 P3 收尾**：P3-4 最小自动化测试骨架、P3-8 NotebookCog 移除、P3-5 ruff / linter 已完成；后续按需要推进 P3-6 归档目录清理、P3-7 日志 id/name 双记录。
 
 ---
 
