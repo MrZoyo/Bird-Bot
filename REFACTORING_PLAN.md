@@ -1049,6 +1049,7 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 ### P3-4. 补自动化测试
 - **现状**：零测试，17k 行代码全靠测试服手点。
 - **建议**：优先给 db 管理器（纯函数多、副作用可控）写 `pytest + tmp sqlite` 单元测试；ROI 最高。
+- **当前执行策略（2026-04-27）**：测试目标只覆盖确定保留的模块。NotebookCog 已纳入 P3-8 移除计划，因此 P3-4 不给 `NotebookDatabaseManager` 新增覆盖，避免把待移除功能重新固化。
 
 ### P3-5. 引入 ruff / linter 配置
 - `pyproject.toml` 加 `[tool.ruff]`，默认启用 `E`、`F`、`W`、`B`（bugbear），特别是 `E722`（bare-except）锁死 P0-4 成果。
@@ -1095,11 +1096,34 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 - 与 P1-5（日志 rotation）可以在同一冲刺做（都是 logging 层改动）。
 - 与 P3-5（ruff）可以加 lint 规则禁止 `logging.*(f"... {user_id} ...")` 这种裸 id f-string（高级要求，可选）。
 
+### P3-8. NotebookCog 废弃 / 移除
+
+**决策背景（2026-04-27）**：用户确认希望移除 NotebookCog。此前计划文档只记录了 notebook 的历史重构（P0-3b DB manager、P1-3b 包化、P1-7 slash metadata/i18n pilot），没有把它列为待废弃功能；这会在上下文压缩后造成误解。因此本条作为新的 active P3 任务，后续不要再给 NotebookCog 增加测试或功能投入。
+
+**当前现状**：
+- 代码仍把 notebook 当现役功能：`bot/main.py` 的 `COG_SPECS` 注册 `NotebookCog`，`bot/config/main.yaml.example` 的 `features.notebook` 默认为 `true`。
+- 文件仍存在：`bot/cogs/notebook/`、`bot/utils/notebook_db.py`，并且 `bot/utils/__init__.py` 导出 `NotebookDatabaseManager`。
+- 文案 / 文档仍存在：`bot/locales/zh_CN/commands.yaml` 的 `notebook.*` slash metadata、`README.md` 的 Notebook_Cog 章节、`REFACTORING_TEST_CHECKLIST.md` 的 notebook 功能测试段落。
+- DB 历史数据表为 `event_logs` / `admins`，属于 legacy 数据；移除功能时默认不做 schema migration 删除表，避免破坏旧部署留档。
+
+**建议做法**：
+1. 从 `bot/main.py` 的 `COG_SPECS` 移除 notebook entry，并从 `bot/config/main.yaml.example` 的 `features` 移除 `notebook`。
+2. 归档或删除 `bot/cogs/notebook/` 与 `bot/utils/notebook_db.py`。若需要保留历史代码，按项目既有约定放入 `old_function/`；不要让它继续从 runtime import。
+3. 从 `bot/utils/__init__.py` 移除 `NotebookDatabaseManager` 导入和 `__all__`。
+4. 清理 `bot/locales/zh_CN/commands.yaml` 的 `notebook.*` keys，并运行 locale checker 确认无 dangling key / missing key。
+5. 同步 `README.md` 和 `REFACTORING_TEST_CHECKLIST.md`：Notebook 从现役功能和全量测试清单中移除，必要时标为 legacy/removed。
+6. 不删除生产库里的 `event_logs` / `admins` 表；如将来要清表，单独走 schema migration / 数据归档任务。
+
+**验收**：
+- `rg -n "NotebookCog|notebook" bot/main.py bot/cogs bot/utils bot/config bot/locales README.md REFACTORING_TEST_CHECKLIST.md` 只剩历史说明或明确 legacy 文档，不再有 runtime import / command registration / active test item。
+- `./.venv/Scripts/python.exe -m compileall bot`、`./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`、`./.venv/Scripts/python.exe -m pip check` 通过。
+- 测试服全量验证时不再包含 `/notebook_*` 命令；命令同步后 Discord command picker 不显示 notebook 命令。
+
 ---
 
 ## 推进顺序建议
 
-> **当前状态**：下列 P0/P1 主线已基本执行完；下一步以 PROGRESS.md 的“当前接手点”为准。service.py 横扫已完成 ban probe，P2-1 数据库连接复用高频路径（voice / achievement / shop）已完成，P2-2 schema 迁移机制基础设施和首批 payload 已完成；当前默认进入 P2-3 `save_config` 写回统一策略。用户已决定全部重构完成后再从头逐个功能测试。
+> **当前状态**：P0/P1/P2 主线已基本执行完；P3-1 依赖管理、P3-2 路径、P3-3 根目录空库清理已完成。当前以 PROGRESS.md 的“当前接手点”为准：P3-4 自动化测试正在开工，且 P3-8 NotebookCog 移除已加入计划。用户已决定全部重构完成后再从头逐个功能测试。
 
 1. **本轮冲刺（P0）**：P0-4（裸 except 治理，范围清晰、改动小、风险低）→ P0-1（giveaway 抽 db）→ P0-2（privateroom 规范化）→ P0-3（其余 cog 补 db manager，内部以 `check_status` 为首）。
 2. **下一轮（P1，小步）**：P1-5（日志 rotation）、P1-2（ban_cog 迁 cog_load）、P1-1（命令同步）—— 三个都是改动小、受益长期。
@@ -1107,7 +1131,7 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
    - 启动前必须完成：**P2-5 的判定表**（决定哪些字段迁 DB）。
    - 并行或紧接完成：**P1-7（Slash 元数据本地化）**。
 4. **大 cog 拆包（P1-3）**：放在配置系统 2.0 之后，或与 P1-6 绑同一 PR（拆包时顺手换 YAML，一次 review 双收益）。不要在 P1-6 之前单独拆。
-5. **长期（剩余 P2/P3）**：结合功能迭代穿插。P2-1 高频 manager 长连接和 P2-2 schema migration 基础设施已收官；下一步推进 P2-3 `save_config` 写回统一策略。
+5. **当前 P3 收尾**：先完成 P3-4 最小自动化测试骨架；随后处理 P3-8 NotebookCog 移除，避免全量功能测试清单继续包含待废弃功能；再按需要推进 P3-5 ruff、P3-6 归档目录清理、P3-7 日志 id/name 双记录。
 
 ---
 
