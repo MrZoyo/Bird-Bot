@@ -1,564 +1,259 @@
-# P0 重构测试 Checklist
+# 测试服全量验证 Checklist
 
-> 本清单覆盖 P0 系列（P0-4 / P0-1 / P0-2 / P0-3a~d）**全部改过的功能路径**，配合 `REFACTORING_PROGRESS.md` 使用。
-> 目标：用户在测试服手工过一遍，确认无 regression 后再推生产或进入 P1。
+> 目标：先用自动化 smoke test 排除“不需要真实 Discord”的回归，再按模块在测试服验证命令、按钮、权限、后台任务和日志。
+> 当前清单按 2026-04-27 main 分支现状编写；NotebookCog 已移除，不再作为现役功能测试项。
 
-## 使用说明
-
-- 每个测试项打勾：`[ ]` → `[x]`；如果有问题打 `[!]` 并在下面写一行"现象：xxx"。
-- 每节标注 **改动来源**（哪个 commit / 哪条 P 任务）和 **破坏性风险**（如果这里坏了，影响什么）。
-- 🔴 = 必测（核心路径） / 🟡 = 推荐测（失败路径） / 🟢 = 可选（边缘场景）
-- **测试服** 而非生产服；配置里 `guild_id` 指向测试环境；数据库用测试副本。
-- 进入每节前先看"触发方式"，知道怎么创造场景。
+标记规则：
+- `[ ]` 未测
+- `[x]` 通过
+- `[!]` 异常；在该项下面补一行“现象 / 日志 / 复现步骤”
+- 手工测试只用测试服和测试库；不要直接指向生产 `data/bot.db`
 
 ---
 
-## 0. 启动期健康检查
+## 0. 自动化 Gate
 
-> 破坏性风险：冷启动失败意味着所有 manager 初始化出问题，下面所有项都白测。
+这些测试都使用临时 sqlite DB 或静态导入，不联网、不触碰真实 `data/bot.db`。
 
-- [x] 🔴 **Bot 冷启动无 ImportError**
-  - 操作：重启 bot，观察启动日志
-- 预期：不出现 `ImportError: No module named 'giveaway_db'`（或 check_status / voice_channel_db）之类的错误
-  - 意义：验证 `bot/utils/__init__.py` 的新增导出都对
+自动覆盖：
+- `tests/test_runtime_metadata.py`：YAML 模板可解析、`main.features` 与 `COG_SPECS` 对齐、所有注册 cog 可 import、runtime 不再注册 notebook / tickets_new。
+- `tests/test_check_status_db.py`：在线人数采样写入和按日期查询。
+- `tests/test_tickets_db.py`：ticket type CRUD、配置读写、工单创建 / 成员 / 接单 / 关闭 / 统计 / 历史。
+- `tests/test_voice_channel_db.py`：创建频道配置、临时房间状态、控制面板恢复字段。
+- `tests/test_privateroom_db.py`：私人房间配置、店铺消息、房间生命周期、续费提醒标记。
+- `tests/test_ban_db.py`：临时封禁、活跃查询、统计、手动解除、旧记录清理。
+- `tests/test_role_db.py`：身份组面板记录、签名次数 / 禁用 / 清空。
+- `tests/test_giveaway_db.py`：抽奖记录、参与者、获奖者、持久 View 清理。
+- `tests/test_shop_db.py`：余额、流水、签到、补签、签到面板统计。
+- `tests/test_achievement_db.py`：成就计数、排行榜、语音 session、手动操作、签到联查。
+- `tests/test_log_helpers.py`：日志 `name (id)` helper。
 
-- [x] 🔴 **启动日志里**无 `no such table`**之类异常**
-  - 操作：grep `tail -200 ./logs/main.log | grep -iE "no such table|operational error"`
-  - 预期：空输出；特别是**不应**出现 `no such table: status`（P0-3a 修的竞态 bug 的典型症状）
-  - 意义：验证 `cog_load` 期的 `initialize_database()` 都跑通
-
-- [!] 🟡 **老部署升级路径**（如果是在有旧 `bot.db` 的环境上启动）
-  - **✅ 已在 ⁠商店 创建私人房间商店。** 这个消息不要作为私有回复。
-  - 操作：在一个已有 `privateroom_rooms` / `temp_channels` 数据的副本上启动
-  - 预期：
-    - `privateroom_db` 的 `ALTER TABLE ... renewal_reminder_sent` 如果列已存在，不报错（P0-4 修的收窄）
-    - `voice_channel_db.initialize_database()` 自动补齐老库缺的列（`control_panel_message_id` 等）
-  - 意义：验证 schema migration 在 manager 版本下仍工作
-
-- [x] 🟡 **Bot shutdown 干净**
-  - 操作：给 bot 发 `kill -TERM`（或 Ctrl+C）
-  - 预期：不卡死、无 `asyncio.CancelledError` 被裸 except 吞的警报（P0-4 修复前裸 except 会吞 CancelledError）
-  - 意义：验证裸 except 改动没把 shutdown 路径搞坏
-
----
-
-## 1. P0-4 裸 except 治理（21 处）
-
-> **commit**：`git log --grep='(P0-4)'`
-> 改动基本都在"失败时的 fallback"路径上，正常测试不会触发。想触发需要故意制造失败条件。
-
-### 1.1 `privateroom_db.initialize_database` ALTER TABLE
-
-- [x] 🟡 **重复列容错**
-  - 操作：bot 启动、运行一段时间后再次重启
-  - 预期：第二次启动时 `ALTER TABLE privateroom_rooms ADD COLUMN renewal_reminder_sent` 会失败（列已存在），静默跳过；日志无 ERROR
-  - 收窄类型：`aiosqlite.OperationalError`
-
-### 1.2 `voice_channel_cog.restore_control_panels` fetch_user 容错
-
-- [x] 🟢 **Creator 已离开服务器的控制面板恢复**
-  - 前置：有一个带控制面板的临时房间，然后让 creator 离开服务器（或用一个已退服的测试账号 ID）
-  - 操作：重启 bot
-  - 预期：该房间的控制面板仍然恢复成功（creator 显示为 None），不会因为 fetch_user 抛异常而吞掉整个 restore 流程
-  - 收窄类型：`(discord.NotFound, discord.HTTPException)`
-
-### 1.3 `ban_cog` 管理员列表显示
-
-- [x] 🟡 **管理员 ID 有失效的情况**
-  - 前置：`config_ban.json` 的 `admin_users` 里故意塞一个不存在的用户 ID（或已删账号）
-  - 操作：跑 `/ban_config_view`（或类似查看管理员列表的命令，按实际命令名）
-  - 预期：列表能完整显示，失效的 ID 显示 `<@ID> (不存在)`，不会因此整个命令失败
-
-- [x] 🟡 **tempban 列表里有失效用户**
-  - 前置：数据库里有一条 tempban 记录，对应用户已删账号
-  - 操作：跑 `/ban_list_temp`（或类似）
-  - 预期：列表能显示，失效用户条目显示为 `用户 {id}` 兜底格式
-
-### 1.4 `shop_cog`
-
-- [x] 🟢 **makeup 查询按钮的临时文件清理**
-  - 操作：点击 makeup check-in 查询按钮（生成图片文件）
-  - 预期：响应成功；后续没有 `/tmp/` 残留文件（实际上即使有 OSError 也不影响功能）
-  - 意义：收窄到 `OSError` 就好
-
-- [x] 🟡 **每日 embed 更新时 embed 消息已被删**
-  - 前置：有一个活跃的 daily checkin embed，手动删除那条消息
-  - 操作：等跨天（或手动调 `daily_embed_update` 任务），观察 log
-  - 预期：数据库里这个 embed 被标记为 inactive；不会因为 fetch_message NotFound 崩掉
-  - 收窄类型：`(discord.NotFound, discord.Forbidden, discord.HTTPException)`
-
-- [x] 🟡 **bot 重启后 embed views 恢复（消息已删场景）**
-  - 前置：同上，手动删掉一条活跃 checkin embed 消息
-  - 操作：重启 bot
-  - 预期：该条 embed 被 deactivate，不报错；其他正常 embed 恢复正常
-
-- x] 🟢 **checkin history 文件清理**
-  - 操作：`/checkin_history`（或你们的 checkin 历史命令）
-  - 预期：文件正常下发；后续 `/tmp/` 清理不抛错
-
-- [x] 🟢 **checkin embed 更新失败的兜底 deactivate**
-  - 场景：checkin 后触发 `update_checkin_embeds_after_checkin`，其中一条 embed 消息出错
-  - 预期：错误被 `logging.exception(...)` 记录（不再是静默 `pass`）；其他 embed 仍然更新
-
-### 1.5 `tickets_new_cog`（12 处，大部分是 DM 失败 fallback）
-
-> 触发 DM 失败最简单的方式：用**关闭了 DM 的测试账号**（设置 → 隐私 → 关 "允许服务器成员向我发私信"）
-
-- [ ] 🟡 **接受 ticket 时 DM creator 失败**
-  - 前置：creator 账号关闭 DM
-  - 操作：管理员点击 "Accept" 按钮
-  - 预期：Accept 成功，thread 状态正确更新；只是 DM 送不出去，不影响主流程
-
-- [ ] 🟡 **Add user 到 ticket 时 DM 失败**
-  - 前置：被加的用户关闭 DM
-  - 操作：`/tickets_add_user` 或 modal 加人
-  - 预期：加人成功；DM 失败静默
-
-- [ ] 🟡 **Close ticket 时 DM creator 失败**
-  - 前置：creator 关闭 DM
-  - 操作：关 ticket
-  - 预期：关闭成功 + thread 归档；DM 失败静默
-
-- [ ] 🟡 **Close ticket 时交互响应失败兜底**
-  - 场景：关 ticket 过程中异常，followup + response 都失败
-  - 难以手动触发；靠代码 review 验证即可
-  - 预期：不至于崩链
-
-- [ ] 🟡 **创建 ticket 时发 DM 给创建者失败**
-  - 前置：创建者关 DM
-  - 操作：点 ticket 创建按钮
-  - 预期：ticket 创建成功；DM 失败静默
-
-- [ ] 🟡 **创建 ticket 失败的兜底响应链**
-  - 场景：`ticket_thread_create_error` 的 followup/response 都失败。和上面 Close 同理，代码 review 验证
-
-- [ ] 🟢 **`_validate_channel_permissions` 的异常 log**
-  - 场景：Bot 权限检查抛异常（罕见）
-  - 预期：返回 False，日志里有 `_validate_channel_permissions failed` traceback（之前是**静默** return False）
-
-- [ ] 🟡 **accept command 的 DM 失败**
-  - 前置：creator 关 DM
-  - 操作：在 thread 里 `/tickets_accept`
-  - 预期：accept 成功，DM 失败静默
-
-- [ ] 🟡 **close command 的 DM 失败**
-  - 前置：creator 关 DM
-  - 操作：`/tickets_close reason:xxx`
-  - 预期：关闭成功，DM 失败静默
-
-- [ ] 🟢 **`/tickets_refresh_buttons` 进度刷新失败**
-  - 场景：正在刷新大量 ticket，edit_original_response 被 Discord 限流或过期
-  - 预期：progress 显示停滞但主循环继续跑完；失败被静默收窄为 `discord.HTTPException`
+必须先过：
+- [ ] `./.venv/Scripts/python.exe -m pytest -q`
+  - 预期：全部通过；当前基线是 `17 passed`，允许出现 discord.py 的 `audioop` deprecation warning。
+- [ ] `./.venv/Scripts/python.exe -m ruff check bot tests`
+  - 预期：0 error；当前只启用 `E722`，用于防裸 `except:` 回归。
+- [ ] `./.venv/Scripts/python.exe -m compileall bot tests`
+  - 预期：无语法错误。
+- [ ] `./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`
+  - 预期：locale key 全 resolve。
+- [ ] `./.venv/Scripts/python.exe -m pip check`
+  - 预期：依赖一致。
+- [ ] `uv lock --check`
+  - 预期：lock 与 `pyproject.toml` 对齐。
 
 ---
 
-## 2. P0-1 giveaway 抽 db
+## 1. 启动 / 全局状态
 
-> **commit**：`git log --grep='(P0-1)'`
-> 改动最重、最容易出 regression。**重点测**。
+自动覆盖：`test_runtime_metadata.py` 已验证 runtime 注册清单、配置模板和 import smoke。
 
-### 2.1 创建与参与
-
-- [x] 🔴 **`/ga_create` 命令成功弹出 Modal**
-  - 操作：在合法频道跑 `/ga_create reaction_req:0 message_req:0 timespent_req:0`
-  - 预期：Modal 弹出；填入 `1d` duration、`1` winner、`测试奖品` prizes 等
-
-- [x] 🔴 **Modal 提交后正确入库 + 发 embed**
-  - 操作：在 Modal 里填完提交
-  - 预期：
-    - giveaway channel 出现包含"参加"按钮的 embed
-    - 数据库 `giveaway` 表新增一条记录
-    - （可选验证）SQLite 直接 `SELECT * FROM giveaway ORDER BY rowid DESC LIMIT 1` 看字段完整
-
-- [x] 🔴 **用户点击"参加"按钮**
-  - 操作：另一个账号点参加
-  - 预期：
-    - ephemeral 消息"已加入"
-    - embed 里 participants 数 +1
-    - `participant_ids` 字段追加该 user_id
-
-- [x] 🔴 **重复参加同一 giveaway**
-  - 操作：同一账号再点参加
-  - 预期：显示"已加入"消息 + 退出按钮
-
-- [x] 🔴 **用户点击"退出"按钮**
-  - 操作：已参加的账号点退出
-  - 预期：
-    - ephemeral 消息"已退出"
-    - embed participants 数 -1
-    - `participant_ids` 字段移除该 user_id
-
-- [ ] 🟡 **有门槛的 giveaway**
-  - 操作：`/ga_create reaction_req:5 message_req:100 timespent_req:60`
-  - 前置：用一个 achievements 记录都不够的账号去参加
-  - 预期：参加失败，显示"你不满足条件"类提示（来自 `check_participant_eligibility`）
-
-- [ ] 🟡 **achievements 表没有用户记录的场景**
-  - 前置：全新账号从未互动过
-  - 操作：该账号参加有门槛的 giveaway
-  - 预期：ephemeral 显示 `User {id} does not exist in the achievements table`
-
-### 2.2 管理命令
-
-- [ ] 🔴 **`/check_giveaway` 列出所有 giveaway**
-  - 操作：`/check_giveaway`
-  - 预期：返回一个 txt 文件包含所有 giveaway 记录
-
-- [ ] 🔴 **`/ga_cancel <id>`**
-  - 操作：取消一个未结束的 giveaway
-  - 预期：
-    - embed 标题加上"【已取消】"前缀，变红色
-    - 按钮全 disable
-    - `is_end = 1`
-
-- [ ] 🔴 **`/ga_end <id>` 提前结束**
-  - 前置：有至少 1 个参与者的进行中 giveaway
-  - 操作：`/ga_end <id>`
-  - 预期：
-    - 立刻开奖
-    - embed 标题加"【提前结束】"，winners 字段显示
-    - 中奖者收到 DM（若 DM 开着）
-    - 中奖者的 `achievements.giveaway_count` +1
-
-- [ ] 🟡 **`/ga_end` 无参与者的 giveaway**
-  - 操作：对空 giveaway `/ga_end`
-  - 预期：winners 显示"无"或配置里的 `giveaway_embed_no_winner` 文本；不崩
-
-- [ ] 🔴 **`/ga_time_extend <id> <minutes>`**
-  - 操作：给一个进行中 giveaway 延长 30 分钟
-  - 预期：
-    - embed 的 timeend 字段更新
-    - 标题加"【已延长】"label
-    - DB 中 `duration` 字段 +30
-
-- [ ] 🔴 **`/ga_participant <id>`**
-  - 操作：查看某 giveaway 的参与者列表
-  - 预期：pagination view 列出所有 participant_ids，支持翻页
-
-- [x] 🔴 **`/ga_description <id> <new_description>` ← P0-1 顺手修了 commit 缺失 bug**
-  - 操作：修改一个进行中 giveaway 的描述
-  - 预期：
-    - **重启 bot 后再 `/check_giveaway`，新 description 仍在** ← 这是关键
-    - embed 的 Description 字段立即更新
-  - **改前行为**（反证）：原代码缺 `db.commit()`，重启后 description 会回到旧值（本轮 P0-1 修好）
-
-- [ ] 🟡 **`/ga_sendtowinner`**
-  - 前置：一个已结束有 winner 的 giveaway
-  - 操作：`/ga_sendtowinner <id> <message>`
-  - 预期：所有 winner 收到 DM；如果有 winner 关了 DM，响应里列出 failed_to_send
-
-### 2.3 自动开奖与定时循环
-
-- [x] 🔴 **30 秒检查循环自动开奖**
-  - 操作：创建一个 duration=1（1 分钟）的 giveaway，加 1-2 个参与者，等 1 分钟以上
-  - 预期：
-    - 到期后最多 30 秒内，embed 标题加 "【已结束】" label 变红
-    - winner 字段填充
-    - 参与者（即 winner）的 `achievements.giveaway_count` +1（lifetime + 当月 monthly）
-    - giveaway_views 表里这条记录被清掉
-
-- [ ] 🟡 **消息被删后自动开奖**
-  - 前置：创建一个短 duration giveaway，手动删掉那条消息
-  - 操作：等到期
-  - 预期：channel 收到一条"giveaway 已删除"的 embed；DB 标记 is_end=1
-
-### 2.4 重启恢复
-
-- [ ] 🔴 **重启后未结束的 giveaway 按钮仍可点**
-  - 前置：有 1 个进行中的 giveaway
-  - 操作：重启 bot
-  - 预期：
-    - 启动日志无 error
-    - 到 giveaway 频道，点参加按钮仍然 work
-    - `load_giveaways()` 把 view 重新附加到 message 上
+- [ ] 使用测试服 `main.yaml` 启动 `python run.py`
+  - 预期：所有启用且配置完整的 cog 被加载；缺配置或 disabled feature 只打印 skip，不抛异常。
+- [ ] 启动日志无 `ImportError` / `ModuleNotFoundError` / `no such table` / `OperationalError`
+- [ ] Slash command 同步完成；必要时手动跑 `!synccommands`
+- [ ] Discord command picker 不显示 `/notebook_*`
+- [ ] `bot/cogs/` 顶层只作为包入口；不依赖旧平面 `*_cog.py`
+- [ ] `data/bot.db`、日志、备份路径都解析到仓库根目录下的预期位置
+- [ ] 抽查日志中用户 / 频道 / 角色显示为 `name (id)` 或 `unknown (id)`
 
 ---
 
-## 3. P0-2 privateroom 改动
+## 2. Voice Channel
 
-> **commit**：`git log --grep='(P0-2)'`
-> 仅影响 `get_last_month_voice_hours`，调用链：私房**购买**/**续费**时的折扣计算。
+自动覆盖：`test_voice_channel_db.py` 覆盖 `channel_configs` 与 `temp_channels` 状态读写。
 
-- [x] 🔴 **私房购买时的折扣计算（有语音时长记录）**
-  - 前置：一个测试账号在 `monthly_achievements` 表有**上个月**的 `time_spent` 记录（可以手动 INSERT 模拟）
-  - 操作：该账号触发私房购买流程
-  - 预期：折扣 embed 里的 `actual_hours` 显示为该账号上月语音小时数（`time_spent` 秒数 / 3600）
-
-- [x] 🔴 **私房购买时（无语音时长记录）**
-  - 前置：全新账号无 `monthly_achievements` 记录
-  - 操作：私房购买流程
-  - 预期：`actual_hours = 0`，走最低折扣档；不报错
-
-- [ ] 🟡 **私房续费时的折扣计算**
-  - 前置：有一个活跃私房的账号
-  - 操作：触发续费流程
-  - 预期：和购买同样逻辑 —— 能正确读到上月语音时长
-
-- [ ] 🟢 **上月跨年（1 月时读取去年 12 月）**
-  - 难以测，靠代码 review：`get_last_month_voice_hours` 里 `if now.month == 1: last_month = 12; last_year = now.year - 1` 仍然正确
+- [ ] `/vc_add` 添加一个创建入口频道
+- [ ] `/vc_list` 能看到刚添加的入口频道和前缀 / 类型
+- [ ] 用户进入入口频道后自动创建临时语音房，并被移动进去
+- [ ] 房间控制面板出现；Unlock / Lock / Soundboard 按钮可用
+- [ ] 点击 Lock 后频道权限变私有；点击 Unlock 后恢复公开
+- [ ] Soundboard 状态能切换，按钮 / embed 状态一致
+- [ ] 点击 Full 后如果存在 teamup 展示消息，能标记为满或触发预期提示
+- [ ] 房间无人后自动删除；`/check_temp_channel_records` 不再列出已删除房间
+- [ ] Bot 重启后，有控制面板记录的房间 View 能恢复，按钮仍可点击
+- [ ] `/vc_remove` 能用频道选择或 channel_id 删除入口配置
 
 ---
 
-## 4. P0-3a check_status 改动
+## 3. Invitation / Teamup Display
 
-> **commit**：`git log --grep='(P0-3a)'`
-> 包含建表竞态修复。
+自动覆盖：配置写回、locale、runtime import 已由全局 gate 覆盖；Discord 交互需手工。
 
-- [x] 🔴 **冷启动无 `no such table: status` 错误**
-  - 操作：删除测试 DB 的 `status` 表（或用全新 DB）后重启 bot
-  - 预期：
-    - 启动日志**无** `no such table: status`
-    - 10 分钟后后台任务首次执行时，`status` 表已存在且能写入
-  - 意义：验证建表从 `on_ready` 迁到 `cog_load` 后竞态消除
-
-- [x] 🔴 **后台 10 分钟语音状态采样**
-  - 操作：等一整 10 分钟周期（或手动触发任务，如果有 debug 入口），或直接 `SELECT * FROM status ORDER BY timestamp DESC LIMIT 5`
-  - 预期：有新行、timestamp 正确、people 和 channels 数值合理
-
-- [x] 🔴 **`/print_voice_status date:YYYY-MM-DD` 按日视图**
-  - 前置：该日期至少有几条 status 采样
-  - 操作：`/print_voice_status date:2026-04-23`（今天日期）
-  - 预期：返回两张折线图（people / rooms），有峰值标注
-
-- [ ] 🟡 **`/print_voice_status date:YYYY-MM` 按月视图**
-  - 前置：本月有多日数据
-  - 操作：`/print_voice_status date:2026-04`
-  - 预期：按天聚合的峰值图
-
-- [ ] 🟡 **`/print_voice_status date:YYYY` 按年视图**
-  - 前置：本年有多月数据
-  - 操作：`/print_voice_status date:2026`
-  - 预期：按月聚合的柱状图
-
-- [ ] 🟡 **`/print_voice_status` 格式非法**
-  - 操作：`/print_voice_status date:abc`
-  - 预期：显示"日期格式不支持..."提示；不崩
-
-- [ ] 🟢 **`/print_voice_status` 无数据日期**
-  - 操作：`/print_voice_status date:2020-01-01`
-  - 预期："No data found" 提示
+- [ ] 用户不在语音频道时跑 `/invt`，得到“请先进入语音频道”的提示
+- [ ] 用户在语音频道时跑 `/invt`，生成可点击邀请消息
+- [ ] 在普通频道发送配置的组队关键词，bot 自动回复语音频道邀请
+- [ ] `/invt_addignorelist` 添加忽略频道 / 用户后，关键词不再触发
+- [ ] `/invt_checkignorelist` 显示忽略列表
+- [ ] `/invt_removeignorelist` 移除后，关键词恢复触发
+- [ ] `/teamup_init` 初始化展示频道
+- [ ] `/teamup_type_add` / `/teamup_type_list` / `/teamup_type_delete` 管理展示类型
+- [ ] 临时房间删除或标满后，对应 teamup 展示能被清理或更新
 
 ---
 
-## 5. P0-3b notebook 改动（P3-8 已移除）
+## 4. Shop / Checkin
 
-NotebookCog 已在 P3-8 从 runtime 移除，不再作为测试服全量验证项目。历史数据表 `event_logs` / `admins` 默认保留，不在本清单中测试清表或迁移。
+自动覆盖：`test_shop_db.py` 覆盖余额、流水、签到、补签、签到面板 DB 状态。
 
----
-
-## 6. P0-3c create_invitation 改动
-
-> **commit**：`git log --grep='(P0-3c)'`
-> 仅改了签名读取路径，走 `RoleDatabaseManager.get_user_signature`。**签名三态**是核心测试点。
-
-### 6.1 签名三态
-
-> 要有三个测试账号：A（无签名）、B（有签名且启用）、C（有签名但 `is_disabled=1`）。
-> 可直接 SQL 设置：`INSERT INTO user_signatures (user_id, signature, is_disabled) VALUES (B_id, '我是B的签名', 0), (C_id, 'C被禁用的', 1);`
-
-- [ ] 🔴 **账号 A（无签名）触发邀请**
-  - 操作：账号 A 进语音，在文字频道发"一起打游戏"之类关键词（或跑 `/invitation`）
-  - 预期：邀请 embed **不含**签名字段
-
-- [ ] 🔴 **账号 B（有签名，enabled）触发邀请**
-  - 操作：账号 B 同上
-  - 预期：邀请 embed **含**签名字段，值为 B 的 signature 字符串
-
-- [ ] 🔴 **账号 C（有签名，is_disabled=1）触发邀请**
-  - 操作：账号 C 同上
-  - 预期：邀请 embed **不含**签名字段（即使 DB 里有 signature 内容，`is_disabled=True` 就当作无签名）
-
-### 6.2 邀请基础流程
-
-- [ ] 🔴 **关键词自动路由（`on_message`）**
-  - 操作：在测试频道发 "组队" 或配置里 trigger 关键词
-  - 预期：bot 自动 reply 一个包含"加入房间"按钮的 embed
-  - 注：发送者必须在语音频道，否则走其他路径
-
-- [ ] 🔴 **`/invitation` 命令**
-  - 操作：在语音频道里的账号跑 `/invitation title:"测试组队"`
-  - 预期：发出带 embed 的组队消息
-
-- [ ] 🟡 **"房间满员"按钮**
-  - 操作：邀请消息发出后，按钮是 `roomfull_button_label`；由邀请发起者点击
-  - 预期：
-    - embed 标题改为 `{roomfull_title} ~~原标题~~`
-    - 变红色
-    - 按钮全移除（`view=None`）
-    - 从 teamup display 移除
-
-- [ ] 🟢 **非发起者点"房间满员"**
-  - 操作：另一个账号点同一个按钮
-  - 预期：显示 `interaction_target_error_message`，embed 不变
+- [ ] `/create_checkin_embed` 创建签到面板，图片和按钮显示正常
+- [ ] 普通用户点击每日签到，余额增加、连签显示更新
+- [ ] 同一用户重复点击每日签到，得到已签到提示，不重复加钱
+- [ ] 补签按钮在有可补日期 / 额度时成功；额度用完后失败提示清楚
+- [ ] `/balance_change` 给测试用户加分和扣分，余额正确
+- [ ] `/balance_history` 显示流水，能区分签到和管理员调整
+- [ ] `/checkin_history` 显示签到日历 / 历史
+- [ ] Bot 重启后，签到面板 persistent view 仍可点击
 
 ---
 
-## 7. P0-3d voice_channel 改动
+## 5. Private Room
 
-> **commit**：`git log --grep='(P0-3d)'`
-> 12 处 SQL 迁移 + schema migration 保留 + View 加 db 参数。**功能最重、测试点最多**。
+自动覆盖：`test_privateroom_db.py` 覆盖配置、店铺消息、房间生命周期和续费提醒 DB 状态。
 
-### 7.1 建房基础流程
-
-- [x] 🔴 **加入 trigger 频道自动建房**
-  - 前置：`config_voicechannel.json` 的 `channel_configs` 里有一个 trigger channel（type: "public" 或 "private"）
-  - 操作：加入该 trigger 频道
-  - 预期：
-    - 自动创建一个新的 voice channel（名字是 `{name_prefix}-{display_name}`）
-    - 用户被自动移入
-    - 该频道的文字聊天里出现**控制面板**（4 个按钮：解锁 / 上锁 / 满员 / 声音板）
-    - `temp_channels` 表新增一行：`channel_id`, `creator_id`, `is_soundboard_enabled=1`, `current_room_type` 等于配置的 type
-
-- [x] 🔴 **private 类型房默认是 private**
-  - 前置：trigger 频道配置 `type: "private"`
-  - 操作：加入
-  - 预期：`current_room_type='private'`，其他用户无法加入（`@everyone` 无 connect 权限）
-
-### 7.2 控制面板按钮
-
-- [x] 🔴 **"解锁"按钮 → 设为 public**
-  - 操作：房主点解锁
-  - 预期：
-    - `@everyone` 获得 connect 权限
-    - DB `current_room_type` 更新为 'public'
-    - 面板 embed 刷新
-    - ephemeral 消息
-
-- [x] 🔴 **"上锁"按钮 → 设为 private**
-  - 操作：房主点上锁
-  - 预期：
-    - `@everyone` 失去 connect 权限
-    - DB `current_room_type` 更新为 'private'
-    - 面板 embed 刷新
-
-- [x] 🔴 **"满员"按钮**
-  - 操作：房主点满员
-  - 预期：embed 更新为满员样式（标题变红、`update_message_to_full`）；按钮被移除
-
-- [x] 🔴 **"声音板"按钮（开）→ 关**
-  - 操作：房主点一次切换
-  - 预期：
-    - 相应权限变化（`use_soundboard` / `use_external_sounds`）
-    - DB `is_soundboard_enabled` 切换 0/1
-    - 面板 embed 刷新
-
-- [ ] 🟡 **非房主点任意按钮**
-  - 操作：其他账号进入该房后点控制面板按钮
-  - 预期：显示 `not_in_voice` 或权限错误提示（取决于具体按钮；lock 按钮只允许房主还是所有人在房内 —— 按实际行为验证）
-
-- [ ] 🟡 **用户不在该语音频道时点按钮**
-  - 操作：离开频道后按钮仍可见，点一下
-  - 预期：显示 `not_in_voice`
-
-### 7.3 `/list_voice_channels` / `/add_voice_channel` / `/remove_voice_channel`
-
-> 这三个是"自动建房 trigger"的增删改，动的是 `channel_configs` JSON（**P2-5 判定要迁 DB**，本轮未做）。只需回归性验证没坏。
-
-- [ ] 🟡 **`/list_voice_channels`**
-  - 操作：执行
-  - 预期：显示当前所有 trigger channel 配置
-
-- [ ] 🟡 **`/add_voice_channel`**
-  - 操作：添加一个新的 trigger
-  - 预期：成功、配置写入 `config_voicechannel.json`、后续加入该频道能建房
-
-- [ ] 🟡 **`/remove_voice_channel`**
-  - 操作：移除一个 trigger
-  - 预期：成功、配置更新
-
-### 7.4 `/check_temp_channel_records`
-
-- [x] 🔴 **查看临时频道记录**
-  - 前置：至少有 1 个活跃的 temp channel
-  - 操作：执行
-  - 预期：分页显示所有 `temp_channels` 表记录（新的在前）
-
-### 7.5 清理路径
-
-- [x] 🔴 **所有用户离开后频道自动清理**
-  - 操作：建房后让所有人离开
-  - 预期：
-    - `cleanup_channel` 触发
-    - Discord 频道被删除
-    - 如果 category 空了也被删
-    - （DB 记录**保留**，由下次 cleanup_task 清）
-
-- [x] 🔴 **小时级 cleanup_task 清理孤儿 DB 记录**
-  - 前置：DB 有一条 `temp_channels` 记录但 Discord 频道已不存在（手动模拟：SQL `INSERT INTO temp_channels (channel_id, creator_id) VALUES (999999, 123)`）
-  - 操作：等 1 小时或手动触发 `cleanup_task`
-  - 预期：该孤儿行被 `DELETE`
-
-### 7.6 重启恢复（最关键）
-
-- [x] 🔴 **重启后控制面板 View 恢复**
-  - 前置：有 1-2 个活跃的 temp channel + 控制面板
-  - 操作：重启 bot
-  - 预期：
-    - 启动日志里 `restore_control_panels` 成功报告 `X success, Y failed, Z cleaned`
-    - 到房间的文字聊天点任意按钮，仍然 work（说明 new `RoomControlPanelView(..., self.db, ...)` 被正确重新附加）
-    - **特别验证**：点上锁/解锁/声音板，DB 的 `current_room_type` / `is_soundboard_enabled` 真的更新 ← 这是 P0-3d 改 db 参数传递的核心测试点
-
-- [ ] 🟡 **重启后某 temp channel 已不存在的清理**
-  - 前置：活跃 temp channel 被手动删掉，但 DB 记录还在；重启前控制面板消息还在原位
-  - 操作：重启 bot
-  - 预期：
-    - `on_ready` 里 `fetch_all_channel_ids()` 拿到列表
-    - `bot.get_channel(id)` 返回 None → `delete_temp_channel` 清掉 DB 记录
-    - 不影响其他正常 temp channel
-
-- [ ] 🟡 **重启后控制面板消息已被删**
-  - 前置：DB 有 `control_panel_message_id` 但那条消息被手动删除
-  - 操作：重启
-  - 预期：
-    - `restore_control_panels` 里 `fetch_message` 抛 NotFound
-    - 调 `clear_control_panel_data(channel_id)` → DB 里 `control_panel_message_id` 置 NULL
-    - 计入 `cleaned_count`
-    - 下次该 channel 还在、用户还在，新进的人不会自动出面板，但房间本身还活着（按 DB 行为）
-
-### 7.7 schema migration
-
-- [ ] 🟡 **老部署升级（缺列场景）**
-  - 前置：用一个只有**旧 schema**（没 `control_panel_message_id` / `control_panel_channel_id` / `is_soundboard_enabled` / `current_room_type` 列）的 `bot.db` 副本启动
-  - 操作：冷启动
-  - 预期：
-    - 启动日志有 `[MIGRATION] Adding column <name> to temp_channels` ×4
-    - 列补齐后，建房/面板功能全部正常
+- [ ] `/privateroom_init` 创建或刷新私人房间商店面板
+- [ ] `/privateroom_setup` 设置 category / 价格 / 时长等关键配置
+- [ ] 用户余额足够时购买私人房间成功，频道权限正确
+- [ ] 用户余额不足时购买失败，不创建房间、不扣余额
+- [ ] 到期前续费成功，余额扣除、到期时间延长
+- [ ] 已删除但未过期的房间能通过恢复路径重新绑定新频道
+- [ ] `/privateroom_list` 能列出活跃房间
+- [ ] `/privateroom_ban` 能限制指定用户进入私人房间
+- [ ] `/privateroom_fix` 对异常状态给出可读结果
+- [ ] `/privateroom_reset` 只在测试库上执行；执行后店铺消息 / 房间状态清空
 
 ---
 
-## 8. 回归性检查（未改动的核心路径，快速 smoke）
+## 6. Achievements / Ranking
 
-> 即使没改，也可能因 import 链破坏而连带出问题。挑 5 个最常用功能快速跑一遍：
+自动覆盖：`test_achievement_db.py` 覆盖计数、月度计数、排行榜、语音 session、手动操作和 shop 签到联查。
 
-- [x] 🔴 **签到** `/checkin`（或按钮）
-- [x] 🔴 **查询余额** `/balance` / 签到查询按钮
-- [x] 🔴 **成就查询** `/achievements` / ranking
-- [!] 🔴 **角色领取**（星座 / MBTI / 性别其中一个）
-- [x] 🔴 **工单创建**（点按钮创建一个测试工单，然后关掉）
-
----
-
-## 9. 日志检查（全过程）
-
-整轮测试跑完后看一次日志：
-
-- [ ] 🔴 `grep -iE "no such table|no such column" ./logs/main.log` **为空**
-- [ ] 🔴 `grep -iE "AttributeError" ./logs/main.log` **为空**（特别是 `save_config` 之类的历史 bug）
-- [ ] 🟡 `grep -iE "Traceback" ./logs/main.log | wc -l` **比对照期基本持平或更少**
-- [ ] 🟡 `grep "bare except" ./logs/main.log` 当然是空（不太会打这个字样，主要确认没出乱七八糟的 `NoneType` / `KeyError` 被静默吞的现在不会被吞的情况）
-- [ ] 🟢 **P3-7 用户 / 频道 / 角色日志格式抽查**
-  - 操作：触发一次角色领取、一次临时语音房恢复或清理、一次工单创建 / 管理员通知路径后，grep 最近日志
-  - 预期：涉及用户、频道 / thread、角色的新增日志使用 `name (id)`；只有 raw id 且无缓存对象时显示 `unknown (id)`
-  - 意义：验证 `fmt_user` / `fmt_channel` / `fmt_role` 已接入首批高价值 callsite，排障时不用只靠裸 ID
+- [ ] 普通用户查看 `/achievements`，各项计数显示合理
+- [ ] 管理员用 `/increase_achievement` 增加 message / reaction / time / giveaway
+- [ ] 管理员用 `/decrease_achievement` 减少对应计数
+- [ ] `/achievement_ranking` 显示全服排行榜
+- [ ] `/rank` 显示个人名次和总参与人数
+- [ ] `/check_ach_ops` 显示手动操作日志
+- [ ] 用户进出语音频道后，语音时长最终写入成就
+- [ ] 签到后，`checkin_sum` / `checkin_combo` 排行榜读到 shop 数据
 
 ---
 
-## 结果登记
+## 7. Role / Signature
 
-测试完成后在 `REFACTORING_PROGRESS.md` 的 P0 系列收官小结里补一条：
+自动覆盖：`test_role_db.py` 覆盖面板消息记录和签名状态；`test_log_helpers.py` 覆盖日志格式。
 
-```
-**功能层验证**：2026-XX-XX 由 MrZoyo 在测试服完整跑了 REFACTORING_TEST_CHECKLIST.md，通过 / 问题：...
-```
+- [ ] `/create_role_pickup` 创建普通身份组领取面板
+- [ ] `/create_starsign_pickup`、`/create_mbti_pickup`、`/create_gender_pickup` 创建对应面板
+- [ ] 普通用户点击领取 / 移除，角色变化正确
+- [ ] Bot 角色层级低于目标角色时，用户得到可读错误，不出现裸 traceback
+- [ ] `/create_signature_pickup` 创建签名面板
+- [ ] 有资格用户设置签名成功，重复设置受次数限制
+- [ ] `/signature_check` 能查看无签名 / 有签名 / 已禁用三种状态
+- [ ] `/signature_permission_toggle` 禁用后，用户签名不可展示或不可设置
+- [ ] `/signature_clear` 清空签名和修改记录
+- [ ] `/signature_set_requirement` 写回 YAML 后重启仍生效
 
-如果有红色项目 `[!]` 不通过，不要直接进 P1 —— 先把问题告诉 Claude，定位回溯哪个 commit 引入的，修完再进下一阶段。
+---
+
+## 8. Tickets
+
+自动覆盖：`test_tickets_db.py` 覆盖 ticket types、config、工单生命周期、成员、统计和历史。
+
+- [ ] `/tickets_init` 初始化主面板和日志频道
+- [ ] `/tickets_add_type` 新增测试类型；主面板出现按钮
+- [ ] `/tickets_edit_type` 修改描述 / guide / button color / 管理员列表，重启后仍保留
+- [ ] `/tickets_delete_type` 删除测试类型；主面板刷新后按钮消失
+- [ ] 普通用户点类型按钮创建 thread 工单，创建者自动成为成员
+- [ ] 管理员 `/tickets_add_user` 添加协作者；重复添加有明确提示
+- [ ] 管理员点击 Accept 或跑 `/tickets_accept`，工单状态变 accepted
+- [ ] `/tickets_close` 关闭工单，记录 close reason
+- [ ] 关闭后不能继续添加成员或重复接单
+- [ ] `/tickets_stats` 统计 total / active / closed / by type 正确
+- [ ] `/tickets_refresh_buttons`、`/tickets_refresh_main` 能恢复 persistent buttons
+- [ ] 用户关闭 DM 时，创建 / 关闭流程不因 DM 失败中断
+
+---
+
+## 9. Giveaway
+
+自动覆盖：`test_giveaway_db.py` 覆盖抽奖记录、参与者、获奖者和持久 View 清理。
+
+- [ ] `/ga_create` 打开表单并创建测试抽奖
+- [ ] 普通用户点击参与，参与者列表增加
+- [ ] 同一用户重复参与有明确提示
+- [ ] 用户退出参与后，参与者列表减少
+- [ ] `/check_giveaway` 导出或显示当前抽奖状态
+- [ ] `/ga_description` 修改描述后消息刷新，重启后仍保留
+- [ ] `/ga_time_extend` 延长时长后到期时间正确
+- [ ] `/ga_participant` 能查看参与者
+- [ ] `/ga_end` 手动开奖，winner 写入，View 清理
+- [ ] `/ga_cancel` 取消抽奖后不可继续参与
+- [ ] `/ga_sendtowinner` 能给中奖者发送消息；DM 失败不阻断整体流程
+- [ ] Bot 重启后，未结束抽奖按钮可恢复
+
+---
+
+## 10. Ban / Moderation
+
+自动覆盖：`test_ban_db.py` 覆盖临时封禁生命周期、统计和旧记录清理。
+
+- [ ] `/ban_admin_add_role` / `/ban_admin_add_user` 添加管理员
+- [ ] `/ban_admin_list` 显示 role / user 管理员
+- [ ] `/ban_set_notification_channel` 设置通知频道
+- [ ] `/ban_set_invite_link` 设置合法邀请链接；非法链接给出错误
+- [ ] `/tempban` 封禁测试用户，通知频道记录、DB active 记录存在
+- [ ] Bot 重启后 recover tempbans，不丢失未到期任务
+- [ ] 到期后自动 unban 并 deactivate 记录
+- [ ] `/ban_list_tempbans` 显示活跃临时封禁
+- [ ] `/mute` 路径按预期执行或提示权限不足
+- [ ] `/ban` 永久封禁路径只在测试账号上验证
+- [ ] 删除通知频道 / invite link 后，相关命令回到未配置提示
+
+---
+
+## 11. Check Status / Logs / Backup
+
+自动覆盖：`test_check_status_db.py` 覆盖 status DB；lint 和 locale gate 覆盖日志 / 文案基础一致性。
+
+- [ ] `/check_voice_status` 返回当前语音人数 / 房间统计
+- [ ] `/print_voice_status` 能生成统计图或文件
+- [ ] `/check_log` 能读取 bot / keyword / room activity 日志
+- [ ] 右键菜单 `Where Is` 能查到测试用户所在语音频道
+- [ ] 全新测试 DB 启动时不会出现 `no such table: status`
+- [ ] `/backup_now` 生成手动备份
+- [ ] 自动 / 手动备份目录不误删 `.gitkeep`
+- [ ] 日志轮转路径使用 `main.yaml` 中的 repo-root 相对路径
+
+---
+
+## 12. Welcome / Games
+
+自动覆盖：runtime import 和 locale gate 覆盖基础加载；真实 Discord 事件需手工。
+
+- [ ] `/testwelcome` 能发送欢迎图和按钮
+- [ ] 新成员加入测试服时，欢迎频道消息和 DM 行为符合配置
+- [ ] DM 失败时不影响欢迎频道消息
+- [ ] `/dnd_roll` 掷骰结果格式正常
+- [ ] `/spymode` 创建游戏 View，加入 / 开始 / 退出流程可用
+
+---
+
+## 13. Legacy / Removed
+
+- [ ] main 分支没有 `old_function/` / `old_updates.md` 的 tracked 文件
+- [ ] `LEGACY_ARCHIVE.md` 指向 `legacy-old-files-archive` 分支
+- [ ] 如需旧代码或脱敏旧模板，切到 `legacy-old-files-archive` 查看 `LEGACY_ARCHIVE_INDEX.md`
+- [ ] Discord command picker 不再显示 notebook 命令
+- [ ] 不测试 `event_logs` / `admins` 清表；Notebook 历史 DB 表默认保留
+
+---
+
+## 14. 最终回归
+
+- [ ] 全部手工异常项 `[!]` 已复测或记录为后续 bug
+- [ ] 再跑一次 `./.venv/Scripts/python.exe -m pytest -q`
+- [ ] 再跑一次 `./.venv/Scripts/python.exe -m ruff check bot tests`
+- [ ] 再跑一次 `./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`
+- [ ] 备份测试库和日志
+- [ ] 在 `REFACTORING_PROGRESS.md` 追加测试服通过日期、测试人、遗留问题

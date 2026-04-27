@@ -2,7 +2,7 @@
 import aiosqlite
 import logging
 import discord
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List, Tuple
 
 from .db_lifecycle import BaseDatabaseManager
@@ -219,7 +219,7 @@ class BanDatabaseManager(BaseDatabaseManager):
 
     async def cleanup_old_records(self, days_old: int = 30) -> int:
         """Clean up old inactive tempban records older than specified days."""
-        cutoff_date = discord.utils.utcnow().replace(day=discord.utils.utcnow().day - days_old)
+        cutoff_date = discord.utils.utcnow() - timedelta(days=days_old)
         cutoff_date_str = cutoff_date.isoformat()
         
         async with aiosqlite.connect(self.db_path) as db:
@@ -243,7 +243,7 @@ class BanDatabaseManager(BaseDatabaseManager):
             active_count = (await cursor.fetchone())[0]
             
             # Total tempbans count (last 30 days)
-            thirty_days_ago = discord.utils.utcnow().replace(day=discord.utils.utcnow().day - 30)
+            thirty_days_ago = discord.utils.utcnow() - timedelta(days=30)
             thirty_days_ago_str = thirty_days_ago.isoformat()
             cursor = await db.execute('''
                 SELECT COUNT(*) FROM tempbans 

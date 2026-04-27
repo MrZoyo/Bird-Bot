@@ -1050,7 +1050,7 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 - **现状**：零测试，17k 行代码全靠测试服手点。
 - **建议**：优先给 db 管理器（纯函数多、副作用可控）写 `pytest + tmp sqlite` 单元测试；ROI 最高。
 - **当前执行策略（2026-04-27）**：测试目标只覆盖确定保留的模块。NotebookCog 已纳入 P3-8 移除计划，因此 P3-4 不给 `NotebookDatabaseManager` 新增覆盖，避免把待移除功能重新固化。
-- **完成状态（2026-04-27）**：已建立最小 pytest 骨架：`pyproject.toml` 增加 `test` extra 和 pytest 配置，首批覆盖 `CheckStatusDatabaseManager` 的 status sample 查询，以及 `TicketsDatabaseManager` 的 `ticket_types` JSON CRUD / config 写读。README / AGENTS 已同步测试命令。验证：Windows venv `pytest`、`compileall bot tests`、locale check、pip check、`uv lock --check`、`uv sync --frozen --dry-run --extra test --python 3.12.3`、`git diff --check`。
+- **完成状态（2026-04-27）**：已建立并扩展 pytest smoke suite：`pyproject.toml` 增加 `test` extra 和 pytest 配置，覆盖配置模板 / runtime `COG_SPECS` import、log helpers、CheckStatus、Tickets、VoiceChannel、PrivateRoom、Ban、Role、Giveaway、Shop、Achievement 等可离线验证路径。NotebookCog 已移除，不新增 notebook 覆盖。README / AGENTS / `REFACTORING_TEST_CHECKLIST.md` 已同步；checklist 已改成“自动化 gate + 按模块手工流程”。验证：Windows venv `pytest` 当前 `17 passed`（仅 discord.py `audioop` warning），其余完整 gate 见 PROGRESS。
 
 ### P3-5. 引入 ruff / linter 配置
 - `pyproject.toml` 加 `[tool.ruff]`，默认启用 `E`、`F`、`W`、`B`（bugbear），特别是 `E722`（bare-except）锁死 P0-4 成果。
@@ -1133,7 +1133,7 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 
 ## 推进顺序建议
 
-> **当前状态（2026-04-27）**：P0/P1/P2/P3 重构主线已全部收齐；当前以 PROGRESS.md 的“当前接手点”为准。下一阶段按用户此前决定进入测试服全量功能验证，逐项跑 `REFACTORING_TEST_CHECKLIST.md`。
+> **当前状态（2026-04-27）**：P0/P1/P2/P3 重构主线已全部收齐；当前以 PROGRESS.md 的“当前接手点”为准。下一阶段先跑 `REFACTORING_TEST_CHECKLIST.md` 的自动化 gate，再按模块进行测试服全量功能验证。
 
 1. **本轮冲刺（P0）**：P0-4（裸 except 治理，范围清晰、改动小、风险低）→ P0-1（giveaway 抽 db）→ P0-2（privateroom 规范化）→ P0-3（其余 cog 补 db manager，内部以 `check_status` 为首）。
 2. **下一轮（P1，小步）**：P1-5（日志 rotation）、P1-2（ban_cog 迁 cog_load）、P1-1（命令同步）—— 三个都是改动小、受益长期。

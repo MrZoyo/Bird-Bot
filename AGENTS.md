@@ -10,7 +10,7 @@
 - 安装依赖：`uv sync`（建议虚拟环境；依赖源在 `pyproject.toml`，锁定版本在 `uv.lock`）。
 - 本地运行：`python run.py`（确保已配置好 token、频道/角色 ID）。
 - 可选语法快检：`python -m compileall bot`。
-- 自动化单测：`python -m pytest`（需要 `uv sync --extra test`；当前覆盖部分纯 DB manager）。
+- 自动化单测：`python -m pytest`（需要 `uv sync --extra test`；覆盖配置模板、runtime cog 元数据、日志 helper，以及可离线验证的 DB manager smoke）。
 - 裸 `except:` 回归检查：`python -m ruff check bot tests`（需要 `uv sync --extra lint`；当前只启用 `E722`）。
 - 动数据库前先备份：复制 `data/bot.db` 或在运行中的机器人使用 `/backup_now`。
 
@@ -22,7 +22,7 @@
 - 不要新增裸 `except:`；需要兜底时写 `except Exception` 并记录上下文日志，或优先收窄到具体异常。
 
 ## 测试指引
-- 已有少量 `pytest` 自动化测试覆盖纯 DB manager；涉及真实 Discord 交互时仍需在测试服逐条验证命令与按钮。
+- 已有 `pytest` 自动化 smoke tests 覆盖配置模板、runtime cog 元数据、日志 helper 和纯 DB manager；涉及真实 Discord 交互时仍需在测试服逐条验证命令与按钮，流程以 `REFACTORING_TEST_CHECKLIST.md` 为准。
 - 影响数据库的改动优先用临时库或备份库验证，防止污染正式数据。
 - 涉及连签/余额/补签逻辑时，覆盖重复点击、额度用尽、余额不足等边界场景。
 
