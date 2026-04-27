@@ -12,6 +12,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from bot.utils import config, check_channel_validity
 from bot.utils.i18n import t
+from bot.utils.paths import project_path
 
 from .views import WelcomeDMView
 
@@ -37,17 +38,18 @@ class WelcomeCog(commands.Cog):
         self.avatar_size = tuple(conf['avatar_size'])
         self.welcome_text_1_distance = conf['welcome_text_1_distance']
         self.welcome_text_2_distance = conf['welcome_text_2_distance']
-        self.welcome_text = conf['welcome_text']
+        self.welcome_text = conf.get('welcome_text') or t('welcome.welcome_text_fallback')
 
-        self.base_path = Path(__file__).parent.parent.parent
-        self.font_path = str(self.base_path / "resources" / "fonts" / Path(conf['font_path']).name)
-        self.background_image = str(self.base_path / "resources" / "images" / Path(conf['background_image']).name)
+        self.font_path = str(project_path("resources", "fonts", Path(conf['font_path']).name))
+        self.background_image = str(project_path("resources", "images", Path(conf['background_image']).name))
 
         # Add new config parameters for DM welcome message. DM copy is a
         # mix of data (colour, image, rules_channel_id) and text; a full
         # i18n split is a follow-up — for now dm_config stays YAML-backed.
         self.dm_config = conf.get('dm', {})
-        self.welcome_dm_image = str(self.base_path / "resources" / "images" / Path(self.dm_config.get('dm_image', "welcome_dm.png")).name)
+        self.welcome_dm_image = str(
+            project_path("resources", "images", Path(self.dm_config.get('dm_image', "welcome_dm.png")).name)
+        )
 
         # Verify resources exist
         self._verify_resources()

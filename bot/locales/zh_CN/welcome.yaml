@@ -8,5 +8,6 @@
 # The DM subtree under bot/config/welcome.yaml similarly mixes data
 # (color / dm_image / rules_channel_id) with user-visible text; it
 # stays in the config YAML for now, pending a namespaced split.
+welcome_text_fallback: 欢迎来到本服务器, {member.mention}! 希望你能在这里度过一段美好时光。
 welcome_text_picture_1: 漆黑的世界，我寻着光，遇到了你。 {user_name}，祝君开心。
 welcome_text_picture_2: 本服务器第 {member_number} 名成员

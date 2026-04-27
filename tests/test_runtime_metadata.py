@@ -3,6 +3,7 @@ from pathlib import Path
 from ruamel.yaml import YAML
 
 from bot.main import COG_SPECS, _load_cog_class
+from bot.cogs.shop.views import CheckinEmbedView
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -47,3 +48,24 @@ def test_cog_specs_import_the_registered_class():
         cog_class = _load_cog_class(spec["module_path"], spec["class_name"])
 
         assert cog_class.__name__ == spec["class_name"]
+
+
+def test_shop_checkin_view_labels_come_from_locale(monkeypatch):
+    labels = {
+        "shop.checkin_button_daily_text": "Daily",
+        "shop.checkin_button_makeup_text": "Makeup",
+        "shop.checkin_button_query_text": "Query",
+    }
+    monkeypatch.setattr("bot.cogs.shop.views.t", lambda key, **kwargs: labels[key])
+
+    view = CheckinEmbedView(cog=object(), bot=object(), db=object(), conf={})
+
+    assert {
+        item.custom_id: item.label
+        for item in view.children
+        if getattr(item, "custom_id", None)
+    } == {
+        "checkin_daily": "Daily",
+        "checkin_makeup": "Makeup",
+        "checkin_query": "Query",
+    }

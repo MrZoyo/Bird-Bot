@@ -31,7 +31,7 @@
 
 必须先过：
 - [x] `./.venv/Scripts/python.exe -m pytest -q`
-  - 预期：全部通过；当前基线是 `18 passed`，允许出现 discord.py 的 `audioop` deprecation warning。
+  - 预期：全部通过；当前基线是 `19 passed`，允许出现 discord.py 的 `audioop` deprecation warning。
 - [x] `./.venv/Scripts/python.exe -m ruff check bot tests`
   - 预期：0 error；当前只启用 `E722`，用于防裸 `except:` 回归。
 - [x] `./.venv/Scripts/python.exe -m compileall bot tests`

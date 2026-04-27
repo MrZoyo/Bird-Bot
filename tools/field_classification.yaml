@@ -63,10 +63,10 @@ welcome:
     - welcome_text_1_distance
     - welcome_text_2_distance
     - background_image
+    - welcome_text
   locale:
     - welcome_text_picture_1
     - welcome_text_picture_2
-    - welcome_text
   # `dm` subtree mixes ids/colors/images (yaml) with titles/descriptions
   # (locale). The script keeps `dm` as a single subtree in yaml; the
   # step-7 welcome_cog refactor splits the user-visible dm strings into

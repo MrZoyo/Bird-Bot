@@ -18,15 +18,15 @@ class CheckinEmbedView(discord.ui.View):
         self.db = db
         self.conf = conf
         
-        # Update button labels from config
+        # Button labels live in locale files; YAML keeps only operational data.
         for item in self.children:
             if hasattr(item, 'custom_id'):
                 if item.custom_id == "checkin_daily":
-                    item.label = conf['checkin_button_daily_text']
+                    item.label = t('shop.checkin_button_daily_text')
                 elif item.custom_id == "checkin_makeup":
-                    item.label = conf['checkin_button_makeup_text']
+                    item.label = t('shop.checkin_button_makeup_text')
                 elif item.custom_id == "checkin_query":
-                    item.label = conf['checkin_button_query_text']
+                    item.label = t('shop.checkin_button_query_text')
     
     @discord.ui.button(
         label="✅ 每日签到",
@@ -461,5 +461,4 @@ class TransactionHistoryView(discord.ui.View):
         ))
 
         return embed
-
 

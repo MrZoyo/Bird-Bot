@@ -167,7 +167,8 @@
 
 **测试准备收尾（2026-04-27）**：
 - `REFACTORING_TEST_CHECKLIST.md` 已从历史 P0 checklist 重写为“自动化 gate + 按模块测试流程”。用户后续跟着该文件测试，不再需要从旧任务顺序反推功能路径。
-- 当前自动化基线：`pytest` 为 18 passed；ruff、compileall、locale check、pip check、`uv lock --check`、test/lint extra dry-run 和 `git diff --check` 均通过。覆盖配置/runtime metadata/log helpers、主要 DB manager smoke 和临时 JSON→YAML 迁移 smoke。手工清单仍覆盖 Discord 权限、按钮、command sync、后台任务、DM 失败等必须真实测试服验证的路径。
+- 当前自动化基线：`pytest` 为 19 passed；ruff、compileall、locale check、pip check、`uv lock --check`、test/lint extra dry-run 和 `git diff --check` 均通过。覆盖配置/runtime metadata/log helpers、主要 DB manager smoke 和临时 JSON→YAML 迁移 smoke。手工清单仍覆盖 Discord 权限、按钮、command sync、后台任务、DM 失败等必须真实测试服验证的路径。
+- 启动 smoke 补遗：用户真实启动暴露 `WelcomeCog: 'welcome_text'`、`ShopCog: 'checkin_button_daily_text'`。已修复 Shop 按钮文案从 locale 读取；Welcome 在本地 YAML 缺 `welcome_text` 时用 `welcome_text_fallback` 不阻塞加载；同时修正 Welcome 资源路径为仓库根 `resources/`，并把迁移分类里的 `welcome_text` 显式留在 YAML。真实本地配置下 `create_bot()` + `setup_bot()` 不连接 Discord 的 load smoke 已加载 15 个 cog。
 
 **下一棒默认**：P0-P3 重构主线已全部收齐。下一步先跑 checklist 的自动化 gate，再按模块进入测试服全量功能验证。
 

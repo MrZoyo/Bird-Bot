@@ -45,6 +45,12 @@ tickets:
 voicechannel:
   db:
     - channel_configs
+welcome:
+  yaml:
+    - welcome_channel_id
+    - welcome_text
+  locale:
+    - welcome_text_picture_1
 """.lstrip(),
         encoding="utf-8",
     )
@@ -95,6 +101,17 @@ voicechannel:
             },
         },
     )
+    write_json(
+        config_dir / "config_welcome.json",
+        {
+            "welcome_channel_id": 123456789012345684,
+            "welcome_text": (
+                "Welcome {member.mention} "
+                "https://discord.com/channels/123456789012345685/123456789012345686"
+            ),
+            "welcome_text_picture_1": "Picture line 1",
+        },
+    )
 
     monkeypatch.setattr(migration, "REPO_ROOT", tmp_path)
     monkeypatch.setattr(migration, "CONFIG_DIR", config_dir)
@@ -133,6 +150,16 @@ voicechannel:
 
     tickets_locale = read_yaml(locale_dir / "tickets.yaml")
     assert tickets_locale == {"messages": {"created": "ticket created"}}
+
+    welcome_yaml = read_yaml(config_dir / "welcome.yaml")
+    assert welcome_yaml["welcome_channel_id"] == 123456789012345684
+    assert welcome_yaml["welcome_text"].startswith("Welcome {member.mention}")
+    assert "welcome_text" not in read_yaml(locale_dir / "welcome.yaml")
+
+    welcome_example = read_yaml(config_dir / "welcome.yaml.example")
+    assert welcome_example["welcome_channel_id"] == 1145141919810
+    assert "1145141919810" in welcome_example["welcome_text"]
+    assert "123456789012345685" not in welcome_example["welcome_text"]
 
     seed = json.loads(seed_file.read_text(encoding="utf-8"))
     assert "tickets_new" not in seed
