@@ -68,7 +68,7 @@
 | P2 | P2-2 Schema 迁移机制 | ✅ | `schema_version` + 手写 migrations helper；首批接入 voice / privateroom / ban |
 | P2 | P2-3 `save_config` 写回统一策略 | ✅ | 统一 YAML writer + 当前写回路径核对完成 |
 | P3 | P3-1 依赖管理统一 | ✅ | `pyproject.toml` + tracked `uv.lock` 为主，`requirements.lock` 为兼容导出，`requirements.txt` 退役 |
-| P3 | P3-2 硬编码路径梳理 | ⬜ | |
+| P3 | P3-2 硬编码路径梳理 | ✅ | repo-root path helper + main runtime path normalization + backup Path 化 |
 | P3 | P3-3 清理空 bot.db | ⬜ | |
 | P3 | P3-4 补自动化测试 | ⬜ | |
 | P3 | P3-5 引入 ruff / linter | ⬜ | 锁 E722 保 P0-4 |
@@ -115,7 +115,15 @@
 - 本地工作区是 Windows `.venv` 暴露在 WSL 下；`uv sync --frozen --dry-run --python 3.12.3` 通过，但提示会替换 `.venv`。本轮未实际运行 `uv sync` 改这个环境，而是用 `./.venv/Scripts/python.exe -m pip install -r requirements.lock` 按兼容锁同步现有 Windows venv。
 - 提权验证已通过：`uv lock --check`、`uv sync --frozen --dry-run --python 3.12.3`、`./.venv/Scripts/python.exe -m pip install -r requirements.lock`、`./.venv/Scripts/python.exe -m pip check`、直接依赖 import smoke、`./.venv/Scripts/python.exe -m compileall bot`、`./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`、`git diff --check`。
 
-**下一棒默认**：进入 P3-2 硬编码路径梳理。优先按 `rg -n "\./|bot/config|backup/|data/|Path\\(|open\\(" bot tools run.py` 粗扫实际路径依赖，再区分"配置路径 / 仓库相对路径 / 运行时数据路径 / 历史归档路径"；当前已确认的 active 例子是 `bot/cogs/backup/cog.py` 里的 `./backup/db_backup` / `./backup/db_backup_manual`。不要把 P3-3 的空 `bot.db` 删除混进 P3-2。旧章节里残留的 `*_cog.py` 文件名属于历史记录，不作为下一步 active path。
+**P3-2 硬编码路径梳理已完成**：
+- 新增 `bot/utils/paths.py`：`PROJECT_ROOT` / `project_path()` / `resolve_project_path()` / `ensure_parent_dir()`，统一把相对运行时路径解析到仓库根目录。
+- `bot/utils/config.py` 在 `main.yaml` load + schema 校验后，集中把 `logging_file` / `keyword_log_file` / `room_log_file` / `db_path` 规范成仓库绝对路径；各 cog / db manager 继续读 `main.db_path`，不逐个改业务文件。
+- `bot/main.py` 的 rotating log handler 会先解析路径并创建父目录；`CheckStatusCog` 的 `/check_log` 读取路径也显式走 helper，兼容缺省 `keyword_log_file` / `room_log_file`。
+- `BackupCog` 不再用 `./backup/...` + `os.path`，改成 `Path` 目录和文件操作，且不会把 `.gitkeep` 当成可轮换备份删除。
+- README / AGENTS / `bot/config/main.yaml.example` 已同步：默认主库是 `data/bot.db`，相对 runtime path 按仓库根目录解析。
+- 提权验证已通过：路径解析 smoke（从非仓库 CWD 加载 main config）、changed-module import smoke、`./.venv/Scripts/python.exe -m compileall bot`、`./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`、`./.venv/Scripts/python.exe -m pip check`、`git diff --check`。
+
+**下一棒默认**：进入 P3-3 清理根目录空 `bot.db`。只确认 / 删除仓库根目录那个 0 字节误创建库；不要碰 `data/bot.db` 和 `backup/` 里的真实运行数据。
 
 **环境验证规则**：环境 / import / 启动验证必须提权到沙箱外跑真实环境。项目 Windows `.venv` 已用 `ensurepip` 补出 pip，并通过 `./.venv/Scripts/python.exe -m pip install -r requirements.lock` 按 lock 补齐依赖（含 `ruamel-yaml==0.19.1`）；本轮 project venv import smoke 已通过。后续如果项目 venv 再缺包，直接补环境，不只记录缺失。
 

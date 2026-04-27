@@ -1038,8 +1038,10 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 - **完成状态（2026-04-26）**：已落地。`.gitignore` 不再忽略 `uv.lock`；README / AGENTS / 迁移脚本 docstring 已同步 `uv sync`；当前 Windows `.venv` 已按兼容 `requirements.lock` 同步。验证：`uv lock --check`、`uv sync --frozen --dry-run --python 3.12.3`、Windows venv `pip install -r requirements.lock` + `pip check`、直接依赖 import smoke、`compileall bot`、locale check、`git diff --check`。
 
 ### P3-2. 硬编码路径梳理
-- **例**：`bot/cogs/backup/cog.py` 仍直接使用 `./backup/db_backup` / `./backup/db_backup_manual`；下一步按当前包路径继续扫，不再引用拆包前的 `*_cog.py` 文件名作为 active path。
+- **重构前例**：`bot/cogs/backup/cog.py` 直接使用 `./backup/db_backup` / `./backup/db_backup_manual`；执行时按当前包路径继续扫，不再引用拆包前的 `*_cog.py` 文件名作为 active path。
 - **建议**：基于 `Path(__file__)` 或配置键，避免依赖启动时的 CWD。
+- **本轮执行策略（2026-04-26）**：新增仓库路径 helper，集中把 `main.yaml` 的运行时路径（`logging_file` / `keyword_log_file` / `room_log_file` / `db_path`）解析为仓库绝对路径；backup cog 目录改用 `Path`，避免 `python run.py` 从非仓库 CWD 启动时写错位置。P3-3 的空根目录 `bot.db` 删除保持独立。
+- **完成状态（2026-04-26）**：已落地。`bot/utils/paths.py` 提供 repo-root path helper；`config.get_config('main')` 会返回已规范化的 runtime path；main/checkstatus 日志路径和 backup 目录均不再依赖启动 CWD。验证：路径 smoke、changed-module import smoke、compileall、locale check、pip check、`git diff --check`。
 
 ### P3-3. 清理根目录空 `bot.db`
 - 根目录 `bot.db`（0 字节）疑似误创建，实际 DB 在 `./data/bot.db`，确认后删除。
