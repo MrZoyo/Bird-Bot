@@ -1044,7 +1044,7 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 - **完成状态（2026-04-26）**：已落地。`bot/utils/paths.py` 提供 repo-root path helper；`config.get_config('main')` 会返回已规范化的 runtime path；main/checkstatus 日志路径和 backup 目录均不再依赖启动 CWD。验证：路径 smoke、changed-module import smoke、compileall、locale check、pip check、`git diff --check`。
 
 ### P3-3. 清理根目录空 `bot.db`
-- 根目录 `bot.db`（0 字节）疑似误创建，实际 DB 在 `./data/bot.db`，确认后删除。
+- **完成状态（2026-04-27）**：已确认根目录 `bot.db` 为 tracked 0-byte 误创建文件并删除；真实运行库 `data/bot.db` 未触碰。`.gitignore` 加 `/bot.db`，防止根目录 DB 再次误入 git。
 
 ### P3-4. 补自动化测试
 - **现状**：零测试，17k 行代码全靠测试服手点。

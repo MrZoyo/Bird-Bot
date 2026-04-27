@@ -69,7 +69,7 @@
 | P2 | P2-3 `save_config` 写回统一策略 | ✅ | 统一 YAML writer + 当前写回路径核对完成 |
 | P3 | P3-1 依赖管理统一 | ✅ | `pyproject.toml` + tracked `uv.lock` 为主，`requirements.lock` 为兼容导出，`requirements.txt` 退役 |
 | P3 | P3-2 硬编码路径梳理 | ✅ | repo-root path helper + main runtime path normalization + backup Path 化 |
-| P3 | P3-3 清理空 bot.db | ⬜ | |
+| P3 | P3-3 清理空 bot.db | ✅ | 删除 tracked 0-byte root `bot.db`，保留 ignored `data/bot.db` |
 | P3 | P3-4 补自动化测试 | ⬜ | |
 | P3 | P3-5 引入 ruff / linter | ⬜ | 锁 E722 保 P0-4 |
 | P3 | P3-6 归档目录清理规划 | ⬜ | |
@@ -123,7 +123,13 @@
 - README / AGENTS / `bot/config/main.yaml.example` 已同步：默认主库是 `data/bot.db`，相对 runtime path 按仓库根目录解析。
 - 提权验证已通过：路径解析 smoke（从非仓库 CWD 加载 main config）、changed-module import smoke、`./.venv/Scripts/python.exe -m compileall bot`、`./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`、`./.venv/Scripts/python.exe -m pip check`、`git diff --check`。
 
-**下一棒默认**：进入 P3-3 清理根目录空 `bot.db`。只确认 / 删除仓库根目录那个 0 字节误创建库；不要碰 `data/bot.db` 和 `backup/` 里的真实运行数据。
+**P3-3 清理根目录空 `bot.db` 已完成**：
+- 清理前确认：`./bot.db` 为 0 bytes 且被 git 跟踪；`./data/bot.db` 为 602112 bytes，属于真实运行库并被 `.gitignore` 的 `data/*.db` 保护。
+- 已删除 tracked root `bot.db`，并在 `.gitignore` 加 `/bot.db`，避免旧启动路径或手工误操作再次把根目录库带回 git。
+- 未触碰 `data/bot.db`、`data/*.log`、`backup/` 里的真实运行数据。
+- 验证：`find . -maxdepth 2 -name 'bot.db' -printf '%p %s bytes\n'` 只剩 `./data/bot.db 602112 bytes`；`git ls-files bot.db data/bot.db` 为空；`git check-ignore -v bot.db data/bot.db` 命中 `/bot.db` 和 `data/*.db`。
+
+**下一棒默认**：进入 P3-4 补自动化测试。建议先给纯 DB manager 建最小 pytest 骨架和 tmp sqlite 单测，不直接上测试服功能全测；测试服全量验证仍按当前策略放到主线重构后统一做。
 
 **环境验证规则**：环境 / import / 启动验证必须提权到沙箱外跑真实环境。项目 Windows `.venv` 已用 `ensurepip` 补出 pip，并通过 `./.venv/Scripts/python.exe -m pip install -r requirements.lock` 按 lock 补齐依赖（含 `ruamel-yaml==0.19.1`）；本轮 project venv import smoke 已通过。后续如果项目 venv 再缺包，直接补环境，不只记录缺失。
 
