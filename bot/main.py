@@ -10,6 +10,7 @@ from bot.utils import (
     collect_database_managers_from_cogs,
     config,
 )
+from bot.utils.paths import ensure_parent_dir
 from bot.utils.slash_translator import SlashTranslator
 
 
@@ -214,8 +215,9 @@ async def setup_bot(bot):
     log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 
     def _rotating_handler(path: str) -> TimedRotatingFileHandler:
+        log_path = ensure_parent_dir(path)
         handler = TimedRotatingFileHandler(
-            path,
+            str(log_path),
             when='midnight',
             backupCount=log_backup_count,
             encoding='utf-8',
@@ -231,14 +233,14 @@ async def setup_bot(bot):
     # Configure keyword detection logging
     keyword_logger = logging.getLogger('keyword_detection')
     keyword_logger.setLevel(logging.INFO)
-    keyword_log_file = conf.get('keyword_log_file', './data/keyword_detection.log')
+    keyword_log_file = conf.get('keyword_log_file') or './data/keyword_detection.log'
     keyword_logger.addHandler(_rotating_handler(keyword_log_file))
     keyword_logger.propagate = False
 
     # Configure room activity logging
     room_logger = logging.getLogger('room_activity')
     room_logger.setLevel(logging.INFO)
-    room_log_file = conf.get('room_log_file', './data/room_activity.log')
+    room_log_file = conf.get('room_log_file') or './data/room_activity.log'
     room_logger.addHandler(_rotating_handler(room_log_file))
     room_logger.propagate = False
 

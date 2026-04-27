@@ -3,7 +3,6 @@
 # Date: 2024-06-26
 # ========================================
 
-import os
 import discord
 import shutil
 import asyncio
@@ -14,44 +13,43 @@ from datetime import datetime, timedelta
 import logging
 
 from bot.utils import config, check_channel_validity
+from bot.utils.paths import project_path, resolve_project_path
 
 
 class BackupCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.backup_folder = './backup/db_backup'
-        self.backup_folder_manual = './backup/db_backup_manual'
-        self.backup_database.start()
-        self.file_limit = 20
-
         self.conf = config.get_config()
-        self.db_path = self.conf['db_path']
+        self.db_path = resolve_project_path(self.conf['db_path'])
+        self.backup_folder = project_path('backup', 'db_backup')
+        self.backup_folder_manual = project_path('backup', 'db_backup_manual')
+        self.file_limit = 20
+        self.backup_database.start()
 
     @tasks.loop(hours=6)
     async def backup_database(self, manual=False):
-        if manual:
-            folder = self.backup_folder_manual
-        else:
-            folder = self.backup_folder
+        folder = self.backup_folder_manual if manual else self.backup_folder
 
-        # Create the backup folder if it doesn't exist
-        if not os.path.exists(folder):
-            os.makedirs(folder)
+        folder.mkdir(parents=True, exist_ok=True)
 
         # Copy the database to the backup folder with the current time appended to the name
         backup_name = f"database_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+        backup_path = folder / backup_name
 
-        shutil.copy2(self.db_path, os.path.join(folder, backup_name))
-        logging.info(f"Database backup created: {backup_name}")
+        shutil.copy2(self.db_path, backup_path)
+        logging.info(f"Database backup created: {backup_path}")
 
         # Get a list of all backup files sorted by modification time
-        backups = sorted(os.listdir(folder),
-                         key=lambda x: os.path.getmtime(os.path.join(folder, x)))
+        backups = sorted(
+            (path for path in folder.iterdir() if path.is_file() and path.name != '.gitkeep'),
+            key=lambda path: path.stat().st_mtime,
+        )
 
         # If there are too many backups, delete the oldest one
         while len(backups) > self.file_limit:
-            os.remove(os.path.join(folder, backups.pop(0)))
-            logging.info("Deleted the oldest backup file")
+            oldest_backup = backups.pop(0)
+            oldest_backup.unlink()
+            logging.info(f"Deleted the oldest backup file: {oldest_backup}")
 
     @backup_database.before_loop
     async def before_backup(self):

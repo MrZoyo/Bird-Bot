@@ -8,6 +8,8 @@ from typing import Any, Dict, Optional, Tuple
 
 from ruamel.yaml import YAML
 
+from .paths import resolve_project_path_string
+
 
 def _new_yaml() -> YAML:
     """Fresh round-trip YAML instance.
@@ -24,6 +26,12 @@ def _new_yaml() -> YAML:
 
 class Config:
     _instance = None
+    _MAIN_PATH_KEYS = (
+        'logging_file',
+        'keyword_log_file',
+        'room_log_file',
+        'db_path',
+    )
 
     def __new__(cls):
         if cls._instance is None:
@@ -90,6 +98,17 @@ class Config:
 
         for warning in validate_main_config(self._configs['main']):
             print(warning)
+        self._normalize_main_paths()
+
+    def _normalize_main_paths(self) -> None:
+        main_config = self._configs.get('main', {})
+        if not isinstance(main_config, dict):
+            return
+
+        for key in self._MAIN_PATH_KEYS:
+            value = main_config.get(key)
+            if isinstance(value, (str, Path)) and str(value):
+                main_config[key] = resolve_project_path_string(value)
 
     def get_config(
         self,

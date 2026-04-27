@@ -14,6 +14,7 @@ from discord.ext import commands, tasks
 
 from bot.utils import CheckStatusDatabaseManager, check_channel_validity, config
 from bot.utils.i18n import t
+from bot.utils.paths import resolve_project_path_string
 
 from .views import MemberPositionView
 
@@ -28,11 +29,15 @@ class CheckStatusCog(commands.Cog):
         )
 
         main_config = config.get_config('main')
-        self.db_path = main_config['db_path']
+        self.db_path = resolve_project_path_string(main_config['db_path'])
         self.db = CheckStatusDatabaseManager(self.db_path)
-        self.logging_file = main_config['logging_file']
-        self.keyword_log_file = main_config.get('keyword_log_file', './data/keyword_detection.log')
-        self.room_log_file = main_config.get('room_log_file', './data/room_activity.log')
+        self.logging_file = resolve_project_path_string(main_config['logging_file'])
+        self.keyword_log_file = resolve_project_path_string(
+            main_config.get('keyword_log_file') or './data/keyword_detection.log'
+        )
+        self.room_log_file = resolve_project_path_string(
+            main_config.get('room_log_file') or './data/room_activity.log'
+        )
 
         self.bot.tree.add_command(self.where_is_menu)
         self.check_voice_status_task.start()

@@ -4,13 +4,13 @@
 - 入口：`run.py` 启动并加载 `bot/` 下的各个 cogs。
 - 业务逻辑：`bot/cogs/`（签到/补签、成就、角色、语音、工单等）；公共工具与数据库封装在 `bot/utils/`。
 - 配置：`bot/config/*.yaml.example` 为模板，复制去掉 `.example` 生效（config 2.0 起改用 YAML；legacy `config_*.json.example` 归档在 `old_function/config/`）。文案资源在 `bot/locales/<lang>/<cog>.yaml`，运行时由 `bot.utils.i18n.t()` 读取。静态资源在 `resources/`、`pics/`。
-- 数据：主库 `bot.db` 位于仓库根目录；备份在 `backup/`；旧实验代码在 `old_function/` 和 `old_test/`。
+- 数据：主库默认位于 `data/bot.db`（由 `bot/config/main.yaml` 的 `db_path` 控制，运行时按仓库根目录解析相对路径）；备份在 `backup/`；旧实验代码在 `old_function/` 和 `old_test/`。
 
 ## 构建、运行与开发命令
 - 安装依赖：`uv sync`（建议虚拟环境；依赖源在 `pyproject.toml`，锁定版本在 `uv.lock`）。
 - 本地运行：`python run.py`（确保已配置好 token、频道/角色 ID）。
 - 可选语法快检：`python -m compileall bot`。
-- 动数据库前先备份：复制 `bot.db` 或在运行中的机器人使用 `/backup_now`。
+- 动数据库前先备份：复制 `data/bot.db` 或在运行中的机器人使用 `/backup_now`。
 
 ## 代码风格与命名约定
 - Python 3 异步优先；遵循 PEP 8，四空格缩进，能加类型注解尽量加。

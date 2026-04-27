@@ -3,6 +3,7 @@
 # Template for bot/config/main.yaml. Copy to main.yaml and fill in
 # real values. The real file is gitignored (it carries the bot token
 # and deployment IDs).
+# Relative runtime paths are resolved from the repository root.
 token: YOUR_BOT_TOKEN
 logging_file: ./data/bot.log
 keyword_log_file: ./data/keyword_detection.log
