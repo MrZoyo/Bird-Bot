@@ -1101,6 +1101,10 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 - 与 P1-5（日志 rotation）可以在同一冲刺做（都是 logging 层改动）。
 - 与 P3-5（ruff）可以加 lint 规则禁止 `logging.*(f"... {user_id} ...")` 这种裸 id f-string（高级要求，可选）。
 
+**本轮执行策略（2026-04-27）**：先落地统一 helper 和首批高价值 callsite，不做全仓字符串清洗。覆盖范围：`role/views.py` 的用户/角色授予和移除日志，`voice_channel/cog.py` 的控制面板恢复 / creator / room 日志，`tickets/cog.py` 的 ticket thread / admin / creator 错误日志。同步加 `tests/test_log_helpers.py` 锁住 raw id 和对象格式。
+
+**完成状态（2026-04-27）**：已落地。`bot/utils/log_helpers.py` 提供 `fmt_user` / `fmt_channel` / `fmt_role` 并从 `bot/utils/__init__.py` 导出；README / AGENTS 已写入新日志规则；测试清单增加 P3-7 日志抽查。验证：Windows venv `ruff check bot tests`、pytest、compileall、locale check、pip check、`git diff --check`。
+
 ### P3-8. NotebookCog 废弃 / 移除
 
 **决策背景（2026-04-27）**：用户确认希望移除 NotebookCog。此前计划文档只记录了 notebook 的历史重构（P0-3b DB manager、P1-3b 包化、P1-7 slash metadata/i18n pilot），没有把它列为待废弃功能；这会在上下文压缩后造成误解。因此本条作为新的 active P3 任务，后续不要再给 NotebookCog 增加测试或功能投入。
@@ -1137,7 +1141,7 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
    - 启动前必须完成：**P2-5 的判定表**（决定哪些字段迁 DB）。
    - 并行或紧接完成：**P1-7（Slash 元数据本地化）**。
 4. **大 cog 拆包（P1-3）**：放在配置系统 2.0 之后，或与 P1-6 绑同一 PR（拆包时顺手换 YAML，一次 review 双收益）。不要在 P1-6 之前单独拆。
-5. **当前 P3 收尾**：P3-4 最小自动化测试骨架、P3-8 NotebookCog 移除、P3-5 ruff / linter、P3-6 old 归档分支均已完成；后续按需要推进 P3-7 日志 id/name 双记录。
+5. **当前 P3 收尾**：P3-4 最小自动化测试骨架、P3-8 NotebookCog 移除、P3-5 ruff / linter、P3-6 old 归档分支、P3-7 日志 id/name helper 均已完成；后续进入全量功能测试准备或按需开新 follow-up。
 
 ---
 

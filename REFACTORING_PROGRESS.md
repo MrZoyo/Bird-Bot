@@ -73,7 +73,7 @@
 | P3 | P3-4 补自动化测试 | ✅ | pytest extra + check_status/tickets tmp sqlite tests；Notebook 明确不纳入 |
 | P3 | P3-5 引入 ruff / linter | ✅ | 只启用 E722 锁 P0-4；全量规则留后续 |
 | P3 | P3-6 old 归档分支 | ✅ | tracked old_function/old_updates 转存 legacy-old-files-archive |
-| P3 | P3-7 日志 id/name 双记录 | ⬜ | 计划已在 REFACTORING_PLAN.md，表格补齐 |
+| P3 | P3-7 日志 id/name 双记录 | ✅ | fmt_user/fmt_channel/fmt_role + role/voice/tickets 首批 callsite |
 | P3 | P3-8 NotebookCog 废弃 / 移除 | ✅ | runtime 入口移除；旧代码在 legacy-old-files-archive；DB 历史表保留 |
 
 ---
@@ -156,7 +156,13 @@
 - 归档统计：32 个旧文件 / 16939 行，其中 `old_function/cogs/` 13 个、`old_function/config/*.json.example` 16 个、legacy DB manager 2 个、`old_updates.md` 1 个。
 - main 分支删除 tracked `old_function/` / `old_updates.md`，新增 `LEGACY_ARCHIVE.md` 指向归档分支；README / AGENTS / `.gitignore` 已同步。`old_test/` 仍是 ignored 本地实验目录，不纳入已脱敏归档分支。
 
-**下一棒默认**：进入 P3-7 日志 id/name 双记录 helper 和首批 callsite；如果想先收尾文档，可先快速检查 `REFACTORING_TEST_CHECKLIST.md` 是否需要新增“旧功能已归档分支”备注。
+**P3-7 日志 id/name 双记录已完成**：
+- `bot/utils/log_helpers.py` 新增 `fmt_user` / `fmt_channel` / `fmt_role`，统一输出 `name (id)`；raw id 兜底为 `unknown (id)`，不为日志补做 Discord API fetch。
+- `bot/utils/__init__.py` 导出三个 helper；`tests/test_log_helpers.py` 覆盖 display_name 优先、channel/role name、raw id fallback。
+- 首批替换范围：`bot/cogs/role/views.py` 的角色授予 / 移除 / starter role hierarchy 日志；`bot/cogs/voice_channel/cog.py` 的控制面板恢复、room、creator 日志；`bot/cogs/tickets/cog.py` 的 ticket thread、admin、creator 错误日志。
+- README / AGENTS / `REFACTORING_TEST_CHECKLIST.md` 已同步新日志规则和测试服抽查项。
+
+**下一棒默认**：P0-P3 重构主线已全部收齐。下一步建议先做一次文档/状态总核对，再按用户此前决定进入测试服全量功能验证。
 
 **环境验证规则**：环境 / import / 启动验证必须提权到沙箱外跑真实环境。项目 Windows `.venv` 已用 `ensurepip` 补出 pip，并通过 `./.venv/Scripts/python.exe -m pip install -r requirements.lock` 按 lock 补齐依赖（含 `ruamel-yaml==0.19.1`）；本轮 project venv import smoke 已通过。后续如果项目 venv 再缺包，直接补环境，不只记录缺失。
 
