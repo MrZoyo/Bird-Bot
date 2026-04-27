@@ -29,17 +29,17 @@
 - `tests/test_log_helpers.py`：日志 `name (id)` helper。
 
 必须先过：
-- [ ] `./.venv/Scripts/python.exe -m pytest -q`
+- [x] `./.venv/Scripts/python.exe -m pytest -q`
   - 预期：全部通过；当前基线是 `17 passed`，允许出现 discord.py 的 `audioop` deprecation warning。
-- [ ] `./.venv/Scripts/python.exe -m ruff check bot tests`
+- [x] `./.venv/Scripts/python.exe -m ruff check bot tests`
   - 预期：0 error；当前只启用 `E722`，用于防裸 `except:` 回归。
-- [ ] `./.venv/Scripts/python.exe -m compileall bot tests`
+- [x] `./.venv/Scripts/python.exe -m compileall bot tests`
   - 预期：无语法错误。
-- [ ] `./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`
+- [x] `./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`
   - 预期：locale key 全 resolve。
-- [ ] `./.venv/Scripts/python.exe -m pip check`
+- [x] `./.venv/Scripts/python.exe -m pip check`
   - 预期：依赖一致。
-- [ ] `uv lock --check`
+- [x] `uv lock --check`
   - 预期：lock 与 `pyproject.toml` 对齐。
 
 ---
