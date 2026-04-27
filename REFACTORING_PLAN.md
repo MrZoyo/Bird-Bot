@@ -1060,6 +1060,8 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 ### P3-6. 归档目录清理规划
 - **现状**：`old_function/`、`old_test/`、`old_updates.md` 随时间膨胀。
 - **建议**：git 本身保留历史，可给每个归档文件标注"到 vX.Y 可真删"时间线，定期清理。
+- **本轮执行策略（2026-04-27）**：按用户要求，把 main 分支上已追踪、已脱敏、无 runtime 价值的旧内容转移到专门分支 `legacy-old-files-archive`。该分支保留原 `old_function/` 与 `old_updates.md`，新增 `LEGACY_ARCHIVE_INDEX.md` 做统计和说明；main 删除这些 tracked 旧文件，仅保留 `LEGACY_ARCHIVE.md` 指路。`old_test/` 是 ignored 本地实验目录，不纳入脱敏归档分支。
+- **完成状态（2026-04-27）**：归档分支 `legacy-old-files-archive` 已创建并提交 `772344b docs: index legacy old file archive (P3-6)`，统计 32 个旧文件 / 16939 行。main 分支移除 tracked `old_function/` / `old_updates.md`，README / AGENTS / `.gitignore` / `LEGACY_ARCHIVE.md` 已同步旧内容查找方式。
 
 ### P3-7. 日志里用户 / 频道的 id ↔ name 双记录
 
@@ -1111,7 +1113,7 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 
 **建议做法**：
 1. 从 `bot/main.py` 的 `COG_SPECS` 移除 notebook entry，并从 `bot/config/main.yaml.example` 的 `features` 移除 `notebook`。
-2. 归档或删除 `bot/cogs/notebook/` 与 `bot/utils/notebook_db.py`。若需要保留历史代码，按项目既有约定放入 `old_function/`；不要让它继续从 runtime import。
+2. 归档或删除 `bot/cogs/notebook/` 与 `bot/utils/notebook_db.py`。P3-8 先归档到 `old_function/`；P3-6 后 main 不再保留 tracked 旧归档，历史代码改到 `legacy-old-files-archive` 分支查阅。
 3. 从 `bot/utils/__init__.py` 移除 `NotebookDatabaseManager` 导入和 `__all__`。
 4. 清理 `bot/locales/zh_CN/commands.yaml` 的 `notebook.*` keys，并运行 locale checker 确认无 dangling key / missing key。
 5. 同步 `README.md` 和 `REFACTORING_TEST_CHECKLIST.md`：Notebook 从现役功能和全量测试清单中移除，必要时标为 legacy/removed。
@@ -1121,7 +1123,7 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 - `rg -n "NotebookCog|notebook" bot/main.py bot/cogs bot/utils bot/config bot/locales README.md REFACTORING_TEST_CHECKLIST.md` 只剩历史说明或明确 legacy 文档，不再有 runtime import / command registration / active test item。
 - `./.venv/Scripts/python.exe -m compileall bot`、`./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`、`./.venv/Scripts/python.exe -m pip check` 通过。
 - 测试服全量验证时不再包含 `/notebook_*` 命令；命令同步后 Discord command picker 不显示 notebook 命令。
-- **完成状态（2026-04-27）**：已落地。Notebook runtime entry、feature flag、utils export、slash metadata、README 现役功能段落、测试清单 active 项均已移除；代码归档到 `old_function/cogs/notebook/` 和 `old_function/notebook_db.py`；生产 DB 历史表不触碰。验证：compileall、locale check、pytest、pip check、runtime-scope `rg`、`git diff --check`。
+- **完成状态（2026-04-27）**：已落地。Notebook runtime entry、feature flag、utils export、slash metadata、README 现役功能段落、测试清单 active 项均已移除；生产 DB 历史表不触碰。Notebook 旧代码已随 P3-6 转存到 `legacy-old-files-archive` 分支的 `old_function/cogs/notebook/` 和 `old_function/notebook_db.py`。验证：compileall、locale check、pytest、pip check、runtime-scope `rg`、`git diff --check`。
 
 ---
 
@@ -1135,7 +1137,7 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
    - 启动前必须完成：**P2-5 的判定表**（决定哪些字段迁 DB）。
    - 并行或紧接完成：**P1-7（Slash 元数据本地化）**。
 4. **大 cog 拆包（P1-3）**：放在配置系统 2.0 之后，或与 P1-6 绑同一 PR（拆包时顺手换 YAML，一次 review 双收益）。不要在 P1-6 之前单独拆。
-5. **当前 P3 收尾**：P3-4 最小自动化测试骨架、P3-8 NotebookCog 移除、P3-5 ruff / linter 已完成；后续按需要推进 P3-6 归档目录清理、P3-7 日志 id/name 双记录。
+5. **当前 P3 收尾**：P3-4 最小自动化测试骨架、P3-8 NotebookCog 移除、P3-5 ruff / linter、P3-6 old 归档分支均已完成；后续按需要推进 P3-7 日志 id/name 双记录。
 
 ---
 

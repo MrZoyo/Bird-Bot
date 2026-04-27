@@ -47,14 +47,13 @@ backup/db_backup_manual/*
 !data/.gitkeep
 !backup/db_backup/.gitkeep
 !backup/db_backup_manual/.gitkeep
+# Local legacy scratch files only. Reusable tests belong in tests/.
 old_test/
 !archives/*
 
 # Configuration and sensitive data
 # Real configs live in bot/config/*.yaml; *.yaml.example templates remain tracked.
-# The legacy bot/config/config_*.json files were archived to old_function/config/ in
-# the config 2.0 sprint (see REFACTORING_PROGRESS.md step 9) and are gitignored via
-# the old_function/ rule below.
+# Public legacy templates moved to branch legacy-old-files-archive.
 bot/config/*.yaml
 *.pem
 *.key
@@ -64,8 +63,8 @@ bot/config/*.yaml
 tools/migration_db_seed.json
 tools/migration_report.md
 
-# Archived configs under old_function/ must never return to git with real IDs
-# (`.json.example` / `.yaml.example` are NOT matched and stay tracked as templates)
+# Local old_function configs must never return to git with real IDs.
+# Sanitized old_function files live on branch legacy-old-files-archive.
 old_function/**/*.json
 old_function/**/*.yaml
 

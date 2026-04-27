@@ -72,9 +72,9 @@
 | P3 | P3-3 清理空 bot.db | ✅ | 删除 tracked 0-byte root `bot.db`，保留 ignored `data/bot.db` |
 | P3 | P3-4 补自动化测试 | ✅ | pytest extra + check_status/tickets tmp sqlite tests；Notebook 明确不纳入 |
 | P3 | P3-5 引入 ruff / linter | ✅ | 只启用 E722 锁 P0-4；全量规则留后续 |
-| P3 | P3-6 归档目录清理规划 | ⬜ | |
+| P3 | P3-6 old 归档分支 | ✅ | tracked old_function/old_updates 转存 legacy-old-files-archive |
 | P3 | P3-7 日志 id/name 双记录 | ⬜ | 计划已在 REFACTORING_PLAN.md，表格补齐 |
-| P3 | P3-8 NotebookCog 废弃 / 移除 | ✅ | runtime 入口移除；代码归档 old_function；DB 历史表保留 |
+| P3 | P3-8 NotebookCog 废弃 / 移除 | ✅ | runtime 入口移除；旧代码在 legacy-old-files-archive；DB 历史表保留 |
 
 ---
 
@@ -140,8 +140,8 @@
 
 **P3-8 NotebookCog 废弃 / 移除已完成**：
 - 用户于 2026-04-27 确认 notebook 希望移除；此前 PLAN/PROGRESS 只有 notebook 的历史重构记录，没有 active removal 条目，已在 `REFACTORING_PLAN.md` 新增 P3-8。
-- 已移除 runtime registration / feature flag / utils export / slash metadata / README 现役功能段落 / 测试清单 active 项；代码归档到 `old_function/`，不继续从 runtime import。
-- `git mv` 已完成：`bot/cogs/notebook/` → `old_function/cogs/notebook/`，`bot/utils/notebook_db.py` → `old_function/notebook_db.py`。
+- 已移除 runtime registration / feature flag / utils export / slash metadata / README 现役功能段落 / 测试清单 active 项；旧代码先归档到 `old_function/`，随后在 P3-6 转存到 `legacy-old-files-archive` 分支，不继续从 runtime import。
+- 归档路径在 `legacy-old-files-archive` 分支：`old_function/cogs/notebook/`、`old_function/notebook_db.py`。
 - DB 历史表 `event_logs` / `admins` 默认保留，不在 P3-8 中删除生产数据；如未来要清表，单独走 schema migration / 数据归档任务。
 - 验证：runtime 范围 `rg -n "NotebookCog|notebook" bot/main.py bot/cogs bot/utils bot/config bot/locales README.md REFACTORING_TEST_CHECKLIST.md` 只剩测试清单里的明确已移除说明；`./.venv/Scripts/python.exe -m compileall bot tests`、`./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`、`./.venv/Scripts/python.exe -m pytest -q`、`./.venv/Scripts/python.exe -m pip check`、`git diff --check` 均通过。
 
@@ -151,7 +151,12 @@
 - README / AGENTS 已同步 `uv sync --extra lint` 与 `python -m ruff check bot tests`。
 - 提权验证已通过：`./.venv/Scripts/python.exe -m ruff check bot tests`、`./.venv/Scripts/python.exe -m pytest -q`、`./.venv/Scripts/python.exe -m compileall bot tests`、`./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`、`./.venv/Scripts/python.exe -m pip check`、`uv lock --check`、`uv sync --frozen --dry-run --extra test --extra lint --python 3.12.3`、`uv export --format requirements.txt --no-hashes --no-emit-project --frozen --output-file requirements.lock`、`git diff --check`。
 
-**下一棒默认**：进入 P3-6 归档目录清理规划；如果想继续做代码收益更高的项，则做 P3-7 日志 id/name 双记录 helper 和首批 callsite。
+**P3-6 old 归档分支已完成**：
+- 新建分支 `legacy-old-files-archive`，提交 `772344b docs: index legacy old file archive (P3-6)`；分支内保留 main 原 tracked `old_function/` 与 `old_updates.md`，并新增 `LEGACY_ARCHIVE_INDEX.md` 统计说明。
+- 归档统计：32 个旧文件 / 16939 行，其中 `old_function/cogs/` 13 个、`old_function/config/*.json.example` 16 个、legacy DB manager 2 个、`old_updates.md` 1 个。
+- main 分支删除 tracked `old_function/` / `old_updates.md`，新增 `LEGACY_ARCHIVE.md` 指向归档分支；README / AGENTS / `.gitignore` 已同步。`old_test/` 仍是 ignored 本地实验目录，不纳入已脱敏归档分支。
+
+**下一棒默认**：进入 P3-7 日志 id/name 双记录 helper 和首批 callsite；如果想先收尾文档，可先快速检查 `REFACTORING_TEST_CHECKLIST.md` 是否需要新增“旧功能已归档分支”备注。
 
 **环境验证规则**：环境 / import / 启动验证必须提权到沙箱外跑真实环境。项目 Windows `.venv` 已用 `ensurepip` 补出 pip，并通过 `./.venv/Scripts/python.exe -m pip install -r requirements.lock` 按 lock 补齐依赖（含 `ruamel-yaml==0.19.1`）；本轮 project venv import smoke 已通过。后续如果项目 venv 再缺包，直接补环境，不只记录缺失。
 

@@ -70,7 +70,7 @@ discord.py, aiosqlite, aiohttp, requests, aiofiles, pillow, matplotlib, tqdm, Py
    - `pyproject.toml` is the human-maintained direct dependency list.
    - `uv.lock` is the canonical reproducible lock file.
    - `requirements.lock` is a compatibility export generated from `uv.lock`; do not edit it by hand.
-4. Copy only the required `*.yaml.example` files in `bot/config/`, rename them to `*.yaml`, and fill in the values. Run-time configs are YAML (since config 2.0); the archived `config_*.json.example` templates under `old_function/config/` are kept for historical reference only.
+4. Copy only the required `*.yaml.example` files in `bot/config/`, rename them to `*.yaml`, and fill in the values. Run-time configs are YAML (since config 2.0); legacy `config_*.json.example` templates were moved to the `legacy-old-files-archive` branch for historical reference.
 5. In `main.yaml`, use `features` to enable only the modules you need.
    - Relative runtime paths such as `./data/bot.db` and `./data/bot.log` are resolved from the repository root.
 6. Disabled modules, or modules without a valid config file, will be skipped during startup and their commands will not be registered.
@@ -461,7 +461,7 @@ Comprehensive database manager for the thread-based ticket system (renamed from 
 - **Configuration storage** in database for dynamic updates
 
 ### tickets_db_legacy
-Legacy database manager for the original channel-based ticket system (archived to `old_function/`).
+Legacy database manager for the original channel-based ticket system (archived on the `legacy-old-files-archive` branch).
 - **Channel-based ticket** management for compatibility
 - **Archive functionality** for ticket data preservation
 - **Statistics tracking** for legacy system monitoring
@@ -529,15 +529,12 @@ Media processing module with validation and security features.
 
 ### Code Organization
 - **Main functionality** should be placed in the `bot/` directory
-- **Deprecated or removed code** should be moved to the `old_function/` directory instead of being deleted
-- This approach allows for:
-  - Code version control and recovery if needed
-  - Historical reference for development decisions
-  - Clean separation between active and inactive features
+- **Deprecated or removed code** should normally rely on git history instead of staying in main.
+- **Old archived material** lives on the `legacy-old-files-archive` branch. See `LEGACY_ARCHIVE.md` on main and `LEGACY_ARCHIVE_INDEX.md` on that branch.
 
 ### File Management Rules
-- Use `mv` instead of `rm` when removing functionality
-- Preserve code structure and dependencies when moving files
+- Keep runtime code in `bot/` and reusable tests in `tests/`.
+- Do not force-add real legacy configs or local scratch files.
 - Update documentation to reflect code organization changes
 
 ---

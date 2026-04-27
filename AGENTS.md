@@ -3,8 +3,8 @@
 ## 项目结构与模块组织
 - 入口：`run.py` 启动并加载 `bot/` 下的各个 cogs。
 - 业务逻辑：`bot/cogs/`（签到/补签、成就、角色、语音、工单等）；公共工具与数据库封装在 `bot/utils/`。
-- 配置：`bot/config/*.yaml.example` 为模板，复制去掉 `.example` 生效（config 2.0 起改用 YAML；legacy `config_*.json.example` 归档在 `old_function/config/`）。文案资源在 `bot/locales/<lang>/<cog>.yaml`，运行时由 `bot.utils.i18n.t()` 读取。静态资源在 `resources/`、`pics/`。
-- 数据：主库默认位于 `data/bot.db`（由 `bot/config/main.yaml` 的 `db_path` 控制，运行时按仓库根目录解析相对路径）；备份在 `backup/`；旧实验代码在 `old_function/` 和 `old_test/`。
+- 配置：`bot/config/*.yaml.example` 为模板，复制去掉 `.example` 生效（config 2.0 起改用 YAML；legacy `config_*.json.example` 已转存到 `legacy-old-files-archive` 分支）。文案资源在 `bot/locales/<lang>/<cog>.yaml`，运行时由 `bot.utils.i18n.t()` 读取。静态资源在 `resources/`、`pics/`。
+- 数据：主库默认位于 `data/bot.db`（由 `bot/config/main.yaml` 的 `db_path` 控制，运行时按仓库根目录解析相对路径）；备份在 `backup/`；旧归档内容见 `LEGACY_ARCHIVE.md` 和 `legacy-old-files-archive` 分支。
 
 ## 构建、运行与开发命令
 - 安装依赖：`uv sync`（建议虚拟环境；依赖源在 `pyproject.toml`，锁定版本在 `uv.lock`）。
@@ -35,7 +35,7 @@
 - Token、Guild/Channel/Role ID 属于机密，不要提交已填充的配置文件；按 `.yaml.example` 模板本地生成。
 - 测试尽量使用独立测试服务器；避免让管理员命令指向生产环境。
 - 持续开发前确认配置与数据库路径指向非生产副本。
-- `old_function/` 仅承载已废弃的代码（cogs、工具脚本、旧 db 管理器等）；`old_function/**/*.json` 与 `old_function/**/*.yaml` **一律 gitignore**，禁止把真实 ID 通过"归档旧配置"这个动作带进 git。`.json.example` / `.yaml.example` 脱敏模板不在忽略名单里，可以入 git 供查阅历史结构。config 2.0 收官时已把 `bot/config/config_*.json`（含真 ID）与 `config_*.json.example` 模板一并 `git mv` 到 `old_function/config/`，真 `.json` 被 gitignore 自动挡下。若将来仍需归档新产物，照此直接 `mv` 即可；不要绕过规则去 `git add -f`。
+- main 分支不再保留 `old_function/` / `old_updates.md` 这类旧归档文件；要查旧实现、脱敏 JSON example 或旧更新记录，切到 `legacy-old-files-archive` 分支看 `LEGACY_ARCHIVE_INDEX.md`。`old_function/**/*.json` 与 `old_function/**/*.yaml` 仍一律 gitignore，禁止把真实 ID 通过"归档旧配置"带进 git；不要绕过规则去 `git add -f`。`old_test/` 是 ignored 本地实验区，可复用测试必须进入 `tests/`。
 
 ## Agent 沟通要求
 - 与用户交流时最终请使用中文；展示命令、路径、日志时保持简洁，不泄露敏感信息。
