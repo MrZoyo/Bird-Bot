@@ -4,7 +4,7 @@ import discord
 from discord import components
 from discord.ui import Button, View
 
-from bot.utils import config, safe_member_role_edit
+from bot.utils import config, fmt_role, fmt_user, safe_member_role_edit
 from bot.utils.i18n import t
 from bot.utils.role_db import RoleDatabaseManager
 
@@ -26,22 +26,32 @@ async def ensure_optional_role(member: discord.Member, role_id: int | None, reas
 
     role = discord.utils.get(member.guild.roles, id=role_id)
     if role is None:
-        logging.warning("Configured starter role %s not found in guild %s", role_id, member.guild.id)
+        logging.warning(
+            "Configured starter role %s not found in guild %s for user %s",
+            fmt_role(role_id),
+            member.guild.id,
+            fmt_user(member),
+        )
         return
 
     try:
         await member.add_roles(role, reason=reason)
     except discord.Forbidden:
         logging.error(
-            "Cannot add starter role %r (pos=%d) to %s (%s); bot top_role=%r (pos=%d). "
+            "Cannot add starter role %s (pos=%d) to %s; bot top_role=%s (pos=%d). "
             "Check role hierarchy.",
-            role.name, role.position, member.id, member.display_name,
-            member.guild.me.top_role.name, member.guild.me.top_role.position,
+            fmt_role(role),
+            role.position,
+            fmt_user(member),
+            fmt_role(member.guild.me.top_role),
+            member.guild.me.top_role.position,
         )
     except discord.HTTPException as exc:
         logging.error(
-            "HTTPException adding starter role %r to %s (%s): %s",
-            role.name, member.id, member.display_name, exc,
+            "HTTPException adding starter role %s to %s: %s",
+            fmt_role(role),
+            fmt_user(member),
+            exc,
         )
 
 
@@ -137,7 +147,11 @@ class AchievementRoleView(View):
                 self.role_remove_message.format(name=current_achievement_role.name),
                 ephemeral=True
             )
-            logging.info(f"User {user_id} has removed their {current_achievement_role.name} role")
+            logging.info(
+                "User %s has removed their %s role",
+                fmt_user(interaction.user),
+                fmt_role(current_achievement_role),
+            )
             return
 
         # If user has a role lower than their highest eligible role
@@ -157,7 +171,11 @@ class AchievementRoleView(View):
                 ephemeral=True
             )
             logging.info(
-                f"User {user_id} upgraded from {current_achievement_role.name} to {highest_eligible_role.name}")
+                "User %s upgraded from %s to %s",
+                fmt_user(interaction.user),
+                fmt_role(current_achievement_role),
+                fmt_role(highest_eligible_role),
+            )
             return
 
         # If user has no role yet, give them their highest eligible role
@@ -172,7 +190,11 @@ class AchievementRoleView(View):
             self.role_success_message.format(name=highest_eligible_role.name),
             ephemeral=True
         )
-        logging.info(f"User {user_id} has been awarded the {highest_eligible_role.name} role")
+        logging.info(
+            "User %s has been awarded the %s role",
+            fmt_user(interaction.user),
+            fmt_role(highest_eligible_role),
+        )
 
 
 class StarSignView(View):
@@ -221,7 +243,11 @@ class StarSignView(View):
                 return
             await interaction.followup.send(self.starsign_remove_message.format(name=star_sign_role.name),
                                             ephemeral=True)
-            logging.info(f"User {interaction.user.id} has removed the {star_sign_role.name} role")
+            logging.info(
+                "User %s has removed the %s role",
+                fmt_user(interaction.user),
+                fmt_role(star_sign_role),
+            )
             return
 
         await ensure_optional_role(
@@ -244,7 +270,11 @@ class StarSignView(View):
 
         # Notify the user after successfully adding the role
         await interaction.followup.send(self.starsign_success_message.format(name=star_sign_role.name), ephemeral=True)
-        logging.info(f"User {interaction.user.id} has been awarded the {star_sign_role.name} role")
+        logging.info(
+            "User %s has been awarded the %s role",
+            fmt_user(interaction.user),
+            fmt_role(star_sign_role),
+        )
 
 
 class MBTIView(View):
@@ -292,7 +322,11 @@ class MBTIView(View):
             ):
                 return
             await interaction.followup.send(self.mbti_remove_message.format(name=mbti_role.name), ephemeral=True)
-            logging.info(f"User {interaction.user.id} has removed the {mbti_role.name} role")
+            logging.info(
+                "User %s has removed the %s role",
+                fmt_user(interaction.user),
+                fmt_role(mbti_role),
+            )
             return
 
         await ensure_optional_role(
@@ -314,7 +348,11 @@ class MBTIView(View):
             return
 
         await interaction.followup.send(self.mbti_success_message.format(name=mbti_role.name), ephemeral=True)
-        logging.info(f"User {interaction.user.id} has been awarded the {mbti_role.name} role")
+        logging.info(
+            "User %s has been awarded the %s role",
+            fmt_user(interaction.user),
+            fmt_role(mbti_role),
+        )
 
 
 class GenderView(View):
@@ -362,7 +400,11 @@ class GenderView(View):
             ):
                 return
             await interaction.followup.send(self.gender_remove_message.format(name=gender_role.name), ephemeral=True)
-            logging.info(f"User {interaction.user.id} has removed the {gender_role.name} role")
+            logging.info(
+                "User %s has removed the %s role",
+                fmt_user(interaction.user),
+                fmt_role(gender_role),
+            )
             return
 
         # Remove other gender roles from the user + add the new one
@@ -379,7 +421,11 @@ class GenderView(View):
 
         # Notify the user after successfully adding the role
         await interaction.followup.send(self.gender_success_message.format(name=gender_role.name), ephemeral=True)
-        logging.info(f"User {interaction.user.id} has been awarded the {gender_role.name} role")
+        logging.info(
+            "User %s has been awarded the %s role",
+            fmt_user(interaction.user),
+            fmt_role(gender_role),
+        )
 
 
 
@@ -475,5 +521,4 @@ class SignatureView(View):
             t('role.signature.view_message', signature=signature_data['signature']),
             ephemeral=True
         )
-
 

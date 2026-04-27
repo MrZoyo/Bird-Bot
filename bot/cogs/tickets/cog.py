@@ -7,7 +7,7 @@ from discord import app_commands
 from discord.app_commands import locale_str
 from discord.ext import commands
 
-from bot.utils import TicketsDatabaseManager
+from bot.utils import TicketsDatabaseManager, fmt_channel, fmt_user
 from bot.utils.config import Config
 from bot.utils.i18n import t
 
@@ -77,7 +77,7 @@ class TicketsCog(commands.Cog):
             # Get the ticket channel and message
             ticket_channel = self.bot.get_channel(ticket_channel_id)
             if not ticket_channel:
-                logging.error(f"TicketsCog: Could not find ticket channel {ticket_channel_id}")
+                logging.error("TicketsCog: Could not find ticket channel %s", fmt_channel(ticket_channel_id))
                 return
 
             try:
@@ -138,10 +138,18 @@ class TicketsCog(commands.Cog):
                                 await self.update_ticket_message_buttons(thread, ticket_data, ticket_view)
                                 updated_count += 1
                             except Exception as e:
-                                logging.warning(f"TicketsCog: Could not update buttons for ticket {thread_id}: {e}")
+                                logging.warning(
+                                    "TicketsCog: Could not update buttons for ticket thread %s: %s",
+                                    fmt_channel(thread or thread_id),
+                                    e,
+                                )
 
                     except Exception as e:
-                        logging.error(f"TicketsCog: Error restoring ticket {thread_id}: {e}")
+                        logging.error(
+                            "TicketsCog: Error restoring ticket thread %s: %s",
+                            fmt_channel(thread_id),
+                            e,
+                        )
 
                 # Add delay between batches to avoid rate limits
                 if i + batch_size < len(active_tickets):
@@ -197,9 +205,14 @@ class TicketsCog(commands.Cog):
                 message = await thread.fetch_message(message_id)
                 await message.edit(view=view)
             except discord.NotFound:
-                logging.warning(f"Ticket message {message_id} not found in thread {thread.id}")
+                logging.warning("Ticket message %s not found in thread %s", message_id, fmt_channel(thread))
             except discord.HTTPException as e:
-                logging.warning(f"Could not update ticket message {message_id}: {e}")
+                logging.warning(
+                    "Could not update ticket message %s in thread %s: %s",
+                    message_id,
+                    fmt_channel(thread),
+                    e,
+                )
 
         except Exception as e:
             logging.error(f"Error updating ticket message buttons: {e}")
@@ -383,7 +396,12 @@ class TicketsCog(commands.Cog):
                 pass  # DM failed
 
         except Exception as e:
-            logging.error(f"Error creating ticket thread: {e}")
+            logging.error(
+                "Error creating ticket thread for user %s type %s: %s",
+                fmt_user(interaction.user),
+                type_name,
+                e,
+            )
             try:
                 await interaction.followup.send(
                     t('tickets.messages.ticket_thread_create_error'),
@@ -494,7 +512,13 @@ class TicketsCog(commands.Cog):
                 await info_channel.send(embed=embed)
 
         except Exception as e:
-            logging.error(f"Error logging ticket action: {e}")
+            logging.error(
+                "Error logging ticket action %s for thread %s by user %s: %s",
+                action,
+                fmt_channel(thread_id),
+                fmt_user(user),
+                e,
+            )
 
     @app_commands.command(
         name="tickets_init",
@@ -681,7 +705,7 @@ class TicketsCog(commands.Cog):
                 t('tickets.messages.init_permission_error')
             )
         except Exception as e:
-            logging.error(f"Error initializing ticket system: {e}")
+            logging.error("Error initializing ticket system by user %s: %s", fmt_user(interaction.user), e)
             await interaction.followup.send(
                 t('tickets.messages.init_error').format(error=str(e))
             )
@@ -1196,7 +1220,7 @@ class TicketsCog(commands.Cog):
         try:
             await thread.edit(locked=True, archived=True)
         except discord.HTTPException as e:
-            logging.warning(f"Could not archive thread {thread_id}: {e}")
+            logging.warning("Could not archive ticket thread %s: %s", fmt_channel(thread_id), e)
 
         # Send DM to creator
         if ticket_data:
@@ -1301,7 +1325,7 @@ class TicketsCog(commands.Cog):
                             # Thread not found, count as skipped
                             skipped_count += 1
                     except Exception as e:
-                        logging.error(f"Error updating ticket {thread_id}: {e}")
+                        logging.error("Error updating ticket thread %s: %s", fmt_channel(thread_id), e)
                         error_count += 1
 
                     current_progress += 1
@@ -1520,7 +1544,7 @@ class TicketsCog(commands.Cog):
             guild_id = self.main_conf['guild_id']
             guild = self.bot.get_guild(guild_id)
             if not guild:
-                logging.error(f"Could not find guild {guild_id} for ticket cleanup")
+                logging.error("Could not find guild %s for ticket cleanup", guild_id)
                 return
 
             closed_count = 0
@@ -1564,7 +1588,7 @@ class TicketsCog(commands.Cog):
                     )
                     if success:
                         closed_count += 1
-                        logging.info(f"Closed missing ticket {thread_id}")
+                        logging.info("Closed missing ticket thread %s", fmt_channel(thread_id))
 
             if closed_count > 0:
                 logging.info(f"Automatically closed {closed_count} tickets with missing channels")
@@ -1808,7 +1832,12 @@ class TicketsCog(commands.Cog):
             # Safety check: limit the number of admins to prevent issues
             max_admins = self.conf.get('max_admins_per_ticket', 50)  # Default limit of 50
             if len(all_admins_to_add) > max_admins:
-                logging.warning(f"Too many admins ({len(all_admins_to_add)}) for ticket {thread.id}, limiting to {max_admins}")
+                logging.warning(
+                    "Too many admins (%s) for ticket thread %s, limiting to %s",
+                    len(all_admins_to_add),
+                    fmt_channel(thread),
+                    max_admins,
+                )
                 all_admins_to_add = set(list(all_admins_to_add)[:max_admins])
 
             # Add all admins to thread with rate limiting
@@ -1829,26 +1858,45 @@ class TicketsCog(commands.Cog):
 
                 except discord.HTTPException as e:
                     if e.status == 429:  # Rate limited
-                        logging.warning(f"Rate limited while adding admin {admin.id} to ticket {thread.id}, waiting...")
+                        logging.warning(
+                            "Rate limited while adding admin %s to ticket thread %s, waiting...",
+                            fmt_user(admin),
+                            fmt_channel(thread),
+                        )
                         await asyncio.sleep(2)  # Wait longer for rate limit
                         try:
                             await thread.add_user(admin)
                             await self.db_manager.add_ticket_member(thread.id, admin.id, self.bot.user.id)
                             added_count += 1
                         except Exception as retry_e:
-                            logging.error(f"Failed to add admin {admin.id} after rate limit retry: {retry_e}")
+                            logging.error(
+                                "Failed to add admin %s to ticket thread %s after rate limit retry: %s",
+                                fmt_user(admin),
+                                fmt_channel(thread),
+                                retry_e,
+                            )
                             failed_count += 1
                     else:
-                        logging.error(f"HTTP error adding admin {admin.id} to ticket {thread.id}: {e}")
+                        logging.error(
+                            "HTTP error adding admin %s to ticket thread %s: %s",
+                            fmt_user(admin),
+                            fmt_channel(thread),
+                            e,
+                        )
                         failed_count += 1
                 except Exception as e:
-                    logging.error(f"Error adding admin {admin.id} to ticket {thread.id}: {e}")
+                    logging.error(
+                        "Error adding admin %s to ticket thread %s: %s",
+                        fmt_user(admin),
+                        fmt_channel(thread),
+                        e,
+                    )
                     failed_count += 1
 
             if added_count > 0:
-                logging.info(f"Added {added_count} admins to ticket {thread.id}")
+                logging.info("Added %s admins to ticket thread %s", added_count, fmt_channel(thread))
             if failed_count > 0:
-                logging.warning(f"Failed to add {failed_count} admins to ticket {thread.id}")
+                logging.warning("Failed to add %s admins to ticket thread %s", failed_count, fmt_channel(thread))
 
             # Send DM notifications to all admins with rate limiting
             dm_count = 0
@@ -1882,29 +1930,42 @@ class TicketsCog(commands.Cog):
                         await asyncio.sleep(1)
 
                 except discord.Forbidden:
-                    logging.info(f"Could not send DM to admin {admin.display_name} (DMs disabled)")
+                    logging.info("Could not send DM to admin %s (DMs disabled)", fmt_user(admin))
                     dm_failed += 1
                 except discord.HTTPException as e:
                     if e.status == 429:  # Rate limited
-                        logging.warning(f"Rate limited while sending DM to admin {admin.id}, waiting...")
+                        logging.warning("Rate limited while sending DM to admin %s, waiting...", fmt_user(admin))
                         await asyncio.sleep(5)  # Wait longer for DM rate limits
                         try:
                             await admin.send(embed=admin_embed, view=dm_view)
                             dm_count += 1
                         except Exception as retry_e:
-                            logging.error(f"Failed to send DM to admin {admin.id} after rate limit retry: {retry_e}")
+                            logging.error(
+                                "Failed to send DM to admin %s after rate limit retry: %s",
+                                fmt_user(admin),
+                                retry_e,
+                            )
                             dm_failed += 1
                     else:
-                        logging.error(f"HTTP error sending DM to admin {admin.id}: {e}")
+                        logging.error("HTTP error sending DM to admin %s: %s", fmt_user(admin), e)
                         dm_failed += 1
                 except Exception as e:
-                    logging.error(f"Error sending DM to admin {admin.id}: {e}")
+                    logging.error("Error sending DM to admin %s: %s", fmt_user(admin), e)
                     dm_failed += 1
 
             if dm_count > 0:
-                logging.info(f"Sent DM notifications to {dm_count} admins for ticket {thread.id}")
+                logging.info("Sent DM notifications to %s admins for ticket thread %s", dm_count, fmt_channel(thread))
             if dm_failed > 0:
-                logging.warning(f"Failed to send DM notifications to {dm_failed} admins for ticket {thread.id}")
+                logging.warning(
+                    "Failed to send DM notifications to %s admins for ticket thread %s",
+                    dm_failed,
+                    fmt_channel(thread),
+                )
 
         except Exception as e:
-            logging.error(f"Error in add_admins_to_ticket: {e}")
+            logging.error(
+                "Error in add_admins_to_ticket for thread %s creator %s: %s",
+                fmt_channel(thread),
+                fmt_user(creator),
+                e,
+            )

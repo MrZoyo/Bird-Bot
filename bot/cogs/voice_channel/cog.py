@@ -7,7 +7,7 @@ from discord import app_commands
 from discord.app_commands import locale_str
 from discord.ext import commands, tasks
 
-from bot.utils import VoiceChannelDatabaseManager, check_channel_validity, config
+from bot.utils import VoiceChannelDatabaseManager, check_channel_validity, config, fmt_channel, fmt_user
 from bot.utils.i18n import t
 
 from .modals import AddChannelForm
@@ -154,10 +154,16 @@ class VoiceStateCog(commands.Cog):
 
             # Log to room activity log
             room_logger = logging.getLogger('room_activity')
-            room_logger.info(f"Control panel sent for room {voice_channel.id}")
+            room_logger.info("Control panel sent for room %s", fmt_channel(voice_channel))
 
         except Exception as e:
-            logging.error(f"Error sending control panel: {e}", exc_info=True)
+            logging.error(
+                "Error sending control panel for room %s creator %s: %s",
+                fmt_channel(voice_channel),
+                fmt_user(creator),
+                e,
+                exc_info=True,
+            )
 
     async def cleanup_channel(self, channel_id):
         channel = self.bot.get_channel(channel_id)
@@ -422,7 +428,7 @@ class VoiceStateCog(commands.Cog):
                     # 检查语音频道（语音频道本身就是文字聊天的位置）
                     voice_channel = self.bot.get_channel(voice_channel_id)
                     if not voice_channel:
-                        logging.warning(f"Voice channel {voice_channel_id} not found during restore")
+                        logging.warning("Voice channel %s not found during restore", fmt_channel(voice_channel_id))
                         failed_count += 1
                         continue
 
@@ -430,14 +436,22 @@ class VoiceStateCog(commands.Cog):
                     try:
                         message = await voice_channel.fetch_message(message_id)
                     except discord.NotFound:
-                        logging.warning(f"Control panel message {message_id} not found")
+                        logging.warning(
+                            "Control panel message %s not found in room %s",
+                            message_id,
+                            fmt_channel(voice_channel),
+                        )
                         # 清理数据库
                         await self.clear_control_panel_data(voice_channel_id)
                         cleaned_count += 1
                         failed_count += 1
                         continue
                     except discord.Forbidden:
-                        logging.error(f"No permission to fetch message {message_id}")
+                        logging.error(
+                            "No permission to fetch control panel message %s in room %s",
+                            message_id,
+                            fmt_channel(voice_channel),
+                        )
                         failed_count += 1
                         continue
 
@@ -446,7 +460,11 @@ class VoiceStateCog(commands.Cog):
                         creator = await self.bot.fetch_user(creator_id)
                     except (discord.NotFound, discord.HTTPException):
                         creator = None
-                        logging.warning(f"Creator {creator_id} not found")
+                        logging.warning(
+                            "Creator %s not found while restoring room %s",
+                            fmt_user(creator_id),
+                            fmt_channel(voice_channel),
+                        )
 
                     # 重新附加View
                     view = RoomControlPanelView(
@@ -462,11 +480,23 @@ class VoiceStateCog(commands.Cog):
                     restored_count += 1
 
                 except Exception as e:
-                    logging.error(f"Error restoring control panel for record {record}: {e}", exc_info=True)
+                    logging.error(
+                        "Error restoring control panel for room %s creator %s message %s: %s",
+                        fmt_channel(voice_channel_id),
+                        fmt_user(creator_id),
+                        message_id,
+                        e,
+                        exc_info=True,
+                    )
                     failed_count += 1
                     continue
 
-            logging.info(f"Control panels restored: {restored_count} success, {failed_count} failed, {cleaned_count} cleaned")
+            logging.info(
+                "Control panels restored: %s success, %s failed, %s cleaned",
+                restored_count,
+                failed_count,
+                cleaned_count,
+            )
 
         except Exception as e:
             logging.error(f"Critical error in restore_control_panels: {e}", exc_info=True)

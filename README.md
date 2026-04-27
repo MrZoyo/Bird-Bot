@@ -537,6 +537,10 @@ Media processing module with validation and security features.
 - Do not force-add real legacy configs or local scratch files.
 - Update documentation to reflect code organization changes
 
+### Logging Rules
+- Use `bot.utils.fmt_user`, `fmt_channel`, and `fmt_role` when logging Discord users, channels, threads, or roles.
+- The standard log shape is `name (id)`; raw IDs are logged as `unknown (id)` when no cached Discord object is available.
+
 ---
 
 ## Update Log Latest

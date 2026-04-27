@@ -17,6 +17,7 @@
 ## 代码风格与命名约定
 - Python 3 异步优先；遵循 PEP 8，四空格缩进，能加类型注解尽量加。
 - Cog 方法保持小而事件驱动；使用 logging 而非 print。
+- 日志里记录用户 / 频道 / 角色时优先使用 `bot.utils.fmt_user` / `fmt_channel` / `fmt_role`，保持 `name (id)` 格式；只有 raw id 时允许显示 `unknown (id)`。
 - 配置键、JSON、数据库列名用 lower_snake_case；避免硬编码 ID，优先读配置。
 - 不要新增裸 `except:`；需要兜底时写 `except Exception` 并记录上下文日志，或优先收窄到具体异常。
 
