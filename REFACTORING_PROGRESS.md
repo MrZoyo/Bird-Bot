@@ -70,7 +70,7 @@
 | P3 | P3-1 依赖管理统一 | ✅ | `pyproject.toml` + tracked `uv.lock` 为主，`requirements.lock` 为兼容导出，`requirements.txt` 退役 |
 | P3 | P3-2 硬编码路径梳理 | ✅ | repo-root path helper + main runtime path normalization + backup Path 化 |
 | P3 | P3-3 清理空 bot.db | ✅ | 删除 tracked 0-byte root `bot.db`，保留 ignored `data/bot.db` |
-| P3 | P3-4 补自动化测试 | ✅ | pytest smoke 覆盖配置/runtime metadata/log helpers + 9 个 DB manager；Notebook 明确不纳入 |
+| P3 | P3-4 补自动化测试 | ✅ | pytest smoke 覆盖配置/runtime metadata/log helpers、临时 JSON→YAML 迁移 + 9 个 DB manager；Notebook 明确不纳入 |
 | P3 | P3-5 引入 ruff / linter | ✅ | 只启用 E722 锁 P0-4；全量规则留后续 |
 | P3 | P3-6 old 归档分支 | ✅ | tracked old_function/old_updates 转存 legacy-old-files-archive |
 | P3 | P3-7 日志 id/name 双记录 | ✅ | fmt_user/fmt_channel/fmt_role + role/voice/tickets 首批 callsite |
@@ -139,7 +139,7 @@
 - 本轮写 ban smoke 时发现并修复真实日期 bug：`BanDatabaseManager.get_tempban_stats()` / `cleanup_old_records()` 原用 `utcnow().replace(day=day-30)`，每月前 30 天会 `ValueError`；已改为 `timedelta(days=...)`。
 - 临时写过的 `test_notebook_db.py` 已删除；NotebookCog 已纳入 P3-8 移除计划，P3-4 不给 notebook 增加测试覆盖，避免把待移除功能固化。
 - README / AGENTS / `REFACTORING_TEST_CHECKLIST.md` 已同步：测试 extra 用 `uv sync --extra test`，自动化 gate 用 `python -m pytest`；Discord 交互路径按模块清单在测试服手工验证。
-- 提权验证已通过：`./.venv/Scripts/python.exe -m pytest -q`（18 passed，只有 discord.py `audioop` deprecation warning）、`./.venv/Scripts/python.exe -m ruff check bot tests`、`./.venv/Scripts/python.exe -m compileall bot tests`、`./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`、`./.venv/Scripts/python.exe -m pip check`、`uv lock --check`、`uv sync --frozen --dry-run --extra test --extra lint --python 3.12.3`、`git diff --check`。
+- 提权验证已通过：`./.venv/Scripts/python.exe -m pytest -q`（19 passed，只有 discord.py `audioop` deprecation warning）、`./.venv/Scripts/python.exe -m ruff check bot tests`、`./.venv/Scripts/python.exe -m compileall bot tests`、`./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`、`./.venv/Scripts/python.exe -m pip check`、`uv lock --check`、`uv sync --frozen --dry-run --extra test --extra lint --python 3.12.3`、`git diff --check`。
 
 **P3-8 NotebookCog 废弃 / 移除已完成**：
 - 用户于 2026-04-27 确认 notebook 希望移除；此前 PLAN/PROGRESS 只有 notebook 的历史重构记录，没有 active removal 条目，已在 `REFACTORING_PLAN.md` 新增 P3-8。
@@ -650,7 +650,7 @@
 
 这些内容 60% 以上和本部署的"小鸟"品牌 / 真实邀请链接深绑，和一般意义上"可翻译的 UI 文案"不同。把它们搬到 `bot/locales/zh_CN/welcome.yaml` 会让 locale 文件承担"deploy-specific 配置"的角色，违反 P1-6 locale vs yaml 的边界（locale = 通用翻译，yaml = 每部署数据）。留 yaml 即可，后续若有多部署再说。
 
-对应地 `check_locales.py` 目前不会抱怨：`welcome.yaml` locale 里只有 `welcome_text_picture_1/2` 两个真正通用的 key，没有 orphan；welcome 的 t() 引用也只有这两个。
+对应地 `check_locales.py` 目前不会抱怨：`welcome.yaml` locale 里保留图片文案和 `welcome_text_fallback` 等通用 key；部署专属 `welcome_text` 仍留在 config YAML，不进 tracked locale。
 
 **验收**：`tools/check_locales.py` 从 502 t() key 长到 553，全部映射到 locale 字符串叶子，零 MISSING。三个 follow-up（voicechannel / role.signature / welcome.dm）全部闭环（后者以显式决策结束，不是遗漏）。
 
