@@ -11,12 +11,14 @@
 - 本地运行：`python run.py`（确保已配置好 token、频道/角色 ID）。
 - 可选语法快检：`python -m compileall bot`。
 - 自动化单测：`python -m pytest`（需要 `uv sync --extra test`；当前覆盖部分纯 DB manager）。
+- 裸 `except:` 回归检查：`python -m ruff check bot tests`（需要 `uv sync --extra lint`；当前只启用 `E722`）。
 - 动数据库前先备份：复制 `data/bot.db` 或在运行中的机器人使用 `/backup_now`。
 
 ## 代码风格与命名约定
 - Python 3 异步优先；遵循 PEP 8，四空格缩进，能加类型注解尽量加。
 - Cog 方法保持小而事件驱动；使用 logging 而非 print。
 - 配置键、JSON、数据库列名用 lower_snake_case；避免硬编码 ID，优先读配置。
+- 不要新增裸 `except:`；需要兜底时写 `except Exception` 并记录上下文日志，或优先收窄到具体异常。
 
 ## 测试指引
 - 已有少量 `pytest` 自动化测试覆盖纯 DB manager；涉及真实 Discord 交互时仍需在测试服逐条验证命令与按钮。

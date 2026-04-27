@@ -65,6 +65,7 @@ discord.py, aiosqlite, aiohttp, requests, aiofiles, pillow, matplotlib, tqdm, Py
    - `uv sync --python 3.12.3`
    - `source .venv/bin/activate`
    - Optional test tooling: `uv sync --extra test`
+   - Optional lint tooling: `uv sync --extra lint`
 2. Dependency management is centralized in `pyproject.toml` and `uv.lock`.
    - `pyproject.toml` is the human-maintained direct dependency list.
    - `uv.lock` is the canonical reproducible lock file.
@@ -78,8 +79,9 @@ discord.py, aiosqlite, aiohttp, requests, aiofiles, pillow, matplotlib, tqdm, Py
 9. Run `python run.py`. If you are using a Linux server, you can use `nohup python3 run.py &` to run the bot in the background.
 10. Invite the bot to your server and give it the necessary permissions.(Required permissions: bot, application command, administrator)
 11. Run automated DB-manager smoke tests with `python -m pytest` when the test extra is installed.
-12. For updating the bot, you can use the `git pull` command to update the bot to the latest version, then rerun `uv sync`.
-13. For the Tickets cog, use `/tickets_init` to initialize the ticket system. Please check function introduction for more details.
+12. Run the bare-except lint guard with `python -m ruff check bot tests` when the lint extra is installed.
+13. For updating the bot, you can use the `git pull` command to update the bot to the latest version, then rerun `uv sync`.
+14. For the Tickets cog, use `/tickets_init` to initialize the ticket system. Please check function introduction for more details.
 
 ---
 ## Function Introduction

@@ -20,6 +20,22 @@ dependencies = [
 test = [
     "pytest>=8.0",
 ]
+lint = [
+    "ruff>=0.8.0",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+exclude = [
+    "old_function",
+    "old_test",
+]
+
+[tool.ruff.lint]
+select = [
+    "E722",
+]
 
 [tool.pytest.ini_options]
 testpaths = [
