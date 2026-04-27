@@ -74,7 +74,7 @@
 | P3 | P3-5 引入 ruff / linter | ⬜ | 锁 E722 保 P0-4 |
 | P3 | P3-6 归档目录清理规划 | ⬜ | |
 | P3 | P3-7 日志 id/name 双记录 | ⬜ | 计划已在 REFACTORING_PLAN.md，表格补齐 |
-| P3 | P3-8 NotebookCog 废弃 / 移除 | ⬜ | 2026-04-27 加入计划；当前尚未删 runtime |
+| P3 | P3-8 NotebookCog 废弃 / 移除 | ✅ | runtime 入口移除；代码归档 old_function；DB 历史表保留 |
 
 ---
 
@@ -138,13 +138,14 @@
 - README / AGENTS 已同步：测试 extra 用 `uv sync --extra test`，自动化单测用 `python -m pytest`；Discord 交互路径仍按既定策略留到全部重构后测试服全量验证。
 - 提权验证已通过：`./.venv/Scripts/python.exe -m pytest -q`（3 passed，只有 discord.py `audioop` deprecation warning）、`./.venv/Scripts/python.exe -m compileall bot tests`、`./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`、`./.venv/Scripts/python.exe -m pip check`、`uv lock --check`、`uv sync --frozen --dry-run --extra test --python 3.12.3`、`git diff --check`。
 
-**P3-8 NotebookCog 废弃 / 移除已加入计划（未实施）**：
+**P3-8 NotebookCog 废弃 / 移除已完成**：
 - 用户于 2026-04-27 确认 notebook 希望移除；此前 PLAN/PROGRESS 只有 notebook 的历史重构记录，没有 active removal 条目，已在 `REFACTORING_PLAN.md` 新增 P3-8。
-- 当前代码仍把 notebook 当现役功能：`bot/main.py` 注册 `NotebookCog`，`bot/config/main.yaml.example` 有 `features.notebook: true`，`bot/cogs/notebook/` 和 `bot/utils/notebook_db.py` 仍存在，`bot/utils/__init__.py` 仍导出 `NotebookDatabaseManager`。
-- README / `REFACTORING_TEST_CHECKLIST.md` / `bot/locales/zh_CN/commands.yaml` 仍有 notebook 现役文档与 slash metadata；P3-8 实施时必须同步清理。
+- 已移除 runtime registration / feature flag / utils export / slash metadata / README 现役功能段落 / 测试清单 active 项；代码归档到 `old_function/`，不继续从 runtime import。
+- `git mv` 已完成：`bot/cogs/notebook/` → `old_function/cogs/notebook/`，`bot/utils/notebook_db.py` → `old_function/notebook_db.py`。
 - DB 历史表 `event_logs` / `admins` 默认保留，不在 P3-8 中删除生产数据；如未来要清表，单独走 schema migration / 数据归档任务。
+- 验证：runtime 范围 `rg -n "NotebookCog|notebook" bot/main.py bot/cogs bot/utils bot/config bot/locales README.md REFACTORING_TEST_CHECKLIST.md` 只剩测试清单里的明确已移除说明；`./.venv/Scripts/python.exe -m compileall bot tests`、`./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`、`./.venv/Scripts/python.exe -m pytest -q`、`./.venv/Scripts/python.exe -m pip check`、`git diff --check` 均通过。
 
-**下一棒默认**：优先做 P3-8 NotebookCog 移除，再进入 P3-5/P3-6/P3-7，避免全量功能测试清单继续包含待废弃命令。
+**下一棒默认**：进入 P3-5 引入 ruff / linter，先锁住 P0-4 裸 except 治理成果，再视 lint 噪声决定是否扩大到 P3-6/P3-7。
 
 **环境验证规则**：环境 / import / 启动验证必须提权到沙箱外跑真实环境。项目 Windows `.venv` 已用 `ensurepip` 补出 pip，并通过 `./.venv/Scripts/python.exe -m pip install -r requirements.lock` 按 lock 补齐依赖（含 `ruamel-yaml==0.19.1`）；本轮 project venv import smoke 已通过。后续如果项目 venv 再缺包，直接补环境，不只记录缺失。
 

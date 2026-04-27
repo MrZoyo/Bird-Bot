@@ -1101,7 +1101,7 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 
 **决策背景（2026-04-27）**：用户确认希望移除 NotebookCog。此前计划文档只记录了 notebook 的历史重构（P0-3b DB manager、P1-3b 包化、P1-7 slash metadata/i18n pilot），没有把它列为待废弃功能；这会在上下文压缩后造成误解。因此本条作为新的 active P3 任务，后续不要再给 NotebookCog 增加测试或功能投入。
 
-**当前现状**：
+**移除前现状**：
 - 代码仍把 notebook 当现役功能：`bot/main.py` 的 `COG_SPECS` 注册 `NotebookCog`，`bot/config/main.yaml.example` 的 `features.notebook` 默认为 `true`。
 - 文件仍存在：`bot/cogs/notebook/`、`bot/utils/notebook_db.py`，并且 `bot/utils/__init__.py` 导出 `NotebookDatabaseManager`。
 - 文案 / 文档仍存在：`bot/locales/zh_CN/commands.yaml` 的 `notebook.*` slash metadata、`README.md` 的 Notebook_Cog 章节、`REFACTORING_TEST_CHECKLIST.md` 的 notebook 功能测试段落。
@@ -1119,6 +1119,7 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 - `rg -n "NotebookCog|notebook" bot/main.py bot/cogs bot/utils bot/config bot/locales README.md REFACTORING_TEST_CHECKLIST.md` 只剩历史说明或明确 legacy 文档，不再有 runtime import / command registration / active test item。
 - `./.venv/Scripts/python.exe -m compileall bot`、`./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`、`./.venv/Scripts/python.exe -m pip check` 通过。
 - 测试服全量验证时不再包含 `/notebook_*` 命令；命令同步后 Discord command picker 不显示 notebook 命令。
+- **完成状态（2026-04-27）**：已落地。Notebook runtime entry、feature flag、utils export、slash metadata、README 现役功能段落、测试清单 active 项均已移除；代码归档到 `old_function/cogs/notebook/` 和 `old_function/notebook_db.py`；生产 DB 历史表不触碰。验证：compileall、locale check、pytest、pip check、runtime-scope `rg`、`git diff --check`。
 
 ---
 
