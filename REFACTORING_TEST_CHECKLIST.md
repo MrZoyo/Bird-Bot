@@ -49,12 +49,12 @@
 
 自动覆盖：`test_runtime_metadata.py` 已验证 runtime 注册清单、配置模板和 import smoke。
 
-- [ ] 使用测试服 `main.yaml` 启动 `python run.py`
+- [x] 使用测试服 `main.yaml` 启动 `python run.py`
   - 预期：所有启用且配置完整的 cog 被加载；缺配置或 disabled feature 只打印 skip，不抛异常。
 - [ ] 启动日志无 `ImportError` / `ModuleNotFoundError` / `no such table` / `OperationalError`
-- [ ] Slash command 同步完成；必要时手动跑 `!synccommands`
-- [ ] Discord command picker 不显示 `/notebook_*`
-- [ ] `bot/cogs/` 顶层只作为包入口；不依赖旧平面 `*_cog.py`
+- [x] Slash command 同步完成；必要时手动跑 `!synccommands`
+- [x] Discord command picker 不显示 `/notebook_*`
+- [x] `bot/cogs/` 顶层只作为包入口；不依赖旧平面 `*_cog.py`
 - [ ] `data/bot.db`、日志、备份路径都解析到仓库根目录下的预期位置
 - [ ] 抽查日志中用户 / 频道 / 角色显示为 `name (id)` 或 `unknown (id)`
 
