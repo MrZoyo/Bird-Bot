@@ -70,7 +70,7 @@
 | P3 | P3-1 依赖管理统一 | ✅ | `pyproject.toml` + tracked `uv.lock` 为主，`requirements.lock` 为兼容导出，`requirements.txt` 退役 |
 | P3 | P3-2 硬编码路径梳理 | ✅ | repo-root path helper + main runtime path normalization + backup Path 化 |
 | P3 | P3-3 清理空 bot.db | ✅ | 删除 tracked 0-byte root `bot.db`，保留 ignored `data/bot.db` |
-| P3 | P3-4 补自动化测试 | 🔄 | pytest extra + check_status/tickets tmp sqlite tests drafted；Notebook 明确不纳入 |
+| P3 | P3-4 补自动化测试 | ✅ | pytest extra + check_status/tickets tmp sqlite tests；Notebook 明确不纳入 |
 | P3 | P3-5 引入 ruff / linter | ⬜ | 锁 E722 保 P0-4 |
 | P3 | P3-6 归档目录清理规划 | ⬜ | |
 | P3 | P3-7 日志 id/name 双记录 | ⬜ | 计划已在 REFACTORING_PLAN.md，表格补齐 |
@@ -131,12 +131,12 @@
 - 未触碰 `data/bot.db`、`data/*.log`、`backup/` 里的真实运行数据。
 - 验证：`find . -maxdepth 2 -name 'bot.db' -printf '%p %s bytes\n'` 只剩 `./data/bot.db 602112 bytes`；`git ls-files bot.db data/bot.db` 为空；`git check-ignore -v bot.db data/bot.db` 命中 `/bot.db` 和 `data/*.db`。
 
-**P3-4 补自动化测试进行中（代码 WIP 尚未提交）**：
-- 已在 `pyproject.toml` 草拟 `project.optional-dependencies.test = ["pytest>=8.0"]` 和 pytest 配置；`uv.lock` 已通过 `uv lock` 更新，新增 pytest 及其传递依赖。
-- 已按环境规则把 `pytest==9.0.3` 装进项目 Windows venv；后续继续用 `./.venv/Scripts/python.exe -m pytest` 做真实环境验证。
-- 首批测试目标已调整为确定保留的 DB manager：`tests/test_check_status_db.py` 和 `tests/test_tickets_db.py`。其中 tickets 覆盖 P2-5 后的 `ticket_types` JSON CRUD / config 路径。
-- 临时写过的 `test_notebook_db.py` 已删除；NotebookCog 已纳入 P3-8 移除计划，P3-4 不再给 notebook 增加测试覆盖，避免把待移除功能固化。
-- 当前还没跑完 P3-4 验证，也还没提交 P3-4 代码；下一步继续 P3-4 时需要跑 `pytest`、`compileall`、locale check、pip check、`uv lock --check`、`git diff --check`。
+**P3-4 补自动化测试已完成**：
+- `pyproject.toml` 新增 `project.optional-dependencies.test = ["pytest>=8.0"]` 和 pytest 配置；`uv.lock` 已通过 `uv lock` 更新，新增 pytest 及其传递依赖。`requirements.lock` 仍是 runtime 兼容导出，不包含 test extra。
+- 首批测试只覆盖确定保留的 DB manager：`tests/test_check_status_db.py` 覆盖 status sample 写入 / date prefix 查询；`tests/test_tickets_db.py` 覆盖 P2-5 后的 `ticket_types` JSON CRUD 和 ticket config 写读。
+- 临时写过的 `test_notebook_db.py` 已删除；NotebookCog 已纳入 P3-8 移除计划，P3-4 不给 notebook 增加测试覆盖，避免把待移除功能固化。
+- README / AGENTS 已同步：测试 extra 用 `uv sync --extra test`，自动化单测用 `python -m pytest`；Discord 交互路径仍按既定策略留到全部重构后测试服全量验证。
+- 提权验证已通过：`./.venv/Scripts/python.exe -m pytest -q`（3 passed，只有 discord.py `audioop` deprecation warning）、`./.venv/Scripts/python.exe -m compileall bot tests`、`./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`、`./.venv/Scripts/python.exe -m pip check`、`uv lock --check`、`uv sync --frozen --dry-run --extra test --python 3.12.3`、`git diff --check`。
 
 **P3-8 NotebookCog 废弃 / 移除已加入计划（未实施）**：
 - 用户于 2026-04-27 确认 notebook 希望移除；此前 PLAN/PROGRESS 只有 notebook 的历史重构记录，没有 active removal 条目，已在 `REFACTORING_PLAN.md` 新增 P3-8。
@@ -144,11 +144,11 @@
 - README / `REFACTORING_TEST_CHECKLIST.md` / `bot/locales/zh_CN/commands.yaml` 仍有 notebook 现役文档与 slash metadata；P3-8 实施时必须同步清理。
 - DB 历史表 `event_logs` / `admins` 默认保留，不在 P3-8 中删除生产数据；如未来要清表，单独走 schema migration / 数据归档任务。
 
-**下一棒默认**：继续完成 P3-4 自动化测试 WIP。P3-4 收口后建议优先做 P3-8 NotebookCog 移除，再进入 P3-5/P3-6/P3-7，避免全量功能测试清单继续包含待废弃命令。
+**下一棒默认**：优先做 P3-8 NotebookCog 移除，再进入 P3-5/P3-6/P3-7，避免全量功能测试清单继续包含待废弃命令。
 
 **环境验证规则**：环境 / import / 启动验证必须提权到沙箱外跑真实环境。项目 Windows `.venv` 已用 `ensurepip` 补出 pip，并通过 `./.venv/Scripts/python.exe -m pip install -r requirements.lock` 按 lock 补齐依赖（含 `ruamel-yaml==0.19.1`）；本轮 project venv import smoke 已通过。后续如果项目 venv 再缺包，直接补环境，不只记录缺失。
 
-**当前工作区预期**：除未跟踪 `.codex`（本地状态，不碰）外，允许存在 P3-4 WIP：`pyproject.toml`、`uv.lock`、`tests/test_check_status_db.py`、`tests/test_tickets_db.py`。这些还未验证 / 未提交；不要误认为已完成。
+**当前工作区预期**：只剩未跟踪 `.codex`（本地状态，不碰）。
 
 ---
 
