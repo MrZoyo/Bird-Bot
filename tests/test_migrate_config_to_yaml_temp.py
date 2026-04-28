@@ -70,12 +70,26 @@ welcome:
         },
     )
     write_json(
+        config_dir / "config_rating.json",
+        {
+            "rating_channel_id": 123456789012345690,
+            "rating_message": "removed legacy rating config",
+        },
+    )
+    write_json(
+        config_dir / "config_tickets.json",
+        {
+            "ticket_category_id": 123456789012345691,
+            "ticket_message": "removed legacy ticket config",
+        },
+    )
+    write_json(
         config_dir / "config_tickets_new.json",
-            {
-                "ticket_channel_id": 123456789012345680,
-                "messages": {
-                    "created": "ticket created",
-                },
+        {
+            "ticket_channel_id": 123456789012345680,
+            "messages": {
+                "created": "ticket created",
+            },
             "ticket_types": {
                 "support": {
                     "description": "Support request",
@@ -124,6 +138,8 @@ welcome:
     assert migration.main() == 0
 
     captured = capsys.readouterr()
+    assert "skipped config_rating.json" in captured.out
+    assert "skipped config_tickets.json" in captured.out
     assert "migrated tickets_new" in captured.out
     assert "tickets" in captured.out
     assert "Wrote DB seed:" in captured.out
@@ -144,6 +160,7 @@ welcome:
     tickets_yaml = read_yaml(config_dir / "tickets.yaml")
     assert tickets_yaml == {"ticket_channel_id": 123456789012345680}
     assert not (config_dir / "tickets_new.yaml").exists()
+    assert not (config_dir / "rating.yaml").exists()
 
     tickets_example = read_yaml(config_dir / "tickets.yaml.example")
     assert tickets_example["ticket_channel_id"] == 1145141919810

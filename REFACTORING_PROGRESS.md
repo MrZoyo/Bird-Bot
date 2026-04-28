@@ -134,7 +134,7 @@
 **P3-4 补自动化测试已完成并扩展（2026-04-27）**：
 - `pyproject.toml` 新增 `project.optional-dependencies.test = ["pytest>=8.0"]` 和 pytest 配置；`uv.lock` 已通过 `uv lock` 更新，新增 pytest 及其传递依赖。`requirements.lock` 仍是 runtime 兼容导出，不包含 test extra。
 - 当前 smoke suite 覆盖确定保留的离线路径：配置模板 / runtime `COG_SPECS` import、log helpers、CheckStatus、Tickets、VoiceChannel、PrivateRoom、Ban、Role、Giveaway、Shop、Achievement。所有 DB 测试均使用 `tmp_path` 临时 sqlite，不触碰真实 `data/bot.db`。
-- 按用户要求新增单独临时迁移测试：`tests/test_migrate_config_to_yaml_temp.py` 用 `tmp_path` 验证旧 `config_*.json` 能转换为新 YAML / `.yaml.example` / locale / `migration_db_seed.json` / report，并覆盖 `tickets_new→tickets` legacy mapping。该测试服务于升级窗口，未来 JSON 迁移脚本退役时可一并删除。
+- 按用户要求新增单独临时迁移测试：`tests/test_migrate_config_to_yaml_temp.py` 用 `tmp_path` 验证旧 `config_*.json` 能转换为新 YAML / `.yaml.example` / locale / `migration_db_seed.json` / report，并覆盖 `tickets_new→tickets` legacy mapping；已明确跳过移除系统的 `config_tickets.json`（旧 ticket）和 `config_rating.json`。该测试服务于升级窗口，未来 JSON 迁移脚本退役时可一并删除。
 - `tests/test_task_helpers.py` 覆盖未登录客户端下后台 `tasks.loop.before_loop` 自动 stop 的 helper，避免离线 cog-load smoke 污染日志。
 - `tests/test_tickets_db.py` 在原 ticket type/config 基础上新增工单生命周期、成员、接单、关闭、统计、历史 smoke。
 - 本轮写 ban smoke 时发现并修复真实日期 bug：`BanDatabaseManager.get_tempban_stats()` / `cleanup_old_records()` 原用 `utcnow().replace(day=day-30)`，每月前 30 天会 `ValueError`；已改为 `timedelta(days=...)`。

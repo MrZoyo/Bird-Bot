@@ -20,6 +20,11 @@ Outputs (see PLAN):
 
 The script is idempotent: rerunning overwrites the YAML / locale
 outputs and rewrites the seed + report.
+
+Deprecated V1 configs are skipped intentionally: `config_rating.json`
+belongs to the removed rating system, and `config_tickets.json` belongs
+to the removed channel-based ticket system. The supported ticket source
+is `config_tickets_new.json`, which maps to `tickets.yaml`.
 """
 from __future__ import annotations
 
@@ -45,6 +50,15 @@ REPORT_FILE = REPO_ROOT / 'tools' / 'migration_report.md'
 # + `bot/locales/zh_CN/tickets.yaml` + the `tickets` key in the seed.
 LEGACY_NAME_MAP = {
     'tickets_new': 'tickets',
+}
+
+# Deprecated V1 configs that should not produce YAML in config 2.0.
+# `config_tickets_new.json` is the supported tickets migration source;
+# the older `config_tickets.json` belongs to the removed channel-based
+# ticket system and must not collide with the current tickets target.
+IGNORED_SOURCE_NAMES = {
+    'rating',
+    'tickets',
 }
 
 # Keys whose values are Discord IDs / lists of IDs. Matched via substring
@@ -419,7 +433,15 @@ def main() -> int:
     report_rows: List[Tuple[str, str, str, str]] = []
     summary: Dict[str, Dict[str, int]] = {}
 
-    json_files = sorted(CONFIG_DIR.glob('config_*.json'))
+    skipped_files = []
+    json_files = []
+    for json_path in sorted(CONFIG_DIR.glob('config_*.json')):
+        source_name = json_path.stem.removeprefix('config_')
+        if source_name in IGNORED_SOURCE_NAMES:
+            skipped_files.append(json_path.name)
+            continue
+        json_files.append(json_path)
+
     if args.only:
         # Accept both the legacy source name and the post-rename target.
         wanted = {LEGACY_NAME_MAP.get(n, n) for n in args.only}
@@ -435,8 +457,11 @@ def main() -> int:
             return 1
 
     if not json_files:
-        print("No config_*.json files found under bot/config/", file=sys.stderr)
+        print("No migratable config_*.json files found under bot/config/", file=sys.stderr)
         return 1
+
+    for file_name in skipped_files:
+        print(f"  skipped {file_name}: deprecated legacy config")
 
     # Reject ambiguous input up front: if two source files collapse to the
     # same target (typical case — legacy `config_tickets_new.json` coexists
@@ -481,8 +506,14 @@ def main() -> int:
         )
 
     write_report(report_rows, summary)
+    yaml_output_count = sum(1 for item in summary.values() if item['yaml_keys'])
+    locale_output_count = sum(1 for item in summary.values() if item['locale_keys'])
     print()
-    print(f"Wrote {len(json_files)} YAML configs + locales.")
+    print(
+        f"Processed {len(json_files)} migratable JSON config(s); "
+        f"wrote {yaml_output_count} YAML config(s) "
+        f"+ {locale_output_count} locale file(s)."
+    )
     if seed:
         print(f"Wrote DB seed: {SEED_FILE.relative_to(REPO_ROOT)}")
     print(f"Wrote report:  {REPORT_FILE.relative_to(REPO_ROOT)}")

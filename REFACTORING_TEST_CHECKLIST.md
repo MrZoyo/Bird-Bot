@@ -27,7 +27,7 @@
 - `tests/test_shop_db.py`：余额、流水、签到、补签、签到面板统计。
 - `tests/test_achievement_db.py`：成就计数、排行榜、语音 session、手动操作、签到联查。
 - `tests/test_log_helpers.py`：日志 `name (id)` helper。
-- `tests/test_migrate_config_to_yaml_temp.py`：临时升级 smoke，验证旧 JSON config 可转换为新 YAML / locale / DB seed。
+- `tests/test_migrate_config_to_yaml_temp.py`：临时升级 smoke，验证旧 JSON config 可转换为新 YAML / locale / DB seed，并跳过旧 rating / 旧 ticket。
 - `tests/test_task_helpers.py`：离线 cog-load smoke 时后台 loop 不再因未登录客户端抛未取回异常。
 
 必须先过：

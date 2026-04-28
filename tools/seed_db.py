@@ -58,15 +58,18 @@ async def seed_voicechannel(db_path: str, payload: Dict[str, Any]) -> int:
     if not channel_configs:
         return 0
     db = VoiceChannelDatabaseManager(db_path)
-    await db.initialize_database()  # idempotent; safe if cog has already run
-    count = 0
-    for channel_id_raw, cfg in channel_configs.items():
-        channel_id = int(channel_id_raw)
-        name_prefix = cfg.get('name_prefix', '')
-        room_type = cfg.get('type', 'public')
-        await db.upsert_channel_config(channel_id, name_prefix, room_type)
-        count += 1
-    return count
+    try:
+        await db.initialize_database()  # idempotent; safe if cog has already run
+        count = 0
+        for channel_id_raw, cfg in channel_configs.items():
+            channel_id = int(channel_id_raw)
+            name_prefix = cfg.get('name_prefix', '')
+            room_type = cfg.get('type', 'public')
+            await db.upsert_channel_config(channel_id, name_prefix, room_type)
+            count += 1
+        return count
+    finally:
+        await db.close()
 
 
 async def seed_tickets(db_path: str, payload: Dict[str, Any]) -> int:
