@@ -1050,7 +1050,7 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 - **现状**：零测试，17k 行代码全靠测试服手点。
 - **建议**：优先给 db 管理器（纯函数多、副作用可控）写 `pytest + tmp sqlite` 单元测试；ROI 最高。
 - **当前执行策略（2026-04-27）**：测试目标只覆盖确定保留的模块。NotebookCog 已纳入 P3-8 移除计划，因此 P3-4 不给 `NotebookDatabaseManager` 新增覆盖，避免把待移除功能重新固化。
-- **完成状态（2026-04-27）**：已建立并扩展 pytest smoke suite：`pyproject.toml` 增加 `test` extra 和 pytest 配置，覆盖配置模板 / runtime `COG_SPECS` import、log helpers、临时 JSON→YAML 配置迁移、CheckStatus、Tickets、VoiceChannel、PrivateRoom、Ban、Role、Giveaway、Shop、Achievement 等可离线验证路径。NotebookCog 已移除，不新增 notebook 覆盖。README / AGENTS / `REFACTORING_TEST_CHECKLIST.md` 已同步；checklist 已改成“自动化 gate + 按模块手工流程”。验证：Windows venv `pytest` 当前 `19 passed`（仅 discord.py `audioop` warning）；真实本地配置下不连接 Discord 的 `create_bot()` + `setup_bot()` load smoke 已加载 15 个 cog；其余完整 gate 见 PROGRESS。
+- **完成状态（2026-04-28）**：已建立并扩展 pytest smoke suite：`pyproject.toml` 增加 `test` extra 和 pytest 配置，覆盖配置模板 / runtime `COG_SPECS` import、log helpers、临时 JSON→YAML 配置迁移、后台 loop 离线 smoke guard、CheckStatus、Tickets、VoiceChannel、PrivateRoom、Ban、Role、Giveaway、Shop、Achievement 等可离线验证路径。NotebookCog 已移除，不新增 notebook 覆盖。README / AGENTS / `REFACTORING_TEST_CHECKLIST.md` 已同步；checklist 已改成“自动化 gate + 按模块手工流程”。验证：Windows venv `pytest` 当前 `21 passed`（仅 discord.py `audioop` warning）；真实本地配置下不连接 Discord 的 `create_bot()` + `setup_bot()` load smoke 已加载 15 个 cog 且不再产生未取回 task 异常；其余完整 gate 见 PROGRESS。
 
 ### P3-5. 引入 ruff / linter 配置
 - `pyproject.toml` 加 `[tool.ruff]`，默认启用 `E`、`F`、`W`、`B`（bugbear），特别是 `E722`（bare-except）锁死 P0-4 成果。

@@ -10,6 +10,7 @@ from discord.ext import commands, tasks
 
 from bot.utils import BanDatabaseManager, config
 from bot.utils.i18n import t
+from bot.utils.task_helpers import wait_until_ready_or_stop
 
 from .service import (
     build_ban_notification_embed,
@@ -193,7 +194,11 @@ class BanCog(commands.Cog):
     @check_expired_tempbans.before_loop
     async def before_check_expired_tempbans(self):
         """Wait for bot to be ready before starting the loop."""
-        await self.bot.wait_until_ready()
+        await wait_until_ready_or_stop(
+            self.bot,
+            self.check_expired_tempbans,
+            'BanCog.check_expired_tempbans',
+        )
 
     async def has_ban_permission(self, interaction: discord.Interaction) -> bool:
         """Check if user has permission to use ban commands"""

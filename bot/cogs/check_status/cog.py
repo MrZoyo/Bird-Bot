@@ -15,6 +15,7 @@ from discord.ext import commands, tasks
 from bot.utils import CheckStatusDatabaseManager, check_channel_validity, config
 from bot.utils.i18n import t
 from bot.utils.paths import resolve_project_path_string
+from bot.utils.task_helpers import wait_until_ready_or_stop
 
 from .views import MemberPositionView
 
@@ -84,7 +85,11 @@ class CheckStatusCog(commands.Cog):
         now = datetime.now()
         next_run = (now + timedelta(minutes=10 - now.minute % 10)).replace(second=0, microsecond=0)
         await asyncio.sleep((next_run - now).total_seconds())
-        await self.bot.wait_until_ready()
+        await wait_until_ready_or_stop(
+            self.bot,
+            self.check_voice_status_task,
+            'CheckStatusCog.check_voice_status_task',
+        )
 
     @discord.app_commands.command(
         name="print_voice_status",

@@ -78,7 +78,7 @@ discord.py, aiosqlite, aiohttp, requests, aiofiles, pillow, matplotlib, tqdm, Py
 8. In the Discord Developer Portal, enable the privileged intents required by this bot. The current runtime requests `Intents.all()`, so the safe setup is to enable `Server Members Intent`, `Presence Intent`, and `Message Content Intent`.
 9. Run `python run.py`. If you are using a Linux server, you can use `nohup python3 run.py &` to run the bot in the background.
 10. Invite the bot to your server and give it the necessary permissions.(Required permissions: bot, application command, administrator)
-11. Run automated smoke tests with `python -m pytest` when the test extra is installed. The suite covers config templates, runtime cog metadata, log helpers, the temporary JSON-to-YAML config migration smoke, and pure DB-manager paths with temporary sqlite databases.
+11. Run automated smoke tests with `python -m pytest` when the test extra is installed. The suite covers config templates, runtime cog metadata, log helpers, the temporary JSON-to-YAML config migration smoke, background-loop offline guards, and pure DB-manager paths with temporary sqlite databases.
 12. Run the bare-except lint guard with `python -m ruff check bot tests` when the lint extra is installed.
 13. For updating the bot, you can use the `git pull` command to update the bot to the latest version, then rerun `uv sync`.
 14. For the Tickets cog, use `/tickets_init` to initialize the ticket system. Please check function introduction for more details.

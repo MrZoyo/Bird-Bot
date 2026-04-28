@@ -9,6 +9,7 @@ from discord.ext import commands, tasks
 
 from bot.utils import VoiceChannelDatabaseManager, check_channel_validity, config, fmt_channel, fmt_user
 from bot.utils.i18n import t
+from bot.utils.task_helpers import wait_until_ready_or_stop
 
 from .modals import AddChannelForm
 from .views import CheckTempChannelView, RoomControlPanelView
@@ -187,7 +188,11 @@ class VoiceStateCog(commands.Cog):
 
     @cleanup_task.before_loop
     async def before_cleanup(self):
-        await self.bot.wait_until_ready()
+        await wait_until_ready_or_stop(
+            self.bot,
+            self.cleanup_task,
+            'VoiceStateCog.cleanup_task',
+        )
 
     @app_commands.command(
         name="check_temp_channel_records",

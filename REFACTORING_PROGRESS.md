@@ -70,7 +70,7 @@
 | P3 | P3-1 依赖管理统一 | ✅ | `pyproject.toml` + tracked `uv.lock` 为主，`requirements.lock` 为兼容导出，`requirements.txt` 退役 |
 | P3 | P3-2 硬编码路径梳理 | ✅ | repo-root path helper + main runtime path normalization + backup Path 化 |
 | P3 | P3-3 清理空 bot.db | ✅ | 删除 tracked 0-byte root `bot.db`，保留 ignored `data/bot.db` |
-| P3 | P3-4 补自动化测试 | ✅ | pytest smoke 覆盖配置/runtime metadata/log helpers、临时 JSON→YAML 迁移 + 9 个 DB manager；Notebook 明确不纳入 |
+| P3 | P3-4 补自动化测试 | ✅ | pytest smoke 覆盖配置/runtime metadata/log helpers、临时 JSON→YAML 迁移、后台 loop guard + 9 个 DB manager；Notebook 明确不纳入 |
 | P3 | P3-5 引入 ruff / linter | ✅ | 只启用 E722 锁 P0-4；全量规则留后续 |
 | P3 | P3-6 old 归档分支 | ✅ | tracked old_function/old_updates 转存 legacy-old-files-archive |
 | P3 | P3-7 日志 id/name 双记录 | ✅ | fmt_user/fmt_channel/fmt_role + role/voice/tickets 首批 callsite |
@@ -135,11 +135,12 @@
 - `pyproject.toml` 新增 `project.optional-dependencies.test = ["pytest>=8.0"]` 和 pytest 配置；`uv.lock` 已通过 `uv lock` 更新，新增 pytest 及其传递依赖。`requirements.lock` 仍是 runtime 兼容导出，不包含 test extra。
 - 当前 smoke suite 覆盖确定保留的离线路径：配置模板 / runtime `COG_SPECS` import、log helpers、CheckStatus、Tickets、VoiceChannel、PrivateRoom、Ban、Role、Giveaway、Shop、Achievement。所有 DB 测试均使用 `tmp_path` 临时 sqlite，不触碰真实 `data/bot.db`。
 - 按用户要求新增单独临时迁移测试：`tests/test_migrate_config_to_yaml_temp.py` 用 `tmp_path` 验证旧 `config_*.json` 能转换为新 YAML / `.yaml.example` / locale / `migration_db_seed.json` / report，并覆盖 `tickets_new→tickets` legacy mapping。该测试服务于升级窗口，未来 JSON 迁移脚本退役时可一并删除。
+- `tests/test_task_helpers.py` 覆盖未登录客户端下后台 `tasks.loop.before_loop` 自动 stop 的 helper，避免离线 cog-load smoke 污染日志。
 - `tests/test_tickets_db.py` 在原 ticket type/config 基础上新增工单生命周期、成员、接单、关闭、统计、历史 smoke。
 - 本轮写 ban smoke 时发现并修复真实日期 bug：`BanDatabaseManager.get_tempban_stats()` / `cleanup_old_records()` 原用 `utcnow().replace(day=day-30)`，每月前 30 天会 `ValueError`；已改为 `timedelta(days=...)`。
 - 临时写过的 `test_notebook_db.py` 已删除；NotebookCog 已纳入 P3-8 移除计划，P3-4 不给 notebook 增加测试覆盖，避免把待移除功能固化。
 - README / AGENTS / `REFACTORING_TEST_CHECKLIST.md` 已同步：测试 extra 用 `uv sync --extra test`，自动化 gate 用 `python -m pytest`；Discord 交互路径按模块清单在测试服手工验证。
-- 提权验证已通过：`./.venv/Scripts/python.exe -m pytest -q`（19 passed，只有 discord.py `audioop` deprecation warning）、`./.venv/Scripts/python.exe -m ruff check bot tests`、`./.venv/Scripts/python.exe -m compileall bot tests`、`./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`、`./.venv/Scripts/python.exe -m pip check`、`uv lock --check`、`uv sync --frozen --dry-run --extra test --extra lint --python 3.12.3`、`git diff --check`。
+- 提权验证已通过：`./.venv/Scripts/python.exe -m pytest -q`（21 passed，只有 discord.py `audioop` deprecation warning）、`./.venv/Scripts/python.exe -m ruff check bot tests`、`./.venv/Scripts/python.exe -m compileall bot tests`、`./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`、`./.venv/Scripts/python.exe -m pip check`、`uv lock --check`、`uv sync --frozen --dry-run --extra test --extra lint --python 3.12.3`、`git diff --check`。
 
 **P3-8 NotebookCog 废弃 / 移除已完成**：
 - 用户于 2026-04-27 确认 notebook 希望移除；此前 PLAN/PROGRESS 只有 notebook 的历史重构记录，没有 active removal 条目，已在 `REFACTORING_PLAN.md` 新增 P3-8。
@@ -167,8 +168,9 @@
 
 **测试准备收尾（2026-04-27）**：
 - `REFACTORING_TEST_CHECKLIST.md` 已从历史 P0 checklist 重写为“自动化 gate + 按模块测试流程”。用户后续跟着该文件测试，不再需要从旧任务顺序反推功能路径。
-- 当前自动化基线：`pytest` 为 19 passed；ruff、compileall、locale check、pip check、`uv lock --check`、test/lint extra dry-run 和 `git diff --check` 均通过。覆盖配置/runtime metadata/log helpers、主要 DB manager smoke 和临时 JSON→YAML 迁移 smoke。手工清单仍覆盖 Discord 权限、按钮、command sync、后台任务、DM 失败等必须真实测试服验证的路径。
+- 当前自动化基线：`pytest` 为 21 passed；ruff、compileall、locale check、pip check、`uv lock --check`、test/lint extra dry-run 和 `git diff --check` 均通过。覆盖配置/runtime metadata/log helpers、主要 DB manager smoke、临时 JSON→YAML 迁移 smoke 和后台 loop 离线 guard。手工清单仍覆盖 Discord 权限、按钮、command sync、后台任务、DM 失败等必须真实测试服验证的路径。
 - 启动 smoke 补遗：用户真实启动暴露 `WelcomeCog: 'welcome_text'`、`ShopCog: 'checkin_button_daily_text'`。已修复 Shop 按钮文案从 locale 读取；Welcome 在本地 YAML 缺 `welcome_text` 时用 `welcome_text_fallback` 不阻塞加载；同时修正 Welcome 资源路径为仓库根 `resources/`，并把迁移分类里的 `welcome_text` 显式留在 YAML。真实本地配置下 `create_bot()` + `setup_bot()` 不连接 Discord 的 load smoke 已加载 15 个 cog。
+- 离线 load smoke 补遗：未登录客户端直接跑 `setup_bot()` 会让后台 `tasks.loop.before_loop` 的 `wait_until_ready()` 抛 `RuntimeError("Client has not been properly initialised")`，日志表现为多条 `Task exception was never retrieved`。新增 `bot.utils.task_helpers.wait_until_ready_or_stop()`，离线环境自动 stop loop；真实登录后的 bot 仍正常等待 ready。
 
 **下一棒默认**：P0-P3 重构主线已全部收齐。下一步先跑 checklist 的自动化 gate，再按模块进入测试服全量功能验证。
 

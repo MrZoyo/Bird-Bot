@@ -11,6 +11,7 @@ from discord.ext import commands, tasks
 from bot.utils import ShopDatabaseManager, check_channel_validity, config
 from bot.utils.i18n import t
 from bot.utils.privateroom_db import PrivateRoomDatabaseManager
+from bot.utils.task_helpers import wait_until_ready_or_stop
 
 from .views import (
     ConfirmPurchaseView,
@@ -82,7 +83,13 @@ class PrivateRoomCog(commands.Cog):
 
     @check_expired_rooms.before_loop
     async def before_check_expired_rooms(self):
-        await self.bot.wait_until_ready()
+        ready = await wait_until_ready_or_stop(
+            self.bot,
+            self.check_expired_rooms,
+            'PrivateRoomCog.check_expired_rooms',
+        )
+        if not ready:
+            return
 
         # 计算下次运行时间（在8:10）
         now = datetime.now()

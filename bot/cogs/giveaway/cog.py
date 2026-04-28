@@ -11,6 +11,7 @@ from discord.utils import format_dt
 
 from bot.utils import GiveawayDatabaseManager, check_channel_validity, config
 from bot.utils.i18n import t
+from bot.utils.task_helpers import wait_until_ready_or_stop
 
 from .modals import GiveawayForm
 from .views import GiveawayCheckParticipantView, GiveawayParticipationView
@@ -167,7 +168,11 @@ class GiveawayCog(commands.Cog):
 
     @check_giveaways.before_loop
     async def before_check_giveaways(self):
-        await self.bot.wait_until_ready()
+        await wait_until_ready_or_stop(
+            self.bot,
+            self.check_giveaways,
+            'GiveawayCog.check_giveaways',
+        )
 
     async def fetch_all_giveaways(self, is_end=True):
         return await self.db.fetch_all_giveaways(include_ended=is_end)

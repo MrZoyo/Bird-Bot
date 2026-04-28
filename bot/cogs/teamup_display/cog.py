@@ -11,6 +11,7 @@ from discord.ext import commands, tasks
 from bot.utils import config
 from bot.utils.channel_validator import check_channel_validity
 from bot.utils.i18n import t
+from bot.utils.task_helpers import wait_until_ready_or_stop
 from bot.utils.teamup_display_manager import TeamupDisplayManager
 
 
@@ -66,7 +67,11 @@ class TeamupDisplayCog(commands.Cog):
     @refresh_displays.before_loop
     async def before_refresh(self):
         """Wait for bot to be ready before starting scheduled tasks"""
-        await self.bot.wait_until_ready()
+        await wait_until_ready_or_stop(
+            self.bot,
+            self.refresh_displays,
+            'TeamupDisplayCog.refresh_displays',
+        )
     
     def format_time_ago(self, created_at: str) -> str:
         """Format time using Discord's relative time display"""
