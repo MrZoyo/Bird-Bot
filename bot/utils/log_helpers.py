@@ -29,9 +29,25 @@ def _format_entity(entity: Any, attrs: tuple[str, ...]) -> str:
     return f"{name} ({entity_id})"
 
 
+def _user_label(user: Any) -> str:
+    if user is None or isinstance(user, int | str):
+        return "unknown"
+
+    display_name = _entity_name(user, ("display_name", "global_name", "name"))
+    username = getattr(user, "name", None)
+
+    if username and str(username) != display_name:
+        return f"{display_name} / {username}"
+    return display_name
+
+
 def fmt_user(user: Any) -> str:
     """Format a Discord user/member or raw user id for logs."""
-    return _format_entity(user, ("display_name", "global_name", "name"))
+    entity_id = _entity_id(user)
+    label = _user_label(user)
+    if entity_id is None:
+        return label
+    return f"{label} ({entity_id})"
 
 
 def fmt_channel(channel: Any) -> str:

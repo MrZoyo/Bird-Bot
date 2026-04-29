@@ -92,10 +92,11 @@ Never commit real YAML configs, real JSON configs, `tools/migration_db_seed.json
 
 All bot logs should identify Discord entities with both name and id:
 
-- Users/members: `display_name (id)` via `bot.utils.fmt_user`.
+- Users/members: `display_name / username (id)` via `bot.utils.fmt_user` when nickname/display name and username differ; `display_name (id)` when they are identical.
 - Channels/threads: `name (id)` via `bot.utils.fmt_channel`.
 - Roles: `name (id)` via `bot.utils.fmt_role`.
 - If only a raw id is available, log `unknown (id)`.
+- Numeric ids must use ASCII parentheses: `(1234567890)`, not `（1234567890）`.
 
 This applies to root logs, `keyword_detection`, `room_activity`, cog logs, DB manager warnings, and future maintenance scripts. Do not log only a bare username, channel name, mention, or id when a Discord object is available.
 

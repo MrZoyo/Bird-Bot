@@ -26,14 +26,14 @@
 - `tests/test_giveaway_db.py`：抽奖记录、参与者、获奖者、持久 View 清理。
 - `tests/test_shop_db.py`：余额、流水、签到、补签、签到面板统计。
 - `tests/test_achievement_db.py`：成就计数、排行榜、语音 session、手动操作、签到联查。
-- `tests/test_log_helpers.py`：日志 `name (id)` helper。
-- `tests/test_invitation_full_message.py`：关键词检测日志 `name (id)` 格式，组队消息 / 房间面板满员样式共享。
+- `tests/test_log_helpers.py`：日志 helper；用户 `昵称 / 用户名 (id)`，频道/身份组 `name (id)`，id 使用英文括号。
+- `tests/test_invitation_full_message.py`：关键词检测日志 `昵称 / 用户名 (id)` 格式，组队消息 / 房间面板满员样式共享。
 - `tests/test_migrate_config_to_yaml_temp.py`：临时升级 smoke，验证旧 JSON config 可转换为新 YAML / locale / DB seed，并跳过旧 rating / 旧 ticket。
 - `tests/test_task_helpers.py`：离线 cog-load smoke 时后台 loop 不再因未登录客户端抛未取回异常。
 
 必须先过：
 - [x] `./.venv/Scripts/python.exe -m pytest -q`
-  - 预期：全部通过；当前基线是 `23 passed`，允许出现 discord.py 的 `audioop` deprecation warning。
+  - 预期：全部通过；当前基线是 `25 passed`，允许出现 discord.py 的 `audioop` deprecation warning。
 - [x] `./.venv/Scripts/python.exe -m ruff check bot tests tools`
   - 预期：0 error；当前只启用 `E722`，用于防裸 `except:` 回归。
 - [x] `./.venv/Scripts/python.exe -m compileall bot tests tools`
@@ -58,7 +58,7 @@
 - [x] Discord command picker 不显示 `/notebook_*`
 - [x] `bot/cogs/` 顶层只作为包入口；不依赖旧平面 `*_cog.py`
 - [ ] `data/bot.db`、日志、备份路径都解析到仓库根目录下的预期位置
-- [ ] 抽查日志中用户 / 频道 / 角色显示为 `name (id)` 或 `unknown (id)`
+- [ ] 抽查日志中用户显示为 `昵称 / 用户名 (id)`，频道 / 角色显示为 `name (id)`，raw id 为 `unknown (id)`；id 使用英文括号。
 
 ---
 

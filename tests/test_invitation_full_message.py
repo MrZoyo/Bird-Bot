@@ -76,7 +76,7 @@ def test_keyword_detection_log_uses_name_and_id(caplog):
     logger.propagate = True
     try:
         message = SimpleNamespace(
-            author=SimpleNamespace(id=123, display_name="Alice"),
+            author=SimpleNamespace(id=123, display_name="Alice", name="alice_raw"),
             channel=SimpleNamespace(id=456, name="teamup"),
             content="缺1",
         )
@@ -84,7 +84,7 @@ def test_keyword_detection_log_uses_name_and_id(caplog):
         with caplog.at_level(logging.INFO, logger="keyword_detection"):
             log_keyword_detection(message, [("缺", "1", "")])
 
-        assert "Alice (123)" in caplog.text
+        assert "Alice / alice_raw (123)" in caplog.text
         assert "teamup (456)" in caplog.text
     finally:
         logger.propagate = old_propagate
