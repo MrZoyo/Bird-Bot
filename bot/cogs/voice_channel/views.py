@@ -1,9 +1,9 @@
 import logging
-import re
 
 import discord
 from discord.ui import Button
 
+from bot.cogs.create_invitation.full_message import update_invitation_message_to_full
 from bot.utils import config
 from bot.utils.i18n import t
 
@@ -349,75 +349,4 @@ class RoomControlPanelView(discord.ui.View):
 
     async def update_message_to_full(self, message):
         """将组队消息更新为满员状态"""
-        try:
-            if not message.embeds:
-                return
-
-            # 获取 invitation 配置（原由 create_invitation cog 持有）
-            invitation_conf = config.get_config('invitation')
-            roomfull_title = invitation_conf.get('roomfull_title', '【已满员】')
-            invite_embed_content_edited = invitation_conf.get('invite_embed_content_edited', '')
-
-            embed = message.embeds[0]
-
-            # 从原embed的description中提取语音频道信息
-            # 原格式可能是：- 📢 语音频道: ...
-            # 需要从中提取URL和其他信息
-            # 尝试从description中提取voice channel URL
-            voice_channel_match = re.search(r'https://discord\.com/channels/\d+/(\d+)', embed.description)
-
-            if voice_channel_match:
-                # 提取必要信息
-                voice_channel_id = voice_channel_match.group(1)
-                guild_id_match = re.search(r'https://discord\.com/channels/(\d+)/\d+', embed.description)
-                guild_id = guild_id_match.group(1) if guild_id_match else ""
-                url = f"https://discord.com/channels/{guild_id}/{voice_channel_id}"
-
-                # 提取mention和time
-                mention_match = re.search(r'<@\d+>', embed.description)
-                mention = mention_match.group(0) if mention_match else ""
-
-                # 提取时间（相对时间格式）
-                time_match = re.search(r'<t:\d+:R>', embed.description)
-                time = time_match.group(0) if time_match else ""
-
-                # 从voice_channel获取name
-                voice_channel = self.bot.get_channel(int(voice_channel_id))
-                channel_name = voice_channel.name if voice_channel else "未知频道"
-
-                # 使用配置的格式创建新description
-                new_description = invite_embed_content_edited.format(
-                    name=channel_name,
-                    url=url,
-                    mention=mention,
-                    time=time
-                )
-            else:
-                # 如果无法提取，保持原description
-                new_description = embed.description
-
-            # 创建新embed
-            new_embed = discord.Embed(
-                title=f"{roomfull_title} ~~{embed.title}~~",
-                description=new_description,
-                color=discord.Color.red()
-            )
-
-            # 保留原有字段
-            for field in embed.fields:
-                new_embed.add_field(name=field.name, value=field.value, inline=field.inline)
-
-            # 保留缩略图；满员后移除 footer 避免残留按钮提示
-            if embed.thumbnail:
-                new_embed.set_thumbnail(url=embed.thumbnail.url)
-            # 不保留时间戳，避免右下角显示旧时间
-
-            # 移除所有按钮（统一格式：满员后按钮全部消失）
-            await message.edit(embed=new_embed, view=None)
-
-        except discord.Forbidden:
-            logging.error(f"No permission to edit message {message.id}")
-        except discord.NotFound:
-            logging.warning(f"Message {message.id} not found when trying to update to full")
-        except Exception as e:
-            logging.error(f"Error updating message to full: {e}", exc_info=True)
+        await update_invitation_message_to_full(self.bot, message)

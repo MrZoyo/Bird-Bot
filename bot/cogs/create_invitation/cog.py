@@ -7,10 +7,28 @@ from discord import app_commands
 from discord.app_commands import locale_str
 from discord.ext import commands
 
-from bot.utils import RoleDatabaseManager, check_channel_validity, config
+from bot.utils import (
+    RoleDatabaseManager,
+    check_channel_validity,
+    config,
+    fmt_channel,
+    fmt_user,
+)
 from bot.utils.i18n import t
 
+from .full_message import update_invitation_message_to_full
 from .views import DefaultRoomView, TeamInvitationView
+
+
+def log_keyword_detection(message: discord.Message, valid_matches) -> None:
+    keyword_logger = logging.getLogger('keyword_detection')
+    keyword_logger.info(
+        '检测到用户 %s 在频道 %s 的内容: %s, 匹配项: %s!',
+        fmt_user(message.author),
+        fmt_channel(message.channel),
+        message.content,
+        valid_matches,
+    )
 
 
 class CreateInvitationCog(commands.Cog):
@@ -29,75 +47,10 @@ class CreateInvitationCog(commands.Cog):
         self.failed_invite_responses = t('invitation.failed_invite_responses')
         self.ignore_user_ids = self.conf['ignore_user_ids']
         self.ignore_channel_ids = self.conf['ignore_channel_ids']
-        self.roomfull_title = t('invitation.roomfull_title')
 
     async def update_message_to_full(self, message):
         """将组队消息更新为满员状态（可复用方法）"""
-        try:
-            if not message.embeds:
-                return
-
-            embed = message.embeds[0]
-            invite_embed_content_edited = t('invitation.invite_embed_content_edited')
-
-            # 从原embed的description中提取语音频道信息
-            voice_channel_match = re.search(r'https://discord\.com/channels/\d+/(\d+)', embed.description)
-
-            if voice_channel_match:
-                # 提取必要信息
-                voice_channel_id = voice_channel_match.group(1)
-                guild_id_match = re.search(r'https://discord\.com/channels/(\d+)/\d+', embed.description)
-                guild_id = guild_id_match.group(1) if guild_id_match else ""
-                url = f"https://discord.com/channels/{guild_id}/{voice_channel_id}"
-
-                # 提取mention和time
-                mention_match = re.search(r'<@\d+>', embed.description)
-                mention = mention_match.group(0) if mention_match else ""
-
-                # 提取时间（相对时间格式）
-                time_match = re.search(r'<t:\d+:R>', embed.description)
-                time = time_match.group(0) if time_match else ""
-
-                # 从voice_channel获取name
-                voice_channel = self.bot.get_channel(int(voice_channel_id))
-                channel_name = voice_channel.name if voice_channel else "未知频道"
-
-                # 使用配置的格式创建新description（带"偷看一眼"链接）
-                new_description = invite_embed_content_edited.format(
-                    name=channel_name,
-                    url=url,
-                    mention=mention,
-                    time=time
-                )
-            else:
-                # 如果无法提取，保持原description
-                new_description = embed.description
-
-            # 创建新embed
-            new_embed = discord.Embed(
-                title=f"{self.roomfull_title} ~~{embed.title}~~",
-                description=new_description,
-                color=discord.Color.red()
-            )
-
-            # 保留原有字段
-            for field in embed.fields:
-                new_embed.add_field(name=field.name, value=field.value, inline=field.inline)
-
-            # 保留缩略图；满员时移除 footer 避免残留按钮指示
-            if embed.thumbnail:
-                new_embed.set_thumbnail(url=embed.thumbnail.url)
-            # 不保留时间戳，避免右下角显示旧的时间
-
-            # 移除所有按钮（Link按钮无法disabled，所以直接移除）
-            await message.edit(embed=new_embed, view=None)
-
-        except discord.Forbidden:
-            logging.error(f"No permission to edit message {message.id}")
-        except discord.NotFound:
-            logging.warning(f"Message {message.id} not found when trying to update to full")
-        except Exception as e:
-            logging.error(f"Error updating message to full: {e}", exc_info=True)
+        await update_invitation_message_to_full(self.bot, message)
 
     async def mark_old_invitation_full(self, old_invitation):
         """异步将旧的组队消息设置为满员"""
@@ -171,8 +124,7 @@ class CreateInvitationCog(commands.Cog):
                 return
 
             # Use keyword detection logger
-            keyword_logger = logging.getLogger('keyword_detection')
-            keyword_logger.info(f'检测到 {message.author} 的内容: {message.content}, 匹配项: {valid_matches}!')
+            log_keyword_detection(message, valid_matches)
 
             # Check if the author is in a voice channel
             if message.author.voice and message.author.voice.channel:

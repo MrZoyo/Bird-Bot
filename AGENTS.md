@@ -1,43 +1,35 @@
-# Repository Guidelines
+# Repository Agent Entry
 
-## 项目结构与模块组织
-- 入口：`run.py` 启动并加载 `bot/` 下的各个 cogs。
-- 业务逻辑：`bot/cogs/`（签到/补签、成就、角色、语音、工单等）；公共工具与数据库封装在 `bot/utils/`。
-- 配置：`bot/config/*.yaml.example` 为模板，复制去掉 `.example` 生效（config 2.0 起改用 YAML；legacy `config_*.json.example` 已转存到 `legacy-old-files-archive` 分支）。文案资源在 `bot/locales/<lang>/<cog>.yaml`，运行时由 `bot.utils.i18n.t()` 读取。静态资源在 `resources/`、`pics/`。
-- 数据：主库默认位于 `data/bot.db`（由 `bot/config/main.yaml` 的 `db_path` 控制，运行时按仓库根目录解析相对路径）；备份在 `backup/`；旧归档内容见 `LEGACY_ARCHIVE.md` 和 `legacy-old-files-archive` 分支。
+本文件是给自动化 coding agent 的入口说明。详细项目结构、开发约定、测试命令、迁移规则和日志规范都维护在 `CLAUDE.md`；开始工作前先读 `CLAUDE.md`，本文件只保留必须马上知道的约束。
 
-## 构建、运行与开发命令
-- 安装依赖：`uv sync`（建议虚拟环境；依赖源在 `pyproject.toml`，锁定版本在 `uv.lock`）。
-- 本地运行：`python run.py`（确保已配置好 token、频道/角色 ID）。
-- 可选语法快检：`python -m compileall bot`。
-- 自动化单测：`python -m pytest`（需要 `uv sync --extra test`；覆盖配置模板、runtime cog 元数据、日志 helper、临时 JSON→YAML 配置迁移 smoke、后台 loop 离线 guard，以及可离线验证的 DB manager smoke）。
-- 裸 `except:` 回归检查：`python -m ruff check bot tests`（需要 `uv sync --extra lint`；当前只启用 `E722`）。
-- 动数据库前先备份：复制 `data/bot.db` 或在运行中的机器人使用 `/backup_now`。
+## 必读顺序
+- 先读 `CLAUDE.md`，再读当前任务相关代码。
+- 涉及功能测试流程时同步查看 `REFACTORING_TEST_CHECKLIST.md`。
+- 涉及重构历史、已完成/未完成状态时同步查看 `REFACTORING_PROGRESS.md` 和 `REFACTORING_PLAN.md`。
 
-## 代码风格与命名约定
-- Python 3 异步优先；遵循 PEP 8，四空格缩进，能加类型注解尽量加。
-- Cog 方法保持小而事件驱动；使用 logging 而非 print。
-- 日志里记录用户 / 频道 / 角色时优先使用 `bot.utils.fmt_user` / `fmt_channel` / `fmt_role`，保持 `name (id)` 格式；只有 raw id 时允许显示 `unknown (id)`。
-- 配置键、JSON、数据库列名用 lower_snake_case；避免硬编码 ID，优先读配置。
-- 不要新增裸 `except:`；需要兜底时写 `except Exception` 并记录上下文日志，或优先收窄到具体异常。
+## 当前项目事实
+- 入口是 `run.py`，实际 bot 构造、cog 加载和 command sync 在 `bot/main.py`。
+- 运行时配置是 `bot/config/*.yaml`；旧 `config_*.json` 只用于一次性迁移或历史归档。
+- 文案资源在 `bot/locales/<lang>/<cog>.yaml`，运行时通过 `bot.utils.i18n.t()` 读取。
+- 主库默认是 `data/bot.db`；动数据库前先备份。
+- 旧实现、脱敏旧模板和旧更新记录在 `legacy-old-files-archive` 分支；main 分支不保留 `old_function/` / `old_updates.md`。
 
-## 测试指引
-- 已有 `pytest` 自动化 smoke tests 覆盖配置模板、runtime cog 元数据、日志 helper、临时 JSON→YAML 配置迁移、后台 loop 离线 guard 和纯 DB manager；涉及真实 Discord 交互时仍需在测试服逐条验证命令与按钮，流程以 `REFACTORING_TEST_CHECKLIST.md` 为准。
-- 影响数据库的改动优先用临时库或备份库验证，防止污染正式数据。
-- 涉及连签/余额/补签逻辑时，覆盖重复点击、额度用尽、余额不足等边界场景。
+## 开发硬规则
+- 不提交真实 token、Guild/Channel/Role/User ID、真实 YAML 配置、数据库、日志或 migration seed/report。
+- 日志中出现 Discord 用户、频道、线程或身份组时，用 `bot.utils.fmt_user` / `fmt_channel` / `fmt_role`，格式保持 `name (id)`；只有 raw id 时允许 `unknown (id)`。
+- 不要新增裸 `except:`；需要兜底时用 `except Exception` 并记录上下文。
+- 用户明确要求继续、修复、重构或测试时直接执行；如果只是方案讨论或需求不清，再先确认。
+- 环境验证按用户要求在沙箱外运行，优先使用 `./.venv/Scripts/python.exe`；缺包时同步补齐依赖。
 
-## 提交与 PR 指南
-- 提交信息聚焦且用现在时，如：`优化补签窗口`、`增加语音统计日志`。
-- 跨多个 cog 或数据库结构改动时，在提交正文写清范围与理由。
-- PR 需说明用户可见变化、数据库迁移、手动步骤（新增配置键、需运行的命令），界面/Embed 改动附截图或日志片段更佳。
-- 涉及版本号或用户功能变化时，同步更新 `README.md` 中的版本与说明，保持文档一致。
+## 常用验证
+- `./.venv/Scripts/python.exe -m pytest -q`
+- `./.venv/Scripts/python.exe -m ruff check bot tests tools`
+- `./.venv/Scripts/python.exe -m compileall bot tests tools`
+- `./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`
+- `./.venv/Scripts/python.exe -m pip check`
+- `uv lock --check`
+- `uv sync --frozen --dry-run --extra test --extra lint --python 3.12.3`
 
-## 安全与配置提示
-- Token、Guild/Channel/Role ID 属于机密，不要提交已填充的配置文件；按 `.yaml.example` 模板本地生成。
-- 测试尽量使用独立测试服务器；避免让管理员命令指向生产环境。
-- 持续开发前确认配置与数据库路径指向非生产副本。
-- main 分支不再保留 `old_function/` / `old_updates.md` 这类旧归档文件；要查旧实现、脱敏 JSON example 或旧更新记录，切到 `legacy-old-files-archive` 分支看 `LEGACY_ARCHIVE_INDEX.md`。`old_function/**/*.json` 与 `old_function/**/*.yaml` 仍一律 gitignore，禁止把真实 ID 通过"归档旧配置"带进 git；不要绕过规则去 `git add -f`。`old_test/` 是 ignored 本地实验区，可复用测试必须进入 `tests/`。
-
-## Agent 沟通要求
-- 与用户交流时最终请使用中文；展示命令、路径、日志时保持简洁，不泄露敏感信息。
-- 除非用户明确要求，否则在用户同意进行任何修改之前，不要直接修改，而是把修改计划给用户二次确认。
+## 沟通
+- 与用户交流使用中文。
+- 展示命令、路径、日志时保持简洁，不泄露敏感信息。

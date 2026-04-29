@@ -106,6 +106,5 @@ Desktop.ini
 *.ipynb
 /archives
 /.claude
-CLAUDE.md
 
 # P3-1: uv.lock is the canonical dependency lock and must be tracked.
