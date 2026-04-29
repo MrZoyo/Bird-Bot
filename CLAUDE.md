@@ -2,6 +2,15 @@
 
 This file is the detailed project guide for coding agents and maintainers. `AGENTS.md` is intentionally short and points here.
 
+## Agent Workflow
+
+- Read this file first, then inspect the code relevant to the current task.
+- For manual feature testing, follow `REFACTORING_TEST_CHECKLIST.md`.
+- For refactor state and historical decisions, consult `REFACTORING_PROGRESS.md` and `REFACTORING_PLAN.md`.
+- When the user asks to continue, fix, refactor, or test, execute directly. Ask only when the requirement is genuinely ambiguous or risky.
+- Communicate with the user in Chinese. Keep command, path, and log excerpts concise, and do not expose secrets.
+- Per user preference, environment validation, imports, compile checks, tests, `uv`, and dependency checks should be run outside the sandbox with approval/escalation. If the venv is missing packages, install/sync them as part of the task.
+
 ## Project Overview
 
 DCGameServerHelper is a Discord bot built on `discord.py`. It uses a modular cog architecture, YAML runtime configuration, locale YAML files for user-facing text, and SQLite for persistent state.
@@ -119,8 +128,6 @@ Common checks:
 uv lock --check
 uv sync --frozen --dry-run --extra test --extra lint --python 3.12.3
 ```
-
-Per user preference, environment validation, imports, compile checks, tests, `uv`, and dependency checks should be run outside the sandbox with approval/escalation. If the venv is missing packages, install/sync them as part of the task.
 
 ## Testing Strategy
 
