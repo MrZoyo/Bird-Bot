@@ -343,14 +343,14 @@ class TransactionHistoryView(discord.ui.View):
 
         # Add previous/next buttons
         self.prev_button = discord.ui.Button(
-            emoji=conf['history_prev_button_emoji'],
+            emoji=t('shop.history_prev_button_emoji'),
             style=discord.ButtonStyle.gray,
             disabled=True
         )
         self.prev_button.callback = self.previous_page
 
         self.next_button = discord.ui.Button(
-            emoji=conf['history_next_button_emoji'],
+            emoji=t('shop.history_next_button_emoji'),
             style=discord.ButtonStyle.gray
         )
         self.next_button.callback = self.next_page
@@ -461,4 +461,3 @@ class TransactionHistoryView(discord.ui.View):
         ))
 
         return embed
-

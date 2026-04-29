@@ -51,6 +51,9 @@ welcome:
     - welcome_text
   locale:
     - welcome_text_picture_1
+achievements:
+  locale:
+    - rank
 """.lstrip(),
         encoding="utf-8",
     )
@@ -124,6 +127,32 @@ welcome:
                 "https://discord.com/channels/123456789012345685/123456789012345686"
             ),
             "welcome_text_picture_1": "Picture line 1",
+            "dm": {
+                "description0_title": "Invite title",
+                "description1_title": "https://discord.gg/RealInviteCode",
+                "description1": ["Hello {user}", "Welcome"],
+                "description2_title": "Server title",
+                "description2": ["Line A", "Line B"],
+                "rules": {
+                    "rules_title": "Rules",
+                    "rules_text": "Read rules",
+                },
+                "footer": "Footer",
+                "dm_image": "welcome_dm.png",
+                "color": [1, 2, 3],
+                "rules_channel_id": "123456789012345687",
+                "member_count_button": "Member {member_count}",
+            },
+        },
+    )
+    write_json(
+        config_dir / "config_achievements.json",
+        {
+            "achievements": [],
+            "rank": {
+                "all_button_label": "All",
+                "intro_title": "Rank title",
+            },
         },
     )
 
@@ -171,12 +200,36 @@ welcome:
     welcome_yaml = read_yaml(config_dir / "welcome.yaml")
     assert welcome_yaml["welcome_channel_id"] == 123456789012345684
     assert welcome_yaml["welcome_text"].startswith("Welcome {member.mention}")
-    assert "welcome_text" not in read_yaml(locale_dir / "welcome.yaml")
+    assert welcome_yaml["dm"] == {
+        "dm_image": "welcome_dm.png",
+        "color": [1, 2, 3],
+        "rules_channel_id": "123456789012345687",
+    }
+
+    welcome_locale = read_yaml(locale_dir / "welcome.yaml")
+    assert "welcome_text" not in welcome_locale
+    assert welcome_locale["dm"] == {
+        "description0_title": "Invite title",
+        "description1_title": "https://discord.gg/RealInviteCode",
+        "description1": "Hello {user}\nWelcome",
+        "description2_title": "Server title",
+        "description2": "Line A\nLine B",
+        "rules_title": "Rules",
+        "rules_text": "Read rules",
+        "footer": "Footer",
+        "member_count_button": "Member {member_count}",
+    }
 
     welcome_example = read_yaml(config_dir / "welcome.yaml.example")
     assert welcome_example["welcome_channel_id"] == 1145141919810
     assert "1145141919810" in welcome_example["welcome_text"]
     assert "123456789012345685" not in welcome_example["welcome_text"]
+    assert welcome_example["dm"]["rules_channel_id"] == "1145141919810"
+
+    achievements_yaml = read_yaml(config_dir / "achievements.yaml")
+    assert achievements_yaml == {"achievements": []}
+    achievements_locale = read_yaml(locale_dir / "achievements.yaml")
+    assert achievements_locale["rank"]["all_button_label"] == "All"
 
     seed = json.loads(seed_file.read_text(encoding="utf-8"))
     assert "tickets_new" not in seed
@@ -191,3 +244,4 @@ welcome:
     report = report_file.read_text(encoding="utf-8")
     assert "| tickets | `ticket_types` | db | classification |" in report
     assert "| voicechannel | `channel_configs` | db | classification |" in report
+    assert "| welcome | `dm` | yaml+locale | special:welcome-dm-split |" in report

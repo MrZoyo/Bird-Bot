@@ -67,11 +67,10 @@ welcome:
   locale:
     - welcome_text_picture_1
     - welcome_text_picture_2
-  # `dm` subtree mixes ids/colors/images (yaml) with titles/descriptions
-  # (locale). The script keeps `dm` as a single subtree in yaml; the
-  # step-7 welcome_cog refactor splits the user-visible dm strings into
-  # locales/zh_CN/welcome.yaml by hand.
-  dm_subtree_target: yaml
+  # `dm` is split by tools/migrate_config_to_yaml.py:
+  # data fields (dm_image/color/rules_channel_id) stay in YAML, while
+  # description/rules/footer/member_count_button text goes to locale.
+  dm_subtree_target: split
 
 privateroom:
   yaml:
@@ -155,4 +154,7 @@ teamup_display:
   # fill in after inspecting .json structure
 
 achievements:
-  # large; fill in after migration_report first pass
+  locale:
+    - rank
+  # Achievement definitions / ranking type names are content metadata
+  # coupled to thresholds, type ids, and role ids, so they remain YAML.

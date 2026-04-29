@@ -174,9 +174,15 @@
 - `CLAUDE.md` 已重写为详细项目开发指南，`AGENTS.md` 改为短入口并要求先读 `CLAUDE.md`；`.gitignore` 不再屏蔽 `CLAUDE.md`。
 - `tests/test_invitation_full_message.py` 覆盖满员 embed 样式共享和关键词日志格式；当前 pytest 基线提升到 25 passed。
 
+**2026-04-29 config 文案读取复扫 / Shop 补签修复**：
+- 用户真实点击 Shop 补签按钮暴露 `KeyError: 'makeup_modal_title'`；根因是 Shop modal 还有 UI 文案从 `shop.yaml` runtime config 读取，而迁移后文案已在 locale。已改为 `t('shop.*')`，并把余额修改 modal、交易历史翻页按钮一起切到 locale。
+- 全仓复扫 `conf[...]` / `config.get_config(...)` 后，继续修掉明确漏项：`PrivateRoom` 购买/续费 modal、`Welcome` DM 文案与成员数按钮、`Achievement` `/rank` 介绍页与分页/按钮/空数据文案。`welcome_text` 仍是唯一明确例外，因为它可能携带真实 Discord URL / custom emoji id。
+- `tools/migrate_config_to_yaml.py` 已同步 welcome DM 拆分：`dm_image` / `color` / `rules_channel_id` 留在 YAML，`description*` / `rules_*` / `footer` / `member_count_button` 进 locale；`achievements.rank` 也由迁移分类路由到 locale。
+- 新增 `tests/test_shop_ui_metadata.py` 和 `tests/test_ui_locale_metadata.py`，覆盖 Shop / PrivateRoom / Welcome DM / Achievement rank 控件文案不再依赖 runtime config；临时迁移测试扩展了 welcome DM split 与 `achievements.rank` 路由。
+
 **测试准备收尾（2026-04-27）**：
 - `REFACTORING_TEST_CHECKLIST.md` 已从历史 P0 checklist 重写为“自动化 gate + 按模块测试流程”。用户后续跟着该文件测试，不再需要从旧任务顺序反推功能路径。
-- 当前自动化基线：`pytest` 为 25 passed；ruff、compileall、locale check、pip check、`uv lock --check`、test/lint extra dry-run 和 `git diff --check` 均通过。覆盖配置/runtime metadata/log helpers、组队满员样式、主要 DB manager smoke、临时 JSON→YAML 迁移 smoke 和后台 loop 离线 guard。手工清单仍覆盖 Discord 权限、按钮、command sync、后台任务、DM 失败等必须真实测试服验证的路径。
+- 当前自动化基线：`pytest` 为 31 passed；ruff、compileall、locale check、pip check、`uv lock --check`、test/lint extra dry-run 和 `git diff --check` 均通过。覆盖配置/runtime metadata/log helpers、组队满员样式、UI 文案 locale smoke、主要 DB manager smoke、临时 JSON→YAML 迁移 smoke 和后台 loop 离线 guard。手工清单仍覆盖 Discord 权限、按钮、command sync、后台任务、DM 失败等必须真实测试服验证的路径。
 - 启动 smoke 补遗：用户真实启动暴露 `WelcomeCog: 'welcome_text'`、`ShopCog: 'checkin_button_daily_text'`。已修复 Shop 按钮文案从 locale 读取；Welcome 在本地 YAML 缺 `welcome_text` 时用 `welcome_text_fallback` 不阻塞加载；同时修正 Welcome 资源路径为仓库根 `resources/`，并把迁移分类里的 `welcome_text` 显式留在 YAML。真实本地配置下 `create_bot()` + `setup_bot()` 不连接 Discord 的 load smoke 已加载 15 个 cog。
 - 离线 load smoke 补遗：未登录客户端直接跑 `setup_bot()` 会让后台 `tasks.loop.before_loop` 的 `wait_until_ready()` 抛 `RuntimeError("Client has not been properly initialised")`，日志表现为多条 `Task exception was never retrieved`。新增 `bot.utils.task_helpers.wait_until_ready_or_stop()`，离线环境自动 stop loop；真实登录后的 bot 仍正常等待 ready。
 

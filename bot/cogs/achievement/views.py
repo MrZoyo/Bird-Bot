@@ -4,6 +4,8 @@ from discord.ui import Button, View
 from bot.utils import config
 from bot.utils.i18n import t
 
+from .rank_locale import rank_type_button_labels
+
 
 class AchievementRefreshView(View):
     def __init__(self, bot, user_id, db_manager):
@@ -305,15 +307,15 @@ class RankView(discord.ui.View):
         self.message = None  # Will hold reference to the message
 
         self.achievement_config = config.get_config('achievements')
-        self.rank_config = self.achievement_config.get('rank', {})
         self.achievement_cog = bot.get_cog('AchievementCog')
         self.visible_rankings = self.achievement_cog.get_visible_achievement_rankings()
         self.visible_type_names = self.achievement_cog.get_visible_achievement_type_names()
+        self.type_button_labels = rank_type_button_labels()
 
         # Add buttons for category selection
         self.all_button = discord.ui.Button(
             style=discord.ButtonStyle.success,
-            label=self.rank_config.get('all_button_label', "全部排名"),
+            label=t('achievements.rank.all_button_label'),
             custom_id="all"
         )
         self.all_button.callback = self.all_button_callback
@@ -322,7 +324,7 @@ class RankView(discord.ui.View):
         self.type_buttons = []
         for achievement in self.visible_rankings:
             type_name = achievement.get('type')  # This is exactly "time_spent" for the time button
-            button_label = self.rank_config.get('type_button_labels', {}).get(type_name, type_name)
+            button_label = self.type_button_labels.get(type_name, type_name)
             button = discord.ui.Button(
                 style=discord.ButtonStyle.primary,
                 label=button_label,
@@ -367,8 +369,11 @@ class RankView(discord.ui.View):
         title = t('achievements.achievements_ranking_title')
         if self.year is not None and self.month is not None:
             embed = discord.Embed(
-                title=self.rank_config.get('embed_title_date_format', '{title} ({year}-{month})').format(
-                    title=title, year=self.year, month=self.month
+                title=t(
+                    'achievements.rank.embed_title_date_format',
+                    title=title,
+                    year=self.year,
+                    month=self.month,
                 ),
                 color=discord.Color.blue()
             )
@@ -397,7 +402,7 @@ class RankView(discord.ui.View):
 
             embed.add_field(
                 name=display_name,
-                value=ranking if ranking else self.rank_config.get('no_data_message', "暂无数据"),
+                value=ranking if ranking else t('achievements.rank.no_data_message'),
                 inline=False
             )
 
@@ -415,14 +420,15 @@ class RankView(discord.ui.View):
         type_display_name = self.visible_type_names.get(type_name, type_name)
 
         # Create the embed title
-        title = self.rank_config.get('embed_title_single', "🏆 {type_name}排行榜 🏆").format(
-            type_name=type_display_name
-        )
+        title = t('achievements.rank.embed_title_single', type_name=type_display_name)
 
         # Add date to title if provided
         if self.year is not None and self.month is not None:
-            title = self.rank_config.get('embed_title_date_format', '{title} ({year}-{month})').format(
-                title=title, year=self.year, month=self.month
+            title = t(
+                'achievements.rank.embed_title_date_format',
+                title=title,
+                year=self.year,
+                month=self.month
             )
 
         embed = discord.Embed(title=title, color=discord.Color.blue())
@@ -431,7 +437,7 @@ class RankView(discord.ui.View):
         top_users = self.all_rankings.get(type_name, [])[:40]  # Get up to 40 users
 
         if not top_users:
-            embed.description = self.rank_config.get('no_data_message', "暂无数据")
+            embed.description = t('achievements.rank.no_data_message')
             return embed
 
         # Get emojis for first 10 ranks
@@ -452,7 +458,7 @@ class RankView(discord.ui.View):
                 if rank <= 10 and rank - 1 < len(rank_emojis):
                     rank_display = rank_emojis[rank - 1]
                 else:
-                    rank_display = self.rank_config.get('rank_prefix', "#{rank}").format(rank=rank)
+                    rank_display = t('achievements.rank.rank_prefix', rank=rank)
 
                 # Make sure user_id is treated as an integer
                 user_id = int(user_id)
@@ -465,8 +471,10 @@ class RankView(discord.ui.View):
 
                 ranking += f"{rank_display} {user.mention if user else f'User ID: {user_id}'} - {int(display_count)}\n"
 
-            field_name = self.rank_config.get('pagination_field_name', "排名 {start}-{end}").format(
-                start=start_rank, end=end_rank
+            field_name = t(
+                'achievements.rank.pagination_field_name',
+                start=start_rank,
+                end=end_rank
             )
             embed.add_field(name=field_name, value=ranking, inline=False)
 

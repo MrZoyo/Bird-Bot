@@ -43,9 +43,8 @@ class WelcomeCog(commands.Cog):
         self.font_path = str(project_path("resources", "fonts", Path(conf['font_path']).name))
         self.background_image = str(project_path("resources", "images", Path(conf['background_image']).name))
 
-        # Add new config parameters for DM welcome message. DM copy is a
-        # mix of data (colour, image, rules_channel_id) and text; a full
-        # i18n split is a follow-up — for now dm_config stays YAML-backed.
+        # DM runtime data stays in YAML; visible copy lives under
+        # bot/locales/<lang>/welcome.yaml.
         self.dm_config = conf.get('dm', {})
         self.welcome_dm_image = str(
             project_path("resources", "images", Path(self.dm_config.get('dm_image', "welcome_dm.png")).name)
@@ -212,21 +211,21 @@ class WelcomeCog(commands.Cog):
 
             # Set author with member's avatar
             embed.set_author(
-                name=self.dm_config.get('description0_title'),
+                name=t('welcome.dm.description0_title'),
                 icon_url=member.display_avatar.url
             )
 
             # Add the first description
             embed.add_field(
-                name=self.dm_config.get('description1_title'),
-                value="\n".join(line.format(user=member.mention) for line in self.dm_config.get('description1', [])),
+                name=t('welcome.dm.description1_title'),
+                value=t('welcome.dm.description1', user=member.mention),
                 inline=False
             )
 
             # Add the second description
             embed.add_field(
-                name=self.dm_config.get('description2_title'),
-                value="\n".join(self.dm_config.get('description2', [])),
+                name=t('welcome.dm.description2_title'),
+                value=t('welcome.dm.description2'),
                 inline=False
             )
 
@@ -238,15 +237,15 @@ class WelcomeCog(commands.Cog):
             rules_channel = member.guild.get_channel(int(self.dm_config.get('rules_channel_id')))
             if rules_channel:
                 embed.add_field(
-                    name=self.dm_config.get('rules', {}).get('rules_title'),
-                    value=f"{self.dm_config.get('rules', {}).get('rules_text')}\n{rules_channel.mention}",
+                    name=t('welcome.dm.rules_title'),
+                    value=f"{t('welcome.dm.rules_text')}\n{rules_channel.mention}",
                     inline=False
                 )
 
             # Set footer with bot avatar
             if self.bot.user.avatar:
                 embed.set_footer(
-                    text=self.dm_config.get('footer'),
+                    text=t('welcome.dm.footer'),
                     icon_url=self.bot.user.avatar.url
                 )
 

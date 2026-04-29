@@ -5,3 +5,29 @@ achievements_finish_emoji: ':white_check_mark:'
 achievements_incomplete_emoji: ''
 achievements_ranking_title: ':crown:成就排行榜:crown:'
 achievements_progress_title: '{date} 成就进度 '
+rank:
+  all_button_label: 🟣 全部排名
+  type_button_labels:
+    reaction: 添加反应
+    message: 发送消息
+    time_spent: 语音时长
+    giveaway: 参加抽奖
+    checkin_sum: 累计签到
+    checkin_combo: 连续签到
+  embed_title_single: 🏆 {type_name}排行榜 🏆
+  embed_title_date_format: '{title} ({year}-{month})'
+  pagination_field_name: 排名 {start}-{end}
+  rank_prefix: '#{rank}'
+  no_data_message: 暂无数据
+  intro_title: 🏆 成就排行榜 🏆
+  intro_description: 欢迎使用成就排行榜！请点击下方按钮查看不同类型的成就排行：
+  intro_all_button: 查看全部成就排行 TOP 10
+  intro_type_buttons:
+    reaction: 查看 **添加反应** 成就 TOP 40
+    message: 查看 **发送消息** 成就 TOP 40
+    time_spent: 查看 **语音时长** 成就 TOP 40
+    giveaway: 查看 **参加抽奖** 成就 TOP 40
+    checkin_sum: 查看 **累计签到** 成就 TOP 40
+    checkin_combo: 查看 **连续签到** 成就 TOP 40
+  intro_type_button_default: 查看 {button_label} 排行（显示前40名）
+  intro_footer: '---------点击按钮查看对应排名--------'

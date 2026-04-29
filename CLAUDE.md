@@ -78,7 +78,9 @@ Never commit real YAML configs, real JSON configs, `tools/migration_db_seed.json
 - Code reads text with `bot.utils.i18n.t("cog.key")`.
 - Slash command names/descriptions use locale keys under `bot/locales/zh_CN/commands.yaml`.
 - Run `./.venv/Scripts/python.exe -X utf8 tools/check_locales.py` after adding or moving locale keys.
-- Some operator-controlled strings that embed real IDs or URLs may remain in real YAML config and have sanitized `.yaml.example` forms.
+- `welcome_text` is the current explicit exception: it may embed real Discord URLs/custom emoji IDs, so it remains in ignored `welcome.yaml` and has a sanitized `.yaml.example` form.
+- Welcome DM copy, Shop modal labels, PrivateRoom modal labels, and Achievement rank UI text are locale-backed. Their YAML config should only carry runtime data such as IDs, colours, image paths, prices, limits, and time formats.
+- Achievement definitions, role pick-up option names, and ranking type names remain YAML content metadata because they are coupled to thresholds, type ids, and role ids. Treat these as content/config data, not generic UI chrome.
 
 ## Database
 
@@ -137,6 +139,7 @@ Current pytest smoke coverage includes:
 - Config templates and runtime cog metadata.
 - Locale key integrity.
 - Log helper formatting.
+- UI metadata smoke for locale-backed Shop, PrivateRoom, Welcome DM, and Achievement rank controls.
 - Temporary JSON-to-YAML migration smoke.
 - Background loop offline guard.
 - Offline DB manager smoke for retained modules.

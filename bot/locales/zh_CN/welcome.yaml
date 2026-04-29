@@ -1,13 +1,16 @@
 # Text templates safe for git (no concrete channel / guild IDs).
 # `welcome_text` carries Discord URLs / custom-emoji IDs embedded in the
 # copy and lives in bot/config/welcome.yaml (per-deploy, gitignored).
-# Its sanitised form is in welcome.yaml.example. A future i18n pass
-# can split the URLs out into config placeholders + pull the text
-# back here; until then the cog reads welcome_text from config.
-#
-# The DM subtree under bot/config/welcome.yaml similarly mixes data
-# (color / dm_image / rules_channel_id) with user-visible text; it
-# stays in the config YAML for now, pending a namespaced split.
 welcome_text_fallback: 欢迎来到本服务器, {member.mention}! 希望你能在这里度过一段美好时光。
 welcome_text_picture_1: 漆黑的世界，我寻着光，遇到了你。 {user_name}，祝君开心。
 welcome_text_picture_2: 本服务器第 {member_number} 名成员
+dm:
+  description0_title: 小鸟知道你在想什么・永久邀请链接
+  description1_title: https://discord.gg/Birdgaming
+  description1: "\n 你好，{user}，欢迎你的加入 \n"
+  description2_title: 🐦小鸟知道你在想什么・欧服综合游戏社区 🏮
+  description2: "同时也是最大的LOL EUW社区 🎮\n我们欢迎任何志同道合的绿色玩家🤗\n希望你能在这里成为我们和谐家庭的一员💫"
+  rules_title: 📜 规则与指南
+  rules_text: 请你熟悉一下我们服务器的规则🎐
+  footer: 小鸟知道你在想什么・欧服综合游戏社区
+  member_count_button: 你是小鸟的第 {member_count} 名成员

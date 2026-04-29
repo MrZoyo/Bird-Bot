@@ -16,6 +16,7 @@ from .views import (
     ConfirmationView,
     RankView,
 )
+from .rank_locale import rank_intro_type_buttons
 
 
 FEATURE_LINKED_ACHIEVEMENT_TYPES = {
@@ -411,16 +412,14 @@ class AchievementCog(commands.Cog):
 
         # Create an intro embed that explains the command functionality
         intro_embed = discord.Embed(
-            title=self.achievement_config.get('rank', {}).get('intro_title', "🏆 成就排行榜 🏆"),
-            description=self.achievement_config.get('rank', {}).get('intro_description',
-                                                                    "请点击下方按钮查看不同类型的成就排行："),
+            title=t('achievements.rank.intro_title'),
+            description=t('achievements.rank.intro_description'),
             color=discord.Color.gold()
         )
 
         # Add explanations for each button
-        all_button_text = self.achievement_config.get('rank', {}).get('intro_all_button',
-                                                                      "查看所有类型的成就排行（每类显示前10名）")
-
+        all_button_text = t('achievements.rank.intro_all_button')
+        intro_type_buttons = rank_intro_type_buttons()
         type_name = self.get_visible_achievement_type_names()
 
         intro_embed.add_field(name=view.all_button.label, value=all_button_text, inline=False)
@@ -433,17 +432,20 @@ class AchievementCog(commands.Cog):
 
             # print(f"Button type: {button_type}")  # Debugging log
 
-            # Look up the intro text directly from the config using the exact same type key
-            type_buttons_config = self.achievement_config.get('rank', {}).get('intro_type_buttons', {})
-
             # Use the exact same key from the achievements_ranking type
-            button_text = type_buttons_config.get(button_type, f"查看{button.label}排行（显示前40名）")
+            button_text = intro_type_buttons.get(
+                button_type,
+                t(
+                    'achievements.rank.intro_type_button_default',
+                    button_label=button.label
+                )
+            )
 
             # Add field with button label and description
             intro_embed.add_field(name=f"{type_name.get(button_type)}", value=button_text, inline=False)
 
         # Add footer text and timestamp
-        intro_embed.set_footer(text=self.achievement_config.get('rank', {}).get('intro_footer', "点击按钮查看详细排名"))
+        intro_embed.set_footer(text=t('achievements.rank.intro_footer'))
         intro_embed.timestamp = datetime.now()
 
         # Set the bot's avatar as the thumbnail if available

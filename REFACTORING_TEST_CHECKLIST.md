@@ -28,12 +28,14 @@
 - `tests/test_achievement_db.py`：成就计数、排行榜、语音 session、手动操作、签到联查。
 - `tests/test_log_helpers.py`：日志 helper；用户 `昵称 / 用户名 (id)`，频道/身份组 `name (id)`，id 使用英文括号。
 - `tests/test_invitation_full_message.py`：关键词检测日志 `昵称 / 用户名 (id)` 格式，组队消息 / 房间面板满员样式共享。
+- `tests/test_shop_ui_metadata.py`：Shop 补签 / 余额修改 modal 与交易历史翻页按钮文案来自 locale，不再要求 `shop.yaml` 提供 UI 文案键。
+- `tests/test_ui_locale_metadata.py`：PrivateRoom 购买 / 续费 modal、Welcome DM 成员数按钮、Achievement rank 按钮文案来自 locale。
 - `tests/test_migrate_config_to_yaml_temp.py`：临时升级 smoke，验证旧 JSON config 可转换为新 YAML / locale / DB seed，并跳过旧 rating / 旧 ticket。
 - `tests/test_task_helpers.py`：离线 cog-load smoke 时后台 loop 不再因未登录客户端抛未取回异常。
 
 必须先过：
 - [x] `./.venv/Scripts/python.exe -m pytest -q`
-  - 预期：全部通过；当前基线是 `25 passed`，允许出现 discord.py 的 `audioop` deprecation warning。
+  - 预期：全部通过；当前基线是 `31 passed`，允许出现 discord.py 的 `audioop` / `TextInput.label` deprecation warning。
 - [x] `./.venv/Scripts/python.exe -m ruff check bot tests tools`
   - 预期：0 error；当前只启用 `E722`，用于防裸 `except:` 回归。
 - [x] `./.venv/Scripts/python.exe -m compileall bot tests tools`
@@ -103,6 +105,7 @@
 - [ ] 普通用户点击每日签到，余额增加、连签显示更新
 - [ ] 同一用户重复点击每日签到，得到已签到提示，不重复加钱
 - [ ] 补签按钮在有可补日期 / 额度时成功；额度用完后失败提示清楚
+  - 自动补充：补签 modal 的 title / label / placeholder 已由 `tests/test_shop_ui_metadata.py` 覆盖，手工只需验证真实余额扣减、补签记录和 Discord 交互响应。
 - [ ] `/balance_change` 给测试用户加分和扣分，余额正确
 - [ ] `/balance_history` 显示流水，能区分签到和管理员调整
 - [ ] `/checkin_history` 显示签到日历 / 历史
@@ -119,6 +122,7 @@
 - [ ] 用户余额足够时购买私人房间成功，频道权限正确
 - [ ] 用户余额不足时购买失败，不创建房间、不扣余额
 - [ ] 到期前续费成功，余额扣除、到期时间延长
+  - 自动补充：购买 / 续费 modal 文案已由 `tests/test_ui_locale_metadata.py` 覆盖，手工只需验证扣款、频道权限和到期时间。
 - [ ] 已删除但未过期的房间能通过恢复路径重新绑定新频道
 - [ ] `/privateroom_list` 能列出活跃房间
 - [ ] `/privateroom_ban` 能限制指定用户进入私人房间
@@ -136,6 +140,7 @@
 - [ ] 管理员用 `/decrease_achievement` 减少对应计数
 - [ ] `/achievement_ranking` 显示全服排行榜
 - [ ] `/rank` 显示个人名次和总参与人数
+  - 自动补充：`/rank` 交互按钮文案已由 `tests/test_ui_locale_metadata.py` 覆盖，手工只需验证真实排行榜数据和按钮切页。
 - [ ] `/check_ach_ops` 显示手动操作日志
 - [ ] 用户进出语音频道后，语音时长最终写入成就
 - [ ] 签到后，`checkin_sum` / `checkin_combo` 排行榜读到 shop 数据
@@ -236,6 +241,7 @@
 
 - [ ] `/testwelcome` 能发送欢迎图和按钮
 - [ ] 新成员加入测试服时，欢迎频道消息和 DM 行为符合配置
+  - 自动补充：Welcome DM 成员数按钮已由 `tests/test_ui_locale_metadata.py` 覆盖，手工只需验证 DM 能发出、图片/规则频道链接正确。
 - [ ] DM 失败时不影响欢迎频道消息
 - [ ] `/dnd_roll` 掷骰结果格式正常
 - [ ] `/spymode` 创建游戏 View，加入 / 开始 / 退出流程可用

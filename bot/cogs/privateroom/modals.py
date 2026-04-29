@@ -6,13 +6,13 @@ from bot.utils.i18n import t
 class PurchaseModal(discord.ui.Modal):
     def __init__(self, cog, cost, balance, is_restore=False, old_room=None, is_restore_settings=False, is_renewal=False):
         if is_renewal:
-            title = cog.conf['messages']['renewal_modal_title']
-            label = cog.conf['messages']['renewal_modal_label']
-            placeholder = cog.conf['messages']['renewal_modal_placeholder']
+            title = t('privateroom.messages.renewal_modal_title')
+            label = t('privateroom.messages.renewal_modal_label')
+            placeholder = t('privateroom.messages.renewal_modal_placeholder')
         else:
-            title = cog.conf['messages']['modal_title']
-            label = cog.conf['messages']['modal_label']
-            placeholder = cog.conf['messages']['modal_placeholder']
+            title = t('privateroom.messages.modal_title')
+            label = t('privateroom.messages.modal_label')
+            placeholder = t('privateroom.messages.modal_placeholder')
 
         super().__init__(title=title)
         self.cog = cog
@@ -22,9 +22,6 @@ class PurchaseModal(discord.ui.Modal):
         self.old_room = old_room
         self.is_restore_settings = is_restore_settings
         self.is_renewal = is_renewal
-
-        # 加载消息文本
-
         # 添加确认输入
         self.confirmation = discord.ui.TextInput(
             label=label,

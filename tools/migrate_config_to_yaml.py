@@ -325,6 +325,82 @@ def classify_config(
     return yaml_part, locale_part, db_part, rows
 
 
+_WELCOME_DM_DATA_KEYS = {'dm_image', 'color', 'rules_channel_id'}
+_WELCOME_DM_TEXT_KEYS = {
+    'description0_title',
+    'description1_title',
+    'description1',
+    'description2_title',
+    'description2',
+    'footer',
+    'member_count_button',
+}
+_WELCOME_DM_RULE_TEXT_KEYS = {'rules_title', 'rules_text'}
+
+
+def split_welcome_dm_config(
+    yaml_part: Dict[str, Any],
+    locale_part: Dict[str, Any],
+    rows: List[Tuple[str, str, str]],
+) -> None:
+    """Split welcome.dm into runtime data and locale text.
+
+    Legacy configs stored DM colours/images/IDs and visible copy in the
+    same ``dm`` subtree. The runtime now keeps only data in
+    ``welcome.yaml``; the text goes to ``locales/zh_CN/welcome.yaml``.
+    """
+    dm = yaml_part.get('dm')
+    if not isinstance(dm, dict):
+        return
+
+    yaml_dm: Dict[str, Any] = {}
+    existing_locale_dm = locale_part.get('dm')
+    locale_dm: Dict[str, Any] = (
+        dict(existing_locale_dm) if isinstance(existing_locale_dm, dict) else {}
+    )
+
+    for key, value in dm.items():
+        if key in _WELCOME_DM_DATA_KEYS:
+            yaml_dm[key] = value
+            continue
+
+        if key in _WELCOME_DM_TEXT_KEYS:
+            locale_dm[key] = _as_locale_text(value)
+            continue
+
+        if key == 'rules' and isinstance(value, dict):
+            yaml_rules: Dict[str, Any] = {}
+            for rule_key, rule_value in value.items():
+                if rule_key in _WELCOME_DM_RULE_TEXT_KEYS:
+                    locale_dm[rule_key] = _as_locale_text(rule_value)
+                else:
+                    yaml_rules[rule_key] = rule_value
+            if yaml_rules:
+                yaml_dm[key] = yaml_rules
+            continue
+
+        # Unknown nested keys stay in YAML so future data fields are not
+        # silently dropped during a one-shot migration.
+        yaml_dm[key] = value
+
+    if yaml_dm:
+        yaml_part['dm'] = yaml_dm
+    else:
+        yaml_part.pop('dm', None)
+
+    if locale_dm:
+        locale_part['dm'] = locale_dm
+
+    rows[:] = [row for row in rows if row[0] != 'dm']
+    rows.append(('dm', 'yaml+locale', 'special:welcome-dm-split'))
+
+
+def _as_locale_text(value: Any) -> str:
+    if isinstance(value, list):
+        return '\n'.join(str(item) for item in value)
+    return '' if value is None else str(value)
+
+
 def dump_yaml(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, 'w', encoding='utf-8') as f:
@@ -348,6 +424,8 @@ def migrate_cog(
 
     if cog_name == 'main':
         _rename_legacy_feature_keys(yaml_part)
+    if cog_name == 'welcome':
+        split_welcome_dm_config(yaml_part, locale_part, rows)
 
     for key, routing, source in rows:
         report_rows.append((cog_name, key, routing, source))
