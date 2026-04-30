@@ -1,7 +1,7 @@
 # 测试服全量验证 Checklist
 
 > 目标：先用自动化 smoke test 排除“不需要真实 Discord”的回归，再按模块在测试服验证命令、按钮、权限、后台任务和日志。
-> 当前清单按 2026-04-27 main 分支现状编写；NotebookCog 已移除，不再作为现役功能测试项。
+> 当前清单按 2026-04-30 main 分支现状编写；NotebookCog、RatingCog 和旧 channel-based TicketsCog 已移除，不再作为现役功能测试项。
 
 标记规则：
 - `[ ]` 未测

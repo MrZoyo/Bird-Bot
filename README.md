@@ -30,20 +30,18 @@ The bot's code is deeply optimised for low-performance devices, using asynchrono
   - [Role_Cog](#role_cog)
   - [Backup_Cog](#backup_cog)
   - [Giveaway_Cog](#giveaway_cog)
-  - [Rating_Cog (Legacy)](#rating_cog)
   - [TeamupDisplay_Cog](#teamupdisplay_cog)
   - [Tickets_Cog](#tickets_cog)
-  - [Tickets_Cog_Legacy](#tickets_cog-legacy)
   - [Ban_Cog](#ban_cog)
   - [Shop_Cog](#shop_cog)
   - [PrivateRoom_Cog](#privateroom_cog)
   - [Game_DnD_Cog](#game_dnd_cog)
   - [Game_Spymode_Cog](#game_spymode_cog)
+  - [Legacy / Removed](#legacy--removed)
 - [Utilities and Tools](#utilities-and-tools)
   - [config](#config)
   - [channel_validator](#channel_validator)
   - [tickets_db](#tickets_db)
-  - [tickets_db_legacy](#tickets_db-legacy)
   - [file_utils](#file_utils)
   - [media_handler](#media_handler)
   - [shop_db](#shop_db)
@@ -169,7 +167,7 @@ Comprehensive achievement tracking system for user activity monitoring.
 - `/increase_achievement <member> [reactions] [messages] [time_spent]`: Manually increase achievement progress.
 - `/decrease_achievement <member> [reactions] [messages] [time_spent]`: Manually decrease achievement progress.
 - `/achievement_ranking [date]`: Show top 10 users in various achievement categories.
-- `/check_achi_op`: Check manual operation history for the achievement system.
+- `/check_ach_ops`: Check manual operation history for the achievement system.
 - `/rank`: Enhanced ranking system interface for server leaderboards.
 
 ### Role_Cog
@@ -224,24 +222,7 @@ Comprehensive giveaway management system with achievement-based restrictions.
 - `/ga_time_extend <giveaway_id> <time>`: Extend giveaway duration
 - `/ga_participant <giveaway_id>`: List all giveaway participants
 - `/ga_description <giveaway_id> <description>`: Update giveaway description
-- `/ga_sendtowinner <giveaway_id>`: Send message to giveaway winners
-
-### Rating_Cog
-**⚠️ Deprecated system** - The rating system has been removed in version 1.6.0b.
-
-**Important:** This system is no longer available. All rating-related commands and functionality have been discontinued. Rating data remains in the database but is no longer accessible through bot commands.
-
-**Previous Features:**
-- **10-point rating scale** with anonymous submissions
-- **Manual start/end control** for rating periods
-- **Statistical analysis** showing average scores and distribution
-- **Rating item management** with unique ID system
-
-**Previous Commands (No longer available):**
-- `/rt_create`: Create new rating item with interactive form
-- `/rt_end <rating_id>`: End rating and display statistics
-- `/rt_cancel <rating_id>`: Cancel rating without showing results
-- `/rt_description <rating_id> <description>`: Modify rating description
+- `/ga_sendtowinner <giveaway_id> <message>`: Send message to giveaway winners
 
 ### TeamupDisplay_Cog
 Real-time teamup information display system for organizing team activities.
@@ -291,21 +272,15 @@ Real-time teamup information display system for organizing team activities.
 - `/tickets_close <reason>`: Close current ticket with reason
 - `/tickets_refresh_buttons`: Refresh all ticket button states
 - `/tickets_refresh_main`: Refresh main ticket creation page
+- `/tickets_add_type`: Add a ticket type shown on the main panel
+- `/tickets_edit_type`: Edit a ticket type's metadata, guide, button color, or admins
+- `/tickets_delete_type`: Delete a ticket type and refresh the main panel
 
 **User Experience:**
 - **Jump buttons** for easy navigation to ticket threads
 - **Rich embeds** with comprehensive ticket information
 - **Button state indicators** showing ticket status at a glance
 - **Modal confirmations** for important actions
-
-### Tickets_Cog (Legacy)
-**⚠️ Deprecated system** - The original channel-based ticket system is being phased out.
-
-**Features:**
-- **Category-based archive functionality** for tickets with complete message history and file download
-
-**Commands:**
-- `/tickets_archive`: Archive all tickets in the current category with complete message history and attachment download (≤50MB per file)
 
 ### Shop_Cog
 **🔥 Enhanced point-based economy system** with makeup check-in functionality and improved user experience.
@@ -360,6 +335,7 @@ The new check-in system is completely interface-based using interactive embeds w
 - `/privateroom_reset`: (Admin) Reset entire private room system
 - `/privateroom_list`: List all active private rooms with pagination
 - `/privateroom_ban <user>`: (Admin) Ban user from private room system
+- `/privateroom_fix <user> <days>`: (Admin) Repair an active private room's expiration state
 
 **Shop Interface:**
 - **🛍️ Purchase Button**: Buy new private room with intelligent settings detection
@@ -394,8 +370,8 @@ Interactive spy-based team game system for voice channel activities.
 - **Interactive buttons** for team management and game control
 
 **Commands:**
-- `/spy_mode <team_size> <spy>`: Create spy mode game with specified team size and spy count
-  - Example: `/spy_mode 5 1` creates 5v5 teams with 1 spy per team
+- `/spymode <team_size> <spy>`: Create spy mode game with specified team size and spy count
+  - Example: `/spymode 5 1` creates 5v5 teams with 1 spy per team
 
 **Game Flow:**
 1. **Setup Phase**: Define team sizes and spy counts
@@ -436,6 +412,11 @@ Interactive spy-based team game system for voice channel activities.
 - `/ban_set_invite_link <invite_link>`: Set rejoin link for tempbanned users
 - `/ban_remove_invite_link`: Remove rejoin link setting
 
+### Legacy / Removed
+RatingCog, NotebookCog, and the old channel-based TicketsCog are removed from runtime. They should not appear in Discord command picker, active config templates, or active test flows.
+
+Old implementation snapshots and sanitized legacy templates live on the `legacy-old-files-archive` branch. See `LEGACY_ARCHIVE.md` on main and `LEGACY_ARCHIVE_INDEX.md` on that branch.
+
 ---
 
 ## Utilities and Tools
@@ -460,12 +441,6 @@ Comprehensive database manager for the thread-based ticket system (renamed from 
 - **Member tracking** with addition timestamps and relationship management
 - **Statistics collection** for reporting and analytics
 - **Configuration storage** in database for dynamic updates
-
-### tickets_db_legacy
-Legacy database manager for the original channel-based ticket system (archived on the `legacy-old-files-archive` branch).
-- **Channel-based ticket** management for compatibility
-- **Archive functionality** for ticket data preservation
-- **Statistics tracking** for legacy system monitoring
 
 ### file_utils
 Enhanced file operations module with advanced capabilities.

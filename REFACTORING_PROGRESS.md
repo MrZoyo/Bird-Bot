@@ -172,7 +172,7 @@
 - 新增 `bot/cogs/create_invitation/full_message.py`，将组队消息“满员”embed 更新逻辑收敛为 `update_invitation_message_to_full()`。
 - `CreateInvitationCog.update_message_to_full()` 和 `RoomControlPanelView.update_message_to_full()` 都调用同一 helper；组队频道按钮与房间控制面板按钮不再各自维护一套标题 / description / footer / view 处理。
 - `CLAUDE.md` 已重写为详细项目开发指南，`AGENTS.md` 改为短入口并要求先读 `CLAUDE.md`；`.gitignore` 不再屏蔽 `CLAUDE.md`。
-- `tests/test_invitation_full_message.py` 覆盖满员 embed 样式共享和关键词日志格式；当前 pytest 基线提升到 25 passed。
+- `tests/test_invitation_full_message.py` 覆盖满员 embed 样式共享和关键词日志格式；当时 pytest 基线提升到 25 passed，后续 UI locale smoke 已提升到 31 passed。
 
 **2026-04-29 config 文案读取复扫 / Shop 补签修复**：
 - 用户真实点击 Shop 补签按钮暴露 `KeyError: 'makeup_modal_title'`；根因是 Shop modal 还有 UI 文案从 `shop.yaml` runtime config 读取，而迁移后文案已在 locale。已改为 `t('shop.*')`，并把余额修改 modal、交易历史翻页按钮一起切到 locale。
@@ -180,7 +180,12 @@
 - `tools/migrate_config_to_yaml.py` 已同步 welcome DM 拆分：`dm_image` / `color` / `rules_channel_id` 留在 YAML，`description*` / `rules_*` / `footer` / `member_count_button` 进 locale；`achievements.rank` 也由迁移分类路由到 locale。
 - 新增 `tests/test_shop_ui_metadata.py` 和 `tests/test_ui_locale_metadata.py`，覆盖 Shop / PrivateRoom / Welcome DM / Achievement rank 控件文案不再依赖 runtime config；临时迁移测试扩展了 welcome DM split 与 `achievements.rank` 路由。
 
-**测试准备收尾（2026-04-27）**：
+**2026-04-30 文档状态对齐**：
+- README 已从现役功能目录中移除 RatingCog / 旧 channel-based TicketsCog 的正文入口，统一放到 `Legacy / Removed`；NotebookCog / RatingCog / old TicketsCog 均标注为 runtime removed，旧实现和脱敏模板只去 `legacy-old-files-archive` 分支查。
+- README 命令名同步代码：`/check_ach_ops`、`/spymode`、`/ga_sendtowinner <giveaway_id> <message>`，并补列 Tickets 类型 CRUD 与 `/privateroom_fix`。
+- `REFACTORING_TEST_CHECKLIST.md` 顶部基准日期更新到 2026-04-30；自动化 baseline 保持 `31 passed`。
+
+**测试准备收尾（2026-04-30）**：
 - `REFACTORING_TEST_CHECKLIST.md` 已从历史 P0 checklist 重写为“自动化 gate + 按模块测试流程”。用户后续跟着该文件测试，不再需要从旧任务顺序反推功能路径。
 - 当前自动化基线：`pytest` 为 31 passed；ruff、compileall、locale check、pip check、`uv lock --check`、test/lint extra dry-run 和 `git diff --check` 均通过。覆盖配置/runtime metadata/log helpers、组队满员样式、UI 文案 locale smoke、主要 DB manager smoke、临时 JSON→YAML 迁移 smoke 和后台 loop 离线 guard。手工清单仍覆盖 Discord 权限、按钮、command sync、后台任务、DM 失败等必须真实测试服验证的路径。
 - 启动 smoke 补遗：用户真实启动暴露 `WelcomeCog: 'welcome_text'`、`ShopCog: 'checkin_button_daily_text'`。已修复 Shop 按钮文案从 locale 读取；Welcome 在本地 YAML 缺 `welcome_text` 时用 `welcome_text_fallback` 不阻塞加载；同时修正 Welcome 资源路径为仓库根 `resources/`，并把迁移分类里的 `welcome_text` 显式留在 YAML。真实本地配置下 `create_bot()` + `setup_bot()` 不连接 Discord 的 load smoke 已加载 15 个 cog。
@@ -190,7 +195,11 @@
 
 **环境验证规则**：环境 / import / 启动验证必须提权到沙箱外跑真实环境。项目 Windows `.venv` 已用 `ensurepip` 补出 pip，并通过 `./.venv/Scripts/python.exe -m pip install -r requirements.lock` 按 lock 补齐依赖（含 `ruamel-yaml==0.19.1`）；本轮 project venv import smoke 已通过。后续如果项目 venv 再缺包，直接补环境，不只记录缺失。
 
-**当前工作区预期**：只剩未跟踪 `.codex`（本地状态，不碰）。
+**当前工作区预期（2026-04-30）**：
+- 未跟踪 `.codex` 与 `data/*.log.2026-*` / `data/*_activity.log.2026-*` 属本地状态，不碰。
+- `REFACTORING_TEST_CHECKLIST.md` 可能含用户手工测试勾选状态；提交文档变更时只暂存本轮说明性 hunk，避免覆盖用户勾选。
+- `bot/locales/zh_CN/*.yaml` 中除本轮明确修改的 locale 文件外，可能仍有本地旧配置迁移/运行文案差异；不要误纳入提交。
+- `run.py` 当前只有本地换行/格式差异；除非用户明确要求，不把它和重构提交混在一起。
 
 ---
 
