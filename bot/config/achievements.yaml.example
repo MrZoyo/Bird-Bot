@@ -1,10 +1,10 @@
 # 成就系统运行数据配置。
 # 这里保存成就定义、排行榜类别和成就类别显示名；/rank 按钮、分页、提示等 UI 文案在 bot/locales/zh_CN/achievements.yaml。
-# 如果 main.features.shop=false，checkin_sum/checkin_combo 会在运行时隐藏；如果 main.features.giveaway=false，giveaway 会隐藏。
+# 如果 main.features.shop=false，checkin_sum/checkin_combo 会在运行时隐藏。
 # 成就定义列表。每一项字段：
 # name/description：显示在成就进度和成就身份组面板中的名称/说明；
-# threshold：达成门槛；reaction/message/giveaway/checkin_* 是次数，time_spent 是分钟；
-# type：必须是 reaction、message、time_spent、giveaway、checkin_sum、checkin_combo 之一，且要和排行榜/角色配置对应；
+# threshold：达成门槛；reaction/message/checkin_* 是次数，time_spent 是分钟；
+# type：必须是 reaction、message、time_spent、checkin_sum、checkin_combo 之一，且要和排行榜/角色配置对应；
 # milestone：当前运行时代码不读取，作为迁移保留的成就阶段标识，建议保持唯一；
 # role_id：领取该成就时授予的 Discord Role ID。
 achievements:
@@ -79,24 +79,6 @@ achievements:
   threshold: 525600
   type: time_spent
   milestone: timespent5
-  role_id: 1145141919810
-- name: :game_die:赌:dog:来咯
-  description: 参加一次抽奖
-  threshold: 1
-  type: giveaway
-  milestone: giveaway1
-  role_id: 1145141919810
-- name: :joker:土块！
-  description: 参加10次抽奖
-  threshold: 10
-  type: giveaway
-  milestone: giveaway2
-  role_id: 1145141919810
-- name: :regional_indicator_q::regional_indicator_q::regional_indicator_q:三个蛋！
-  description: 参加100次抽奖
-  threshold: 100
-  type: giveaway
-  milestone: giveaway3
   role_id: 1145141919810
 - name: 打卡旅人·起步章🧭
   description: 刚踏上这条签到之路
@@ -180,8 +162,6 @@ achievements_ranking:
   type: message
 - name: ':yellow_heart: 语音时长最久(min) :yellow_heart: '
   type: time_spent
-- name: ':blue_heart: 参加最多抽奖 :blue_heart: '
-  type: giveaway
 - name: ':orange_heart: 累计签到最多 :orange_heart: '
   type: checkin_sum
 - name: ':purple_heart: 连续签到最久 :purple_heart: '
@@ -194,8 +174,6 @@ achievements_type_name:
   message: 🟡 发送消息
 # time_spent 类型的显示名；数据库存秒，界面显示时换算为分钟。
   time_spent: 🔵 语音时长(min)
-# giveaway 类型的显示名；依赖 GiveawayCog，main.features.giveaway=false 时运行时隐藏。
-  giveaway: 🟢 参加抽奖
 # 累计签到显示名；依赖 ShopCog 的签到记录，main.features.shop=false 时运行时隐藏。
   checkin_sum: 🟠 累计签到
 # 连续签到显示名；依赖 ShopCog 的最大连签记录，main.features.shop=false 时运行时隐藏。

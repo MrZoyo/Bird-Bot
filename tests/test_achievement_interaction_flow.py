@@ -66,7 +66,6 @@ class FakeAchievementCog:
             for ranking in [
                 {"type": "message", "name": "Messages"},
                 {"type": "time_spent", "name": "Voice Time"},
-                {"type": "giveaway", "name": "Giveaways"},
                 {"type": "checkin_sum", "name": "Checkins"},
                 {"type": "checkin_combo", "name": "Checkin Streak"},
             ]
@@ -79,31 +78,10 @@ class FakeAchievementCog:
             for achievement_type, label in {
                 "message": "Messages",
                 "time_spent": "Voice Time",
-                "giveaway": "Giveaways",
                 "checkin_sum": "Checkins",
                 "checkin_combo": "Checkin Streak",
             }.items()
             if self.is_achievement_type_visible(achievement_type)
-        }
-
-
-class LegacyFakeAchievementCog:
-    def __init__(self, *, giveaway_visible=True):
-        self.giveaway_visible = giveaway_visible
-
-    def is_achievement_type_visible(self, achievement_type):
-        return self.giveaway_visible or achievement_type != "giveaway"
-
-    def get_visible_achievement_rankings(self):
-        return [
-            {"type": "message", "name": "Messages"},
-            {"type": "time_spent", "name": "Voice Time"},
-        ]
-
-    def get_visible_achievement_type_names(self):
-        return {
-            "message": "Messages",
-            "time_spent": "Voice Time",
         }
 
 
@@ -169,14 +147,13 @@ def test_confirmation_button_applies_changes_logs_then_edits_original(monkeypatc
         _install_achievement_config(monkeypatch)
         events = []
         db = FakeAchievementDB(events)
-        bot = FakeBot(LegacyFakeAchievementCog(giveaway_visible=True))
+        bot = FakeBot(FakeAchievementCog())
         view = ConfirmationView(
             bot,
             member_id=555,
             reactions=2,
             messages=3,
             time_spent=120,
-            giveaways=1,
             operation="increase",
             db_manager=db,
         )
@@ -195,7 +172,6 @@ def test_confirmation_button_applies_changes_logs_then_edits_original(monkeypatc
             "message_count": 3,
             "reaction_count": 2,
             "time_spent": 120,
-            "giveaway_count": 1,
         }
         assert db.applied == [(555, expected_changes, "increase")]
         assert db.logged == [(999, 555, "increase", expected_changes)]
@@ -236,10 +212,10 @@ def test_rank_type_button_keeps_underscored_time_spent_type(monkeypatch):
     asyncio.run(scenario())
 
 
-def test_rank_view_hides_shop_and_giveaway_types_when_features_are_disabled(monkeypatch):
+def test_rank_view_hides_shop_types_when_shop_feature_is_disabled(monkeypatch):
     _install_achievement_config(monkeypatch)
     bot = FakeBot(FakeAchievementCog(
-        hidden_types={"giveaway", "checkin_sum", "checkin_combo"},
+        hidden_types={"checkin_sum", "checkin_combo"},
     ))
 
     view = RankView(bot, all_rankings={})

@@ -171,12 +171,12 @@ Current pytest smoke coverage includes:
 - Background loop offline guard.
 - Offline DB manager smoke for retained modules.
 - Shared team invitation full-state formatting.
-- Feature-linked achievement visibility: if `main.features.shop` is false, `checkin_sum` / `checkin_combo` disappear from achievement displays, rank buttons, and Role achievement pickup; if `main.features.giveaway` is false, `giveaway` does the same.
+- Feature-linked achievement visibility: if `main.features.shop` is false, `checkin_sum` / `checkin_combo` disappear from achievement displays, rank buttons, and Role achievement pickup. Giveaway achievement categories are retired and remain hidden even when GiveawayCog is enabled.
 
 Current P3-9 status:
 
 - Done: current fake interaction flow list is complete for PrivateRoom, Shop, Tickets, Ban, VoiceChannel, Giveaway, Role / Signature, Achievement / Rank, Welcome / Games, CheckStatus / Backup.
-- Current baseline: `78 passed, 8 warnings`.
+- Current baseline: `79 passed, 8 warnings`.
 - Next default target: full automatic gate, then real test-server validation.
 - Add more fake interaction tests only for new bugs, payload replay work, or new features.
 

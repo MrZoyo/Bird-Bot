@@ -16,9 +16,6 @@ role_type_name:
 - name: 🔵 成就-语音时长
   type: time_spent
   data: time_spent
-- name: 🟢 成就-参加抽奖
-  type: giveaway
-  data: giveaway_count
 - name: 🟠 成就-累计签到
   type: checkin_sum
   data: checkin_sum

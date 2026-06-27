@@ -340,6 +340,7 @@ _WELCOME_DM_TEXT_KEYS = {
     'member_count_button',
 }
 _WELCOME_DM_RULE_TEXT_KEYS = {'rules_title', 'rules_text'}
+_RETIRED_ACHIEVEMENT_TYPES = {'giveaway'}
 
 
 def split_welcome_dm_config(
@@ -399,6 +400,50 @@ def split_welcome_dm_config(
     rows.append(('dm', 'yaml+locale', 'special:welcome-dm-split'))
 
 
+def drop_retired_achievement_types(
+    cog_name: str,
+    yaml_part: Dict[str, Any],
+    rows: List[Tuple[str, str, str]],
+) -> None:
+    """Remove retired achievement categories from migrated runtime metadata."""
+    if cog_name == 'achievements':
+        list_keys = ('achievements', 'achievements_ranking')
+        mapping_keys = ('achievements_type_name',)
+    elif cog_name == 'role':
+        list_keys = ('role_type_name',)
+        mapping_keys = ()
+    else:
+        return
+
+    dropped = False
+    for key in list_keys:
+        items = yaml_part.get(key)
+        if not isinstance(items, list):
+            continue
+        filtered = [
+            item for item in items
+            if not (
+                isinstance(item, dict)
+                and item.get('type') in _RETIRED_ACHIEVEMENT_TYPES
+            )
+        ]
+        if len(filtered) != len(items):
+            yaml_part[key] = filtered
+            dropped = True
+
+    for key in mapping_keys:
+        mapping = yaml_part.get(key)
+        if not isinstance(mapping, dict):
+            continue
+        for achievement_type in _RETIRED_ACHIEVEMENT_TYPES:
+            if achievement_type in mapping:
+                mapping.pop(achievement_type)
+                dropped = True
+
+    if dropped:
+        rows.append(('giveaway achievement metadata', 'drop', 'special:retired-achievement-type'))
+
+
 def _as_locale_text(value: Any) -> str:
     if isinstance(value, list):
         return '\n'.join(str(item) for item in value)
@@ -430,6 +475,7 @@ def migrate_cog(
         _rename_legacy_feature_keys(yaml_part)
     if cog_name == 'welcome':
         split_welcome_dm_config(yaml_part, locale_part, rows)
+    drop_retired_achievement_types(cog_name, yaml_part, rows)
 
     for key, routing, source in rows:
         report_rows.append((cog_name, key, routing, source))

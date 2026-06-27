@@ -107,7 +107,6 @@ class RoleDatabaseManager(BaseDatabaseManager):
                         'reaction': 'reaction_count',
                         'message': 'message_count',
                         'time_spent': 'time_spent',
-                        'giveaway': 'giveaway_count'
                     }
                     column_name = column_mapping.get(achievement_type, achievement_type)
                     

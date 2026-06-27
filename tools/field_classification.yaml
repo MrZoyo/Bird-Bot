@@ -158,3 +158,5 @@ achievements:
     - rank
   # Achievement definitions / ranking type names are content metadata
   # coupled to thresholds, type ids, and role ids, so they remain YAML.
+  # The migrator drops retired `type: giveaway` achievement metadata in a
+  # post-classification pass.

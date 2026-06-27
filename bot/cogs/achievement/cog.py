@@ -75,8 +75,6 @@ class AchievementCog(commands.Cog):
             return user_achievements['message_count']
         if achievement_type == 'time_spent':
             return user_achievements['time_spent'] / 60
-        if achievement_type == 'giveaway':
-            return user_achievements['giveaway_count']
         if achievement_type == 'checkin_sum':
             return user_achievements['checkin_sum']
         if achievement_type == 'checkin_combo':
@@ -88,7 +86,6 @@ class AchievementCog(commands.Cog):
             ('reaction', user_achievements['reaction_count']),
             ('message', user_achievements['message_count']),
             ('time_spent', int(user_achievements['time_spent'] / 60)),
-            ('giveaway', user_achievements['giveaway_count']),
         ]
         return [
             (achievement_type, value)
@@ -209,16 +206,11 @@ class AchievementCog(commands.Cog):
             "The time spent on the server to increase (in seconds)",
             key="achievements.increase_achievement.params.time_spent",
         ),
-        giveaways=locale_str(
-            "The number of giveaways to increase",
-            key="achievements.increase_achievement.params.giveaways",
-        ),
     )
     async def increase_achievement_progress(self, interaction: discord.Interaction, member: discord.Member,
                                             reactions: int = 0,
                                             messages: int = 0,
-                                            time_spent: int = 0,
-                                            giveaways: int = 0):
+                                            time_spent: int = 0):
         if not await check_channel_validity(interaction):
             return
 
@@ -227,11 +219,8 @@ class AchievementCog(commands.Cog):
         # Ensure user exists in database
         await self.db.create_user_if_not_exists(member.id)
 
-        if not self.is_achievement_type_visible('giveaway'):
-            giveaways = 0
-
         # Create a confirmation view and send it with an embed
-        view = ConfirmationView(self.bot, member.id, reactions, messages, time_spent, giveaways, 'increase', self.db)
+        view = ConfirmationView(self.bot, member.id, reactions, messages, time_spent, 'increase', self.db)
         embed = discord.Embed(title="Increase Achievement Progress",
                               description=f"You will increase the achievement progress of {member.mention}.",
                               color=discord.Color.blue())
@@ -239,8 +228,6 @@ class AchievementCog(commands.Cog):
         embed.add_field(name="Messages to Add", value=str(messages), inline=True)
         embed.add_field(name="", value="\u200b", inline=False)
         embed.add_field(name="Time to Add (seconds)", value=str(time_spent), inline=True)
-        if self.is_achievement_type_visible('giveaway'):
-            embed.add_field(name="Giveaways to Add", value=str(giveaways), inline=True)
         await interaction.edit_original_response(embed=embed, view=view)
 
     @app_commands.command(
@@ -267,16 +254,11 @@ class AchievementCog(commands.Cog):
             "The time spent on the server to decrease (in seconds)",
             key="achievements.decrease_achievement.params.time_spent",
         ),
-        giveaways=locale_str(
-            "The number of giveaways to decrease",
-            key="achievements.decrease_achievement.params.giveaways",
-        ),
     )
     async def decrease_achievement_progress(self, interaction: discord.Interaction, member: discord.Member,
                                             reactions: int = 0,
                                             messages: int = 0,
-                                            time_spent: int = 0,
-                                            giveaways: int = 0):
+                                            time_spent: int = 0):
         if not await check_channel_validity(interaction):
             return
 
@@ -285,11 +267,8 @@ class AchievementCog(commands.Cog):
         # Ensure user exists in database
         await self.db.create_user_if_not_exists(member.id)
 
-        if not self.is_achievement_type_visible('giveaway'):
-            giveaways = 0
-
         # Create a confirmation view and send it with an embed
-        view = ConfirmationView(self.bot, member.id, reactions, messages, time_spent, giveaways, 'decrease', self.db)
+        view = ConfirmationView(self.bot, member.id, reactions, messages, time_spent, 'decrease', self.db)
         embed = discord.Embed(title="Decrease Achievement Progress",
                               description=f"You will decrease the achievement progress of {member.mention}.",
                               color=discord.Color.blue())
@@ -297,8 +276,6 @@ class AchievementCog(commands.Cog):
         embed.add_field(name="Messages to Subtract", value=str(messages), inline=True)
         embed.add_field(name="", value="\u200b", inline=False)
         embed.add_field(name="Time to Subtract (seconds)", value=str(time_spent), inline=True)
-        if self.is_achievement_type_visible('giveaway'):
-            embed.add_field(name="Giveaways to Subtract", value=str(giveaways), inline=True)
         await interaction.edit_original_response(embed=embed, view=view)
 
     @app_commands.command(

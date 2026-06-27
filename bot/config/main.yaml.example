@@ -37,7 +37,7 @@ features:
   achievements: true
 # 是否加载 SpyModeCog：SpyMode 小游戏。
   spymode: true
-# 是否加载 GiveawayCog：抽奖功能；关闭后 giveaway 成就类别会隐藏。
+# 是否加载 GiveawayCog：抽奖功能。
   giveaway: true
 # 是否加载 RoleCog：身份组领取、星座/MBTI/性别和签名功能。
   role: true

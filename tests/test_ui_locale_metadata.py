@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from bot.cogs.achievement.views import RankView
 from bot.cogs.privateroom.modals import PurchaseModal
 from bot.cogs.welcome.views import WelcomeDMView
+from bot.utils import achievement_visibility
 
 
 ACHIEVEMENT_RANK_TEXT = {
@@ -10,7 +11,6 @@ ACHIEVEMENT_RANK_TEXT = {
     "achievements.rank.type_button_labels.reaction": "🔴 Reactions",
     "achievements.rank.type_button_labels.message": "🟡 Messages",
     "achievements.rank.type_button_labels.time_spent": "🔵 Voice",
-    "achievements.rank.type_button_labels.giveaway": "🟢 Giveaways",
     "achievements.rank.type_button_labels.checkin_sum": "🟠 Checkins",
     "achievements.rank.type_button_labels.checkin_combo": "🟤 Streaks",
 }
@@ -81,3 +81,27 @@ def test_achievement_rank_buttons_come_from_locale(monkeypatch):
     assert str(view.all_button.emoji) == "🟣"
     assert view.type_buttons[0].label == "Reactions"
     assert str(view.type_buttons[0].emoji) == "🔴"
+
+
+def test_giveaway_achievement_type_is_retired_even_when_giveaway_feature_is_enabled(monkeypatch):
+    monkeypatch.setattr(
+        achievement_visibility.config,
+        "is_feature_enabled",
+        lambda feature_name, default=True: feature_name != "shop",
+    )
+
+    hidden_types = achievement_visibility.resolve_hidden_achievement_types()
+
+    assert "giveaway" in hidden_types
+    assert "checkin_sum" in hidden_types
+    assert "checkin_combo" in hidden_types
+    assert achievement_visibility.filter_visible_achievement_rankings(
+        [
+            {"type": "message", "name": "Messages"},
+            {"type": "giveaway", "name": "Giveaways"},
+            {"type": "checkin_sum", "name": "Checkins"},
+        ],
+        hidden_types,
+    ) == [
+        {"type": "message", "name": "Messages"},
+    ]

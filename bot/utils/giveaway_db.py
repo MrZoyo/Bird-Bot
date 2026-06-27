@@ -1,6 +1,5 @@
 # bot/utils/giveaway_db.py
 import aiosqlite
-import datetime
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -14,10 +13,9 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
       - ``giveaway``        : one row per giveaway (definition + state)
       - ``giveaway_views``  : persisted view metadata so panels restore after restart
 
-    The ``increment_giveaway_achievements`` helper touches ``achievements`` /
-    ``monthly_achievements`` tables; those rows are created elsewhere but the
-    "bump on win" bookkeeping lives here for convenience. Revisit during a
-    future refactor if achievement ownership clarifies.
+    Giveaway participation no longer writes achievement counters. Historical
+    ``giveaway_count`` columns may remain in existing databases, but runtime
+    code does not expose them as achievements.
     """
 
     def __init__(self, db_path: str):
@@ -257,7 +255,7 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
     async def fetch_user_achievements(
         self, user_id
     ) -> Optional[Tuple]:
-        """Row shape matches achievements table: (user_id, message_count, reaction_count, time_spent, giveaway_count)."""
+        """Return legacy achievement counters used for giveaway entry requirements."""
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.execute(
                 'SELECT * FROM achievements WHERE user_id = ?',
@@ -299,56 +297,4 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
                     SELECT giveaway_id FROM giveaway WHERE is_end = 1
                 )
             ''')
-            await db.commit()
-
-    # ------------------------------------------------------------------
-    # achievements bump for winners/participants
-    # ------------------------------------------------------------------
-
-    async def increment_giveaway_achievements(self, participant_ids: List) -> None:
-        now = datetime.datetime.now()
-        current_year, current_month = now.year, now.month
-
-        async with aiosqlite.connect(self.db_path) as db:
-            for participant_id in participant_ids:
-                cursor = await db.execute(
-                    'SELECT giveaway_count FROM achievements WHERE user_id = ?',
-                    (participant_id,),
-                )
-                record = await cursor.fetchone()
-                await cursor.close()
-
-                if record is None:
-                    await db.execute(
-                        'INSERT INTO achievements (user_id, giveaway_count) VALUES (?, ?)',
-                        (participant_id, 1),
-                    )
-                else:
-                    await db.execute(
-                        'UPDATE achievements SET giveaway_count = ? WHERE user_id = ?',
-                        (record[0] + 1, participant_id),
-                    )
-
-                cursor = await db.execute(
-                    'SELECT giveaway_count FROM monthly_achievements '
-                    'WHERE user_id = ? AND year = ? AND month = ?',
-                    (participant_id, current_year, current_month),
-                )
-                monthly_record = await cursor.fetchone()
-                await cursor.close()
-
-                if monthly_record is None:
-                    await db.execute(
-                        'INSERT INTO monthly_achievements '
-                        '(user_id, year, month, giveaway_count) VALUES (?, ?, ?, ?)',
-                        (participant_id, current_year, current_month, 1),
-                    )
-                else:
-                    current_monthly = monthly_record[0] if monthly_record[0] is not None else 0
-                    await db.execute(
-                        'UPDATE monthly_achievements SET giveaway_count = ? '
-                        'WHERE user_id = ? AND year = ? AND month = ?',
-                        (current_monthly + 1, participant_id, current_year, current_month),
-                    )
-
             await db.commit()

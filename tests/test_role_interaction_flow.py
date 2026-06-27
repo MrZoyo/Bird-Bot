@@ -176,7 +176,6 @@ def _install_role_config(monkeypatch, role_db):
                 "achievements": [
                     {"type": "message", "threshold": 10, "name": "Chatter", "role_id": 10},
                     {"type": "message", "threshold": 50, "name": "Veteran", "role_id": 20},
-                    {"type": "giveaway", "threshold": 1, "name": "Lucky", "role_id": 40},
                     {"type": "checkin_sum", "threshold": 1, "name": "Checkin", "role_id": 50},
                     {"type": "checkin_combo", "threshold": 1, "name": "Streak", "role_id": 60},
                 ],
@@ -184,7 +183,6 @@ def _install_role_config(monkeypatch, role_db):
             "role": {
                 "role_type_name": [
                     {"name": "Messages", "type": "message"},
-                    {"name": "Giveaway", "type": "giveaway"},
                     {"name": "Checkin", "type": "checkin_sum"},
                     {"name": "Streak", "type": "checkin_combo"},
                 ],
@@ -204,7 +202,7 @@ def _install_role_config(monkeypatch, role_db):
     monkeypatch.setattr(
         role_views.config,
         "is_feature_enabled",
-        lambda feature_name, default=True: feature_name not in {"shop", "giveaway"},
+        lambda feature_name, default=True: feature_name != "shop",
     )
 
 

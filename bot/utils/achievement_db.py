@@ -21,7 +21,6 @@ class AchievementDatabaseManager(BaseDatabaseManager):
             'reaction': 'reaction_count',
             'message': 'message_count',
             'time_spent': 'time_spent',
-            'giveaway': 'giveaway_count',
             'checkin_sum': 'checkin_sum',
             'checkin_combo': 'checkin_combo'
         }
@@ -542,8 +541,8 @@ class AchievementDatabaseManager(BaseDatabaseManager):
             await self._execute_write(
                 "INSERT INTO achievement_operation "
                 "(user_id, target_user_id, operation, message_count, "
-                "reaction_count, time_spent, giveaway_count) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "reaction_count, time_spent) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
                 (
                     operator_id,
                     target_id,
@@ -551,7 +550,6 @@ class AchievementDatabaseManager(BaseDatabaseManager):
                     changes.get('message_count', 0),
                     changes.get('reaction_count', 0),
                     changes.get('time_spent', 0),
-                    changes.get('giveaway_count', 0),
                 ),
             )
             return True
@@ -583,14 +581,12 @@ class AchievementDatabaseManager(BaseDatabaseManager):
                         "UPDATE achievements SET "
                         "message_count = message_count + ?, "
                         "reaction_count = reaction_count + ?, "
-                        "time_spent = time_spent + ?, "
-                        "giveaway_count = giveaway_count + ? "
+                        "time_spent = time_spent + ? "
                         "WHERE user_id = ?",
                         (
                             changes.get('message_count', 0),
                             changes.get('reaction_count', 0),
                             changes.get('time_spent', 0),
-                            changes.get('giveaway_count', 0),
                             target_id,
                         ),
                     )
@@ -600,14 +596,12 @@ class AchievementDatabaseManager(BaseDatabaseManager):
                         "UPDATE achievements SET "
                         "message_count = message_count - ?, "
                         "reaction_count = reaction_count - ?, "
-                        "time_spent = time_spent - ?, "
-                        "giveaway_count = giveaway_count - ? "
+                        "time_spent = time_spent - ? "
                         "WHERE user_id = ?",
                         (
                             changes.get('message_count', 0),
                             changes.get('reaction_count', 0),
                             changes.get('time_spent', 0),
-                            changes.get('giveaway_count', 0),
                             target_id,
                         ),
                     )

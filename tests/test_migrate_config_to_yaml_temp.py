@@ -54,6 +54,9 @@ welcome:
 achievements:
   drop:
     - rank
+role:
+  yaml:
+    - role_type_name
 """.lstrip(),
         encoding="utf-8",
     )
@@ -148,11 +151,31 @@ achievements:
     write_json(
         config_dir / "config_achievements.json",
         {
-            "achievements": [],
+            "achievements": [
+                {"type": "message", "name": "Chatter", "threshold": 10},
+                {"type": "giveaway", "name": "Lucky", "threshold": 1},
+            ],
+            "achievements_ranking": [
+                {"type": "message", "name": "Messages"},
+                {"type": "giveaway", "name": "Giveaways"},
+            ],
+            "achievements_type_name": {
+                "message": "Messages",
+                "giveaway": "Giveaways",
+            },
             "rank": {
                 "all_button_label": "All",
                 "intro_title": "Rank title",
             },
+        },
+    )
+    write_json(
+        config_dir / "config_role.json",
+        {
+            "role_type_name": [
+                {"type": "message", "name": "Messages"},
+                {"type": "giveaway", "name": "Giveaways"},
+            ],
         },
     )
 
@@ -227,9 +250,35 @@ achievements:
     assert welcome_example["dm"]["rules_channel_id"] == "1145141919810"
 
     achievements_yaml = read_yaml(config_dir / "achievements.yaml")
-    assert achievements_yaml == {"achievements": []}
+    assert achievements_yaml == {
+        "achievements": [
+            {"type": "message", "name": "Chatter", "threshold": 10},
+        ],
+        "achievements_ranking": [
+            {"type": "message", "name": "Messages"},
+        ],
+        "achievements_type_name": {
+            "message": "Messages",
+        },
+    }
     assert not (locale_dir / "achievements.yaml").exists()
-    assert "| achievements | `rank` | drop | classification |" in report_file.read_text(encoding="utf-8")
+    report_text = report_file.read_text(encoding="utf-8")
+    assert "| achievements | `rank` | drop | classification |" in report_text
+    assert (
+        "| achievements | `giveaway achievement metadata` | drop | "
+        "special:retired-achievement-type |"
+    ) in report_text
+
+    role_yaml = read_yaml(config_dir / "role.yaml")
+    assert role_yaml == {
+        "role_type_name": [
+            {"type": "message", "name": "Messages"},
+        ],
+    }
+    assert (
+        "| role | `giveaway achievement metadata` | drop | "
+        "special:retired-achievement-type |"
+    ) in report_text
 
     seed = json.loads(seed_file.read_text(encoding="utf-8"))
     assert "tickets_new" not in seed

@@ -38,19 +38,26 @@ def test_achievement_counts_leaderboards_voice_and_shop_interop(tmp_path):
 
             assert await achievements.apply_manual_changes(
                 target_id=10,
-                changes={"time_spent": 60, "giveaway_count": 2},
+                changes={"time_spent": 60, "reaction_count": 2},
                 operation="increase",
             ) is True
             assert await achievements.log_manual_operation(
                 operator_id=99,
                 target_id=10,
                 operation="increase",
-                changes={"time_spent": 60, "giveaway_count": 2},
+                changes={"time_spent": 60, "reaction_count": 2},
             ) is True
             operations = await achievements.get_all_operations()
             assert operations[0][0] == 99
             assert operations[0][1] == 10
             assert operations[0][2] == "increase"
+
+            assert await achievements.apply_manual_changes(
+                target_id=10,
+                changes={"giveaway_count": 99},
+                operation="increase",
+            ) is True
+            assert (await achievements.get_user_achievements(10))["giveaway_count"] == 0
 
             checkin = await shop.record_checkin(10)
             assert checkin["already_checked_in"] is False

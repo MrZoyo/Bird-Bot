@@ -632,9 +632,6 @@ class GiveawayCog(commands.Cog):
         winner_mentions = [f"<@{winner_id}>" if winner_id is not None and winner_id != 0 else None for
                            winner_id in winners]
 
-        # Update the achievements for all participants
-        await self.update_participant_achievements(giveaway_id)
-
         if winners:
             # Send a message in the giveaway channel congratulating all winners
             await giveaway_channel.send(
@@ -666,10 +663,6 @@ class GiveawayCog(commands.Cog):
         else:
             # No winners, send a message in the giveaway channel
             await giveaway_channel.send(self.giveaway_fail_message.format(prizes=prizes))
-
-    async def update_participant_achievements(self, giveaway_id):
-        participant_ids = await self.fetch_participant_ids(giveaway_id)
-        await self.db.increment_giveaway_achievements(participant_ids)
 
     @commands.Cog.listener()
     async def on_ready(self):

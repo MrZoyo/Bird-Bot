@@ -116,14 +116,13 @@ class AchievementRefreshView(View):
 
 
 class ConfirmationView(View):
-    def __init__(self, bot, member_id, reactions, messages, time_spent, giveaways, operation, db_manager):
+    def __init__(self, bot, member_id, reactions, messages, time_spent, operation, db_manager):
         super().__init__(timeout=120.0)
         self.bot = bot
         self.member_id = member_id
         self.reactions = reactions
         self.messages = messages
         self.time_spent = time_spent
-        self.giveaways = giveaways
         self.operation = operation
         self.db = db_manager
 
@@ -146,8 +145,6 @@ class ConfirmationView(View):
             'reaction_count': self.reactions,
             'time_spent': self.time_spent,
         }
-        if self.bot.get_cog('AchievementCog').is_achievement_type_visible('giveaway'):
-            changes['giveaway_count'] = self.giveaways
 
         # Apply the changes
         success = await self.db.apply_manual_changes(self.member_id, changes, self.operation)
@@ -264,7 +261,6 @@ class AchievementOperationView(discord.ui.View):
             reaction_count = record[4]
             time_spent = record[5]
             timestamp = record[6]
-            giveaway_count = record[7]
 
             operation_lines = [
                 f"Operation: {operation}",
@@ -272,8 +268,6 @@ class AchievementOperationView(discord.ui.View):
                 f"Messages: {message_count}",
                 f"Time Spent: {time_spent}",
             ]
-            if self.bot.get_cog('AchievementCog').is_achievement_type_visible('giveaway'):
-                operation_lines.append(f"Giveaways: {giveaway_count}")
 
             embed.add_field(name=f"{timestamp} - {user.name} -> {target_user.name}",
                             value="\n".join(operation_lines),

@@ -206,10 +206,10 @@ Automated database backup system with scheduled and manual backup capabilities.
 - `/backup_now`: Create an immediate backup file manually
 
 ### Giveaway_Cog
-Comprehensive giveaway management system with achievement-based restrictions.
+Comprehensive giveaway management system with activity-based entry restrictions.
 
 **Features:**
-- **Achievement-based entry requirements** for reaction, message, and voice time thresholds
+- **Activity-count entry requirements** for reaction, message, and voice time thresholds
 - **Time-based giveaway management** with flexible duration formats
 - **Winner selection system** with configurable winner counts
 - **Archive system** preserving original giveaway information
@@ -475,7 +475,7 @@ Media processing module with validation and security features.
 
 ### achievement_db
 **🏆 Comprehensive achievement tracking database manager** for user progress monitoring.
-- **Multi-category achievement tracking** for messages, reactions, voice time, and giveaways
+- **Multi-category achievement tracking** for messages, reactions, voice time, and check-ins
 - **Monthly statistics system** with separate tracking for monthly achievements
 - **Voice session management** with start/stop tracking and time calculation
 - **Leaderboard generation** with ranking and extended leaderboard support
@@ -527,6 +527,7 @@ Media processing module with validation and security features.
 - Improved PrivateRoom renewal semantics so stale active rooms renew from the current time instead of charging users for already-expired days.
 - Standardized Discord entity logging with name and ID formatting for users, channels, roles, and guilds.
 - Added migration tooling for pre-config-2.0 JSON deployments and expanded public YAML template documentation.
+- Retired giveaway-related achievement categories while keeping GiveawayCog itself active.
 
 ---
 
@@ -534,7 +535,7 @@ Media processing module with validation and security features.
 - Locked the Python runtime and dependency environment with `.python-version` and the project lock files.
 - Added preflight role validation before creating achievement, star sign, MBTI, and gender pickup panels.
 - Allowed optional starter roles in `Role_Cog` so empty `achievement_start_role_id` and `social_start_role_id` no longer crash role assignment flows.
-- Hid feature-linked achievement content when the related module is disabled, including giveaway and shop-linked categories.
+- Hid feature-linked achievement content when the related module is disabled.
 - Changed `/tickets_init` follow-up messages to public responses instead of only-visible-to-user replies.
 - Fixed `VoiceStateCog` startup ordering so `temp_channels` is created or migrated before cleanup tasks run.
 - Updated `BanCog` task creation to `asyncio.create_task(...)` for current runtime compatibility and cleaner task cleanup.

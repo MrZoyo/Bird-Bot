@@ -4,14 +4,16 @@ from typing import Any
 from .config import config
 
 
+RETIRED_ACHIEVEMENT_TYPES = {'giveaway'}
+
+
 FEATURE_LINKED_ACHIEVEMENT_TYPES = {
-    'giveaway': {'giveaway'},
     'shop': {'checkin_sum', 'checkin_combo'},
 }
 
 
 def resolve_hidden_achievement_types() -> set[str]:
-    hidden_types: set[str] = set()
+    hidden_types: set[str] = set(RETIRED_ACHIEVEMENT_TYPES)
     for feature_name, achievement_types in FEATURE_LINKED_ACHIEVEMENT_TYPES.items():
         if not config.is_feature_enabled(feature_name):
             hidden_types.update(achievement_types)

@@ -24,7 +24,6 @@ achievements:
       reactions: "要增加的反应次数"
       messages: "要增加的消息数"
       time_spent: "要增加的语音时长（秒）"
-      giveaways: "要增加的抽奖次数"
   decrease_achievement:
     description: "减少成员的成就进度（管理员）"
     params:
@@ -32,7 +31,6 @@ achievements:
       reactions: "要减少的反应次数"
       messages: "要减少的消息数"
       time_spent: "要减少的语音时长（秒）"
-      giveaways: "要减少的抽奖次数"
   achievement_ranking:
     description: "显示成就排行榜"
     params:

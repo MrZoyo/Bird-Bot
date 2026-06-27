@@ -26,7 +26,7 @@
 
 最后一次通过基线：
 - [x] `./.venv/Scripts/python.exe -m pytest -q`
-  - 当前：`78 passed, 8 warnings`
+  - 当前：`79 passed, 8 warnings`
 - [x] `./.venv/Scripts/python.exe -m ruff check bot tests tools`
 - [x] `./.venv/Scripts/python.exe -m compileall bot tests tools`
 - [x] `./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`
