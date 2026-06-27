@@ -1129,11 +1129,58 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 - 测试服全量验证时不再包含 `/notebook_*` 命令；命令同步后 Discord command picker 不显示 notebook 命令。
 - **完成状态（2026-04-27）**：已落地。Notebook runtime entry、feature flag、utils export、slash metadata、README 现役功能段落、测试清单 active 项均已移除；生产 DB 历史表不触碰。Notebook 旧代码已随 P3-6 转存到 `legacy-old-files-archive` 分支的 `old_function/cogs/notebook/` 和 `old_function/notebook_db.py`。验证：compileall、locale check、pytest、pip check、runtime-scope `rg`、`git diff --check`。
 
+### P3-9. Discord interaction flow fake tests
+
+**决策背景（2026-04-30）**：真实 Discord bot 的大量回归来自 slash command、button、modal、followup、DM、权限和异步响应顺序。用户确认采用“本地 fake / fixture 测 interaction handler，测试服只保留少量真实 E2E”的路线，而不是把第二个 bot 当作主测试方案。
+
+**目标**：
+- 给不需要真实 Discord 网络的交互路径补 pytest flow test，覆盖 `interaction.followup.send`、`response.defer/send_message/send_modal`、按钮 / modal handler、DB side effect 和通知顺序。
+- 第一优先级是刚暴露真实 bug 的 PrivateRoom 续费链路：必须证明续费先写 DB 并回读持久化到期时间，再扣款和发送成功通知；如果回读后仍过期，则不扣款。
+- 后续按风险扩展到 Shop 签到 / 补签、Tickets 主链路、Ban 临时封禁、VoiceChannel 控制面板，以及 Giveaway、Role / Signature、Achievement / Rank、Welcome / Games、CheckStatus / Backup。
+
+**当前状态（2026-05-03）**：
+- 已完成并纳入自动化 gate：PrivateRoom 续费、Shop 签到 / 补签、Tickets 创建 / 接单 / 关闭、Ban `/tempban`、VoiceChannel 控制面板、Giveaway 参与 / 退出 / 开奖 / 取消、Role / Signature、Achievement / Rank、Welcome / Games、CheckStatus / Backup。
+- 当前 pytest 基线：`78 passed, 8 warnings`。
+- 当前清单内 fake interaction flow tests 已补完；后续只按新 bug、payload replay 或新增功能单独扩展。
+- 真实语音移动、频道权限、role hierarchy、persistent view 重启恢复、DM 投递、rate limit 和客户端可见 UI 仍归测试服。
+
+**测试边界**：
+- fake Discord 对象只实现当前 handler 实际读取 / 调用的属性与方法，避免构造完整 discord.py 对象。
+- 不使用用户 token / selfbot，也不让“第二个 bot 点 UI”成为默认自动化方案。
+- 真实 staging app + staging guild 只用于权限、rate limit、客户端显示、command sync、persistent view 等必须进 Discord 的 E2E 回归。
+- raw Discord interaction payload replay 可以作为后续增强，但前提是先把 handler 入口和 fixture 格式稳定下来。
+
+**验收**：
+- `tests/` 中存在至少一组 fake interaction flow test，能在离线 pytest 中覆盖按钮 / followup / DB / 通知顺序。
+- `REFACTORING_TEST_CHECKLIST.md` 的自动化 gate 明确列出该覆盖范围，并把仍需测试服验证的 Discord 行为留在模块手工清单里。
+- `CLAUDE.md` 记录长期规则：优先 fake interaction / fixture 测 handler；真实 Discord E2E 保持少量关键链路。
+
+---
+
+### P3-10. Configurable retained timers follow-up
+
+**背景（2026-05-04）**：配置 YAML 已补注释时发现两处历史字段/固定值不够理想：
+
+- `role.signature.max_changes_per_week` 当前只是历史配置字段；签名修改冷却在 `RoleDatabaseManager.find_available_time_slot()` / `get_signature_remaining_changes()` 中固定为 7 天。
+- `teamup_display.display.invitation_expire_minutes` 当前只是历史配置字段；组队邀请过期时间在 `TeamupDisplayManager.add_teamup_invitation()` SQL 中固定为 `+5 minutes`。
+
+**目标**：
+- 后续把这两个固定值接入配置，但保持缺省行为不变：未配置时仍使用 7 天 / 5 分钟。
+- 配置建议作为高级项，不要求普通部署必须修改；`.yaml.example` 和本地 YAML 注释要明确“通常保持默认即可”。
+- 不再新增只写不读的配置项。若保留 `max_changes_per_week`，要么真正接入逻辑，要么改名 / 迁移为能准确表达行为的字段，例如签名修改冷却天数。
+
+**实施建议**：
+1. 签名冷却：让 Role 相关 DB/helper 方法接收配置值，或把冷却计算上移到 RoleCog/SignatureModal 可注入配置的位置；补测试覆盖默认 7 天和自定义冷却天数。
+2. 组队邀请过期：让 `TeamupDisplayManager.add_teamup_invitation()` 接收 `expire_minutes`，由 `TeamupDisplayCog` 从 `teamup_display.display.invitation_expire_minutes` 传入；补测试覆盖默认 5 分钟和自定义分钟数。
+3. 同步 `.yaml.example`、本地 YAML 注释、`CLAUDE.md` 和 checklist；避免把“当前固定值”文档误写成“已配置生效”。
+
+**当前状态**：预备项已记录，运行逻辑尚未改动；当前文档仍按现状标注这两个字段暂未被运行时代码读取。
+
 ---
 
 ## 推进顺序建议
 
-> **当前状态（2026-04-27）**：P0/P1/P2/P3 重构主线已全部收齐；当前以 PROGRESS.md 的“当前接手点”为准。下一阶段先跑 `REFACTORING_TEST_CHECKLIST.md` 的自动化 gate，再按模块进行测试服全量功能验证。
+> **当前状态（2026-05-04）**：P0/P1/P2/P3 重构主线已全部收齐；P3-9 fake interaction flow tests 当前清单已补完；P3-10 仅作为后续预备项记录，尚未改运行逻辑。当前以 `REFACTORING_PROGRESS.md` 顶部“2026-05-03 当前状态同步”为准。下一步默认跑完整自动化 gate，然后进入测试服全量功能验证；若继续配置清理，优先做 P3-10。
 
 1. **本轮冲刺（P0）**：P0-4（裸 except 治理，范围清晰、改动小、风险低）→ P0-1（giveaway 抽 db）→ P0-2（privateroom 规范化）→ P0-3（其余 cog 补 db manager，内部以 `check_status` 为首）。
 2. **下一轮（P1，小步）**：P1-5（日志 rotation）、P1-2（ban_cog 迁 cog_load）、P1-1（命令同步）—— 三个都是改动小、受益长期。

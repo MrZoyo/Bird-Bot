@@ -1,6 +1,6 @@
 # Bird Bot
 
-`Version: 1.9.1`
+`Version: 2.0.0`
 
 ---
 
@@ -520,6 +520,16 @@ Media processing module with validation and security features.
 ---
 
 ## Update Log Latest
+### V2.0.0 - 2026-06-27
+- Completed the config 2.0 runtime migration: YAML configuration, locale-backed UI text, package-based cogs, and DB-backed mutable feature data are now the active runtime path.
+- Removed runtime registration for legacy NotebookCog, RatingCog, and the old channel-based TicketsCog; archived historical code on `legacy-old-files-archive`.
+- Added fake Discord interaction flow tests for the retained modules, covering local handler behavior without requiring live Discord.
+- Improved PrivateRoom renewal semantics so stale active rooms renew from the current time instead of charging users for already-expired days.
+- Standardized Discord entity logging with name and ID formatting for users, channels, roles, and guilds.
+- Added migration tooling for pre-config-2.0 JSON deployments and expanded public YAML template documentation.
+
+---
+
 ### V1.9.1 - 2026-04-14
 - Locked the Python runtime and dependency environment with `.python-version` and the project lock files.
 - Added preflight role validation before creating achievement, star sign, MBTI, and gender pickup panels.

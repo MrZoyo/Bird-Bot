@@ -10,6 +10,49 @@
 
 ---
 
+## 2026-05-03 当前状态同步
+
+- P3-9 fake Discord interaction flow tests 已按当前清单补完，状态为 ✅ 完成；已覆盖 PrivateRoom 续费、Shop 签到 / 补签、Tickets 创建 / 接单 / 关闭、Ban `/tempban`、VoiceChannel 控制面板、Giveaway 参与 / 退出 / 开奖 / 取消、Role / Signature、Achievement / Rank、Welcome / Games、CheckStatus / Backup。
+- 当前自动化基线：`./.venv/Scripts/python.exe -m pytest -q` 为 `78 passed, 8 warnings`。
+- 本轮新增 23 个离线 fake interaction tests；所有新增测试均使用最小 fake Discord 对象和临时状态，不联网、不触碰真实 `data/bot.db`。
+- 2026-05-04 补充：`/rank` 的分类按钮已使用 Discord Button `emoji` 字段补齐彩色圆点；当前色彩为全部排名 🟣、添加反应 🔴、发送消息 🟡、语音时长 🔵、参加抽奖 🟢、累计签到 🟠、连续签到 🟤。连续签到从原先与全部排名重复的 🟣 改为 🟤。按钮上的语音时长不带 `(min)`；排行榜类型名仍保留单位说明。locale 里若已有圆点前缀，运行时会剥离 label 前缀，避免按钮显示重复 emoji。已移除本地 `bot/config/achievements.yaml` 的 legacy `rank:` UI 文案块；迁移脚本也会把旧 JSON 的 `achievements.rank` 显式标为 `drop`，不再迁到 YAML 或 locale。`shop` / `giveaway` feature flag 关闭时，对应签到 / 抽奖成就现在由共享 helper 同步隐藏，覆盖成就页、排行榜、`/rank` 按钮和 Role 成就领取面板。
+- 2026-05-04 补充：所有 `bot/config/*.yaml.example` 和本地实际 `bot/config/*.yaml` 都已补充配置注释。注释按当前代码读取点编写，明确标出单位、ID 类型、DB/locale 分工，以及当前保留但运行时不读取的历史字段（如 `role.signature.max_changes_per_week`、`teamup_display.display.invitation_expire_minutes`）。本地实际 YAML 的真实值未打印；只通过 ruamel round-trip 写入注释。
+- 2026-05-04 补充：用户要求固定的签名 7 天冷却、组队邀请 5 分钟过期后续也要可配置，但作为下一步预备，不在本轮改运行逻辑。已在 `REFACTORING_PLAN.md` 新增 P3-10：后续接入配置时必须保持默认 7 天 / 5 分钟，并补测试；当前代码仍固定 `days >= 7` 和 SQL `+5 minutes`，所以现有 YAML 注释继续标注为“当前未读取 / 历史字段”。
+- `REFACTORING_TEST_CHECKLIST.md` 已从“逐功能穷举”缩减为“自动化 gate + 真实 Discord 必测链路”；手工测试只保留权限、真实频道/线程/语音、persistent view、DM、rate limit、图片/附件和真实客户端表现。
+- 下一步默认：按缩减后的 checklist 进入测试服手工验证；若继续配置清理，优先做 P3-10，把签名冷却天数和组队邀请过期分钟数真正接入配置。
+- 真实测试服仍必须覆盖：Discord 权限、role hierarchy、channel/thread/voice 真实操作、persistent view 重启恢复、DM 投递失败、rate limit、command sync、真实 ban/unban/mute、欢迎事件和图片/附件渲染。
+
+---
+
+## 2026-04-30 P3-9 fake Discord interaction flow tests
+
+- 决策：采用“本地 fake / fixture 测 Discord interaction handler，测试服保留少量真实 E2E”的路线；不把第二个测试 bot 作为 slash/button/modal 自动化主方案。
+- 范围：fake 对象只实现 handler 当前读取 / 调用的 `interaction.user`、`followup.send`、`response.*`、channel/message/user send、DB manager 方法等最小接口；不联网、不触碰真实 `data/bot.db`。
+- 第一目标：PrivateRoom 续费交互链路。测试必须覆盖先写 DB 并回读持久化 `end_date`，再扣款和发送成功通知；如果回读后 `end_date` 仍过期，则返回失败且不扣款。
+- 第一批落地：新增 `tests/test_privateroom_interaction_flow.py`，用 fake `interaction` / `followup` / channel / user DM / DB manager 覆盖滞留过期房间续费。测试断言 calculated `end_date` 写入 DB、成功通知使用 DB 回读后的 persisted `end_date`、扣款发生在 DB 回读之后；同时覆盖 persisted `end_date` 仍过期时不扣款、不发成功通知。
+- 第二批落地：新增 `tests/test_shop_interaction_flow.py`，用 fake `interaction.response` / `followup` / Shop DB / Checkin view 覆盖每日签到必须在语音频道、成功签到先响应再刷新面板、补签按钮打开 modal 不扣款、补签 modal 先记录后扣款、记录失败不扣款。
+- 第三批落地：新增 `tests/test_tickets_interaction_flow.py`，用 fake `interaction.response` / `followup` / guild / thread / DB manager 覆盖确认 modal、创建工单成功路径、DB create 失败时删除 thread 且不注册 view、接单权限拒绝、接单成功先禁用按钮再 followup、关闭工单先写 DB 再响应并禁用按钮 / archive / DM。
+- 第四批落地：新增 `tests/test_ban_interaction_flow.py`，直接调用 `BanCog.tempban_command.callback`，覆盖无权限、非法时长、已有 active tempban、成功 tempban 的 DM → guild ban → DB add → schedule → response → notification 顺序，以及 Discord ban Forbidden 后不写 DB / 不 schedule。
+- 第五批落地：新增 `tests/test_voice_channel_interaction_flow.py`，覆盖控制面板 Lock / Unlock / Soundboard / Full 按钮；Full 路径断言房间面板调用共享组队满员样式并先更新消息再移除展示。
+- 第六批落地：新增 `tests/test_giveaway_interaction_flow.py`，覆盖参与 / 退出、取消抽奖、提前开奖的 interaction 响应、DB 操作、embed/view 更新顺序。
+- 第七批落地：新增 `tests/test_role_interaction_flow.py` 和 `tests/test_achievement_interaction_flow.py`，覆盖成就身份组授予顺序、签名权限 / modal 写入、手动成就确认按钮、`rank` 分类按钮对 `type_time_spent` 的 custom_id 解析。
+- 第八批落地：新增 `tests/test_welcome_games_interaction_flow.py`，覆盖 Welcome DM embed/view、SpyMode 加入队伍到发身份 DM、DnD 掷骰指令响应。
+- 第九批落地：新增 `tests/test_checkstatus_backup_interaction_flow.py`，覆盖 Where Is、语音状态汇总、日志 tail、`/backup_now` 手动备份调用顺序。
+- 验证：上述新增测试 targeted pytest 均通过；全量 `pytest` 当前 `78 passed, 8 warnings`；`ruff`、`compileall`、locale check、`pip check`、`uv lock --check`、`uv sync --frozen --dry-run --extra test --extra lint --python 3.12.3`、`git diff --check` 均通过。`uv sync` dry-run 继续提示 WSL 下会替换 Windows `.venv`，未实际同步。
+- 状态：✅ 已列入并完成 `REFACTORING_PLAN.md` 的 P3-9；后续自动化扩展只按新 bug 或 payload replay 需要单独开 follow-up。
+
+---
+
+## 2026-04-30 PrivateRoom 续费边界修复
+
+- 根因：`process_advance_renewal()` 只阻止“太早续费”，没有处理“房间已经过期但 DB 仍是 active、Discord 频道也还没被清理”的滞留状态；续费日期直接用旧 `end_date + renewal_extend_days`，旧到期日落在过去时会扣款但新到期日仍可能在过去。
+- 修复：新增 PrivateRoom 续费日期计算 helper。正常续费继续从原 `end_date` 延长；滞留过期房间从当前时间延长。`extend_room_validity()` 改为写入后回读 DB，续费成功提示和 DM 使用持久化后的 `end_date`，并在回读日期仍过期时中止扣款。
+- 日志：全仓扫了 `logging.*` / `logger.*` callsite。明显涉及 Discord 对象或 raw Discord ID 的 active runtime 日志已改用 `fmt_user` / `fmt_channel` / `fmt_role` / `fmt_guild`；历史 `data/*.log*` 仍保留旧格式作为运行产物。
+- 测试：新增 `tests/test_privateroom_renewal.py`，覆盖未过期续费、滞留过期续费、续费确认页不显示负数剩余天数；`tests/test_privateroom_db.py` 断言 `extend_room_validity()` 会返回回读后的房间状态；新增 `tests/test_logging_callsite_scan.py` 防明显 raw Discord ID/name logging 回归。
+- 数据注意：代码修复不自动修改既有本地 DB。已被错误续费并标记 inactive 的旧记录，需要备份后单独修复 `privateroom_rooms.end_date`，再通过恢复路径重建频道或按实际 Discord 状态调整 `is_active`。
+
+---
+
 ## P0 系列收官小结（2026-04-23）
 
 **成就**：
@@ -75,6 +118,7 @@
 | P3 | P3-6 old 归档分支 | ✅ | tracked old_function/old_updates 转存 legacy-old-files-archive |
 | P3 | P3-7 日志 id/name 双记录 | ✅ | fmt_user/fmt_channel/fmt_role + role/voice/tickets 首批 callsite |
 | P3 | P3-8 NotebookCog 废弃 / 移除 | ✅ | runtime 入口移除；旧代码在 legacy-old-files-archive；DB 历史表保留 |
+| P3 | P3-9 fake Discord interaction flow tests | ✅ | 本地 fake / fixture 测 handler；当前清单已覆盖 PrivateRoom、Shop、Tickets、Ban、VoiceChannel、Giveaway、Role / Signature、Achievement / Rank、Welcome / Games、CheckStatus / Backup |
 
 ---
 
@@ -177,21 +221,26 @@
 **2026-04-29 config 文案读取复扫 / Shop 补签修复**：
 - 用户真实点击 Shop 补签按钮暴露 `KeyError: 'makeup_modal_title'`；根因是 Shop modal 还有 UI 文案从 `shop.yaml` runtime config 读取，而迁移后文案已在 locale。已改为 `t('shop.*')`，并把余额修改 modal、交易历史翻页按钮一起切到 locale。
 - 全仓复扫 `conf[...]` / `config.get_config(...)` 后，继续修掉明确漏项：`PrivateRoom` 购买/续费 modal、`Welcome` DM 文案与成员数按钮、`Achievement` `/rank` 介绍页与分页/按钮/空数据文案。`welcome_text` 仍是唯一明确例外，因为它可能携带真实 Discord URL / custom emoji id。
-- `tools/migrate_config_to_yaml.py` 已同步 welcome DM 拆分：`dm_image` / `color` / `rules_channel_id` 留在 YAML，`description*` / `rules_*` / `footer` / `member_count_button` 进 locale；`achievements.rank` 也由迁移分类路由到 locale。
-- 新增 `tests/test_shop_ui_metadata.py` 和 `tests/test_ui_locale_metadata.py`，覆盖 Shop / PrivateRoom / Welcome DM / Achievement rank 控件文案不再依赖 runtime config；临时迁移测试扩展了 welcome DM split 与 `achievements.rank` 路由。
+- `tools/migrate_config_to_yaml.py` 已同步 welcome DM 拆分：`dm_image` / `color` / `rules_channel_id` 留在 YAML，`description*` / `rules_*` / `footer` / `member_count_button` 进 locale；`achievements.rank` 作为旧 runtime UI 文案块丢弃，不迁移。
+- 新增 `tests/test_shop_ui_metadata.py` 和 `tests/test_ui_locale_metadata.py`，覆盖 Shop / PrivateRoom / Welcome DM / Achievement rank 控件文案不再依赖 runtime config；临时迁移测试扩展了 welcome DM split，并断言 legacy `achievements.rank` 被 drop。
 
 **2026-04-30 文档状态对齐**：
 - README 已从现役功能目录中移除 RatingCog / 旧 channel-based TicketsCog 的正文入口，统一放到 `Legacy / Removed`；NotebookCog / RatingCog / old TicketsCog 均标注为 runtime removed，旧实现和脱敏模板只去 `legacy-old-files-archive` 分支查。
 - README 命令名同步代码：`/check_ach_ops`、`/spymode`、`/ga_sendtowinner <giveaway_id> <message>`，并补列 Tickets 类型 CRUD 与 `/privateroom_fix`。
-- `REFACTORING_TEST_CHECKLIST.md` 顶部基准日期更新到 2026-04-30；自动化 baseline 保持 `31 passed`。
+- `REFACTORING_TEST_CHECKLIST.md` 顶部基准日期更新到 2026-04-30；自动化 baseline 已随 PrivateRoom / Shop / Tickets / Ban / logging / fake interaction flow 补测提升到 `53 passed`。
+
+**2026-05-03 P3-9 自动测试补完**：
+- 按文档顺序补完剩余 fake interaction flow tests：VoiceChannel、Giveaway、Role / Signature、Achievement / Rank、Welcome / Games、CheckStatus / Backup。
+- 当前自动化 baseline 提升到 `78 passed, 8 warnings`；新增测试均为离线 fake/fixture，不使用真实 Discord、不触碰真实 DB。
+- 下一步从自动化补测转为完整 gate + 测试服手工验证；`REFACTORING_TEST_CHECKLIST.md` 已按模块列出哪些由自动化覆盖、哪些仍需真实 Discord。
 
 **测试准备收尾（2026-04-30）**：
 - `REFACTORING_TEST_CHECKLIST.md` 已从历史 P0 checklist 重写为“自动化 gate + 按模块测试流程”。用户后续跟着该文件测试，不再需要从旧任务顺序反推功能路径。
-- 当前自动化基线：`pytest` 为 31 passed；ruff、compileall、locale check、pip check、`uv lock --check`、test/lint extra dry-run 和 `git diff --check` 均通过。覆盖配置/runtime metadata/log helpers、组队满员样式、UI 文案 locale smoke、主要 DB manager smoke、临时 JSON→YAML 迁移 smoke 和后台 loop 离线 guard。手工清单仍覆盖 Discord 权限、按钮、command sync、后台任务、DM 失败等必须真实测试服验证的路径。
+- 当前自动化基线：`pytest` 为 78 passed；ruff、compileall、locale check、pip check、`uv lock --check`、test/lint extra dry-run 和 `git diff --check` 本轮均通过。覆盖配置/runtime metadata/log helpers、logging callsite scan、组队满员样式、UI 文案 locale smoke、主要 DB manager smoke、PrivateRoom 续费日期 / fake interaction flow、Shop 签到 / 补签 fake interaction flow、Tickets 创建 / 接单 / 关闭 fake interaction flow、Ban tempban fake interaction flow、VoiceChannel 控制面板、Giveaway、Role / Signature、Achievement / Rank、Welcome / Games、CheckStatus / Backup、临时 JSON→YAML 迁移 smoke 和后台 loop 离线 guard。手工清单仍覆盖 Discord 权限、按钮、command sync、后台任务、DM 失败等必须真实测试服验证的路径。
 - 启动 smoke 补遗：用户真实启动暴露 `WelcomeCog: 'welcome_text'`、`ShopCog: 'checkin_button_daily_text'`。已修复 Shop 按钮文案从 locale 读取；Welcome 在本地 YAML 缺 `welcome_text` 时用 `welcome_text_fallback` 不阻塞加载；同时修正 Welcome 资源路径为仓库根 `resources/`，并把迁移分类里的 `welcome_text` 显式留在 YAML。真实本地配置下 `create_bot()` + `setup_bot()` 不连接 Discord 的 load smoke 已加载 15 个 cog。
 - 离线 load smoke 补遗：未登录客户端直接跑 `setup_bot()` 会让后台 `tasks.loop.before_loop` 的 `wait_until_ready()` 抛 `RuntimeError("Client has not been properly initialised")`，日志表现为多条 `Task exception was never retrieved`。新增 `bot.utils.task_helpers.wait_until_ready_or_stop()`，离线环境自动 stop loop；真实登录后的 bot 仍正常等待 ready。
 
-**下一棒默认**：P0-P3 重构主线已全部收齐。下一步先跑 checklist 的自动化 gate，再按模块进入测试服全量功能验证。
+**下一棒默认**：P0-P3 重构主线和 P3-9 自动化补测均已收齐。下一步先跑 checklist 的完整自动化 gate，再按模块进入测试服全量功能验证。
 
 **环境验证规则**：环境 / import / 启动验证必须提权到沙箱外跑真实环境。项目 Windows `.venv` 已用 `ensurepip` 补出 pip，并通过 `./.venv/Scripts/python.exe -m pip install -r requirements.lock` 按 lock 补齐依赖（含 `ruamel-yaml==0.19.1`）；本轮 project venv import smoke 已通过。后续如果项目 venv 再缺包，直接补环境，不只记录缺失。
 

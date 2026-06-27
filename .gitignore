@@ -42,6 +42,7 @@ bot-env/
 /bot.db
 data/*.db
 data/*.log
+data/*.log.*
 backup/db_backup/*
 backup/db_backup_manual/*
 !data/.gitkeep
@@ -106,5 +107,6 @@ Desktop.ini
 *.ipynb
 /archives
 /.claude
+/.codex
 
 # P3-1: uv.lock is the canonical dependency lock and must be tracked.

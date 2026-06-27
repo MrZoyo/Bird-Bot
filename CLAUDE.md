@@ -62,6 +62,8 @@ Runtime config is YAML:
 - Per-feature YAML files: `voicechannel.yaml`, `tickets.yaml`, `shop.yaml`, etc.
 - `Config` in `bot/utils/config.py` loads `bot/config/<name>.yaml`, caches it, validates `main`, and normalizes runtime paths from repo root.
 - Relative paths such as `./data/bot.db` resolve from the repository root, not the process CWD.
+- Keep both `.yaml.example` templates and local real YAML commented. Comments should explain units, Discord ID targets, DB/locale ownership, and whether a key is currently read by runtime code.
+- Known config follow-up: signature change cooldown is still hard-coded to 7 days in `RoleDatabaseManager`, and teamup invitation expiry is still hard-coded to 5 minutes in `TeamupDisplayManager`; P3-10 tracks making both configurable while preserving those defaults.
 
 Legacy JSON:
 
@@ -80,6 +82,7 @@ Never commit real YAML configs, real JSON configs, `tools/migration_db_seed.json
 - Run `./.venv/Scripts/python.exe -X utf8 tools/check_locales.py` after adding or moving locale keys.
 - `welcome_text` is the current explicit exception: it may embed real Discord URLs/custom emoji IDs, so it remains in ignored `welcome.yaml` and has a sanitized `.yaml.example` form.
 - Welcome DM copy, Shop modal labels, PrivateRoom modal labels, and Achievement rank UI text are locale-backed. Their YAML config should only carry runtime data such as IDs, colours, image paths, prices, limits, and time formats.
+- `/rank` category buttons use the Discord Button `emoji` field for colored circles; keep the canonical mapping in `bot/cogs/achievement/rank_locale.py` and strip any locale emoji prefix before assigning the button label. Do not keep or regenerate `rank:` UI text in `bot/config/achievements.yaml`.
 - Achievement definitions, role pick-up option names, and ranking type names remain YAML content metadata because they are coupled to thresholds, type ids, and role ids. Treat these as content/config data, not generic UI chrome.
 
 ## Database
@@ -89,6 +92,7 @@ Never commit real YAML configs, real JSON configs, `tools/migration_db_seed.json
 - Several managers use persistent async connections. If a one-shot script creates one, close it explicitly before exiting.
 - DB schema migrations use `bot/utils/schema_migrations.py` where needed.
 - Before touching the local or production DB, back it up.
+- PrivateRoom renewal semantics: a normal renewal extends from the current `end_date`; a stale active room whose `end_date` is already in the past extends from the current time, so a user is never charged for days that have already elapsed.
 
 ## Logging Rule
 
@@ -97,6 +101,7 @@ All bot logs should identify Discord entities with both name and id:
 - Users/members: `display_name / username (id)` via `bot.utils.fmt_user` when nickname/display name and username differ; `display_name (id)` when they are identical.
 - Channels/threads: `name (id)` via `bot.utils.fmt_channel`.
 - Roles: `name (id)` via `bot.utils.fmt_role`.
+- Guilds: `name (id)` via `bot.utils.fmt_guild`.
 - If only a raw id is available, log `unknown (id)`.
 - Numeric ids must use ASCII parentheses: `(1234567890)`, not `（1234567890）`.
 
@@ -111,6 +116,16 @@ The "room full" state for team invitation messages has one shared implementation
 - Full state should use the `invitation.roomfull_title` and `invitation.invite_embed_content_edited` locale keys, red embed color, preserved fields/thumbnail, no stale footer/timestamp, and no buttons.
 
 Do not fork a second full-message formatting path in another cog.
+
+## Discord Interaction Tests
+
+Prefer local fake / fixture tests for Discord interaction handlers before adding more manual test-server steps:
+
+- Fake only the attributes and methods a handler actually uses, such as `interaction.user`, `followup.send`, `response.defer`, channel/message `send` or `edit`, and DB manager calls.
+- Assert interaction responses, embed/view output, DB side effects, and ordering of critical operations.
+- Do not use user tokens, selfbot behavior, or a second bot as the primary slash/button/modal automation strategy.
+- Keep real staging guild E2E tests for behavior that needs Discord itself: permissions, command sync, persistent views after restart, rate limits, DM delivery, and client-visible UI.
+- PrivateRoom renewal flow tests must preserve the current rule: write and read back the persisted `end_date` before charging or sending success notifications.
 
 ## Development Commands
 
@@ -139,11 +154,31 @@ Current pytest smoke coverage includes:
 - Config templates and runtime cog metadata.
 - Locale key integrity.
 - Log helper formatting.
+- Static logging callsite scan for obvious raw Discord `.id` / `.name` / `.display_name` usage.
 - UI metadata smoke for locale-backed Shop, PrivateRoom, Welcome DM, and Achievement rank controls.
+- Ban fake interaction flow for tempban permission, duplicate-active checks, Discord ban failure, DB record, scheduling, and notification ordering.
+- Shop fake interaction flow for daily check-in and makeup check-in modal charging order.
+- Tickets fake interaction flow for confirmation modal, ticket creation, accept, and close handler ordering.
+- PrivateRoom renewal date calculation, including stale active rooms left behind when the daily expiration task did not run.
+- PrivateRoom fake interaction renewal flow, including persisted `end_date` readback before charging and failure without charge when DB readback is still expired.
+- VoiceChannel fake interaction flow for Lock / Unlock / Soundboard / Full control-panel buttons.
+- Giveaway fake interaction flow for join / leave / cancel / early end ordering.
+- Role / Signature fake interaction flow for achievement role pickup and signature modal writes.
+- Achievement / Rank fake interaction flow for manual operation confirmation and rank type buttons.
+- Welcome / Games fake interaction flow for Welcome DM, SpyMode, and DnD roll response.
+- CheckStatus / Backup fake interaction flow for Where Is, voice status, log tail, and manual backup.
 - Temporary JSON-to-YAML migration smoke.
 - Background loop offline guard.
 - Offline DB manager smoke for retained modules.
 - Shared team invitation full-state formatting.
+- Feature-linked achievement visibility: if `main.features.shop` is false, `checkin_sum` / `checkin_combo` disappear from achievement displays, rank buttons, and Role achievement pickup; if `main.features.giveaway` is false, `giveaway` does the same.
+
+Current P3-9 status:
+
+- Done: current fake interaction flow list is complete for PrivateRoom, Shop, Tickets, Ban, VoiceChannel, Giveaway, Role / Signature, Achievement / Rank, Welcome / Games, CheckStatus / Backup.
+- Current baseline: `78 passed, 8 warnings`.
+- Next default target: full automatic gate, then real test-server validation.
+- Add more fake interaction tests only for new bugs, payload replay work, or new features.
 
 Real Discord behavior still needs test-server validation for slash commands, permission failures, persistent views, buttons, Discord rate limits, DMs, command sync, and UI screenshots/logs where relevant. Follow `REFACTORING_TEST_CHECKLIST.md`.
 
