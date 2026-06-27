@@ -1,6 +1,7 @@
 import discord
 
 from bot.utils.i18n import t
+from bot.utils.modal_helpers import add_labeled_text_input
 
 
 class PurchaseModal(discord.ui.Modal):
@@ -23,13 +24,13 @@ class PurchaseModal(discord.ui.Modal):
         self.is_restore_settings = is_restore_settings
         self.is_renewal = is_renewal
         # 添加确认输入
-        self.confirmation = discord.ui.TextInput(
-            label=label,
+        self.confirmation = add_labeled_text_input(
+            self,
+            label,
             placeholder=placeholder,
             required=True,
             max_length=5
         )
-        self.add_item(self.confirmation)
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=False)

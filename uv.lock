@@ -392,7 +392,7 @@ requires-dist = [
     { name = "aiofiles" },
     { name = "aiohttp" },
     { name = "aiosqlite" },
-    { name = "discord-py", specifier = ">=2.3.2" },
+    { name = "discord-py", specifier = ">=2.7.1" },
     { name = "matplotlib" },
     { name = "pillow" },
     { name = "pysimplegui", specifier = "<5" },

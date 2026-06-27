@@ -1,26 +1,29 @@
 import discord
 from discord import ui
 
+from bot.utils.modal_helpers import add_labeled_text_input
+
 
 class AddChannelForm(ui.Modal):
-    name_prefix = ui.TextInput(
-        label='Room Name Prefix',
-        placeholder='Enter the prefix for created rooms (e.g., "游戏房")',
-        required=True,
-        max_length=10
-    )
-    channel_type = ui.TextInput(
-        label='Channel Type',
-        placeholder='Enter "public" or "private"',
-        required=True,
-        max_length=7,
-        default="public"
-    )
-
     def __init__(self, cog, channel):
         super().__init__(title=f'Configure Voice Channel: {channel.name}')
         self.cog = cog
         self.channel = channel
+        self.name_prefix = add_labeled_text_input(
+            self,
+            'Room Name Prefix',
+            placeholder='Enter the prefix for created rooms (e.g., "游戏房")',
+            required=True,
+            max_length=10
+        )
+        self.channel_type = add_labeled_text_input(
+            self,
+            'Channel Type',
+            placeholder='Enter "public" or "private"',
+            required=True,
+            max_length=7,
+            default="public"
+        )
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer()

@@ -1,6 +1,7 @@
 import discord
 
 from bot.utils.i18n import t
+from bot.utils.modal_helpers import add_labeled_text_input
 from bot.utils.role_db import RoleDatabaseManager
 
 
@@ -8,13 +9,13 @@ class SignatureModal(discord.ui.Modal):
     def __init__(self, bot, max_length):
         super().__init__(title=t('role.signature.modal_title'))
         self.bot = bot
-        self.signature = discord.ui.TextInput(
-            label=t('role.signature.modal_label'),
+        self.signature = add_labeled_text_input(
+            self,
+            t('role.signature.modal_label'),
             placeholder=t('role.signature.modal_placeholder'),
             max_length=max_length,
             style=discord.TextStyle.paragraph
         )
-        self.add_item(self.signature)
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer()
@@ -51,5 +52,4 @@ class SignatureModal(discord.ui.Modal):
             )
         else:
             await interaction.followup.send(t('role.signature.update_failed_message'), ephemeral=True)
-
 

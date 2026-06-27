@@ -3,6 +3,7 @@ import logging
 import discord
 
 from bot.utils.i18n import t
+from bot.utils.modal_helpers import add_labeled_text_input
 
 from .embeds import EmbedColors
 
@@ -14,13 +15,13 @@ class TicketConfirmModal(discord.ui.Modal):
         self.type_name = type_name
         self.type_data = type_data
 
-        self.confirm_input = discord.ui.TextInput(
-            label=t('tickets.messages.ticket_modal_confirm_label').format(type_name=type_name),
+        self.confirm_input = add_labeled_text_input(
+            self,
+            t('tickets.messages.ticket_modal_confirm_label').format(type_name=type_name),
             placeholder=t('tickets.messages.ticket_modal_confirm_placeholder'),
             max_length=10,
             required=True
         )
-        self.add_item(self.confirm_input)
 
     async def on_submit(self, interaction: discord.Interaction):
         if self.confirm_input.value.lower() != "yes":
@@ -43,13 +44,13 @@ class AddUserModal(discord.ui.Modal):
         self.cog = cog
         self.thread_id = thread_id
 
-        self.user_input = discord.ui.TextInput(
-            label=t('tickets.messages.add_user_modal_label'),
+        self.user_input = add_labeled_text_input(
+            self,
+            t('tickets.messages.add_user_modal_label'),
             placeholder=t('tickets.messages.add_user_modal_placeholder'),
             max_length=20,
             required=True
         )
-        self.add_item(self.user_input)
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
@@ -144,14 +145,14 @@ class CloseTicketModal(discord.ui.Modal):
         self.cog = cog
         self.thread_id = thread_id
 
-        self.reason_input = discord.ui.TextInput(
-            label=t('tickets.messages.close_modal_label'),
+        self.reason_input = add_labeled_text_input(
+            self,
+            t('tickets.messages.close_modal_label'),
             placeholder=t('tickets.messages.close_modal_placeholder'),
             style=discord.TextStyle.paragraph,
             max_length=500,
             required=True
         )
-        self.add_item(self.reason_input)
 
     async def on_submit(self, interaction: discord.Interaction):
         # Lazy import to break the modals ↔ views cycle: TicketThreadView
@@ -282,42 +283,42 @@ class TicketTypeModal(discord.ui.Modal):
         # Pre-fill if editing
         existing_data = cog.ticket_types.get(edit_type, {}) if edit_type else {}
 
-        self.type_name = discord.ui.TextInput(
-            label=t('tickets.messages.ticket_type_name_label'),
+        self.type_name = add_labeled_text_input(
+            self,
+            t('tickets.messages.ticket_type_name_label'),
             placeholder=t('tickets.messages.ticket_type_name_placeholder'),
             default=(edit_type or "")[:50],  # Ensure default doesn't exceed max_length
             required=True,
             max_length=50
         )
-        self.add_item(self.type_name)
 
-        self.description = discord.ui.TextInput(
-            label=t('tickets.messages.ticket_type_description_label'),
+        self.description = add_labeled_text_input(
+            self,
+            t('tickets.messages.ticket_type_description_label'),
             placeholder=t('tickets.messages.ticket_type_description_placeholder'),
             default=existing_data.get('description', '')[:100],  # Ensure default doesn't exceed max_length
             required=True,
             max_length=100
         )
-        self.add_item(self.description)
 
-        self.guide = discord.ui.TextInput(
-            label=t('tickets.messages.ticket_type_guide_label'),
+        self.guide = add_labeled_text_input(
+            self,
+            t('tickets.messages.ticket_type_guide_label'),
             placeholder=t('tickets.messages.ticket_type_guide_placeholder'),
             style=discord.TextStyle.paragraph,
             default=existing_data.get('guide', '')[:1000],  # Ensure default doesn't exceed max_length
             required=True,
             max_length=1000
         )
-        self.add_item(self.guide)
 
-        self.button_color = discord.ui.TextInput(
-            label=t('tickets.messages.ticket_type_color_label'),
+        self.button_color = add_labeled_text_input(
+            self,
+            t('tickets.messages.ticket_type_color_label'),
             placeholder=t('tickets.messages.ticket_type_color_placeholder'),
             default=existing_data.get('button_color', 'b')[:10],  # Ensure default doesn't exceed max_length
             required=False,
             max_length=10
         )
-        self.add_item(self.button_color)
 
     async def on_submit(self, interaction: discord.Interaction):
         try:

@@ -1,3 +1,5 @@
+import ast
+from pathlib import Path
 from types import SimpleNamespace
 
 from bot.cogs.achievement.views import RankView
@@ -14,6 +16,7 @@ ACHIEVEMENT_RANK_TEXT = {
     "achievements.rank.type_button_labels.checkin_sum": "🟠 Checkins",
     "achievements.rank.type_button_labels.checkin_combo": "🟤 Streaks",
 }
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 PRIVATEROOM_TEXT = {
@@ -24,6 +27,13 @@ PRIVATEROOM_TEXT = {
     "privateroom.messages.renewal_modal_label": "Type renew",
     "privateroom.messages.renewal_modal_placeholder": "renew",
 }
+
+
+def _modal_label_text(modal, component):
+    return next(
+        child.text for child in modal.children
+        if getattr(child, "component", None) is component
+    )
 
 
 def test_privateroom_purchase_modal_text_comes_from_locale(monkeypatch):
@@ -37,10 +47,10 @@ def test_privateroom_purchase_modal_text_comes_from_locale(monkeypatch):
     renewal_modal = PurchaseModal(cog=cog, cost=100, balance=200, is_renewal=True)
 
     assert purchase_modal.title == "Purchase confirm"
-    assert purchase_modal.confirmation.label == "Type yes"
+    assert _modal_label_text(purchase_modal, purchase_modal.confirmation) == "Type yes"
     assert purchase_modal.confirmation.placeholder == "yes"
     assert renewal_modal.title == "Renew confirm"
-    assert renewal_modal.confirmation.label == "Type renew"
+    assert _modal_label_text(renewal_modal, renewal_modal.confirmation) == "Type renew"
     assert renewal_modal.confirmation.placeholder == "renew"
 
 
@@ -81,6 +91,25 @@ def test_achievement_rank_buttons_come_from_locale(monkeypatch):
     assert str(view.all_button.emoji) == "🟣"
     assert view.type_buttons[0].label == "Reactions"
     assert str(view.type_buttons[0].emoji) == "🔴"
+
+
+def test_modal_text_inputs_use_discord_27_label_wrappers():
+    offenders = []
+    for path in sorted((PROJECT_ROOT / "bot").rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            is_text_input = (
+                isinstance(func, ast.Attribute) and func.attr == "TextInput"
+            ) or (
+                isinstance(func, ast.Name) and func.id == "TextInput"
+            )
+            if is_text_input and any(keyword.arg == "label" for keyword in node.keywords):
+                offenders.append(f"{path.relative_to(PROJECT_ROOT)}:{node.lineno}")
+
+    assert offenders == []
 
 
 def test_giveaway_achievement_type_is_retired_even_when_giveaway_feature_is_enabled(monkeypatch):

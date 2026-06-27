@@ -8,22 +8,14 @@ from discord import ui
 
 from bot.utils import config
 from bot.utils.i18n import t
+from bot.utils.modal_helpers import add_labeled_text_input
 
 from .views import GiveawayConfirmationView, GiveawayParticipationView
 
 
-class GiveawayForm(ui.Modal, title='Create Giveaway'):
-    duration = ui.TextInput(label='Duration Time', placeholder='Enter the duration(Eg. 1d/24h/30m)', required=True,
-                            min_length=2)
-    winners = ui.TextInput(label='Number of Winners', placeholder='Enter the number of winners', required=True,
-                           min_length=1, max_length=2, default="1")
-    prizes = ui.TextInput(label='Prizes', placeholder='Enter the prizes', required=True, max_length=100)
-    description = ui.TextInput(label='Description', placeholder='Enter the description', required=False,
-                               default="No Limit", max_length=500)
-    providers = ui.TextInput(label='Providers', placeholder='Leave blank as default', required=False)
-
+class GiveawayForm(ui.Modal):
     def __init__(self, bot, db, reaction_limit=0, message_limit=0, timespent_limit=0):
-        super().__init__()
+        super().__init__(title='Create Giveaway')
         self.bot = bot
         self.db = db
         self.giveaways = {}
@@ -36,6 +28,43 @@ class GiveawayForm(ui.Modal, title='Create Giveaway'):
         self.message_limit = message_limit
         # Convert the timespent_limit to seconds
         self.timespent_limit = timespent_limit * 60
+        self.duration = add_labeled_text_input(
+            self,
+            'Duration Time',
+            placeholder='Enter the duration(Eg. 1d/24h/30m)',
+            required=True,
+            min_length=2
+        )
+        self.winners = add_labeled_text_input(
+            self,
+            'Number of Winners',
+            placeholder='Enter the number of winners',
+            required=True,
+            min_length=1,
+            max_length=2,
+            default="1"
+        )
+        self.prizes = add_labeled_text_input(
+            self,
+            'Prizes',
+            placeholder='Enter the prizes',
+            required=True,
+            max_length=100
+        )
+        self.description = add_labeled_text_input(
+            self,
+            'Description',
+            placeholder='Enter the description',
+            required=False,
+            default="No Limit",
+            max_length=500
+        )
+        self.providers = add_labeled_text_input(
+            self,
+            'Providers',
+            placeholder='Leave blank as default',
+            required=False
+        )
 
     async def on_submit(self, interaction: discord.Interaction):
         # Validate the input
@@ -148,4 +177,3 @@ class GiveawayForm(ui.Modal, title='Create Giveaway'):
             return False
 
         return True
-

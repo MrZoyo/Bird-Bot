@@ -24,6 +24,13 @@ SHOP_TEXT = {
 }
 
 
+def _modal_label_text(modal, component):
+    return next(
+        child.text for child in modal.children
+        if getattr(child, "component", None) is component
+    )
+
+
 def test_makeup_modal_text_comes_from_locale(monkeypatch):
     monkeypatch.setattr("bot.cogs.shop.modals.t", lambda key, **kwargs: SHOP_TEXT[key])
 
@@ -38,9 +45,9 @@ def test_makeup_modal_text_comes_from_locale(monkeypatch):
     )
 
     assert modal.title == "Makeup confirm"
-    assert modal.info_field.label == "Makeup info"
+    assert _modal_label_text(modal, modal.info_field) == "Makeup info"
     assert modal.info_field.default == "remaining=2; total=3; cost=50; balance=120"
-    assert modal.confirm_field.label == "Confirm"
+    assert _modal_label_text(modal, modal.confirm_field) == "Confirm"
     assert modal.confirm_field.placeholder == "type yes"
 
 
@@ -56,11 +63,11 @@ def test_balance_modify_modal_text_comes_from_locale(monkeypatch):
     )
 
     assert modal.title == "Modify Alice"
-    assert modal.amount.label == "Amount (💰:42)"
+    assert _modal_label_text(modal, modal.amount) == "Amount (💰:42)"
     assert modal.amount.placeholder == "amount placeholder"
-    assert modal.operation_type.label == "Type"
+    assert _modal_label_text(modal, modal.operation_type) == "Type"
     assert modal.operation_type.placeholder == "type placeholder"
-    assert modal.reason.label == "Reason"
+    assert _modal_label_text(modal, modal.reason) == "Reason"
     assert modal.reason.placeholder == "reason placeholder"
 
 

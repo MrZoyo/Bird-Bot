@@ -1,6 +1,7 @@
 import discord
 
 from bot.utils.i18n import t
+from bot.utils.modal_helpers import add_labeled_text_input
 
 
 class CheckinMakeupModal(discord.ui.Modal):
@@ -14,8 +15,9 @@ class CheckinMakeupModal(discord.ui.Modal):
         self.cost = cost
         self.missed_date = missed_date
         
-        self.info_field = discord.ui.TextInput(
-            label=t('shop.makeup_modal_info_label'),
+        self.info_field = add_labeled_text_input(
+            self,
+            t('shop.makeup_modal_info_label'),
             default=t('shop.makeup_modal_info_format').format(
                 remaining=remaining_count,
                 total=conf['makeup_checkin_limit_per_month'],
@@ -26,16 +28,14 @@ class CheckinMakeupModal(discord.ui.Modal):
             required=False
         )
         
-        self.confirm_field = discord.ui.TextInput(
-            label=t('shop.makeup_modal_confirm_label'),
+        self.confirm_field = add_labeled_text_input(
+            self,
+            t('shop.makeup_modal_confirm_label'),
             placeholder=t('shop.makeup_modal_confirm_placeholder'),
             required=True,
             max_length=10,
             style=discord.TextStyle.short
         )
-        
-        self.add_item(self.info_field)
-        self.add_item(self.confirm_field)
     
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
@@ -105,28 +105,27 @@ class BalanceModifyModal(discord.ui.Modal):
         amount_label = (
             f"{t('shop.modify_balance_amount_label')} (💰:{current_balance})"
         )
-        self.amount = discord.ui.TextInput(
-            label=amount_label,
+        self.amount = add_labeled_text_input(
+            self,
+            amount_label,
             placeholder=t('shop.modify_balance_amount_placeholder'),
             required=True
         )
 
-        self.operation_type = discord.ui.TextInput(
-            label=t('shop.modify_balance_type_label'),
+        self.operation_type = add_labeled_text_input(
+            self,
+            t('shop.modify_balance_type_label'),
             placeholder=t('shop.modify_balance_type_placeholder'),
             required=False
         )
 
-        self.reason = discord.ui.TextInput(
-            label=t('shop.modify_balance_reason_label'),
+        self.reason = add_labeled_text_input(
+            self,
+            t('shop.modify_balance_reason_label'),
             placeholder=t('shop.modify_balance_reason_placeholder'),
             style=discord.TextStyle.paragraph,
             required=True
         )
-
-        self.add_item(self.amount)
-        self.add_item(self.operation_type)
-        self.add_item(self.reason)
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
@@ -166,4 +165,3 @@ class BalanceModifyModal(discord.ui.Modal):
                 t('shop.modify_balance_invalid_amount'),
                 ephemeral=True
             )
-
