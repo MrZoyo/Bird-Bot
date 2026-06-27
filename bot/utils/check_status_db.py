@@ -2,6 +2,7 @@
 import aiosqlite
 from typing import List, Tuple
 
+from .db_connect import connect_database
 from .db_lifecycle import BaseDatabaseManager
 
 
@@ -17,7 +18,7 @@ class CheckStatusDatabaseManager(BaseDatabaseManager):
         self.db_path = db_path
 
     async def initialize_database(self) -> None:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS status (
                     timestamp TEXT NOT NULL,
@@ -28,7 +29,7 @@ class CheckStatusDatabaseManager(BaseDatabaseManager):
             await db.commit()
 
     async def record_status(self, timestamp: str, people: int, channels: int) -> None:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             await db.execute(
                 'INSERT INTO status (timestamp, people, channels) VALUES (?, ?, ?)',
                 (timestamp, people, channels),
@@ -37,7 +38,7 @@ class CheckStatusDatabaseManager(BaseDatabaseManager):
 
     async def fetch_status_by_date_prefix(self, date_prefix: str) -> List[Tuple[str, int, int]]:
         """``date_prefix`` is matched against the leading portion of ``timestamp`` via LIKE ?%."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute(
                 'SELECT timestamp, people, channels FROM status '
                 'WHERE timestamp LIKE ? ORDER BY timestamp',

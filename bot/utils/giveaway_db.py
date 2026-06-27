@@ -3,6 +3,7 @@ import aiosqlite
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
+from .db_connect import connect_database
 from .db_lifecycle import BaseDatabaseManager
 
 
@@ -22,7 +23,7 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
         self.db_path = db_path
 
     async def initialize_database(self) -> None:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS giveaway (
                     giveaway_id INTEGER NOT NULL,
@@ -69,7 +70,7 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
         message_req,
         timespent_req,
     ) -> None:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             await db.execute(
                 'INSERT INTO giveaway '
                 '(giveaway_id, message_id, starttime, duration, winner_number, '
@@ -83,7 +84,7 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
             await db.commit()
 
     async def fetch_giveaway(self, giveaway_id) -> Optional[Dict[str, Any]]:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute(
                 'SELECT * FROM giveaway WHERE giveaway_id = ?',
                 (giveaway_id,),
@@ -112,7 +113,7 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
         }
 
     async def fetch_all_giveaway_ids(self) -> List[str]:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('SELECT giveaway_id FROM giveaway')
             rows = await cursor.fetchall()
             await cursor.close()
@@ -121,7 +122,7 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
     async def fetch_all_giveaways(self, include_ended: bool = True) -> List[Tuple]:
         """Raw row tuples; ordering matches the giveaway table's column order."""
         query = 'SELECT * FROM giveaway' if include_ended else 'SELECT * FROM giveaway WHERE is_end = 0'
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute(query)
             records = await cursor.fetchall()
             await cursor.close()
@@ -129,7 +130,7 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
 
     async def update_giveaway_winners(self, giveaway_id, winners: List) -> None:
         """Store winners (comma-joined) and mark ended."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             await db.execute(
                 'UPDATE giveaway SET winner_ids = ?, is_end = 1 WHERE giveaway_id = ?',
                 (",".join(str(w) for w in winners), giveaway_id),
@@ -137,7 +138,7 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
             await db.commit()
 
     async def mark_giveaway_as_ended(self, giveaway_id) -> None:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             await db.execute(
                 'UPDATE giveaway SET is_end = 1 WHERE giveaway_id = ?',
                 (giveaway_id,),
@@ -145,7 +146,7 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
             await db.commit()
 
     async def update_giveaway_description(self, giveaway_id, new_description) -> None:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             await db.execute(
                 'UPDATE giveaway SET description = ? WHERE giveaway_id = ?',
                 (new_description, giveaway_id),
@@ -153,7 +154,7 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
             await db.commit()
 
     async def update_giveaway_duration(self, giveaway_id, new_duration) -> None:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             await db.execute(
                 'UPDATE giveaway SET duration = ? WHERE giveaway_id = ?',
                 (new_duration, giveaway_id),
@@ -165,7 +166,7 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
     # ------------------------------------------------------------------
 
     async def fetch_participant_ids(self, giveaway_id) -> List[str]:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute(
                 'SELECT participant_ids FROM giveaway WHERE giveaway_id = ?',
                 (giveaway_id,),
@@ -182,7 +183,7 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
         return str(participant_id) in participant_ids
 
     async def add_participant(self, giveaway_id, participant_id) -> None:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute(
                 'SELECT participant_ids FROM giveaway WHERE giveaway_id = ?',
                 (giveaway_id,),
@@ -199,7 +200,7 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
             await db.commit()
 
     async def remove_participant(self, giveaway_id, participant_id) -> None:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute(
                 'SELECT participant_ids FROM giveaway WHERE giveaway_id = ?',
                 (giveaway_id,),
@@ -222,7 +223,7 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
 
     async def fetch_winner_ids(self, giveaway_id) -> List[int]:
         """Winner rows may hold either raw ids or '<@id>' mentions; normalize to ints."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute(
                 'SELECT winner_ids FROM giveaway WHERE giveaway_id = ?',
                 (giveaway_id,),
@@ -242,7 +243,7 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
         self, giveaway_id
     ) -> Optional[Tuple[int, int, int]]:
         """Return (reaction_req, message_req, timespent_req) or None if the giveaway is missing."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute(
                 'SELECT reaction_req, message_req, timespent_req '
                 'FROM giveaway WHERE giveaway_id = ?',
@@ -256,7 +257,7 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
         self, user_id
     ) -> Optional[Tuple]:
         """Return legacy achievement counters used for giveaway entry requirements."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute(
                 'SELECT * FROM achievements WHERE user_id = ?',
                 (user_id,),
@@ -272,7 +273,7 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
     async def save_giveaway_view(
         self, giveaway_id, giveaway_channel_id, message_id
     ) -> None:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             await db.execute(
                 'REPLACE INTO giveaway_views (giveaway_id, giveaway_channel_id, message_id) '
                 'VALUES (?, ?, ?)',
@@ -281,7 +282,7 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
             await db.commit()
 
     async def load_giveaway_views(self) -> List[Tuple[str, str, str]]:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute(
                 'SELECT giveaway_id, giveaway_channel_id, message_id FROM giveaway_views'
             )
@@ -290,7 +291,7 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
         return records
 
     async def cleanup_ended_giveaway_views(self) -> None:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             await db.execute('''
                 DELETE FROM giveaway_views
                 WHERE giveaway_id IN (

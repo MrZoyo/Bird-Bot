@@ -49,12 +49,13 @@ The bot's code is deeply optimised for low-performance devices, using asynchrono
   - [achievement_db](#achievement_db)
   - [role_db](#role_db)
   - [ban_db](#ban_db)
+- [Privacy and Data Security](#privacy-and-data-security)
 - [Update Log](#update-log)
 
 ---
 ## Package Usage
 
-discord.py, aiosqlite, aiohttp, requests, aiofiles, pillow, matplotlib, tqdm, PySimpleGUI, ruamel.yaml
+discord.py, aiosqlite, sqlcipher3, aiohttp, requests, aiofiles, pillow, matplotlib, tqdm, PySimpleGUI, ruamel.yaml
 
 ---
 ## Setup
@@ -71,9 +72,10 @@ discord.py, aiosqlite, aiohttp, requests, aiofiles, pillow, matplotlib, tqdm, Py
 4. Copy only the required `*.yaml.example` files in `bot/config/`, rename them to `*.yaml`, and fill in the values. Run-time configs are YAML (since config 2.0); legacy `config_*.json.example` templates were moved to the `legacy-old-files-archive` branch for historical reference.
 5. In `main.yaml`, use `features` to enable only the modules you need.
    - Relative runtime paths such as `./data/bot.db` and `./data/bot.log` are resolved from the repository root.
+   - For encrypted database storage, set `DCGSH_DB_KEY` or `DCGSH_DB_KEY_FILE`, migrate the existing database with `python tools/encrypt_database.py`, then set `DCGSH_DB_REQUIRE_ENCRYPTION=1` in production.
 6. Disabled modules, or modules without a valid config file, will be skipped during startup and their commands will not be registered.
 7. If migrating from a pre-config-2.0 deployment: run `python tools/migrate_config_to_yaml.py` to produce YAML + locale files from your existing `config_*.json`, review `tools/migration_report.md`, then run `python tools/seed_db.py` to load `voicechannel.channel_configs` / `tickets.ticket_types` into the database (these were JSON-subtree-turned-DB-tables in P2-5; note: legacy `config_tickets_new.json` sources are auto-mapped to the new `tickets` name, while removed-system sources `config_tickets.json` and `config_rating.json` are skipped). See `REFACTORING_PROGRESS.md` "Upgrade 协议" for the full sequence.
-8. In the Discord Developer Portal, enable the privileged intents required by this bot. The current runtime requests `Intents.all()`, so the safe setup is to enable `Server Members Intent`, `Presence Intent`, and `Message Content Intent`.
+8. In the Discord Developer Portal, enable the privileged intents required by this bot: `Server Members Intent` and `Message Content Intent`. The runtime does not request `Presence Intent`.
 9. Run `python run.py`. If you are using a Linux server, you can use `nohup python3 run.py &` to run the bot in the background.
 10. Invite the bot to your server and give it the necessary permissions.(Required permissions: bot, application command, administrator)
 11. Run automated smoke tests with `python -m pytest` when the test extra is installed. The suite covers config templates, runtime cog metadata, log helpers, UI locale metadata, the temporary JSON-to-YAML config migration smoke, background-loop offline guards, and pure DB-manager paths with temporary sqlite databases.
@@ -518,6 +520,10 @@ Media processing module with validation and security features.
 - The standard log shape is `name (id)` for channels/roles and `display_name / username (id)` for users when those names differ. Raw IDs are logged as `unknown (id)` when no cached Discord object is available. Numeric IDs use ASCII parentheses.
 
 ---
+
+## Privacy and Data Security
+
+See [PRIVACY.md](./PRIVACY.md) for the data inventory, privileged-intent rationale, log/backup retention notes, and SQLCipher database encryption procedure.
 
 ## Update Log Latest
 ### V2.0.0 - 2026-06-27

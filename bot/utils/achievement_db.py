@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import aiosqlite
 
+from .db_connect import connect_database
 from .db_lifecycle import BaseDatabaseManager
 from .log_helpers import fmt_channel, fmt_user
 

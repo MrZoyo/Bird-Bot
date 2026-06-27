@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import logging
 from typing import Optional, List, Dict, Tuple
 
+from .db_connect import connect_database
 from .db_lifecycle import BaseDatabaseManager
 from .log_helpers import fmt_channel, fmt_user
 
@@ -17,7 +18,7 @@ class TeamupDisplayManager(BaseDatabaseManager):
     
     async def init_tables(self):
         """Initialize database tables"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             # Display board management table
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS teamup_displays (
@@ -70,7 +71,7 @@ class TeamupDisplayManager(BaseDatabaseManager):
     
     async def save_display_board(self, channel_id: int, message_id: int) -> bool:
         """Save or update display board information"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 await db.execute('''
                     INSERT OR REPLACE INTO teamup_displays (channel_id, message_id, updated_at)
@@ -84,7 +85,7 @@ class TeamupDisplayManager(BaseDatabaseManager):
     
     async def get_display_board(self, channel_id: int) -> Optional[Tuple[int, int]]:
         """Get display board information"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('''
                 SELECT message_id, channel_id FROM teamup_displays WHERE channel_id = ?
             ''', (channel_id,))
@@ -93,7 +94,7 @@ class TeamupDisplayManager(BaseDatabaseManager):
     
     async def remove_display_board(self, channel_id: int) -> bool:
         """Remove display board information"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 await db.execute('DELETE FROM teamup_displays WHERE channel_id = ?', (channel_id,))
                 await db.commit()
@@ -104,7 +105,7 @@ class TeamupDisplayManager(BaseDatabaseManager):
     
     async def add_game_type(self, channel_id: int, game_type: str) -> bool:
         """Add game type configuration"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 # Get current maximum display_order
                 cursor = await db.execute('SELECT MAX(display_order) FROM teamup_game_types')
@@ -123,7 +124,7 @@ class TeamupDisplayManager(BaseDatabaseManager):
     
     async def remove_game_type(self, channel_id: int) -> bool:
         """Remove game type configuration"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 await db.execute('DELETE FROM teamup_game_types WHERE channel_id = ?', (channel_id,))
                 await db.commit()
@@ -134,7 +135,7 @@ class TeamupDisplayManager(BaseDatabaseManager):
     
     async def get_all_game_types(self) -> Dict[int, str]:
         """Get all game type configurations"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('''
                 SELECT channel_id, game_type FROM teamup_game_types ORDER BY display_order
             ''')
@@ -143,7 +144,7 @@ class TeamupDisplayManager(BaseDatabaseManager):
     
     async def get_game_type_by_channel(self, channel_id: int) -> Optional[str]:
         """Get game type by channel ID"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('''
                 SELECT game_type FROM teamup_game_types WHERE channel_id = ?
             ''', (channel_id,))
@@ -154,7 +155,7 @@ class TeamupDisplayManager(BaseDatabaseManager):
                                    message_content: str, player_count: int = 1, 
                                    game_type: str = None) -> bool:
         """Add or update teamup invitation"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 # Calculate expiration time (5 minutes later)
                 expires_at = datetime.now(timezone.utc).replace(microsecond=0)
@@ -187,7 +188,7 @@ class TeamupDisplayManager(BaseDatabaseManager):
     
     async def remove_teamup_invitation(self, user_id: int, voice_channel_id: int) -> bool:
         """Remove teamup invitation if user is the latest poster for this voice channel"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 # Check if this user is the latest poster for this voice channel
                 cursor = await db.execute('''
@@ -213,7 +214,7 @@ class TeamupDisplayManager(BaseDatabaseManager):
     
     async def cleanup_expired_invitations(self) -> int:
         """Clean up expired teamup invitations and return count of cleaned items"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 cursor = await db.execute('''
                     DELETE FROM teamup_invitations 
@@ -227,7 +228,7 @@ class TeamupDisplayManager(BaseDatabaseManager):
     
     async def remove_invalid_invitation(self, voice_channel_id: int) -> bool:
         """Remove invitation for non-existent voice channel"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 await db.execute('''
                     DELETE FROM teamup_invitations 
@@ -245,7 +246,7 @@ class TeamupDisplayManager(BaseDatabaseManager):
     
     async def get_active_invitations(self) -> List[Dict]:
         """Get all active teamup invitations"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('''
                 SELECT user_id, channel_id, voice_channel_id, message_content, 
                        player_count, game_type, created_at, expires_at
@@ -272,7 +273,7 @@ class TeamupDisplayManager(BaseDatabaseManager):
     
     async def update_user_stats(self, user_id: int) -> bool:
         """Update user teamup statistics"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 await db.execute('''
                     INSERT OR REPLACE INTO user_teamup_stats 
@@ -291,7 +292,7 @@ class TeamupDisplayManager(BaseDatabaseManager):
     
     async def get_user_stats(self, user_id: int) -> Tuple[int, Optional[str]]:
         """Get user teamup statistics"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('''
                 SELECT teamup_count, last_teamup_at FROM user_teamup_stats WHERE user_id = ?
             ''', (user_id,))
@@ -300,7 +301,7 @@ class TeamupDisplayManager(BaseDatabaseManager):
     
     async def get_all_display_boards(self) -> List[Tuple[int, int]]:
         """Get all display board information"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('SELECT channel_id, message_id FROM teamup_displays')
             results = await cursor.fetchall()
             return results
@@ -308,7 +309,7 @@ class TeamupDisplayManager(BaseDatabaseManager):
     async def save_invitation_message(self, voice_channel_id: int, message_id: int, channel_id: int) -> bool:
         """Save invitation message ID for a voice channel"""
         try:
-            async with aiosqlite.connect(self.db_path) as db:
+            async with connect_database(self.db_path) as db:
                 # Use subquery to get the latest invitation ID (SQLite UPDATE doesn't support ORDER BY directly)
                 await db.execute('''
                     UPDATE teamup_invitations
@@ -342,7 +343,7 @@ class TeamupDisplayManager(BaseDatabaseManager):
     async def get_last_invitation_by_voice_channel(self, voice_channel_id: int) -> Optional[Dict]:
         """Get the last invitation for a specific voice channel"""
         try:
-            async with aiosqlite.connect(self.db_path) as db:
+            async with connect_database(self.db_path) as db:
                 cursor = await db.execute('''
                     SELECT invitation_message_id, invitation_channel_id, user_id
                     FROM teamup_invitations

@@ -6,6 +6,7 @@ import logging
 from datetime import datetime
 from typing import Optional, List, Tuple, Dict
 
+from .db_connect import connect_database
 from .db_lifecycle import BaseDatabaseManager
 
 
@@ -15,7 +16,7 @@ class TicketsDatabaseManager(BaseDatabaseManager):
 
     async def initialize_database(self) -> None:
         """Create necessary database tables if they don't exist."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             # New tickets table for thread-based system
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS tickets_new (
@@ -82,7 +83,7 @@ class TicketsDatabaseManager(BaseDatabaseManager):
         ``self.conf['ticket_types']`` so reads elsewhere in the tickets cog
         stay literal (``ticket_types[name]['description']`` etc.).
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 cursor = await db.execute(
                     'SELECT type_name, type_data FROM ticket_types'
@@ -99,7 +100,7 @@ class TicketsDatabaseManager(BaseDatabaseManager):
         Single-statement upsert keeps concurrent modal submits from racing
         into two rows with the same name.
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 await db.execute(
                     '''
@@ -125,7 +126,7 @@ class TicketsDatabaseManager(BaseDatabaseManager):
         doing it transactionally prevents a partial state where the old name
         is gone but the new one failed to insert (or vice-versa).
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 await db.execute('BEGIN')
                 await db.execute(
@@ -151,7 +152,7 @@ class TicketsDatabaseManager(BaseDatabaseManager):
                 return False
 
     async def remove_ticket_type(self, type_name: str) -> bool:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 await db.execute(
                     'DELETE FROM ticket_types WHERE type_name = ?',
@@ -166,7 +167,7 @@ class TicketsDatabaseManager(BaseDatabaseManager):
     async def set_config(self, ticket_channel_id: int, info_channel_id: int, 
                         main_message_id: Optional[int] = None) -> bool:
         """Set or update ticket system configuration."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 # Check if config exists
                 cursor = await db.execute('SELECT id FROM ticket_new_config LIMIT 1')
@@ -197,7 +198,7 @@ class TicketsDatabaseManager(BaseDatabaseManager):
 
     async def get_config(self) -> Optional[Dict]:
         """Get ticket system configuration."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 cursor = await db.execute('''
                     SELECT ticket_channel_id, info_channel_id, main_message_id
@@ -221,7 +222,7 @@ class TicketsDatabaseManager(BaseDatabaseManager):
                             creator_id: int, type_name: str, 
                             ticket_channel_id: int, ticket_number: int) -> bool:
         """Create a new ticket and add creator as first member."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 await db.execute('''
                     INSERT INTO tickets_new (
@@ -244,7 +245,7 @@ class TicketsDatabaseManager(BaseDatabaseManager):
 
     async def check_member_exists(self, thread_id: int, user_id: int) -> bool:
         """Check if a user is already a member of the ticket."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('''
                 SELECT 1 FROM ticket_new_members 
                 WHERE thread_id = ? AND user_id = ?
@@ -254,7 +255,7 @@ class TicketsDatabaseManager(BaseDatabaseManager):
 
     async def check_ticket_status(self, thread_id: int) -> Tuple[bool, bool]:
         """Check if ticket exists and if it's closed."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('''
                 SELECT is_closed FROM tickets_new WHERE thread_id = ?
             ''', (thread_id,))
@@ -267,7 +268,7 @@ class TicketsDatabaseManager(BaseDatabaseManager):
     async def add_ticket_member(self, thread_id: int, user_id: int,
                                 added_by: int) -> bool:
         """Add a member to a ticket if they're not already in it."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 # First check if ticket exists and is not closed
                 ticket_exists, is_closed = await self.check_ticket_status(thread_id)
@@ -293,7 +294,7 @@ class TicketsDatabaseManager(BaseDatabaseManager):
 
     async def accept_ticket(self, thread_id: int, accepted_by: int) -> bool:
         """Mark a ticket as accepted if it's not already accepted."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 # Check if ticket is already accepted
                 cursor = await db.execute('''
@@ -323,7 +324,7 @@ class TicketsDatabaseManager(BaseDatabaseManager):
     async def close_ticket(self, thread_id: int, closed_by: int,
                            reason: str) -> bool:
         """Close a ticket if it's not already closed."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 cursor = await db.execute('''
                     SELECT is_closed FROM tickets_new WHERE thread_id = ?
@@ -348,7 +349,7 @@ class TicketsDatabaseManager(BaseDatabaseManager):
 
     async def get_ticket_stats(self) -> dict:
         """Get comprehensive ticket statistics."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.cursor()
 
             # Get total tickets
@@ -392,7 +393,7 @@ class TicketsDatabaseManager(BaseDatabaseManager):
 
     async def get_ticket_members(self, thread_id: int) -> List[Tuple[int, int, str]]:
         """Get all members of a ticket."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 cursor = await db.execute('''
                     SELECT user_id, added_by, added_at
@@ -407,7 +408,7 @@ class TicketsDatabaseManager(BaseDatabaseManager):
 
     async def get_active_tickets(self) -> List[dict]:
         """Get all active (not closed) tickets."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 cursor = await db.execute('''
                     SELECT thread_id, message_id, creator_id, type_name, 
@@ -437,7 +438,7 @@ class TicketsDatabaseManager(BaseDatabaseManager):
 
     async def clean_invalid_tickets(self, valid_thread_ids: List[int]) -> None:
         """Clean up tickets for threads that no longer exist."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 await db.execute('''
                     DELETE FROM ticket_new_members 
@@ -455,7 +456,7 @@ class TicketsDatabaseManager(BaseDatabaseManager):
 
     async def get_ticket_number(self, thread_id: int = None) -> int:
         """Get next ticket number based on highest existing ticket number."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('''
                 SELECT MAX(ticket_number) FROM tickets_new WHERE ticket_number IS NOT NULL
             ''')
@@ -464,7 +465,7 @@ class TicketsDatabaseManager(BaseDatabaseManager):
 
     async def fetch_ticket(self, thread_id: int) -> Optional[dict]:
         """Fetch ticket details by thread ID."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.cursor()
             await cursor.execute('''
                 SELECT thread_id, ticket_number, message_id, creator_id, type_name, 
@@ -491,7 +492,7 @@ class TicketsDatabaseManager(BaseDatabaseManager):
         """
         Get complete ticket history including all metadata and members.
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.cursor()
 
             # Get basic ticket info
@@ -544,7 +545,7 @@ class TicketsDatabaseManager(BaseDatabaseManager):
 
     async def fix_null_ticket_numbers(self) -> int:
         """Fix tickets with NULL ticket_number by assigning sequential numbers."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 # Get all tickets with NULL ticket_number ordered by created_at
                 cursor = await db.execute('''
@@ -584,7 +585,7 @@ class TicketsDatabaseManager(BaseDatabaseManager):
     async def update_ticket_message_id(self, thread_id: int, message_id: int) -> bool:
         """Update the message ID for a ticket."""
         try:
-            async with aiosqlite.connect(self.db_path) as db:
+            async with connect_database(self.db_path) as db:
                 await db.execute(
                     "UPDATE tickets_new SET message_id = ? WHERE thread_id = ?",
                     (message_id, thread_id)

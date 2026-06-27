@@ -5,6 +5,7 @@ import discord
 from datetime import datetime, timedelta
 from typing import Optional, List, Tuple
 
+from .db_connect import connect_database
 from .db_lifecycle import BaseDatabaseManager
 from .schema_migrations import SchemaMigration, apply_schema_migrations
 
@@ -15,7 +16,7 @@ class BanDatabaseManager(BaseDatabaseManager):
 
     async def initialize_database(self) -> None:
         """Create necessary database tables if they don't exist."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             # Create new table with correct schema. Existing tables keep their
             # current definition and are handled by the migrations below.
             await db.execute('''
@@ -111,7 +112,7 @@ class BanDatabaseManager(BaseDatabaseManager):
     async def add_tempban(self, user_id: int, guild_id: int, banned_by: int, 
                          reason: str, unban_at: datetime, delete_message_days: int = 0) -> int:
         """Add a new tempban record."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             # Convert datetime to ISO format string for consistent storage
             unban_at_str = unban_at.isoformat()
             
@@ -128,7 +129,7 @@ class BanDatabaseManager(BaseDatabaseManager):
         current_time = discord.utils.utcnow()
         current_time_str = current_time.isoformat()
         
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             if guild_id:
                 cursor = await db.execute('''
                     SELECT id, user_id, guild_id, banned_by, reason, banned_at, unban_at, delete_message_days
@@ -148,7 +149,7 @@ class BanDatabaseManager(BaseDatabaseManager):
 
     async def get_all_active_tempbans_including_expired(self, guild_id: Optional[int] = None) -> List[Tuple]:
         """Get all active tempbans including expired ones (for recovery/cleanup)."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             if guild_id:
                 cursor = await db.execute('''
                     SELECT id, user_id, guild_id, banned_by, reason, banned_at, unban_at, delete_message_days
@@ -171,7 +172,7 @@ class BanDatabaseManager(BaseDatabaseManager):
         current_time = discord.utils.utcnow()
         current_time_str = current_time.isoformat()
         
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('''
                 SELECT id, user_id, guild_id, banned_by, reason, banned_at, unban_at, delete_message_days
                 FROM tempbans 
@@ -183,7 +184,7 @@ class BanDatabaseManager(BaseDatabaseManager):
 
     async def deactivate_tempban(self, tempban_id: int) -> bool:
         """Mark a tempban as inactive (completed)."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('''
                 UPDATE tempbans 
                 SET is_active = 0 
@@ -196,7 +197,7 @@ class BanDatabaseManager(BaseDatabaseManager):
 
     async def deactivate_tempban_by_user(self, user_id: int, guild_id: int) -> bool:
         """Mark a user's active tempban as inactive (for manual unban)."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('''
                 UPDATE tempbans 
                 SET is_active = 0 
@@ -208,7 +209,7 @@ class BanDatabaseManager(BaseDatabaseManager):
 
     async def get_user_tempban(self, user_id: int, guild_id: int) -> Optional[Tuple]:
         """Get a user's active tempban record."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('''
                 SELECT id, user_id, guild_id, banned_by, reason, banned_at, unban_at, delete_message_days
                 FROM tempbans 
@@ -222,7 +223,7 @@ class BanDatabaseManager(BaseDatabaseManager):
         cutoff_date = discord.utils.utcnow() - timedelta(days=days_old)
         cutoff_date_str = cutoff_date.isoformat()
         
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('''
                 DELETE FROM tempbans 
                 WHERE is_active = 0 AND unban_at < ?
@@ -233,7 +234,7 @@ class BanDatabaseManager(BaseDatabaseManager):
 
     async def get_tempban_stats(self, guild_id: int) -> dict:
         """Get tempban statistics for a guild."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             # Active tempbans count (not expired)
             current_time_str = discord.utils.utcnow().isoformat()
             cursor = await db.execute('''

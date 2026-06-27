@@ -156,12 +156,19 @@ def _load_cog_class(module_path, class_name):
     return getattr(module, class_name)
 
 
-def create_bot():
-    intents = discord.Intents.all()
+def build_intents() -> discord.Intents:
+    intents = discord.Intents.default()
     intents.members = True
-    intents.guilds = True
+    intents.message_content = True
     intents.voice_states = True
+    intents.guild_messages = True
+    intents.guild_reactions = True
+    intents.presences = False
+    return intents
 
+
+def create_bot():
+    intents = build_intents()
     bot = DCGameServerHelperBot(command_prefix="!", intents=intents)
 
     @bot.event

@@ -13,6 +13,7 @@ dependencies = [
     "PySimpleGUI<5",
     "requests",
     "ruamel.yaml",
+    "sqlcipher3==0.6.2",
     "tqdm",
 ]
 

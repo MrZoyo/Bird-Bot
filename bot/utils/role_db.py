@@ -4,6 +4,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional, Dict, List, Tuple, Any
 
+from .db_connect import connect_database
 from .db_lifecycle import BaseDatabaseManager
 from .log_helpers import fmt_user
 
@@ -14,7 +15,7 @@ class RoleDatabaseManager(BaseDatabaseManager):
 
     async def initialize_database(self) -> None:
         """Create necessary role-related database tables if they don't exist."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             # Role views tables for different role types
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS role_views (
@@ -63,7 +64,7 @@ class RoleDatabaseManager(BaseDatabaseManager):
 
     async def save_role_view(self, message_id: int, channel_id: int, table: str = 'role_views') -> bool:
         """Save a role view message to the database."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 await db.execute(f'INSERT INTO {table} (message_id, channel_id) VALUES (?, ?)',
                                  (message_id, channel_id))
@@ -75,7 +76,7 @@ class RoleDatabaseManager(BaseDatabaseManager):
 
     async def remove_role_view(self, message_id: int, channel_id: int, table: str = 'role_views') -> bool:
         """Remove a role view message from the database."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 await db.execute(f'DELETE FROM {table} WHERE message_id = ? AND channel_id = ?',
                                  (message_id, channel_id))
@@ -87,7 +88,7 @@ class RoleDatabaseManager(BaseDatabaseManager):
 
     async def get_all_role_views(self, table: str = 'role_views') -> List[Tuple[int, int]]:
         """Get all role view messages from the database."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 cursor = await db.execute(f'SELECT message_id, channel_id FROM {table}')
                 return await cursor.fetchall()
@@ -97,7 +98,7 @@ class RoleDatabaseManager(BaseDatabaseManager):
 
     async def get_user_achievement_progress(self, user_id: int, achievement_type: str) -> Optional[int]:
         """Get user's progress for a specific achievement type."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 if achievement_type in ['checkin_sum', 'checkin_combo']:
                     return await self._get_checkin_progress(user_id, achievement_type)
@@ -130,7 +131,7 @@ class RoleDatabaseManager(BaseDatabaseManager):
 
     async def _get_checkin_progress(self, user_id: int, checkin_type: str) -> Optional[int]:
         """Get user's checkin progress from shop tables."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 if checkin_type == 'checkin_sum':
                     cursor = await db.execute("SELECT COUNT(*) FROM shop_checkin_records WHERE user_id = ?", (user_id,))
@@ -152,7 +153,7 @@ class RoleDatabaseManager(BaseDatabaseManager):
 
     async def check_voice_time_requirement(self, user_id: int, required_time: int) -> Tuple[bool, int]:
         """Check if user meets voice time requirement for signature feature."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 cursor = await db.execute(
                     "SELECT time_spent FROM achievements WHERE user_id = ?",
@@ -173,7 +174,7 @@ class RoleDatabaseManager(BaseDatabaseManager):
     # Signature-related methods
     async def get_user_signature(self, user_id: int) -> Optional[Dict[str, Any]]:
         """Get user's signature information."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 cursor = await db.execute('''
                     SELECT signature, change_time1, change_time2, change_time3, is_disabled
@@ -197,7 +198,7 @@ class RoleDatabaseManager(BaseDatabaseManager):
 
     async def update_user_signature(self, user_id: int, signature: str, time_slot: int) -> bool:
         """Update user's signature and record the change time."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 current_time = datetime.now(timezone.utc).isoformat()
                 
@@ -288,7 +289,7 @@ class RoleDatabaseManager(BaseDatabaseManager):
 
     async def toggle_signature_permission(self, user_id: int, disable: bool) -> bool:
         """Toggle a user's signature permission."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 await db.execute('''
                     INSERT INTO user_signatures (user_id, is_disabled)
@@ -303,7 +304,7 @@ class RoleDatabaseManager(BaseDatabaseManager):
 
     async def clear_user_signature(self, user_id: int) -> bool:
         """Clear user's signature and change history."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             try:
                 await db.execute('''
                     UPDATE user_signatures

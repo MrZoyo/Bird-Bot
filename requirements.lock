@@ -72,6 +72,8 @@ ruamel-yaml==0.19.1
     # via dcgameserverhelper
 six==1.17.0
     # via python-dateutil
+sqlcipher3==0.6.2
+    # via dcgameserverhelper
 tqdm==4.67.3
     # via dcgameserverhelper
 typing-extensions==4.15.0 ; python_full_version < '3.13'

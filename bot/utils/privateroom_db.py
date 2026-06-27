@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import logging
 from typing import Dict, List, Optional, Tuple, Any
 
+from .db_connect import connect_database
 from .db_lifecycle import BaseDatabaseManager
 from .log_helpers import fmt_channel
 from .schema_migrations import (
@@ -20,7 +21,7 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
 
     async def initialize_database(self) -> None:
         """创建私人房间相关的数据库表"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             # 系统配置表 - 存储 category_id 和商店相关信息
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS privateroom_config (
@@ -78,14 +79,14 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
 
     async def get_config_value(self, key: str) -> Optional[str]:
         """从配置表中获取一个值"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('SELECT value FROM privateroom_config WHERE key = ?', (key,))
             result = await cursor.fetchone()
             return result[0] if result else None
 
     async def set_config_value(self, key: str, value: str) -> None:
         """设置配置表中的值"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             await db.execute('''
                 INSERT INTO privateroom_config (key, value) 
                 VALUES (?, ?) 
@@ -105,7 +106,7 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
     async def save_shop_message(self, channel_id: int, message_id: int) -> None:
         """保存商店消息信息"""
         current_time = datetime.now().isoformat()
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             await db.execute('''
                 INSERT INTO privateroom_shop_messages (channel_id, message_id, created_at)
                 VALUES (?, ?, ?)
@@ -115,20 +116,20 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
 
     async def get_shop_messages(self) -> List[Tuple[int, int]]:
         """获取所有商店消息"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('SELECT channel_id, message_id FROM privateroom_shop_messages')
             return await cursor.fetchall()
 
     async def delete_shop_messages(self) -> None:
         """删除所有商店消息记录"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             await db.execute('DELETE FROM privateroom_shop_messages')
             await db.commit()
 
     async def create_room(self, room_id: int, user_id: int,
                           start_date: datetime, end_date: datetime) -> None:
         """创建新的私人房间记录"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             await db.execute('''
                 INSERT INTO privateroom_rooms 
                 (room_id, user_id, start_date, end_date, is_active)
@@ -139,7 +140,7 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
     async def get_deleted_room_by_user(self, user_id: int) -> Optional[Dict[str, Any]]:
         """获取用户之前删除的但仍在有效期内的私人房间"""
         now = datetime.now()
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('''
                 SELECT room_id, user_id, start_date, end_date
                 FROM privateroom_rooms
@@ -162,7 +163,7 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
     async def get_expired_rooms(self) -> List[Dict[str, Any]]:
         """获取所有已过期的活跃房间"""
         now = datetime.now()
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('''
                 SELECT room_id, user_id, start_date, end_date
                 FROM privateroom_rooms
@@ -183,7 +184,7 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
 
     async def deactivate_room(self, room_id: int) -> None:
         """将房间标记为非活跃（过期）"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             await db.execute('''
                 UPDATE privateroom_rooms 
                 SET is_active = 0
@@ -193,7 +194,7 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
 
     async def reset_privateroom_system(self) -> None:
         """重置整个私人房间系统（删除所有数据）"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             await db.execute('DELETE FROM privateroom_config')
             await db.execute('DELETE FROM privateroom_rooms')
             await db.execute('DELETE FROM privateroom_shop_messages')
@@ -201,7 +202,7 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
 
     async def get_active_room_by_user(self, user_id: int) -> Optional[Dict[str, Any]]:
         """获取用户当前活跃的私人房间"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('''
                 SELECT room_id, user_id, start_date, end_date
                 FROM privateroom_rooms
@@ -221,7 +222,7 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
 
     async def mark_room_inactive(self, room_id: int) -> None:
         """Mark a room as inactive (for when the channel is deleted)"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             await db.execute('''
                 UPDATE privateroom_rooms 
                 SET is_active = 0
@@ -231,7 +232,7 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
 
     async def restore_room(self, old_room_id: int, new_room_id: int) -> None:
         """Restore a previously inactive room using a new channel ID"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             # Get the original room info
             cursor = await db.execute('''
                 SELECT user_id, start_date, end_date
@@ -257,7 +258,7 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
     async def get_inactive_valid_room(self, user_id: int) -> Optional[Dict[str, Any]]:
         """Get a user's inactive room that's still within its validity period"""
         now = datetime.now()
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('''
                 SELECT room_id, user_id, start_date, end_date
                 FROM privateroom_rooms
@@ -294,7 +295,7 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
 
     async def remove_shop_message(self, channel_id: int, message_id: int) -> None:
         """从数据库中移除单个商店消息记录"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             await db.execute(
                 'DELETE FROM privateroom_shop_messages WHERE channel_id = ? AND message_id = ?',
                 (channel_id, message_id)
@@ -319,7 +320,7 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
 
     async def get_active_rooms_count(self) -> int:
         """Get the total count of active private rooms"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('SELECT COUNT(*) FROM privateroom_rooms WHERE is_active = 1')
             result = await cursor.fetchone()
             return result[0] if result else 0
@@ -328,7 +329,7 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
         """Get paginated active rooms
         Returns: (rooms, total_count)
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             # Get total count first
             cursor = await db.execute(
                 'SELECT COUNT(*) FROM privateroom_rooms WHERE is_active = 1'
@@ -355,7 +356,7 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
             room_id: 房间ID
             new_end_date: 新的结束日期
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('''
                 UPDATE privateroom_rooms
                 SET end_date = ?, renewal_reminder_sent = 0
@@ -397,7 +398,7 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
             now = datetime.now()
             threshold_date = now + timedelta(days=threshold_days)
 
-            async with aiosqlite.connect(self.db_path) as db:
+            async with connect_database(self.db_path) as db:
                 cursor = await db.execute('''
                     SELECT room_id, user_id, end_date
                     FROM privateroom_rooms
@@ -434,7 +435,7 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
             sent: True 表示已发送提醒，False 表示重置标志
         """
         try:
-            async with aiosqlite.connect(self.db_path) as db:
+            async with connect_database(self.db_path) as db:
                 await db.execute('''
                     UPDATE privateroom_rooms
                     SET renewal_reminder_sent = ?
@@ -462,7 +463,7 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
         is here so private-room eligibility checks can stay within a single manager
         dependency. Revisit if cross-manager access grows.
         """
-        async with aiosqlite.connect(self.db_path) as db:
+        async with connect_database(self.db_path) as db:
             cursor = await db.execute('''
                 SELECT time_spent FROM monthly_achievements
                 WHERE user_id = ? AND year = ? AND month = ?

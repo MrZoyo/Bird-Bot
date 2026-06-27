@@ -88,6 +88,9 @@ Never commit real YAML configs, real JSON configs, `tools/migration_db_seed.json
 ## Database
 
 - Main DB path comes from `main.db_path`, usually `data/bot.db`.
+- All runtime SQLite connections must go through `bot.utils.db_connect.connect_database()` so SQLCipher encryption is applied consistently when `DCGSH_DB_KEY` or `DCGSH_DB_KEY_FILE` is set.
+- Production encrypted deployments should set `DCGSH_DB_REQUIRE_ENCRYPTION=1`; keys must stay in environment/secret files, never YAML, logs, docs, or git.
+- Existing plaintext databases are migrated with `tools/encrypt_database.py`; back up the plaintext source first and protect or delete that plaintext backup after validation.
 - Use feature DB managers in `bot/utils/*_db.py`; do not put raw SQL in cogs unless there is already an established local exception.
 - Several managers use persistent async connections. If a one-shot script creates one, close it explicitly before exiting.
 - DB schema migrations use `bot/utils/schema_migrations.py` where needed.
@@ -172,12 +175,13 @@ Current pytest smoke coverage includes:
 - Background loop offline guard.
 - Offline DB manager smoke for retained modules.
 - Shared team invitation full-state formatting for legacy embed messages and Components v2 panels.
+- Explicit gateway-intent selection and SQLCipher database encryption helpers.
 - Feature-linked achievement visibility: if `main.features.shop` is false, `checkin_sum` / `checkin_combo` disappear from achievement displays, rank buttons, and Role achievement pickup. Giveaway achievement categories are retired and remain hidden even when GiveawayCog is enabled.
 
 Current P3-9 status:
 
 - Done: current fake interaction flow list is complete for PrivateRoom, Shop, Tickets, Ban, VoiceChannel, Giveaway, Role / Signature, Achievement / Rank, Welcome / Games, CheckStatus / Backup.
-- Current baseline: `87 passed, 1 warning`.
+- Current baseline: `91 passed, 1 warning`.
 - Next default target: full automatic gate, then real test-server validation.
 - Add more fake interaction tests only for new bugs, payload replay work, or new features.
 

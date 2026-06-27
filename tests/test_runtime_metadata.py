@@ -2,7 +2,7 @@ from pathlib import Path
 
 from ruamel.yaml import YAML
 
-from bot.main import COG_SPECS, _load_cog_class
+from bot.main import COG_SPECS, _load_cog_class, build_intents
 from bot.cogs.shop.views import CheckinEmbedView
 
 
@@ -48,6 +48,17 @@ def test_cog_specs_import_the_registered_class():
         cog_class = _load_cog_class(spec["module_path"], spec["class_name"])
 
         assert cog_class.__name__ == spec["class_name"]
+
+
+def test_gateway_intents_are_explicit_and_minimal():
+    intents = build_intents()
+
+    assert intents.members is True
+    assert intents.message_content is True
+    assert intents.voice_states is True
+    assert intents.guild_messages is True
+    assert intents.guild_reactions is True
+    assert intents.presences is False
 
 
 def test_shop_checkin_view_labels_come_from_locale(monkeypatch):

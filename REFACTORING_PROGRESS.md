@@ -10,10 +10,10 @@
 
 ---
 
-## 2026-06-27 当前状态同步
+## 2026-06-28 当前状态同步
 
 - P3-9 fake Discord interaction flow tests 已按当前清单补完，状态为 ✅ 完成；已覆盖 PrivateRoom 续费、Shop 签到 / 补签、Tickets 创建 / 接单 / 关闭、Ban `/tempban`、VoiceChannel 控制面板、Giveaway 参与 / 退出 / 开奖 / 取消、Role / Signature、Achievement / Rank、Welcome / Games、CheckStatus / Backup。
-- 当前自动化基线：`./.venv/Scripts/python.exe -m pytest -q` 为 `87 passed, 1 warning`。
+- 当前自动化基线：`./.venv/Scripts/python.exe -m pytest -q` 为 `91 passed, 1 warning`。
 - 本轮新增 23 个离线 fake interaction tests；所有新增测试均使用最小 fake Discord 对象和临时状态，不联网、不触碰真实 `data/bot.db`。
 - 2026-05-04 补充：`/rank` 的分类按钮已使用 Discord Button `emoji` 字段补齐彩色圆点；当前色彩为全部排名 🟣、添加反应 🔴、发送消息 🟡、语音时长 🔵、累计签到 🟠、连续签到 🟤。连续签到从原先与全部排名重复的 🟣 改为 🟤。按钮上的语音时长不带 `(min)`；排行榜类型名仍保留单位说明。locale 里若已有圆点前缀，运行时会剥离 label 前缀，避免按钮显示重复 emoji。已移除本地 `bot/config/achievements.yaml` 的 legacy `rank:` UI 文案块；迁移脚本也会把旧 JSON 的 `achievements.rank` 显式标为 `drop`，不再迁到 YAML 或 locale。`shop` feature flag 关闭时，对应签到成就现在由共享 helper 同步隐藏，覆盖成就页、排行榜、`/rank` 按钮和 Role 成就领取面板；抽奖成就类别已退役，即使 GiveawayCog 启用也不会再显示或计数。
 - 2026-05-04 补充：所有 `bot/config/*.yaml.example` 和本地实际 `bot/config/*.yaml` 都已补充配置注释。注释按当前代码读取点编写，明确标出单位、ID 类型、DB/locale 分工，以及当前保留但运行时不读取的历史字段（如 `role.signature.max_changes_per_week`、`teamup_display.display.invitation_expire_minutes`）。本地实际 YAML 的真实值未打印；只通过 ruamel round-trip 写入注释。
@@ -21,6 +21,7 @@
 - 2026-06-27 补充：抽奖相关成就类别已退役；GiveawayCog 抽奖功能本身保留，但 `giveaway` 不再出现在成就定义、排行榜、`/rank` 按钮、Role 成就领取、手动成就增减参数或迁移输出中。历史数据库里的 `giveaway_count` 列保留作兼容，不再由运行时代码写入或展示。
 - 2026-06-27 补充：依赖声明已提升到 `discord.py>=2.7.1`；所有 modal 文本输入已改用 `discord.ui.Label(text=..., component=discord.ui.TextInput(...))`，不再使用 2.6 起 deprecated 的 `TextInput(label=...)`。
 - 2026-06-27 补充：PrivateRoom 商店面板、Shop 签到面板、Tickets 主入口和组队邀请消息已迁移到 Components v2 `LayoutView` / `Container`；组队“满员”共享 helper 同时兼容旧 embed 消息和新 Components v2 panel，便于平滑处理已发出的旧邀请。
+- 2026-06-28 补充：Gateway intents 已从 `Intents.all()` 收窄为显式所需集合：Members、Message Content、Voice States、Guild Messages、Guild Reactions，不再请求 Presence。SQLite runtime 连接已统一走 `bot.utils.db_connect.connect_database()`，支持 `sqlcipher3` / SQLCipher 加密；新增 `tools/encrypt_database.py` 将现有明文库迁移为加密库，生产可用 `DCGSH_DB_REQUIRE_ENCRYPTION=1` 强制密钥存在。
 - `REFACTORING_TEST_CHECKLIST.md` 已从“逐功能穷举”缩减为“自动化 gate + 真实 Discord 必测链路”；手工测试只保留权限、真实频道/线程/语音、persistent view、DM、rate limit、图片/附件和真实客户端表现。
 - 下一步默认：按缩减后的 checklist 进入测试服手工验证；若继续配置清理，优先做 P3-10，把签名冷却天数和组队邀请过期分钟数真正接入配置。
 - 真实测试服仍必须覆盖：Discord 权限、role hierarchy、channel/thread/voice 真实操作、persistent view 重启恢复、DM 投递失败、rate limit、command sync、真实 ban/unban/mute、欢迎事件和图片/附件渲染。

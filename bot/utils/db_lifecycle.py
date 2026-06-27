@@ -5,6 +5,8 @@ from typing import Any
 
 import aiosqlite
 
+from .db_connect import connect_database
+
 
 class BaseDatabaseManager:
     """Lifecycle contract for database managers.
@@ -32,7 +34,7 @@ class BaseDatabaseManager:
                 f"{self.__class__.__name__} requires db_path for a persistent connection"
             )
 
-        connection = await aiosqlite.connect(db_path)
+        connection = await connect_database(db_path)
         self._persistent_connection = connection
         return connection
 
