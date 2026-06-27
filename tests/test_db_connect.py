@@ -1,16 +1,30 @@
 import os
 import sqlite3
+import stat
 
 import pytest
 
-from bot.utils.db_connect import connect_database, database_encryption_enabled
+from bot.utils.db_connect import (
+    DB_CREATE_KEY_FILE_ENV,
+    DB_KEY_ENV,
+    DB_KEY_FILE_ENV,
+    DB_REQUIRE_ENCRYPTION_ENV,
+    connect_database,
+    database_encryption_enabled,
+    get_database_key,
+)
 from tools.encrypt_database import encrypt_database
 
 
+def _clear_database_key_env(monkeypatch):
+    monkeypatch.delenv(DB_KEY_ENV, raising=False)
+    monkeypatch.delenv(DB_KEY_FILE_ENV, raising=False)
+    monkeypatch.delenv(DB_CREATE_KEY_FILE_ENV, raising=False)
+    monkeypatch.delenv(DB_REQUIRE_ENCRYPTION_ENV, raising=False)
+
+
 def test_connect_database_uses_plain_sqlite_without_key(tmp_path, monkeypatch):
-    monkeypatch.delenv("DCGSH_DB_KEY", raising=False)
-    monkeypatch.delenv("DCGSH_DB_KEY_FILE", raising=False)
-    monkeypatch.delenv("DCGSH_DB_REQUIRE_ENCRYPTION", raising=False)
+    _clear_database_key_env(monkeypatch)
 
     db_path = tmp_path / "plain.db"
 
@@ -29,19 +43,45 @@ def test_connect_database_uses_plain_sqlite_without_key(tmp_path, monkeypatch):
 
 
 def test_connect_database_requires_key_when_enforced(monkeypatch):
-    monkeypatch.delenv("DCGSH_DB_KEY", raising=False)
-    monkeypatch.delenv("DCGSH_DB_KEY_FILE", raising=False)
-    monkeypatch.setenv("DCGSH_DB_REQUIRE_ENCRYPTION", "1")
+    _clear_database_key_env(monkeypatch)
+    monkeypatch.setenv(DB_REQUIRE_ENCRYPTION_ENV, "1")
 
     with pytest.raises(RuntimeError, match="requires DCGSH_DB_KEY"):
         connect_database(":memory:")
 
 
+def test_database_key_file_can_be_generated_on_first_use(tmp_path, monkeypatch):
+    _clear_database_key_env(monkeypatch)
+    key_file = tmp_path / "secrets" / "db.key"
+    monkeypatch.setenv(DB_KEY_FILE_ENV, str(key_file))
+    monkeypatch.setenv(DB_CREATE_KEY_FILE_ENV, "1")
+
+    key = get_database_key()
+
+    assert key_file.exists()
+    assert key_file.read_text(encoding="utf-8").strip() == key
+    assert len(key) >= 64
+    assert database_encryption_enabled() is True
+    assert get_database_key() == key
+    if os.name == "posix":
+        assert stat.S_IMODE(key_file.stat().st_mode) == 0o600
+
+
+def test_missing_database_key_file_requires_explicit_generation(tmp_path, monkeypatch):
+    _clear_database_key_env(monkeypatch)
+    key_file = tmp_path / "missing.key"
+    monkeypatch.setenv(DB_KEY_FILE_ENV, str(key_file))
+
+    with pytest.raises(RuntimeError, match=DB_CREATE_KEY_FILE_ENV):
+        get_database_key()
+
+    assert not key_file.exists()
+
+
 def test_encrypt_database_outputs_sqlcipher_database(tmp_path, monkeypatch):
     pytest.importorskip("sqlcipher3")
-    monkeypatch.setenv("DCGSH_DB_KEY", "unit-test-key")
-    monkeypatch.delenv("DCGSH_DB_KEY_FILE", raising=False)
-    monkeypatch.delenv("DCGSH_DB_REQUIRE_ENCRYPTION", raising=False)
+    _clear_database_key_env(monkeypatch)
+    monkeypatch.setenv(DB_KEY_ENV, "unit-test-key")
 
     source = tmp_path / "plain.db"
     destination = tmp_path / "encrypted.db"

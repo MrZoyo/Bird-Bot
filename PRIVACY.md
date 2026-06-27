@@ -70,6 +70,8 @@ a key is configured. The runtime key must come from the environment, not YAML:
 
 - `DCGSH_DB_KEY`: passphrase used by SQLCipher.
 - `DCGSH_DB_KEY_FILE`: path to a file containing the passphrase.
+- `DCGSH_DB_CREATE_KEY_FILE=1`: generate `DCGSH_DB_KEY_FILE` once if it
+  does not exist.
 - `DCGSH_DB_REQUIRE_ENCRYPTION=1`: fail startup if no key is configured.
 
 When a key is configured, all runtime database managers open SQLite through
@@ -79,25 +81,32 @@ verifies that the database is readable before feature SQL runs.
 To encrypt an existing plaintext database:
 
 ```bash
-export DCGSH_DB_KEY='replace-with-a-long-random-secret'
+export DCGSH_DB_KEY_FILE='/secure/bird-bot/db.key'
+export DCGSH_DB_CREATE_KEY_FILE=1
 python tools/encrypt_database.py data/bot.db data/bot.encrypted.db \
   --backup-source backup/db_backup_manual/plain-before-encryption.db
 mv data/bot.encrypted.db data/bot.db
+unset DCGSH_DB_CREATE_KEY_FILE
 export DCGSH_DB_REQUIRE_ENCRYPTION=1
 ```
 
 For PowerShell:
 
 ```powershell
-$env:DCGSH_DB_KEY = 'replace-with-a-long-random-secret'
+$env:DCGSH_DB_KEY_FILE = 'C:\secure\bird-bot\db.key'
+$env:DCGSH_DB_CREATE_KEY_FILE = '1'
 python tools/encrypt_database.py data/bot.db data/bot.encrypted.db --backup-source backup/db_backup_manual/plain-before-encryption.db
 Move-Item -Force data/bot.encrypted.db data/bot.db
+Remove-Item Env:DCGSH_DB_CREATE_KEY_FILE
 $env:DCGSH_DB_REQUIRE_ENCRYPTION = '1'
 ```
 
 The plaintext backup created during migration is sensitive. Move it to an
 offline encrypted backup location or delete it after validating the encrypted
 database.
+
+The generated key file is also sensitive. Keep a secure offline copy; if the
+key is lost, existing encrypted database and backup files cannot be decrypted.
 
 ## Retention and Deletion
 
@@ -115,6 +124,7 @@ database.
 - Do not enable Presence Intent unless a future feature explicitly needs presence data and this document is updated.
 - Keep `bot/config/*.yaml`, `.env` files, `data/*.db`, backup files, and logs out of git.
 - Set `DCGSH_DB_REQUIRE_ENCRYPTION=1` in production after migrating the database.
-- Store `DCGSH_DB_KEY` in the host secret manager or an environment file with restricted permissions.
+- Store `DCGSH_DB_KEY` in the host secret manager, or store `DCGSH_DB_KEY_FILE` outside the repo with restricted permissions.
+- Use `DCGSH_DB_CREATE_KEY_FILE=1` only for first-run key-file generation, then remove it.
 - Do not paste bot tokens, DB keys, full logs, or plaintext database dumps into support channels.
 - Test migrations on a copy of the database before replacing production `data/bot.db`.

@@ -23,12 +23,12 @@
 - Shop、Tickets、Ban、VoiceChannel、Giveaway、Role / Signature、Achievement / Rank、Welcome / Games、CheckStatus / Backup 的 fake interaction flow。
 - PrivateRoom 商店、Shop 签到、Tickets 主入口和组队邀请的 Components v2 panel 结构。
 - 组队消息和房间面板“满员”共享样式；旧 embed 和新 Components v2 消息均有兼容覆盖。
-- 显式 gateway intents、SQLCipher 数据库加密连接和明文库迁移工具。
+- 显式 gateway intents、SQLCipher 数据库加密连接、明文库迁移工具和显式 key 文件生成。
 - 后台 loop 未登录离线 guard。
 
 最后一次通过基线：
 - [x] `./.venv/Scripts/python.exe -m pytest -q`
-  - 当前：`91 passed, 1 warning`
+  - 当前：`93 passed, 1 warning`
 - [x] `./.venv/Scripts/python.exe -m ruff check bot tests tools`
 - [x] `./.venv/Scripts/python.exe -m compileall bot tests tools`
 - [x] `./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`
