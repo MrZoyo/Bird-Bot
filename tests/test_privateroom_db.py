@@ -47,7 +47,10 @@ def test_privateroom_config_shop_and_room_state_round_trip(tmp_path):
         await db.update_renewal_reminder_flag(555, True)
         assert await db.get_rooms_eligible_for_renewal(threshold_days=10) == []
 
-        await db.extend_room_validity(555, datetime.now() + timedelta(days=30))
+        extended_until = datetime.now() + timedelta(days=30)
+        updated_room = await db.extend_room_validity(555, extended_until)
+        assert updated_room["room_id"] == 555
+        assert updated_room["end_date"] == extended_until
         await db.update_renewal_reminder_flag(555, False)
         assert await db.get_rooms_eligible_for_renewal(threshold_days=10) == []
 

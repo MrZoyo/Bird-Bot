@@ -52,7 +52,7 @@ welcome:
   locale:
     - welcome_text_picture_1
 achievements:
-  locale:
+  drop:
     - rank
 """.lstrip(),
         encoding="utf-8",
@@ -228,8 +228,8 @@ achievements:
 
     achievements_yaml = read_yaml(config_dir / "achievements.yaml")
     assert achievements_yaml == {"achievements": []}
-    achievements_locale = read_yaml(locale_dir / "achievements.yaml")
-    assert achievements_locale["rank"]["all_button_label"] == "All"
+    assert not (locale_dir / "achievements.yaml").exists()
+    assert "| achievements | `rank` | drop | classification |" in report_file.read_text(encoding="utf-8")
 
     seed = json.loads(seed_file.read_text(encoding="utf-8"))
     assert "tickets_new" not in seed

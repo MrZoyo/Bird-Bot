@@ -6,13 +6,13 @@ from bot.cogs.welcome.views import WelcomeDMView
 
 
 ACHIEVEMENT_RANK_TEXT = {
-    "achievements.rank.all_button_label": "All rankings",
-    "achievements.rank.type_button_labels.reaction": "Reactions",
-    "achievements.rank.type_button_labels.message": "Messages",
-    "achievements.rank.type_button_labels.time_spent": "Voice",
-    "achievements.rank.type_button_labels.giveaway": "Giveaways",
-    "achievements.rank.type_button_labels.checkin_sum": "Checkins",
-    "achievements.rank.type_button_labels.checkin_combo": "Streaks",
+    "achievements.rank.all_button_label": "🟣 All rankings",
+    "achievements.rank.type_button_labels.reaction": "🔴 Reactions",
+    "achievements.rank.type_button_labels.message": "🟡 Messages",
+    "achievements.rank.type_button_labels.time_spent": "🔵 Voice",
+    "achievements.rank.type_button_labels.giveaway": "🟢 Giveaways",
+    "achievements.rank.type_button_labels.checkin_sum": "🟠 Checkins",
+    "achievements.rank.type_button_labels.checkin_combo": "🟤 Streaks",
 }
 
 
@@ -78,4 +78,6 @@ def test_achievement_rank_buttons_come_from_locale(monkeypatch):
     view = RankView(bot=bot, year=None, month=None, all_rankings={})
 
     assert view.all_button.label == "All rankings"
+    assert str(view.all_button.emoji) == "🟣"
     assert view.type_buttons[0].label == "Reactions"
+    assert str(view.type_buttons[0].emoji) == "🔴"
