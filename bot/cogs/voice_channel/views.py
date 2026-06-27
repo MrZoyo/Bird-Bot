@@ -4,7 +4,7 @@ import discord
 from discord.ui import Button
 
 from bot.cogs.create_invitation.full_message import update_invitation_message_to_full
-from bot.utils import config
+from bot.utils import config, fmt_channel
 from bot.utils.i18n import t
 
 
@@ -242,7 +242,10 @@ class RoomControlPanelView(discord.ui.View):
             try:
                 text_channel = self.bot.get_channel(last_invitation['invitation_channel_id'])
                 if not text_channel:
-                    logging.warning(f"Text channel {last_invitation['invitation_channel_id']} not found")
+                    logging.warning(
+                        "Invitation text channel %s not found",
+                        fmt_channel(last_invitation['invitation_channel_id']),
+                    )
                     await interaction.followup.send(t('voicechannel.control_panel.messages.full_channel_not_found'), ephemeral=True)
                     return
 
@@ -254,7 +257,11 @@ class RoomControlPanelView(discord.ui.View):
                 await interaction.followup.send(t('voicechannel.control_panel.messages.full_message_deleted'), ephemeral=True)
                 return
             except discord.Forbidden:
-                logging.error(f"No permission to fetch message {last_invitation['invitation_message_id']}")
+                logging.error(
+                    "No permission to fetch invitation message %s in %s",
+                    last_invitation['invitation_message_id'],
+                    fmt_channel(text_channel),
+                )
                 await interaction.followup.send(t('voicechannel.control_panel.messages.full_no_permission'), ephemeral=True)
                 return
 

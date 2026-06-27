@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import aiosqlite
 
 from .db_lifecycle import BaseDatabaseManager
+from .log_helpers import fmt_channel, fmt_user
 
 
 class AchievementDatabaseManager(BaseDatabaseManager):
@@ -213,7 +214,7 @@ class AchievementDatabaseManager(BaseDatabaseManager):
                 'checkin_combo': checkin_data['checkin_combo']
             }
         except Exception as e:
-            logging.error(f"Error getting user achievements for {user_id}: {e}")
+            logging.error("Error getting user achievements for %s: %s", fmt_user(user_id), e)
             return {
                 'message_count': 0,
                 'reaction_count': 0,
@@ -258,7 +259,11 @@ class AchievementDatabaseManager(BaseDatabaseManager):
             }
         except Exception as e:
             logging.error(
-                f"Error getting monthly achievements for {user_id} ({year}-{month}): {e}"
+                "Error getting monthly achievements for %s (%s-%s): %s",
+                fmt_user(user_id),
+                year,
+                month,
+                e,
             )
             return {
                 'message_count': 0,
@@ -278,7 +283,7 @@ class AchievementDatabaseManager(BaseDatabaseManager):
             )
             return True
         except Exception as e:
-            logging.error(f"Error creating user record for {user_id}: {e}")
+            logging.error("Error creating user record for %s: %s", fmt_user(user_id), e)
             return False
 
     async def create_monthly_user_if_not_exists(self, user_id: int, year: int, month: int) -> bool:
@@ -292,7 +297,11 @@ class AchievementDatabaseManager(BaseDatabaseManager):
             return True
         except Exception as e:
             logging.error(
-                f"Error creating monthly user record for {user_id} ({year}-{month}): {e}"
+                "Error creating monthly user record for %s (%s-%s): %s",
+                fmt_user(user_id),
+                year,
+                month,
+                e,
             )
             return False
 
@@ -325,7 +334,7 @@ class AchievementDatabaseManager(BaseDatabaseManager):
                 return True
             except Exception as e:
                 await db.rollback()
-                logging.error(f"Error updating achievement count for {user_id}: {e}")
+                logging.error("Error updating achievement count for %s: %s", fmt_user(user_id), e)
                 return False
 
     async def update_monthly_achievement_count(
@@ -361,8 +370,11 @@ class AchievementDatabaseManager(BaseDatabaseManager):
             except Exception as e:
                 await db.rollback()
                 logging.error(
-                    f"Error updating monthly achievement count for {user_id} "
-                    f"({year}-{month}): {e}"
+                    "Error updating monthly achievement count for %s (%s-%s): %s",
+                    fmt_user(user_id),
+                    year,
+                    month,
+                    e,
                 )
                 return False
 
@@ -445,7 +457,7 @@ class AchievementDatabaseManager(BaseDatabaseManager):
 
                 return rank, total
             except Exception as e:
-                logging.error(f"Error getting user rank for {user_id}: {e}")
+                logging.error("Error getting user rank for %s: %s", fmt_user(user_id), e)
                 return 0, 0
 
     async def start_voice_session(self, user_id: int, channel_id: int) -> bool:
@@ -459,7 +471,12 @@ class AchievementDatabaseManager(BaseDatabaseManager):
             )
             return True
         except Exception as e:
-            logging.error(f"Error starting voice session for {user_id}: {e}")
+            logging.error(
+                "Error starting voice session for %s in %s: %s",
+                fmt_user(user_id),
+                fmt_channel(channel_id),
+                e,
+            )
             return False
 
     async def end_voice_session(self, user_id: int, channel_id: int) -> int:
@@ -494,7 +511,12 @@ class AchievementDatabaseManager(BaseDatabaseManager):
                 return time_spent
             except Exception as e:
                 await db.rollback()
-                logging.error(f"Error ending voice session for {user_id}: {e}")
+                logging.error(
+                    "Error ending voice session for %s in %s: %s",
+                    fmt_user(user_id),
+                    fmt_channel(channel_id),
+                    e,
+                )
                 return 0
 
     async def get_active_voice_sessions(self, user_id: int) -> List[Tuple[int, str]]:
@@ -505,7 +527,7 @@ class AchievementDatabaseManager(BaseDatabaseManager):
                 (user_id,),
             )
         except Exception as e:
-            logging.error(f"Error getting active voice sessions for {user_id}: {e}")
+            logging.error("Error getting active voice sessions for %s: %s", fmt_user(user_id), e)
             return []
 
     async def log_manual_operation(
@@ -709,7 +731,7 @@ class AchievementDatabaseManager(BaseDatabaseManager):
                     'checkin_combo': checkin_combo
                 }
             except Exception as e:
-                logging.error(f"Error getting checkin data for {user_id}: {e}")
+                logging.error("Error getting checkin data for %s: %s", fmt_user(user_id), e)
                 return {
                     'checkin_sum': 0,
                     'checkin_combo': 0
@@ -763,8 +785,11 @@ class AchievementDatabaseManager(BaseDatabaseManager):
                 }
             except Exception as e:
                 logging.error(
-                    f"Error getting monthly checkin data for {user_id} "
-                    f"({year}-{month}): {e}"
+                    "Error getting monthly checkin data for %s (%s-%s): %s",
+                    fmt_user(user_id),
+                    year,
+                    month,
+                    e,
                 )
                 return {
                     'checkin_sum': 0,

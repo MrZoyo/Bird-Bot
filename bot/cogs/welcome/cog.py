@@ -10,7 +10,7 @@ from discord.app_commands import locale_str
 from discord.ext import commands
 from PIL import Image, ImageDraw, ImageFont
 
-from bot.utils import config, check_channel_validity
+from bot.utils import check_channel_validity, config, fmt_user
 from bot.utils.i18n import t
 from bot.utils.paths import project_path
 
@@ -171,9 +171,12 @@ class WelcomeCog(commands.Cog):
         # 2. Command is used in admin channel
         if member == interaction.user or await check_channel_validity(interaction):
             await self.send_welcome_dm(member)
-            logging.info(f"Test welcome message and DM sent to {member}")
+            logging.info("Test welcome message and DM sent to %s", fmt_user(member))
         else:
-            logging.info(f"Test welcome message sent to {member} (DM skipped - not admin channel)")
+            logging.info(
+                "Test welcome message sent to %s (DM skipped - not admin channel)",
+                fmt_user(member),
+            )
 
         await interaction.followup.send(
             f"Test welcome message {'and DM ' if member == interaction.user or await check_channel_validity(interaction) else ''}sent for {member.mention}",
@@ -261,6 +264,6 @@ class WelcomeCog(commands.Cog):
                 await member.send(embed=embed, view=view)
 
         except discord.Forbidden:
-            logging.warning(f"Could not send welcome DM to {member.name} - DMs are closed")
+            logging.warning("Could not send welcome DM to %s - DMs are closed", fmt_user(member))
         except Exception as e:
-            logging.error(f"Error sending welcome DM to {member.name}: {str(e)}")
+            logging.error("Error sending welcome DM to %s: %s", fmt_user(member), str(e))

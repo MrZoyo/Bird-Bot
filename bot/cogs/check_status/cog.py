@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from discord.app_commands import locale_str
 from discord.ext import commands, tasks
 
-from bot.utils import CheckStatusDatabaseManager, check_channel_validity, config
+from bot.utils import CheckStatusDatabaseManager, check_channel_validity, config, fmt_user
 from bot.utils.i18n import t
 from bot.utils.paths import resolve_project_path_string
 from bot.utils.task_helpers import wait_until_ready_or_stop
@@ -406,7 +406,11 @@ class CheckStatusCog(commands.Cog):
             )
             return
 
-        logging.info(f"Checking position for {member.display_name} by {interaction.user.display_name}")
+        logging.info(
+            "Checking position for %s by %s",
+            fmt_user(member),
+            fmt_user(interaction.user),
+        )
 
         channel = member.voice.channel
         members_in_channel = [m.display_name for m in channel.members]

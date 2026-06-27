@@ -6,6 +6,7 @@ import logging
 from typing import Dict, List, Optional, Tuple, Any
 
 from .db_lifecycle import BaseDatabaseManager
+from .log_helpers import fmt_channel
 from .schema_migrations import (
     SchemaMigration,
     add_column_if_missing,
@@ -288,7 +289,7 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
         except (discord.NotFound, discord.Forbidden):
             return False
         except Exception as e:
-            logging.error(f"Error checking shop message: {e}")
+            logging.error("Error checking private room shop message %s in %s: %s", message_id, fmt_channel(channel), e)
             return False
 
     async def remove_shop_message(self, channel_id: int, message_id: int) -> None:
@@ -347,7 +348,7 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
             rooms = await cursor.fetchall()
             return rooms, total_count
 
-    async def extend_room_validity(self, room_id: int, new_end_date: datetime) -> None:
+    async def extend_room_validity(self, room_id: int, new_end_date: datetime) -> Optional[Dict[str, Any]]:
         """延长房间的有效期，并重置续费提醒标志
 
         Args:
@@ -355,12 +356,33 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
             new_end_date: 新的结束日期
         """
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute('''
+            cursor = await db.execute('''
                 UPDATE privateroom_rooms
                 SET end_date = ?, renewal_reminder_sent = 0
                 WHERE room_id = ?
             ''', (new_end_date.isoformat(), room_id))
+
+            if cursor.rowcount == 0:
+                await db.commit()
+                return None
+
+            cursor = await db.execute('''
+                SELECT room_id, user_id, start_date, end_date
+                FROM privateroom_rooms
+                WHERE room_id = ?
+            ''', (room_id,))
+            row = await cursor.fetchone()
             await db.commit()
+
+            if not row:
+                return None
+
+            return {
+                'room_id': row[0],
+                'user_id': row[1],
+                'start_date': datetime.fromisoformat(row[2]),
+                'end_date': datetime.fromisoformat(row[3])
+            }
 
     async def get_rooms_eligible_for_renewal(self, threshold_days: int) -> List[Dict[str, Any]]:
         """获取符合续费提醒条件的房间列表
@@ -419,9 +441,18 @@ class PrivateRoomDatabaseManager(BaseDatabaseManager):
                     WHERE room_id = ?
                 ''', (1 if sent else 0, room_id))
                 await db.commit()
-                logging.debug(f"Updated renewal_reminder_sent to {sent} for room {room_id}")
+                logging.debug(
+                    "Updated renewal_reminder_sent to %s for %s",
+                    sent,
+                    fmt_channel(room_id),
+                )
         except Exception as e:
-            logging.error(f"Error updating renewal reminder flag for room {room_id}: {e}", exc_info=True)
+            logging.error(
+                "Error updating renewal reminder flag for %s: %s",
+                fmt_channel(room_id),
+                e,
+                exc_info=True,
+            )
             raise
 
     async def get_user_monthly_voice_seconds(self, user_id: int, year: int, month: int) -> float:

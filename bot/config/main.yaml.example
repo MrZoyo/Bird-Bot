@@ -1,34 +1,55 @@
-# bot/config/main.yaml.example
-#
-# Template for bot/config/main.yaml. Copy to main.yaml and fill in
-# real values. The real file is gitignored (it carries the bot token
-# and deployment IDs).
-# Relative runtime paths are resolved from the repository root.
+# 机器人主配置。
+# 真实 main.yaml 包含 token、服务器 ID、频道 ID 和本地路径，禁止提交；相对路径会按仓库根目录解析。
+# Discord Bot Token。真实值只放本地 main.yaml，不要提交或贴到日志/文档。
 token: YOUR_BOT_TOKEN
+# 主 bot 日志文件路径；日志轮转会基于该路径生成按日期分割的备份文件。
 logging_file: ./data/bot.log
+# 关键词检测专用日志路径；CreateInvitationCog 检测到组队关键词时写入。
 keyword_log_file: ./data/keyword_detection.log
+# 房间/组队活动日志路径；TeamupDisplay 等房间相关清理和活动会写入。
 room_log_file: ./data/room_activity.log
+# 日志轮转保留天数/文件数；由 TimedRotatingFileHandler 的 backupCount 使用。
 log_backup_count: 14  # TimedRotatingFileHandler keeps N days of *.log.YYYY-MM-DD files
+# SQLite 主数据库路径；所有 DB manager 默认使用该文件。
 db_path: ./data/bot.db
+# 主 Discord 服务器 ID；用于获取 guild、恢复工单/频道链接和部分启动逻辑。
 guild_id: 1145141919810
+# 管理员命令允许执行的频道 ID；check_channel_validity 会用它限制部分命令。
 admin_channel_id: 1145141919810
 # locale controls runtime-response language via bot.utils.i18n.t();
 # currently only zh_CN is delivered (P1-6 decision B2).
+# 运行时响应文案语言；bot.utils.i18n.t() 使用该值，当前仓库提供 zh_CN。
 locale: zh_CN
 # Feature toggles — set false to skip loading a cog.
+# Cog 加载开关。缺失的 feature 默认视为启用；显式写 false 会跳过对应 cog。
 features:
+# 是否加载 VoiceStateCog：临时语音房、房间控制面板和入口频道逻辑。
   voicechannel: true
+# 是否加载 WelcomeCog：进服欢迎图、欢迎 DM 和 /testwelcome。
   welcome: true
+# 是否加载 CreateInvitationCog：组队关键词检测和 /invt。
   invitation: true
+# 是否加载 DnDCog：D&D 掷骰命令。
   dnd: true
+# 是否加载 CheckStatusCog：语音状态、日志查看、Where Is 等状态命令。
   checkstatus: true
+# 是否加载 AchievementCog：成就统计、排行榜和手动成就操作。
   achievements: true
+# 是否加载 SpyModeCog：SpyMode 小游戏。
   spymode: true
+# 是否加载 GiveawayCog：抽奖功能；关闭后 giveaway 成就类别会隐藏。
   giveaway: true
+# 是否加载 RoleCog：身份组领取、星座/MBTI/性别和签名功能。
   role: true
+# 是否加载 BackupCog：手动数据库备份命令。
   backup: true
+# 是否加载 TicketsCog：新版工单系统。
   tickets: true
+# 是否加载 ShopCog：签到、余额和补签；关闭后签到相关成就类别会隐藏。
   shop: true
+# 是否加载 PrivateRoomCog：私人房间商店、购买、续费和到期检查。
   privateroom: true
+# 是否加载 BanCog：封禁、临时封禁、禁言和管理白名单。
   ban: true
+# 是否加载 TeamupDisplayCog：组队展示板和组队邀请聚合。
   teamup_display: true

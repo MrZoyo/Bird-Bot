@@ -16,7 +16,7 @@ Outputs (see PLAN):
   - bot/config/<name>.yaml.example      (ID-sanitised template)
   - bot/locales/zh_CN/<name>.yaml       (user-facing text)
   - tools/migration_db_seed.json        (DB-bound fields; gitignored)
-  - tools/migration_report.md           (per-field routing; gitignored)
+  - tools/migration_report.md           (per-field routing, including dropped legacy UI blocks; gitignored)
 
 The script is idempotent: rerunning overwrites the YAML / locale
 outputs and rewrites the seed + report.
@@ -285,8 +285,12 @@ def classify_config(
     explicit_yaml: Set[str] = set(classification.get('yaml') or [])
     explicit_locale: Set[str] = set(classification.get('locale') or [])
     explicit_db: Set[str] = set(classification.get('db') or [])
+    explicit_drop: Set[str] = set(classification.get('drop') or [])
 
     for key, value in data.items():
+        if key in explicit_drop:
+            rows.append((key, 'drop', 'classification'))
+            continue
         if key in explicit_db:
             db_part[key] = value
             rows.append((key, 'db', 'classification'))

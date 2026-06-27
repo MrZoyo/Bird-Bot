@@ -19,7 +19,7 @@ from .giveaway_db import GiveawayDatabaseManager
 from .check_status_db import CheckStatusDatabaseManager
 from .voice_channel_db import VoiceChannelDatabaseManager
 from .role_helpers import safe_member_role_edit
-from .log_helpers import fmt_channel, fmt_role, fmt_user
+from .log_helpers import fmt_channel, fmt_guild, fmt_role, fmt_user
 
 __all__ = [
     'config',
@@ -43,6 +43,7 @@ __all__ = [
     'VoiceChannelDatabaseManager',
     'safe_member_role_edit',
     'fmt_channel',
+    'fmt_guild',
     'fmt_role',
     'fmt_user',
 ]

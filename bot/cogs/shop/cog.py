@@ -8,7 +8,7 @@ from discord import app_commands
 from discord.app_commands import locale_str
 from discord.ext import commands, tasks
 
-from bot.utils import check_channel_validity, config
+from bot.utils import check_channel_validity, config, fmt_channel, fmt_user
 from bot.utils.i18n import t
 from bot.utils.shop_db import ShopDatabaseManager
 
@@ -161,7 +161,7 @@ class ShopCog(commands.Cog):
                         await self.db.deactivate_checkin_embed(embed_data['id'])
                         continue
                     except discord.Forbidden:
-                        logging.error(f"No permission to fetch message in channel {channel.name}")
+                        logging.error("No permission to fetch message in %s", fmt_channel(channel))
                         continue
                     
                     # Update embed with new statistics
@@ -173,9 +173,9 @@ class ShopCog(commands.Cog):
                     try:
                         await message.edit(embed=new_embed, attachments=[file])
                     except discord.HTTPException as e:
-                        logging.error(f"Failed to update embed in channel {channel.name}: {e}")
+                        logging.error("Failed to update checkin embed in %s: %s", fmt_channel(channel), e)
                     except discord.Forbidden:
-                        logging.error(f"No permission to edit message in channel {channel.name}")
+                        logging.error("No permission to edit message in %s", fmt_channel(channel))
                         
                 except Exception as e:
                     logging.error(f"Error processing embed {embed_data.get('id', 'unknown')}: {e}")
@@ -394,7 +394,7 @@ class ShopCog(commands.Cog):
         # Get monthly check-in history
         checkin_history = await self.db.get_checkin_history_by_month(user.id)
         
-        logging.info(f"Checkin history for user {user.id}: {checkin_history}")
+        logging.info("Checkin history for %s: %s", fmt_user(user), checkin_history)
 
         if checkin_history:
             # Format check-in history for the temporary file
@@ -414,7 +414,7 @@ class ShopCog(commands.Cog):
                     file=file,
                     ephemeral=False
                 )
-                logging.info(f"Sent checkin history file for user {user.id}")
+                logging.info("Sent checkin history file for %s", fmt_user(user))
             except Exception as e:
                 logging.error(f"Error sending checkin history file: {e}")
                 # Send embed without file if file sending fails
@@ -427,7 +427,7 @@ class ShopCog(commands.Cog):
                     pass
         else:
             # Send just the embed if no history (public response)
-            logging.info(f"No checkin history found for user {user.id}")
+            logging.info("No checkin history found for %s", fmt_user(user))
             await interaction.followup.send(embed=embed, ephemeral=False)
 
     def format_checkin_history(self, checkin_history):

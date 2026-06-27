@@ -1,17 +1,37 @@
+# 组队展示板配置。
+# 这里保存展示板刷新/截断参数和展示用 emoji；展示板消息、游戏类型和邀请记录保存在数据库。
+# 组队展示板显示参数。
 display:
+# 展示板中组队消息内容的最大字符数，超过后截断并追加 ...。
   max_content_length: 50
+# 展示板 embed 颜色，使用 Discord 十进制颜色整数。
   embed_color: 10039500
+# 配置字段；当前后台 refresh_displays loop 在代码里固定为每 2 分钟运行，初始化会读取该值但未用于 loop 参数。
   refresh_interval_minutes: 3
+# 历史配置字段；当前 TeamupDisplayManager 写入邀请时固定 5 分钟过期，运行时代码不读取该值。
+# P3-10 预备：后续会把组队邀请过期分钟数接入配置；普通部署保持默认即可。
   invitation_expire_minutes: 5
+# 展示板格式化用 emoji 映射；消息模板在 bot/locales/zh_CN/teamup_display.yaml。
 emojis:
+# 展示组队内容行使用的 emoji。
   search: 🔍
+# 展示房间人数行使用的 emoji。
   players: 🏠
+# 展示语音频道跳转链接行使用的 emoji。
   link: 📍
+# 展示相对时间时使用的 emoji。
   time: ⏳
+# 展示板相关命令/提示可使用的组队板 emoji。
   teamup_board: 🎮
+# 无组队内容时使用的 emoji。
   no_teamup: 📭
+# 未分类组队区块使用的 emoji。
   general: 🌐
+# 成功提示使用的 emoji。
   success: ✅
+# 错误提示使用的 emoji。
   error: ❌
+# 设置/管理提示使用的 emoji。
   settings: 🎯
+# 空状态提示使用的 emoji。
   empty: 📝

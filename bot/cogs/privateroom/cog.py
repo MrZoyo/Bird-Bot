@@ -8,7 +8,13 @@ from discord import app_commands
 from discord.app_commands import locale_str
 from discord.ext import commands, tasks
 
-from bot.utils import ShopDatabaseManager, check_channel_validity, config
+from bot.utils import (
+    ShopDatabaseManager,
+    check_channel_validity,
+    config,
+    fmt_channel,
+    fmt_user,
+)
 from bot.utils.i18n import t
 from bot.utils.privateroom_db import PrivateRoomDatabaseManager
 from bot.utils.task_helpers import wait_until_ready_or_stop
@@ -42,6 +48,26 @@ class PrivateRoomCog(commands.Cog):
         # 停止任务
         self.check_expired_rooms.cancel()
 
+    def _renewal_days_remaining(self, end_date: datetime, now: datetime | None = None) -> int:
+        now = now or datetime.now()
+        return max((end_date - now).days, 0)
+
+    def _calculate_renewal_end_date(
+            self,
+            current_end_date: datetime,
+            now: datetime | None = None,
+    ) -> datetime:
+        """Return the paid renewal end date without charging for already-expired days."""
+        now = now or datetime.now()
+        base_date = current_end_date if current_end_date > now else now
+        extend_days = self.conf.get('renewal_extend_days', 31)
+        return (base_date + timedelta(days=extend_days)).replace(
+            hour=self.conf['check_time_hour'],
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+
     @tasks.loop(time=time(hour=8, minute=10))  # 每天8:10检查
     async def check_expired_rooms(self):
         """检查并删除过期的私人房间，并发送续费提醒"""
@@ -64,15 +90,26 @@ class PrivateRoomCog(commands.Cog):
 
                     # 删除房间
                     await channel.delete(reason="Private room expired")
-                    logging.info(f"Deleted expired private room {room_id} for user {user_id}")
+                    logging.info(
+                        "Deleted expired private room %s for %s",
+                        fmt_channel(channel),
+                        fmt_user(user_id),
+                    )
 
                     # 发送通知给用户
                     await self.send_expiration_notification(user_id, room_name, room_data)
 
                 except discord.HTTPException as e:
-                    logging.error(f"Failed to delete expired room {room_id}: {e}")
+                    logging.error(
+                        "Failed to delete expired room %s: %s",
+                        fmt_channel(channel),
+                        e,
+                    )
             else:
-                logging.info(f"Expired room {room_id} not found, already deleted")
+                logging.info(
+                    "Expired private room %s not found, already deleted",
+                    fmt_channel(room_id),
+                )
 
             # 无论房间是否存在，都标记为非活跃
             await self.db.deactivate_room(room_id)
@@ -146,7 +183,11 @@ class PrivateRoomCog(commands.Cog):
             await user.send(embed=embed, view=view)
 
         except discord.HTTPException as e:
-            logging.error(f"Failed to send expiration notification to user {user_id}: {e}")
+            logging.error(
+                "Failed to send expiration notification to %s: %s",
+                fmt_user(user_id),
+                e,
+            )
 
     async def check_and_send_renewal_reminders(self):
         """检查并发送续费提醒"""
@@ -171,7 +212,10 @@ class PrivateRoomCog(commands.Cog):
                 # 获取房间对象
                 channel = self.bot.get_channel(room_id)
                 if not channel:
-                    logging.warning(f"Room {room_id} not found for renewal reminder")
+                    logging.warning(
+                        "Private room %s not found for renewal reminder",
+                        fmt_channel(room_id),
+                    )
                     # 房间不存在，也标记为已发送，避免重复检查
                     await self.db.update_renewal_reminder_flag(room_id, True)
                     continue
@@ -182,11 +226,19 @@ class PrivateRoomCog(commands.Cog):
                 # 无论成功与否，都标记为已发送，避免重复发送
                 if success:
                     await self.db.update_renewal_reminder_flag(room_id, True)
-                    logging.info(f"Sent renewal reminder for room {room_id} to user {user_id}")
+                    logging.info(
+                        "Sent renewal reminder for %s to %s",
+                        fmt_channel(channel),
+                        fmt_user(user_id),
+                    )
                 else:
                     # 即使发送失败（如用户关闭私信），也标记为已发送
                     await self.db.update_renewal_reminder_flag(room_id, True)
-                    logging.warning(f"Failed to send renewal reminder for room {room_id} to user {user_id}, but marked as sent")
+                    logging.warning(
+                        "Failed to send renewal reminder for %s to %s, but marked as sent",
+                        fmt_channel(channel),
+                        fmt_user(user_id),
+                    )
 
         except Exception as e:
             logging.error(f"Error in check_and_send_renewal_reminders: {e}", exc_info=True)
@@ -207,7 +259,7 @@ class PrivateRoomCog(commands.Cog):
             # 获取用户对象
             user = await self.bot.fetch_user(user_id)
             if not user:
-                logging.error(f"User {user_id} not found for renewal reminder")
+                logging.error("User %s not found for renewal reminder", fmt_user(user_id))
                 return False
 
             # 提取房间信息
@@ -287,7 +339,9 @@ class PrivateRoomCog(commands.Cog):
             except discord.Forbidden:
                 # 用户关闭了私信，改为在私房内提醒
                 logging.warning(
-                    f"Cannot send renewal reminder to user {user_id}: DMs are disabled, sending to room"
+                    "Cannot send renewal reminder to %s: DMs are disabled, sending to %s",
+                    fmt_user(user),
+                    fmt_channel(channel),
                 )
                 if not channel:
                     return False
@@ -299,17 +353,30 @@ class PrivateRoomCog(commands.Cog):
                     return True
                 except (discord.Forbidden, discord.HTTPException) as e:
                     logging.error(
-                        f"Failed to send renewal reminder in room {channel.id} for user {user_id}: {e}",
+                        "Failed to send renewal reminder in %s for %s: %s",
+                        fmt_channel(channel),
+                        fmt_user(user),
+                        e,
                         exc_info=True
                     )
                     return False
         except discord.HTTPException as e:
             # 其他 Discord API 错误
-            logging.error(f"Failed to send renewal reminder to user {user_id}: {e}", exc_info=True)
+            logging.error(
+                "Failed to send renewal reminder to %s: %s",
+                fmt_user(user_id),
+                e,
+                exc_info=True,
+            )
             return False
         except Exception as e:
             # 其他未预期的错误
-            logging.error(f"Unexpected error sending renewal reminder to user {user_id}: {e}", exc_info=True)
+            logging.error(
+                "Unexpected error sending renewal reminder to %s: %s",
+                fmt_user(user_id),
+                e,
+                exc_info=True,
+            )
             return False
 
     @app_commands.command(
@@ -558,7 +625,7 @@ class PrivateRoomCog(commands.Cog):
             return any(role.id == helper_role_id for role in member.roles)
 
         except Exception as e:
-            logging.error(f"Error checking booster status for user {user_id}: {e}")
+            logging.error("Error checking booster status for %s: %s", fmt_user(user_id), e)
             return False
 
     async def get_booster_bonus_hours(self) -> float:
@@ -777,13 +844,14 @@ class PrivateRoomCog(commands.Cog):
         # 检查房间剩余时间是否符合续费条件
         end_date = active_room['end_date']
         now = datetime.now()
-        days_remaining = (end_date - now).days
+        raw_days_remaining = (end_date - now).days
+        days_remaining = self._renewal_days_remaining(end_date, now)
 
         renewal_threshold = self.conf.get('renewal_days_threshold', 7)
-        if days_remaining > renewal_threshold:
+        if raw_days_remaining > renewal_threshold:
             await interaction.followup.send(
                 t('privateroom.messages.error_renewal_too_early').format(
-                    days_remaining=days_remaining,
+                    days_remaining=raw_days_remaining,
                     threshold=renewal_threshold
                 ),
                 ephemeral=True
@@ -1040,12 +1108,13 @@ class PrivateRoomCog(commands.Cog):
 
             # 再次校验续费窗口，避免重复续费叠加
             now = datetime.now()
-            days_remaining = (active_room['end_date'] - now).days
+            current_end_date = active_room['end_date']
+            raw_days_remaining = (current_end_date - now).days
             renewal_threshold = self.conf.get('renewal_days_threshold', 7)
-            if days_remaining > renewal_threshold:
+            if raw_days_remaining > renewal_threshold:
                 await interaction.followup.send(
                     t('privateroom.messages.error_renewal_too_early').format(
-                        days_remaining=days_remaining,
+                        days_remaining=raw_days_remaining,
                         threshold=renewal_threshold
                     ),
                     ephemeral=True
@@ -1053,20 +1122,61 @@ class PrivateRoomCog(commands.Cog):
                 return False
 
             # 计算新的结束时间
-            current_end_date = active_room['end_date']
             extend_days = self.conf.get('renewal_extend_days', 31)
-            new_end_date = current_end_date + timedelta(days=extend_days)
+            new_end_date = self._calculate_renewal_end_date(current_end_date, now)
+            if current_end_date <= now:
+                logging.warning(
+                    "Renewing stale private room for %s in %s from expired end_date %s to %s",
+                    fmt_user(user),
+                    fmt_channel(channel),
+                    current_end_date.isoformat(),
+                    new_end_date.isoformat(),
+                )
+            else:
+                logging.info(
+                    "Renewing private room for %s in %s from %s to %s",
+                    fmt_user(user),
+                    fmt_channel(channel),
+                    current_end_date.isoformat(),
+                    new_end_date.isoformat(),
+                )
 
-            # 设置结束时间为8:00
-            new_end_date = new_end_date.replace(
-                hour=self.conf['check_time_hour'],
-                minute=0,
-                second=0,
-                microsecond=0
-            )
+            # 更新数据库并回读，成功通知只展示持久化后的到期时间。
+            persisted_room = await self.db.extend_room_validity(active_room['room_id'], new_end_date)
+            if not persisted_room:
+                logging.error(
+                    "Failed to persist renewal for %s in %s",
+                    fmt_user(user),
+                    fmt_channel(channel),
+                )
+                await interaction.followup.send(
+                    t('privateroom.messages.error_renewal_failed'),
+                    ephemeral=True,
+                )
+                return False
 
-            # 更新数据库中的房间到期时间
-            await self.db.extend_room_validity(active_room['room_id'], new_end_date)
+            persisted_end_date = persisted_room['end_date']
+            if persisted_end_date <= now:
+                logging.error(
+                    "Persisted renewal for %s in %s is still expired: %s",
+                    fmt_user(user),
+                    fmt_channel(channel),
+                    persisted_end_date.isoformat(),
+                )
+                await interaction.followup.send(
+                    t('privateroom.messages.error_renewal_failed'),
+                    ephemeral=True,
+                )
+                return False
+
+            if persisted_end_date != new_end_date:
+                logging.warning(
+                    "Renewal end_date mismatch for %s in %s: calculated %s, persisted %s",
+                    fmt_user(user),
+                    fmt_channel(channel),
+                    new_end_date.isoformat(),
+                    persisted_end_date.isoformat(),
+                )
 
             # 扣除积分
             if cost > 0:
@@ -1082,10 +1192,10 @@ class PrivateRoomCog(commands.Cog):
             )
 
             # 在房间中发送续费成功的embed
-            await self.send_renewal_success_embed(channel, user, new_end_date, extend_days)
+            await self.send_renewal_success_embed(channel, user, persisted_end_date, extend_days)
 
             # 发送私信通知
-            await self.send_renewal_confirmation(user, channel, new_end_date, extend_days)
+            await self.send_renewal_confirmation(user, channel, persisted_end_date, extend_days)
 
             return True
 
@@ -1160,13 +1270,21 @@ class PrivateRoomCog(commands.Cog):
             microsecond=0
         )
 
-        await self.db.extend_room_validity(active_room['room_id'], new_end_date)
+        persisted_room = await self.db.extend_room_validity(active_room['room_id'], new_end_date)
+        if not persisted_room:
+            await interaction.followup.send(
+                t('privateroom.messages.error_renewal_failed'),
+                ephemeral=False,
+            )
+            return
+
+        persisted_end_date = persisted_room['end_date']
 
         await interaction.followup.send(
             t('privateroom.messages.fix_success').format(
                 user_mention=user.mention,
                 days=days,
-                end_date=new_end_date.strftime("%Y-%m-%d %H:%M")
+                end_date=persisted_end_date.strftime("%Y-%m-%d %H:%M")
             ),
             ephemeral=False
         )
@@ -1430,7 +1548,7 @@ class PrivateRoomCog(commands.Cog):
             await user.send(embed=embed, view=view)
 
         except discord.HTTPException as e:
-            logging.error(f"Failed to send purchase confirmation to user {user.id}: {e}")
+            logging.error("Failed to send purchase confirmation to %s: %s", fmt_user(user), e)
 
     async def send_renewal_success_embed(self, channel, user, new_end_date, extend_days):
         """在私人房间中发送续费成功的嵌入消息"""
@@ -1479,7 +1597,7 @@ class PrivateRoomCog(commands.Cog):
             await user.send(embed=embed, view=view)
 
         except discord.HTTPException as e:
-            logging.error(f"Failed to send renewal confirmation to user {user.id}: {e}")
+            logging.error("Failed to send renewal confirmation to %s: %s", fmt_user(user), e)
 
     async def verify_shop_messages(self):
         """验证并清理不存在的商店消息"""
@@ -1521,9 +1639,18 @@ class PrivateRoomCog(commands.Cog):
                     view = PrivateRoomShopView(self)
                     await message.edit(view=view)
 
-                    logging.info(f"Restored shop view for message {message_id} in channel {channel_id}")
+                    logging.info(
+                        "Restored private room shop view for message %s in %s",
+                        message_id,
+                        fmt_channel(channel),
+                    )
             except (discord.NotFound, discord.Forbidden) as e:
-                logging.error(f"Failed to restore shop view for message {message_id}: {e}")
+                logging.error(
+                    "Failed to restore private room shop view for message %s in %s: %s",
+                    message_id,
+                    fmt_channel(channel),
+                    e,
+                )
 
     @app_commands.command(
         name="privateroom_list",
@@ -1600,7 +1727,7 @@ class PrivateRoomCog(commands.Cog):
 
             if channel:
                 # Delete the room in Discord
-                await channel.delete(reason=f"Admin banned user {user.name} from having private rooms")
+                await channel.delete(reason=f"Admin banned {fmt_user(user)} from having private rooms")
 
             # Mark the room as inactive in the database
             await self.db.deactivate_room(room_id)
@@ -1664,6 +1791,11 @@ class PrivateRoomCog(commands.Cog):
                 except (discord.NotFound, discord.Forbidden):
                     continue
                 except Exception as e:
-                    logging.error(f"Error updating shop message {message_id} in channel {channel_id}: {e}")
+                    logging.error(
+                        "Error updating private room shop message %s in %s: %s",
+                        message_id,
+                        fmt_channel(channel),
+                        e,
+                    )
         except Exception as e:
             logging.error(f"Error in update_shop_messages: {e}")

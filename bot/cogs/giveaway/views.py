@@ -6,7 +6,7 @@ from discord import components, ui
 from discord.ui import Button, View
 from discord.utils import format_dt
 
-from bot.utils import config
+from bot.utils import config, fmt_channel
 from bot.utils.i18n import t
 
 
@@ -123,7 +123,7 @@ class GiveawayParticipationView(ui.View):
         # Fetch the giveaway message
         channel = self.bot.get_channel(self.giveaway_channel_id)
         if channel is None:
-            logging.error(f"Error: Channel {self.giveaway_channel_id} not found")
+            logging.error("Giveaway channel %s not found", fmt_channel(self.giveaway_channel_id))
             return
         message = await channel.fetch_message(self.message_id)
 
@@ -259,4 +259,3 @@ class GiveawayCheckParticipantView(ui.View):
             text=f"Page {self.current_page + 1}/{self.get_max_pages()} | Total Participants: {len(self.participant_ids)}")
 
         return embed
-

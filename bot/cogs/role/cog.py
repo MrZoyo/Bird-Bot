@@ -6,7 +6,12 @@ from discord import app_commands
 from discord.app_commands import locale_str
 from discord.ext import commands
 
-from bot.utils import check_channel_validity, config
+from bot.utils import check_channel_validity, config, fmt_channel
+from bot.utils.achievement_visibility import (
+    filter_visible_achievements,
+    filter_visible_role_types,
+    resolve_hidden_achievement_types,
+)
 from bot.utils.i18n import t
 from bot.utils.role_db import RoleDatabaseManager
 
@@ -29,8 +34,15 @@ class RoleCog(commands.Cog):
 
         self.role_config = config.get_config('role')
         # Existing config loads
-        self.achievements = self.achievement_config['achievements']
-        self.role_type_name = self.role_config['role_type_name']
+        hidden_achievement_types = resolve_hidden_achievement_types()
+        self.achievements = filter_visible_achievements(
+            self.achievement_config['achievements'],
+            hidden_achievement_types,
+        )
+        self.role_type_name = filter_visible_role_types(
+            self.role_config['role_type_name'],
+            hidden_achievement_types,
+        )
 
         self.role_pickup_title = t('role.role_pickup_title')
         self.role_pickup_footer = t('role.role_pickup_footer')
@@ -481,15 +493,23 @@ class RoleCog(commands.Cog):
         for message_id, channel_id in records:
             channel = self.bot.get_channel(int(channel_id))
             if channel is None:
-                logging.error(f"Error: Channel {channel_id} from {table} not found, removing from database")
+                logging.error(
+                    "Channel %s from %s not found, removing from database",
+                    fmt_channel(channel_id),
+                    table,
+                )
                 await self.role_db.remove_role_view(message_id, channel_id, table=table)
                 continue
 
             try:
                 message = await channel.fetch_message(message_id)
             except discord.NotFound:
-                logging.error(f"Error: Message {message_id} from {table} not found in channel {channel_id}, "
-                              f"removing from database")
+                logging.error(
+                    "Message %s from %s not found in %s, removing from database",
+                    message_id,
+                    table,
+                    fmt_channel(channel),
+                )
                 await self.role_db.remove_role_view(message_id, channel_id, table=table)
                 continue
 
@@ -505,7 +525,7 @@ class RoleCog(commands.Cog):
             elif table == 'signature_views':
                 view = SignatureView(self.bot)
 
-            logging.info(f"Recreating {table} for message {message_id} in channel {channel_id}")
+            logging.info("Recreating %s for message %s in %s", table, message_id, fmt_channel(channel))
 
             await message.edit(view=view)
 

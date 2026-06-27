@@ -1,11 +1,24 @@
+# 商店/签到模块配置。
+# 这里保存签到奖励、补签费用、补签次数上限、交易历史显示格式和签到面板颜色；用户余额与流水在数据库。
+# 每日签到成功后增加的余额点数。
 checkin_daily_reward: 10
+# 交易历史时间显示格式，传给 datetime.strftime。
 history_time_format: '%Y-%m-%d %H:%M:%S'
+# 交易历史按 operation_type 显示的 emoji 映射；未知类型使用 history_default_emoji。
 history_type_emoji:
+# 每日签到流水的 emoji。
   checkin: ✅
+# 商店消费/私人房间消费流水的 emoji。
   shop: 🛒
+# 管理员手动改余额流水的 emoji。
   admin: 🔧
+# 补签流水的 emoji。
   makeup_checkin: 🗓️
+# 交易类型未命中 history_type_emoji 时使用的默认 emoji。
 history_default_emoji: 🔄
+# 每次补签扣除的余额点数。
 makeup_checkin_cost: 50
+# 每个用户每月可补签次数上限；ShopDatabaseManager 和补签 modal 都读取该值。
 makeup_checkin_limit_per_month: 3
+# 签到面板 embed 颜色；字符串形式的十六进制整数，例如 '0x9966ff'。
 checkin_embed_color: '0x9966ff'

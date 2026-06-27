@@ -3,8 +3,6 @@ where_is_title_message: 为你找到 {name} 啦！
 current_channel_name_message: 当前频道
 current_channel_members_message: 频道成员
 where_is_join_button_label: 👆点我加入一起玩
-
-# P1-6 step 7: additional keys extracted from check_status_cog.py hardcoded literals.
 date_format_error: '日期格式不支持，请使用 YYYY-MM-DD / YYYY-MM / YYYY。'
 no_data_for_date: 'No data found for the specified date: {date}'
 log_type_main: 主要

@@ -2,7 +2,7 @@
 #
 # Routing overrides for tools/migrate_config_to_yaml.py.
 # The script classifies *top-level* keys of each config_<name>.json into
-# `yaml` / `locale` / `db`; nested restructuring (e.g. splitting
+# `yaml` / `locale` / `db` / `drop`; nested restructuring (e.g. splitting
 # `role.starsign_name[*].name` out to locale) is left as a follow-up
 # hand edit during each cog's step-7 refactor.
 #
@@ -154,7 +154,7 @@ teamup_display:
   # fill in after inspecting .json structure
 
 achievements:
-  locale:
+  drop:
     - rank
   # Achievement definitions / ranking type names are content metadata
   # coupled to thresholds, type ids, and role ids, so they remain YAML.

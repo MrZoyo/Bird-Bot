@@ -7,7 +7,7 @@ from discord import app_commands
 from discord.app_commands import locale_str
 from discord.ext import commands
 
-from bot.utils import TicketsDatabaseManager, fmt_channel, fmt_user
+from bot.utils import TicketsDatabaseManager, fmt_channel, fmt_guild, fmt_user
 from bot.utils.config import Config
 from bot.utils.i18n import t
 
@@ -1544,7 +1544,7 @@ class TicketsCog(commands.Cog):
             guild_id = self.main_conf['guild_id']
             guild = self.bot.get_guild(guild_id)
             if not guild:
-                logging.error("Could not find guild %s for ticket cleanup", guild_id)
+                logging.error("Could not find guild %s for ticket cleanup", fmt_guild(guild_id))
                 return
 
             closed_count = 0

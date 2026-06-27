@@ -58,16 +58,27 @@ class CreateInvitationCog(commands.Cog):
             # 1. 获取消息
             text_channel = self.bot.get_channel(old_invitation['invitation_channel_id'])
             if not text_channel:
-                logging.warning(f"Old invitation channel {old_invitation['invitation_channel_id']} not found")
+                logging.warning(
+                    "Old invitation channel %s not found",
+                    fmt_channel(old_invitation['invitation_channel_id']),
+                )
                 return
 
             try:
                 old_message = await text_channel.fetch_message(old_invitation['invitation_message_id'])
             except discord.NotFound:
-                logging.warning(f"Old invitation message {old_invitation['invitation_message_id']} not found, already deleted")
+                logging.warning(
+                    "Old invitation message %s in %s not found, already deleted",
+                    old_invitation['invitation_message_id'],
+                    fmt_channel(text_channel),
+                )
                 return
             except discord.Forbidden:
-                logging.error(f"No permission to fetch old invitation message")
+                logging.error(
+                    "No permission to fetch old invitation message %s in %s",
+                    old_invitation['invitation_message_id'],
+                    fmt_channel(text_channel),
+                )
                 return
 
             # 2. 更新为满员状态

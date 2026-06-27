@@ -8,12 +8,12 @@ achievements_progress_title: '{date} 成就进度 '
 rank:
   all_button_label: 🟣 全部排名
   type_button_labels:
-    reaction: 添加反应
-    message: 发送消息
-    time_spent: 语音时长
-    giveaway: 参加抽奖
-    checkin_sum: 累计签到
-    checkin_combo: 连续签到
+    reaction: 🔴 添加反应
+    message: 🟡 发送消息
+    time_spent: 🔵 语音时长
+    giveaway: 🟢 参加抽奖
+    checkin_sum: 🟠 累计签到
+    checkin_combo: 🟤 连续签到
   embed_title_single: 🏆 {type_name}排行榜 🏆
   embed_title_date_format: '{title} ({year}-{month})'
   pagination_field_name: 排名 {start}-{end}

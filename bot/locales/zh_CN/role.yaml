@@ -51,11 +51,6 @@ gender_sakura_title: 闭月羞花
 gender_sakura_description: '- 🌸 Sakura 永远绽放'
 gender_ninja_title: 我是忍者
 gender_ninja_description: '- 🥷 Ninja 永远神秘'
-
-# P1-4 follow-up: signature subtree extracted from role.yaml data-side.
-# Data fields (max_length / max_changes_per_week / time_requirement /
-# helper_role_id) remain in bot/config/role.yaml — those are operator-
-# tunable knobs, not translatable prose.
 signature:
   pickup_title: 个性签名设置
   pickup_description: |-
@@ -67,7 +62,7 @@ signature:
     - 💾每个签名最多50字
     - 📆每周最多修改3次
     - 🔇请遵守社区规范，和谐友善，否则可能被禁用此功能
-  pickup_footer: ------点击按钮设置你的个性签名------
+  pickup_footer: '------点击按钮设置你的个性签名------'
   button_label: 设置签名
   modal_title: 设置个性签名
   modal_label: 在此输入你的新签名

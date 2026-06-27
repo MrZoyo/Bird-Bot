@@ -9,7 +9,7 @@ from discord.app_commands import locale_str
 from discord.ext import commands, tasks
 from discord.utils import format_dt
 
-from bot.utils import GiveawayDatabaseManager, check_channel_validity, config
+from bot.utils import GiveawayDatabaseManager, check_channel_validity, config, fmt_channel
 from bot.utils.i18n import t
 from bot.utils.task_helpers import wait_until_ready_or_stop
 
@@ -85,7 +85,7 @@ class GiveawayCog(commands.Cog):
                         # Fetch the giveaway message
                         channel = self.bot.get_channel(self.giveaway_channel_id)
                         if channel is None:
-                            logging.error(f"Couldn't find a channel with the ID {self.giveaway_channel_id}")
+                            logging.error("Couldn't find giveaway channel %s", fmt_channel(self.giveaway_channel_id))
                         else:
                             try:
                                 # Try to fetch the giveaway message
@@ -617,7 +617,7 @@ class GiveawayCog(commands.Cog):
             # Fetch the giveaway message from Discord
             channel = self.bot.get_channel(int(giveaway_channel_id))
             if channel is None:
-                logging.error(f"Error: Channel {giveaway_channel_id} not found")
+                logging.error("Giveaway channel %s not found", fmt_channel(giveaway_channel_id))
                 continue
 
             message = await channel.fetch_message(message_id)

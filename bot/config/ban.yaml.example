@@ -1,6 +1,12 @@
+# 封禁/禁言模块配置。
+# 管理员名单、通知频道和临时封禁 DM 的回服邀请链接会由 /ban_admin_*、/ban_set_* 命令写回本文件。
+# 可使用 ban/tempban/mute 管理命令的 Discord Role ID 列表；成员拥有任一角色即通过权限检查。
 admin_roles:
 - 1145141919810
+# 可使用 ban/tempban/mute 管理命令的 Discord User ID 列表；用于给单个用户授权。
 admin_users:
 - 1145141919810
+# 封禁/禁言通知频道 ID；为空或频道不存在时只写日志，不发送通知 embed。
 ban_notification_channel_id: 1145141919810
+# 临时封禁 DM 里的回服按钮链接；必须是 discord.gg 或 discord.com/invite 格式，可用 /ban_set_invite_link 修改。
 invite_link: https://discord.gg/YOUR_INVITE_CODE

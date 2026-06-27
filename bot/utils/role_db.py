@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Optional, Dict, List, Tuple, Any
 
 from .db_lifecycle import BaseDatabaseManager
+from .log_helpers import fmt_user
 
 
 class RoleDatabaseManager(BaseDatabaseManager):
@@ -120,7 +121,12 @@ class RoleDatabaseManager(BaseDatabaseManager):
                         return result[0]
                     return None
             except Exception as e:
-                logging.error(f"Error getting achievement progress for {user_id}, type {achievement_type}: {e}")
+                logging.error(
+                    "Error getting achievement progress for %s, type %s: %s",
+                    fmt_user(user_id),
+                    achievement_type,
+                    e,
+                )
                 return None
 
     async def _get_checkin_progress(self, user_id: int, checkin_type: str) -> Optional[int]:
@@ -137,7 +143,12 @@ class RoleDatabaseManager(BaseDatabaseManager):
                     return result[0] if result else 0
                 return None
             except Exception as e:
-                logging.error(f"Error getting checkin progress for {user_id}, type {checkin_type}: {e}")
+                logging.error(
+                    "Error getting checkin progress for %s, type %s: %s",
+                    fmt_user(user_id),
+                    checkin_type,
+                    e,
+                )
                 return None
 
     async def check_voice_time_requirement(self, user_id: int, required_time: int) -> Tuple[bool, int]:
@@ -157,7 +168,7 @@ class RoleDatabaseManager(BaseDatabaseManager):
                 current_time = result[0] // 60
                 return current_time >= required_time, current_time
             except Exception as e:
-                logging.error(f"Error checking voice time requirement for {user_id}: {e}")
+                logging.error("Error checking voice time requirement for %s: %s", fmt_user(user_id), e)
                 return False, 0
 
     # Signature-related methods
@@ -182,7 +193,7 @@ class RoleDatabaseManager(BaseDatabaseManager):
                     }
                 return None
             except Exception as e:
-                logging.error(f"Error getting signature for {user_id}: {e}")
+                logging.error("Error getting signature for %s: %s", fmt_user(user_id), e)
                 return None
 
     async def update_user_signature(self, user_id: int, signature: str, time_slot: int) -> bool:
@@ -214,7 +225,7 @@ class RoleDatabaseManager(BaseDatabaseManager):
                 await db.commit()
                 return True
             except Exception as e:
-                logging.error(f"Error updating signature for {user_id}: {e}")
+                logging.error("Error updating signature for %s: %s", fmt_user(user_id), e)
                 return False
 
     async def get_signature_remaining_changes(self, user_id: int) -> int:
@@ -288,7 +299,7 @@ class RoleDatabaseManager(BaseDatabaseManager):
                 await db.commit()
                 return True
             except Exception as e:
-                logging.error(f"Error toggling signature permission for {user_id}: {e}")
+                logging.error("Error toggling signature permission for %s: %s", fmt_user(user_id), e)
                 return False
 
     async def clear_user_signature(self, user_id: int) -> bool:
@@ -306,5 +317,5 @@ class RoleDatabaseManager(BaseDatabaseManager):
                 await db.commit()
                 return True
             except Exception as e:
-                logging.error(f"Error clearing signature for {user_id}: {e}")
+                logging.error("Error clearing signature for %s: %s", fmt_user(user_id), e)
                 return False

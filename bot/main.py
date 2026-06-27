@@ -9,6 +9,8 @@ from bot.utils import (
     close_database_managers,
     collect_database_managers_from_cogs,
     config,
+    fmt_guild,
+    fmt_user,
 )
 from bot.utils.paths import ensure_parent_dir
 from bot.utils.slash_translator import SlashTranslator
@@ -166,15 +168,15 @@ def create_bot():
     async def on_ready():
         guild_id = config.get_config()['guild_id']
 
-        logging.info(f'Logged in as {bot.user.name}')
+        logging.info("Logged in as %s", fmt_user(bot.user))
 
         for guild in bot.guilds:
             if guild.id == guild_id:
-                logging.info(f"\n机器人已连接到服务器 {guild.name}\n")
+                logging.info("\n机器人已连接到服务器 %s\n", fmt_guild(guild))
                 print(f"\n机器人已连接到服务器 {guild.name}\n")
                 await bot.change_presence(activity=discord.Game(name=f"在 {guild.name} 上搬砖"))
             else:
-                logging.info(f"Bot not allowed to connect to {guild.name}")
+                logging.info("Bot not allowed to connect to %s", fmt_guild(guild))
                 print(f"Bot not allowed to connect to {guild.name}")
 
     @bot.command()

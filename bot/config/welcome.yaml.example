@@ -1,25 +1,39 @@
+# 欢迎图和欢迎 DM 数据配置。
+# 欢迎图片资源、字体、频道 ID、坐标/尺寸和部署相关欢迎正文在这里；普通 DM 文案在 bot/locales/zh_CN/welcome.yaml。
+# 欢迎消息发送的文字频道 ID；/testwelcome 也用它判断是否在欢迎频道。
 welcome_channel_id: 1145141919810
+# 欢迎图片文字颜色 RGB 列表，格式为 [R, G, B]，每个值 0-255。
 text_color:
 - 107
 - 104
 - 180
+# 欢迎图片使用的字体文件名；运行时会在 resources/fonts/ 下按文件名查找。
 font_path: mengshenshouxieti.ttf
+# 欢迎图片文字字号，传给 PIL ImageFont.truetype。
 font_size: 60
+# 欢迎图片中用户头像尺寸 [宽, 高]，单位像素。
 avatar_size:
 - 400
 - 400
+# 欢迎图第一行文字相对定位距离，传给图片渲染逻辑。
 welcome_text_1_distance: 30
+# 欢迎图第二行文字相对定位距离，传给图片渲染逻辑。
 welcome_text_2_distance: 30
+# 欢迎图片背景文件名；运行时会在 resources/images/ 下按文件名查找。
 background_image: background.png
 # welcome_text lives here rather than the locale file because it
 # carries real channel / guild URLs + custom-emoji IDs per deployment.
 # Placeholders: {member}, {member.mention}.
-welcome_text: "欢迎来到本服务器, {member.mention}! 希望你能在这里度过一段美好时光。<:200013:1145141919810>\n请查看\
-  \ https://discord.com/channels/1145141919810/1145141919810 了解更多信息。"
+# 频道欢迎正文；保留在 config 是因为常含真实频道链接和自定义 emoji ID。可用 {member} 和 {member.mention}。
+welcome_text: "欢迎来到本服务器, {member.mention}! 希望你能在这里度过一段美好时光。<:200013:1145141919810>\n请查看 https://discord.com/channels/1145141919810/1145141919810 了解更多信息。"
+# 欢迎 DM 数据配置。当前代码读取 dm_image、color、rules_channel_id；DM 文案从 bot/locales/zh_CN/welcome.yaml 读取。
 dm:
+# 欢迎 DM 附图文件名；运行时会在 resources/images/ 下按文件名查找。
   dm_image: welcome_dm.png
+# 欢迎 DM embed 颜色 RGB 列表，格式为 [R, G, B]。
   color:
   - 107
   - 104
   - 180
+# 规则频道 ID；欢迎 DM 会把该频道 mention 附在规则说明字段里。
   rules_channel_id: '1145141919810'

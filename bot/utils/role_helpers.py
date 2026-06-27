@@ -4,6 +4,8 @@ from typing import Iterable, Sequence
 
 import discord
 
+from .log_helpers import fmt_role, fmt_user
+
 
 _HIERARCHY_ERROR_MESSAGE = (
     "❌ Bot 角色层级不足：有目标角色的层级等于或高于 Bot 自身角色。\n"
@@ -49,12 +51,11 @@ async def safe_member_role_edit(
         blockers_remove = [(r.name, r.position) for r in remove_list if r >= bot_top]
         blockers_add = [(r.name, r.position) for r in add_list if r >= bot_top]
         logging.error(
-            "[%s] Role hierarchy block for user %s (%s): "
-            "bot top_role=%r (pos=%d); remove blocked=%s; add blocked=%s",
+            "[%s] Role hierarchy block for %s: "
+            "bot top_role=%s (pos=%d); remove blocked=%s; add blocked=%s",
             context,
-            member.id,
-            member.display_name,
-            bot_top.name,
+            fmt_user(member),
+            fmt_role(bot_top),
             bot_top.position,
             blockers_remove,
             blockers_add,
@@ -66,10 +67,9 @@ async def safe_member_role_edit(
         return False
     except discord.HTTPException as exc:
         logging.error(
-            "[%s] HTTPException updating roles for user %s (%s): %s",
+            "[%s] HTTPException updating roles for %s: %s",
             context,
-            member.id,
-            member.display_name,
+            fmt_user(member),
             exc,
         )
         try:

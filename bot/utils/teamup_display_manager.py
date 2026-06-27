@@ -6,6 +6,7 @@ import logging
 from typing import Optional, List, Dict, Tuple
 
 from .db_lifecycle import BaseDatabaseManager
+from .log_helpers import fmt_channel, fmt_user
 
 
 class TeamupDisplayManager(BaseDatabaseManager):
@@ -235,7 +236,11 @@ class TeamupDisplayManager(BaseDatabaseManager):
                 await db.commit()
                 return True
             except Exception as e:
-                logging.error(f"Failed to remove invalid invitation for channel {voice_channel_id}: {e}")
+                logging.error(
+                    "Failed to remove invalid invitation for %s: %s",
+                    fmt_channel(voice_channel_id),
+                    e,
+                )
                 return False
     
     async def get_active_invitations(self) -> List[Dict]:
@@ -281,7 +286,7 @@ class TeamupDisplayManager(BaseDatabaseManager):
                 await db.commit()
                 return True
             except Exception as e:
-                logging.error(f"Failed to update user stats: {e}")
+                logging.error("Failed to update teamup stats for %s: %s", fmt_user(user_id), e)
                 return False
     
     async def get_user_stats(self, user_id: int) -> Tuple[int, Optional[str]]:
@@ -320,7 +325,10 @@ class TeamupDisplayManager(BaseDatabaseManager):
 
                 # Verify update was successful
                 if db.total_changes == 0:
-                    logging.warning(f"No invitation found for voice channel {voice_channel_id} to update message ID")
+                    logging.warning(
+                        "No invitation found for %s to update message ID",
+                        fmt_channel(voice_channel_id),
+                    )
                     return False
                 return True
 

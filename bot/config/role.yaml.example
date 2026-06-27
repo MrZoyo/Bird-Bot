@@ -1,4 +1,11 @@
+# 身份组领取和签名功能配置。
+# 这里保存角色 ID、按钮选项和签名功能的数值限制；用户可见文案在 bot/locales/zh_CN/role.yaml。
+# 用户首次领取任意成就身份组时额外授予的起始成就角色 ID。
 achievement_start_role_id: 1145141919810
+# 成就身份组领取面板的按钮类别列表。每一项字段：
+# name：按钮/面板显示名；
+# type：成就类型，必须和 achievements[].type 对应；
+# data：历史兼容字段，当前 RoleCog 领取逻辑按 type 查询进度，不直接读取 data。
 role_type_name:
 - name: 🔴 成就-添加反应
   type: reaction
@@ -15,10 +22,12 @@ role_type_name:
 - name: 🟠 成就-累计签到
   type: checkin_sum
   data: checkin_sum
-- name: 🟣 成就-连续签到
+- name: 🟤 成就-连续签到
   type: checkin_combo
   data: checkin_combo
+# 用户选择星座、MBTI 或性别身份组时额外授予的社交起始角色 ID。
 social_start_role_id: 1145141919810
+# 星座身份组按钮列表；每项 name 是 custom_id，emoji 是按钮显示，role_id 是要授予的角色 ID。
 starsign_name:
 - name: Aries
   emoji: ♈
@@ -56,6 +65,7 @@ starsign_name:
 - name: Pisces
   emoji: ♓
   role_id: 1145141919810
+# MBTI 身份组按钮列表；每项 name 是 custom_id/按钮文本，emoji 当前不作为按钮 label 使用，role_id 是要授予的角色 ID。
 mbti_name:
 - name: INTJ
   emoji: 🧑‍🔬
@@ -105,6 +115,7 @@ mbti_name:
 - name: ESFP
   emoji: 🧑‍🔬
   role_id: 1145141919810
+# 性别标识身份组按钮列表；每项 name 是 custom_id，emoji 是按钮显示，role_id 是要授予的角色 ID。
 gender_name:
 - name: Tree
   emoji: 🌳
@@ -119,8 +130,14 @@ gender_name:
 # prompts, success / cooldown / admin messages, etc.) lives under
 # `signature:` in bot/locales/<lang>/role.yaml and is resolved via
 # bot.utils.i18n.t('role.signature.*').
+# 签名功能数值配置。用户可见文案在 bot/locales/zh_CN/role.yaml；本地旧 YAML 若残留文案字段，当前代码不会读取。
 signature:
+# 签名 modal 输入最大长度，传给 discord.ui.TextInput(max_length=...)。
   max_length: 50
+# 历史配置字段；当前数据库固定提供 3 个 7 天冷却槽，运行时代码不读取该值。
+# P3-10 预备：后续会把签名冷却天数接入配置；普通部署保持默认即可。
   max_changes_per_week: 3
+# 设置/查看签名前需要的累计语音时长，单位是分钟；来源是 achievements.time_spent 秒数换算。
   time_requirement: 43200
+# 助力用户角色 ID；签名权限说明使用它，PrivateRoom 也用它判断助力加成。
   helper_role_id: 1145141919810

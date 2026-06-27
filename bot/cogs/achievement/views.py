@@ -4,7 +4,7 @@ from discord.ui import Button, View
 from bot.utils import config
 from bot.utils.i18n import t
 
-from .rank_locale import rank_type_button_labels
+from .rank_locale import rank_button_parts, rank_type_button_labels
 
 
 class AchievementRefreshView(View):
@@ -313,9 +313,11 @@ class RankView(discord.ui.View):
         self.type_button_labels = rank_type_button_labels()
 
         # Add buttons for category selection
+        all_emoji, all_label = rank_button_parts('all', t('achievements.rank.all_button_label'))
         self.all_button = discord.ui.Button(
             style=discord.ButtonStyle.success,
-            label=t('achievements.rank.all_button_label'),
+            label=all_label,
+            emoji=all_emoji,
             custom_id="all"
         )
         self.all_button.callback = self.all_button_callback
@@ -324,9 +326,13 @@ class RankView(discord.ui.View):
         self.type_buttons = []
         for achievement in self.visible_rankings:
             type_name = achievement.get('type')  # This is exactly "time_spent" for the time button
-            button_label = self.type_button_labels.get(type_name, type_name)
+            button_emoji, button_label = rank_button_parts(
+                type_name,
+                self.type_button_labels.get(type_name, type_name),
+            )
             button = discord.ui.Button(
                 style=discord.ButtonStyle.primary,
+                emoji=button_emoji,
                 label=button_label,
                 custom_id=f"type_{type_name}"  # This becomes "type_time_spent"
             )

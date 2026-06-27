@@ -8,7 +8,7 @@ from discord import app_commands
 from discord.app_commands import locale_str
 from discord.ext import commands, tasks
 
-from bot.utils import BanDatabaseManager, config
+from bot.utils import BanDatabaseManager, config, fmt_channel, fmt_guild, fmt_user
 from bot.utils.i18n import t
 from bot.utils.task_helpers import wait_until_ready_or_stop
 
@@ -105,7 +105,12 @@ class BanCog(commands.Cog):
                 if not guild:
                     # Mark as inactive if guild not found
                     success = await self.db.deactivate_tempban(tempban_id)
-                    logging.info(f"Deactivated tempban {tempban_id} - guild {guild_id} not found - success: {success}")
+                    logging.info(
+                        "Deactivated tempban %s - guild %s not found - success: %s",
+                        tempban_id,
+                        fmt_guild(guild_id),
+                        success,
+                    )
                     continue
 
                 # Process expired tempbans
@@ -114,12 +119,24 @@ class BanCog(commands.Cog):
                         user = await self.bot.fetch_user(user_id)
                         # Try to unban the user
                         await guild.unban(user, reason="Automatic unban after tempban period (startup recovery)")
-                        logging.info(f"Unbanned expired tempban user {user_id} from guild {guild_id}")
+                        logging.info(
+                            "Unbanned expired tempban user %s from %s",
+                            fmt_user(user),
+                            fmt_guild(guild),
+                        )
                     except discord.NotFound:
                         # User was already unbanned
-                        logging.info(f"User {user_id} was already unbanned from guild {guild_id}")
+                        logging.info(
+                            "User %s was already unbanned from %s",
+                            fmt_user(user_id),
+                            fmt_guild(guild),
+                        )
                     except Exception as e:
-                        logging.warning(f"Failed to unban expired tempban user {user_id}: {e}")
+                        logging.warning(
+                            "Failed to unban expired tempban user %s: %s",
+                            fmt_user(user_id),
+                            e,
+                        )
 
                     # Mark as inactive in database regardless
                     success = await self.db.deactivate_tempban(tempban_id)
@@ -136,7 +153,7 @@ class BanCog(commands.Cog):
                     await self.schedule_unban_with_db(guild, user, unban_time, tempban_id)
                     recovered_count += 1
                 except Exception as e:
-                    logging.warning(f"Failed to recover tempban for user {user_id}: {e}")
+                    logging.warning("Failed to recover tempban for %s: %s", fmt_user(user_id), e)
                     # Mark as inactive if we can't recover it
                     await self.db.deactivate_tempban(tempban_id)
 
@@ -163,18 +180,23 @@ class BanCog(commands.Cog):
                 guild = self.bot.get_guild(guild_id)
                 if not guild:
                     success = await self.db.deactivate_tempban(tempban_id)
-                    logging.warning(f"Guild {guild_id} not found, deactivating tempban {tempban_id} - success: {success}")
+                    logging.warning(
+                        "Guild %s not found, deactivating tempban %s - success: %s",
+                        fmt_guild(guild_id),
+                        tempban_id,
+                        success,
+                    )
                     continue
 
                 try:
                     user = await self.bot.fetch_user(user_id)
                     await guild.unban(user, reason="Automatic unban after tempban period")
-                    logging.info(f"Successfully unbanned user {user_id} from guild {guild_id}")
+                    logging.info("Successfully unbanned %s from %s", fmt_user(user), fmt_guild(guild))
                 except discord.NotFound:
                     # User was already unbanned
-                    logging.info(f"User {user_id} was already unbanned from guild {guild_id}")
+                    logging.info("%s was already unbanned from %s", fmt_user(user_id), fmt_guild(guild))
                 except Exception as e:
-                    logging.error(f"Failed to unban user {user_id}: {e}")
+                    logging.error("Failed to unban %s: %s", fmt_user(user_id), e)
 
                 # Always deactivate the tempban in database
                 success = await self.db.deactivate_tempban(tempban_id)
@@ -218,7 +240,7 @@ class BanCog(commands.Cog):
 
         channel = self.bot.get_channel(channel_id)
         if not channel:
-            logging.error(f"Ban notification channel {channel_id} not found")
+            logging.error("Ban notification channel %s not found", fmt_channel(channel_id))
             return
 
         # 添加权限检查日志
@@ -227,11 +249,11 @@ class BanCog(commands.Cog):
         perms = channel.permissions_for(bot_member)
 
         if not perms.send_messages:
-            logging.error(f"Bot lacks Send Messages permission in channel {channel_id}")
+            logging.error("Bot lacks Send Messages permission in %s", fmt_channel(channel))
             return
 
         if not perms.embed_links:
-            logging.error(f"Bot lacks Embed Links permission in channel {channel_id}")
+            logging.error("Bot lacks Embed Links permission in %s", fmt_channel(channel))
             return
 
         embed = build_ban_notification_embed(
@@ -244,11 +266,15 @@ class BanCog(commands.Cog):
 
         try:
             await channel.send(embed=embed)
-            logging.info(f"Successfully sent ban notification for user {user.id} to channel {channel_id}")
+            logging.info(
+                "Successfully sent ban notification for %s to %s",
+                fmt_user(user),
+                fmt_channel(channel),
+            )
         except discord.Forbidden:
-            logging.error(f"Bot lacks permission to send message in channel {channel_id}")
+            logging.error("Bot lacks permission to send message in %s", fmt_channel(channel))
         except discord.HTTPException as e:
-            logging.error(f"Failed to send ban notification for user {user.id}: {e}")
+            logging.error("Failed to send ban notification for %s: %s", fmt_user(user), e)
         except Exception as e:
             logging.error(f"Unexpected error sending ban notification: {type(e).__name__}: {e}")
 
@@ -273,7 +299,7 @@ class BanCog(commands.Cog):
         try:
             await channel.send(embed=embed)
         except discord.HTTPException:
-            logging.error(f"Failed to send mute notification for user {user.id}")
+            logging.error("Failed to send mute notification for %s", fmt_user(user))
 
     async def send_tempban_dm(self, user: discord.User, guild: discord.Guild, reason: str, duration: str, unban_time: datetime):
         """Send tempban notification DM to user"""
@@ -288,12 +314,12 @@ class BanCog(commands.Cog):
 
             # Send DM
             await user.send(embed=embed, view=view)
-            logging.info(f"Sent tempban DM to user {user.id}")
+            logging.info("Sent tempban DM to %s", fmt_user(user))
 
         except discord.Forbidden:
-            logging.warning(f"Cannot send DM to user {user.id} - DMs disabled or blocked")
+            logging.warning("Cannot send DM to %s - DMs disabled or blocked", fmt_user(user))
         except Exception as e:
-            logging.error(f"Failed to send tempban DM to user {user.id}: {e}")
+            logging.error("Failed to send tempban DM to %s: %s", fmt_user(user), e)
 
     async def send_mute_dm(self, user: discord.User, guild: discord.Guild, reason: str, duration: str, unmute_time: datetime):
         """Send mute notification DM to user"""
@@ -302,12 +328,12 @@ class BanCog(commands.Cog):
 
             # Send DM
             await user.send(embed=embed)
-            logging.info(f"Sent mute DM to user {user.id}")
+            logging.info("Sent mute DM to %s", fmt_user(user))
 
         except discord.Forbidden:
-            logging.warning(f"Cannot send DM to user {user.id} - DMs disabled or blocked")
+            logging.warning("Cannot send DM to %s - DMs disabled or blocked", fmt_user(user))
         except Exception as e:
-            logging.error(f"Failed to send mute DM to user {user.id}: {e}")
+            logging.error("Failed to send mute DM to %s: %s", fmt_user(user), e)
 
     async def schedule_unban_with_db(self, guild: discord.Guild, user: discord.User, unban_time: datetime, tempban_id: int):
         """Schedule automatic unban with database integration"""
@@ -323,9 +349,9 @@ class BanCog(commands.Cog):
                 if user.id in self.tempban_tasks:
                     del self.tempban_tasks[user.id]
 
-                logging.info(f"Automatically unbanned user {user.id} from guild {guild.id}")
+                logging.info("Automatically unbanned %s from %s", fmt_user(user), fmt_guild(guild))
             except Exception as e:
-                logging.error(f"Failed to automatically unban user {user.id}: {e}")
+                logging.error("Failed to automatically unban %s: %s", fmt_user(user), e)
                 # Still mark as inactive in database even if unban failed
                 await self.db.deactivate_tempban(tempban_id)
                 if user.id in self.tempban_tasks:
@@ -408,7 +434,12 @@ class BanCog(commands.Cog):
             # Send notification
             await self.send_ban_notification(user, reason)
 
-            logging.info(f"User {user.id} banned by {interaction.user.id} in guild {interaction.guild.id}")
+            logging.info(
+                "%s banned by %s in %s",
+                fmt_user(user),
+                fmt_user(interaction.user),
+                fmt_guild(interaction.guild),
+            )
 
         except discord.Forbidden:
             await interaction.response.send_message(
@@ -420,7 +451,7 @@ class BanCog(commands.Cog):
                 t('ban.ban_failed_error'),
                 ephemeral=False
             )
-            logging.error(f"Failed to ban user {user.id}: {e}")
+            logging.error("Failed to ban %s: %s", fmt_user(user), e)
 
     @app_commands.command(
         name="tempban",
@@ -537,7 +568,13 @@ class BanCog(commands.Cog):
             # Send notification
             await self.send_ban_notification(user, reason, duration, unban_time)
 
-            logging.info(f"User {user.id} temporarily banned for {duration} by {interaction.user.id} in guild {interaction.guild.id}")
+            logging.info(
+                "%s temporarily banned for %s by %s in %s",
+                fmt_user(user),
+                duration,
+                fmt_user(interaction.user),
+                fmt_guild(interaction.guild),
+            )
 
         except discord.Forbidden:
             await interaction.response.send_message(
@@ -549,7 +586,7 @@ class BanCog(commands.Cog):
                 t('ban.ban_failed_error'),
                 ephemeral=False
             )
-            logging.error(f"Failed to temporarily ban user {user.id}: {e}")
+            logging.error("Failed to temporarily ban %s: %s", fmt_user(user), e)
 
     @app_commands.command(
         name="mute",
@@ -633,7 +670,13 @@ class BanCog(commands.Cog):
             # Send notification
             await self.send_mute_notification(user, reason, duration, unmute_time)
 
-            logging.info(f"User {user.id} muted for {duration} by {interaction.user.id} in guild {interaction.guild.id}")
+            logging.info(
+                "%s muted for %s by %s in %s",
+                fmt_user(user),
+                duration,
+                fmt_user(interaction.user),
+                fmt_guild(interaction.guild),
+            )
 
         except discord.Forbidden:
             await interaction.response.send_message(
@@ -645,7 +688,7 @@ class BanCog(commands.Cog):
                 t('ban.mute_failed_error'),
                 ephemeral=False
             )
-            logging.error(f"Failed to mute user {user.id}: {e}")
+            logging.error("Failed to mute %s: %s", fmt_user(user), e)
 
     @app_commands.command(
         name="ban_admin_list",

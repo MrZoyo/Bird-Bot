@@ -1,3 +1,12 @@
+# 成就系统运行数据配置。
+# 这里保存成就定义、排行榜类别和成就类别显示名；/rank 按钮、分页、提示等 UI 文案在 bot/locales/zh_CN/achievements.yaml。
+# 如果 main.features.shop=false，checkin_sum/checkin_combo 会在运行时隐藏；如果 main.features.giveaway=false，giveaway 会隐藏。
+# 成就定义列表。每一项字段：
+# name/description：显示在成就进度和成就身份组面板中的名称/说明；
+# threshold：达成门槛；reaction/message/giveaway/checkin_* 是次数，time_spent 是分钟；
+# type：必须是 reaction、message、time_spent、giveaway、checkin_sum、checkin_combo 之一，且要和排行榜/角色配置对应；
+# milestone：当前运行时代码不读取，作为迁移保留的成就阶段标识，建议保持唯一；
+# role_id：领取该成就时授予的 Discord Role ID。
 achievements:
 - name: 表达情绪
   description: 为10条信息添加反应
@@ -149,6 +158,7 @@ achievements:
   type: checkin_combo
   milestone: checkin_combo5
   role_id: 1145141919810
+# 排行榜名次图标列表；前 10 名按顺序使用这些 emoji，超过列表长度后部分视图会停止使用图标或改用数字。
 achievements_ranking_emoji:
 - ':first_place:'
 - ':second_place:'
@@ -160,6 +170,9 @@ achievements_ranking_emoji:
 - ':eight:'
 - ':nine:'
 - ':keycap_ten:'
+# 排行榜类别列表。每一项字段：
+# name：/achievement_ranking 和 /rank 的该类别字段标题；
+# type：要统计的成就类型，必须和 achievements[].type / achievements_type_name 的 key 对应。
 achievements_ranking:
 - name: ':heart: 添加最多反应 :heart: '
   type: reaction
@@ -173,10 +186,17 @@ achievements_ranking:
   type: checkin_sum
 - name: ':purple_heart: 连续签到最久 :purple_heart: '
   type: checkin_combo
+# 成就类型显示名映射；用于月度进度、单类别排行标题和 /rank 介绍 embed。time_spent 在这里保留 (min) 表示显示单位。
 achievements_type_name:
+# reaction 类型的显示名；统计用户添加反应的次数。
   reaction: 🔴 添加反应
+# message 类型的显示名；统计用户发送消息的次数。
   message: 🟡 发送消息
+# time_spent 类型的显示名；数据库存秒，界面显示时换算为分钟。
   time_spent: 🔵 语音时长(min)
+# giveaway 类型的显示名；依赖 GiveawayCog，main.features.giveaway=false 时运行时隐藏。
   giveaway: 🟢 参加抽奖
+# 累计签到显示名；依赖 ShopCog 的签到记录，main.features.shop=false 时运行时隐藏。
   checkin_sum: 🟠 累计签到
-  checkin_combo: 🟣 连续签到
+# 连续签到显示名；依赖 ShopCog 的最大连签记录，main.features.shop=false 时运行时隐藏。
+  checkin_combo: 🟤 连续签到

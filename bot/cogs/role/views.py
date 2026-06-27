@@ -5,6 +5,11 @@ from discord import components
 from discord.ui import Button, View
 
 from bot.utils import config, fmt_role, fmt_user, safe_member_role_edit
+from bot.utils.achievement_visibility import (
+    filter_visible_achievements,
+    filter_visible_role_types,
+    resolve_hidden_achievement_types,
+)
 from bot.utils.i18n import t
 from bot.utils.role_db import RoleDatabaseManager
 
@@ -66,8 +71,15 @@ class AchievementRoleView(View):
         self.achievement_config = config.get_config('achievements')
 
         self.role_config = config.get_config('role')
-        self.achievements = self.achievement_config['achievements']
-        self.role_type_name = self.role_config['role_type_name']
+        hidden_achievement_types = resolve_hidden_achievement_types()
+        self.achievements = filter_visible_achievements(
+            self.achievement_config['achievements'],
+            hidden_achievement_types,
+        )
+        self.role_type_name = filter_visible_role_types(
+            self.role_config['role_type_name'],
+            hidden_achievement_types,
+        )
         self.achievement_start_role_id = self.role_config['achievement_start_role_id']
         self.role_no_column_name_message = t('role.role_no_column_name_message')
         self.role_no_progress_message = t('role.role_no_progress_message')
@@ -521,4 +533,3 @@ class SignatureView(View):
             t('role.signature.view_message', signature=signature_data['signature']),
             ephemeral=True
         )
-

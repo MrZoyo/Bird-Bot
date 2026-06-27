@@ -7,6 +7,13 @@ from discord.app_commands import locale_str
 from discord.ext import commands
 
 from bot.utils import AchievementDatabaseManager, check_channel_validity, config
+from bot.utils.achievement_visibility import (
+    filter_visible_achievement_rankings,
+    filter_visible_achievement_type_names,
+    filter_visible_achievements,
+    is_achievement_type_visible,
+    resolve_hidden_achievement_types,
+)
 from bot.utils.i18n import t
 
 from .views import (
@@ -16,13 +23,7 @@ from .views import (
     ConfirmationView,
     RankView,
 )
-from .rank_locale import rank_intro_type_buttons
-
-
-FEATURE_LINKED_ACHIEVEMENT_TYPES = {
-    'giveaway': {'giveaway'},
-    'shop': {'checkin_sum', 'checkin_combo'},
-}
+from .rank_locale import rank_button_display_name, rank_intro_type_buttons
 
 
 class AchievementCog(commands.Cog):
@@ -41,35 +42,31 @@ class AchievementCog(commands.Cog):
         self.db = AchievementDatabaseManager(self.db_path, self.achievement_config)
 
     def _resolve_hidden_achievement_types(self) -> set[str]:
-        hidden_types = set()
-        for feature_name, achievement_types in FEATURE_LINKED_ACHIEVEMENT_TYPES.items():
-            if not config.is_feature_enabled(feature_name):
-                hidden_types.update(achievement_types)
-        return hidden_types
+        return resolve_hidden_achievement_types()
 
     def is_achievement_type_visible(self, achievement_type: str) -> bool:
-        return achievement_type not in self.hidden_achievement_types
+        return is_achievement_type_visible(
+            achievement_type,
+            self.hidden_achievement_types,
+        )
 
     def get_visible_achievements(self) -> list[dict]:
-        return [
-            achievement.copy()
-            for achievement in self.achievement_config.get('achievements', [])
-            if self.is_achievement_type_visible(achievement.get('type'))
-        ]
+        return filter_visible_achievements(
+            self.achievement_config.get('achievements', []),
+            self.hidden_achievement_types,
+        )
 
     def get_visible_achievement_rankings(self) -> list[dict]:
-        return [
-            ranking.copy()
-            for ranking in self.achievement_config.get('achievements_ranking', [])
-            if self.is_achievement_type_visible(ranking.get('type'))
-        ]
+        return filter_visible_achievement_rankings(
+            self.achievement_config.get('achievements_ranking', []),
+            self.hidden_achievement_types,
+        )
 
     def get_visible_achievement_type_names(self) -> dict[str, str]:
-        return {
-            achievement_type: label
-            for achievement_type, label in self.achievement_config.get('achievements_type_name', {}).items()
-            if self.is_achievement_type_visible(achievement_type)
-        }
+        return filter_visible_achievement_type_names(
+            self.achievement_config.get('achievements_type_name', {}),
+            self.hidden_achievement_types,
+        )
 
     def get_achievement_count_value(self, user_achievements: dict, achievement_type: str) -> int | float:
         if achievement_type == 'reaction':
@@ -422,7 +419,11 @@ class AchievementCog(commands.Cog):
         intro_type_buttons = rank_intro_type_buttons()
         type_name = self.get_visible_achievement_type_names()
 
-        intro_embed.add_field(name=view.all_button.label, value=all_button_text, inline=False)
+        intro_embed.add_field(
+            name=rank_button_display_name('all', view.all_button.label),
+            value=all_button_text,
+            inline=False,
+        )
 
         # Add fields for each category button
         for button in view.type_buttons:
@@ -442,7 +443,11 @@ class AchievementCog(commands.Cog):
             )
 
             # Add field with button label and description
-            intro_embed.add_field(name=f"{type_name.get(button_type)}", value=button_text, inline=False)
+            intro_embed.add_field(
+                name=type_name.get(button_type, rank_button_display_name(button_type, button.label)),
+                value=button_text,
+                inline=False,
+            )
 
         # Add footer text and timestamp
         intro_embed.set_footer(text=t('achievements.rank.intro_footer'))

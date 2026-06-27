@@ -8,7 +8,7 @@ from discord import app_commands
 from discord.app_commands import locale_str
 from discord.ext import commands, tasks
 
-from bot.utils import config
+from bot.utils import config, fmt_channel
 from bot.utils.channel_validator import check_channel_validity
 from bot.utils.i18n import t
 from bot.utils.task_helpers import wait_until_ready_or_stop
@@ -219,7 +219,7 @@ class TeamupDisplayCog(commands.Cog):
         try:
             channel = self.bot.get_channel(channel_id)
             if not channel:
-                logging.warning(f"Display board channel not found: {channel_id}")
+                logging.warning("Display board channel not found: %s", fmt_channel(channel_id))
                 return
             
             try:
@@ -227,11 +227,11 @@ class TeamupDisplayCog(commands.Cog):
                 embed = await self.create_display_embed()
                 await message.edit(embed=embed)
             except discord.NotFound:
-                logging.warning(f"Display board message not found: {message_id}")
+                logging.warning("Display board message %s not found in %s", message_id, fmt_channel(channel))
                 # Clean up invalid records in database
                 await self.db_manager.remove_display_board(channel_id)
             except discord.Forbidden:
-                logging.warning(f"No permission to edit display board message: {message_id}")
+                logging.warning("No permission to edit display board message %s in %s", message_id, fmt_channel(channel))
             
         except Exception as e:
             logging.error(f"Failed to update display board: {e}")

@@ -1,9 +1,20 @@
+# 私人房间商店配置。
+# 价格、折扣、房间有效期和到期检查时间都从这里读取；频道分类和商店消息记录存数据库。
+# 私人房间原价，单位是 Shop 余额点数；购买/续费都会先按语音时长折扣计算最终价格。
 points_cost: 600
+# 上个月语音时长满折扣门槛，单位是小时；达到该小时数时可把价格折到 0。
 voice_hours_threshold: 150
+# 助力用户额外计入的语音小时数；是否为助力用户由 role.signature.helper_role_id 对应角色判断。
 booster_discount_hours: 20
+# 每日到期检查目标小时，0-23；新房间和修复续期的到期时间也会对齐到该小时。
 check_time_hour: 8
+# 每日到期检查目标分钟，0-59；后台任务启动后会调度到这个时刻运行。
 check_time_minute: 10
+# 首次购买私人房间的有效天数。
 room_duration_days: 31
+# 允许同时存在的活跃私人房间数量上限。
 max_rooms: 40
+# 允许提前续费的剩余天数阈值；剩余天数大于该值时会拒绝续费。
 renewal_days_threshold: 7
+# 续费时延长的天数；正常房间从当前 end_date 延长，滞留过期 active 房间从当前时间延长。
 renewal_extend_days: 31

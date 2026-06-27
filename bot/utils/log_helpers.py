@@ -58,3 +58,8 @@ def fmt_channel(channel: Any) -> str:
 def fmt_role(role: Any) -> str:
     """Format a Discord role or raw role id for logs."""
     return _format_entity(role, ("name",))
+
+
+def fmt_guild(guild: Any) -> str:
+    """Format a Discord guild or raw guild id for logs."""
+    return _format_entity(guild, ("name",))

@@ -1,8 +1,10 @@
-# Only structural / data fields stay in yaml. All user-facing text
-# (title / footer / description / button labels / status messages) lives
-# in bot/locales/<lang>/voicechannel.yaml and is resolved via
-# bot.utils.i18n.t('voicechannel.control_panel.*').
+# 临时语音房配置。
+# 创建入口频道配置保存在数据库；这里保留控制面板颜色等结构化数据，控制面板文案在 bot/locales/zh_CN/voicechannel.yaml。
+# 房间控制面板结构配置。当前运行时代码只从这里读取 colors；标题、按钮和消息文案从 locale 读取。
 control_panel:
+# 控制面板 embed 颜色配置。
   colors:
+# 公开房间状态的 embed 颜色，使用 Discord 十进制颜色整数。
     public: 3447003
+# 私密房间状态的 embed 颜色，使用 Discord 十进制颜色整数。
     private: 15158332
