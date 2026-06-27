@@ -9,6 +9,7 @@ from discord.app_commands import locale_str
 from discord.ext import commands, tasks
 
 from bot.utils import check_channel_validity, config, fmt_channel, fmt_user
+from bot.utils.components_v2 import clear_legacy_message_payload
 from bot.utils.i18n import t
 from bot.utils.shop_db import ShopDatabaseManager
 
@@ -34,38 +35,40 @@ class ShopCog(commands.Cog):
         """Initialize database when cog loads."""
         await self.db.initialize_database()
         
-        # Set up checkin embed view
+        # Set up checkin panel view
         self.checkin_view = CheckinEmbedView(self, self.bot, self.db, self.conf)
         self.bot.add_view(self.checkin_view)
         
-        # Start daily embed update task
+        # Start daily panel update task
         if not self.update_daily_embeds.is_running():
             self.update_daily_embeds.start()
         
-        # Recover existing embed views on bot restart
+        # Recover existing panel views on bot restart
         await self.recover_embed_views()
 
     @tasks.loop(minutes=30)
     async def update_daily_embeds(self):
-        """Check and update daily embeds every 30 minutes."""
+        """Check and update daily check-in panels every 30 minutes."""
         try:
             current_date = datetime.now().strftime('%Y-%m-%d')
             active_embeds = await self.db.get_active_checkin_embeds()
             
             for embed_data in active_embeds:
-                # Check if embed needs daily update
+                # Check if panel needs daily update
                 if embed_data['created_date'] != current_date:
                     # Reset daily stats in database
                     await self.db.reset_daily_embed_stats(current_date)
                     
-                    # Update the actual embed message
+                    # Update the actual panel message
                     try:
                         channel = self.bot.get_channel(embed_data['channel_id'])
                         if channel:
                             message = await channel.fetch_message(embed_data['message_id'])
                             if message:
-                                new_embed = await self.create_daily_checkin_embed(current_date)
-                                await message.edit(embed=new_embed, view=self.checkin_view)
+                                view = await self.create_daily_checkin_view(current_date)
+                                payload = clear_legacy_message_payload()
+                                payload["attachments"] = [self.create_checkin_image_file()]
+                                await message.edit(**payload, view=view)
                     except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                         # If embed message no longer exists, deactivate it
                         await self.db.deactivate_checkin_embed(embed_data['id'])
@@ -73,17 +76,21 @@ class ShopCog(commands.Cog):
             logging.error(f"Error in daily embed update: {e}")
 
     async def recover_embed_views(self):
-        """Recover embed views after bot restart."""
+        """Recover check-in panel views after bot restart."""
         try:
             active_embeds = await self.db.get_active_checkin_embeds()
+            current_date = datetime.now().strftime('%Y-%m-%d')
             for embed_data in active_embeds:
                 try:
                     channel = self.bot.get_channel(embed_data['channel_id'])
                     if channel:
                         message = await channel.fetch_message(embed_data['message_id'])
                         if message:
-                            # Re-add the view to existing embed
-                            await message.edit(view=self.checkin_view)
+                            # Re-add the view and migrate old embed panels to Components v2.
+                            view = await self.create_daily_checkin_view(current_date)
+                            payload = clear_legacy_message_payload()
+                            payload["attachments"] = [self.create_checkin_image_file()]
+                            await message.edit(**payload, view=view)
                         else:
                             # Message not found, deactivate
                             await self.db.deactivate_checkin_embed(embed_data['id'])
@@ -93,60 +100,36 @@ class ShopCog(commands.Cog):
         except Exception as e:
             logging.error(f"Error recovering embed views: {e}")
 
-    async def create_daily_checkin_embed(self, date_str: str) -> discord.Embed:
-        """Create the daily checkin embed."""
-        # Get today's statistics
+    def create_checkin_image_file(self) -> discord.File:
+        image_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'resources', 'images', 'checkin.png')
+        return discord.File(image_path, filename="checkin.png")
+
+    async def create_daily_checkin_view(self, date_str: str) -> CheckinEmbedView:
+        """Create the daily check-in Components v2 panel."""
         today_count = await self.db.get_today_checkin_count(date_str)
         first_user_id = await self.db.get_today_first_checkin_user(date_str)
-        
-        # Create embed with date in title
-        embed = discord.Embed(
-            title=t('shop.checkin_embed_title').format(date=date_str),
-            description=t('shop.checkin_embed_description'),
-            color=int(self.conf['checkin_embed_color'], 16)
-        )
-        
-        # Add checkin count field
-        count_text = str(today_count) if today_count > 0 else t('shop.checkin_embed_no_checkin')
-        embed.add_field(
-            name=t('shop.checkin_embed_count_field'),
-            value=count_text,
-            inline=True
-        )
-        
-        # Add first checkin user field
+
         if first_user_id:
             first_user = self.bot.get_user(first_user_id)
             first_user_text = first_user.mention if first_user else f"<@{first_user_id}>"
         else:
-            first_user_text = t('shop.checkin_embed_no_checkin')
-        
-        embed.add_field(
-            name=t('shop.checkin_embed_first_field'),
-            value=first_user_text,
-            inline=True
+            first_user_text = None
+
+        return CheckinEmbedView(
+            self,
+            self.bot,
+            self.db,
+            self.conf,
+            panel_date=date_str,
+            today_count=today_count,
+            first_user_text=first_user_text,
         )
-        
-        # Set footer with bot avatar
-        footer_text = t('shop.checkin_embed_footer')
-        if self.bot.user.avatar:
-            embed.set_footer(text=footer_text, icon_url=self.bot.user.avatar.url)
-        else:
-            embed.set_footer(text=footer_text)
-        
-        # Set checkin image
-        embed.set_image(url="attachment://checkin.png")
-        
-        return embed
 
     async def update_checkin_embeds_after_checkin(self, user_id: int):
         """Update all active checkin embeds after someone checks in."""
         try:
             current_date = datetime.now().strftime('%Y-%m-%d')
             active_embeds = await self.db.get_active_checkin_embeds()
-            
-            # Pre-create the file object once to avoid path issues
-            image_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'resources', 'images', 'checkin.png')
             
             for embed_data in active_embeds:
                 try:
@@ -164,14 +147,13 @@ class ShopCog(commands.Cog):
                         logging.error("No permission to fetch message in %s", fmt_channel(channel))
                         continue
                     
-                    # Update embed with new statistics
-                    new_embed = await self.create_daily_checkin_embed(current_date)
-                    
-                    # Create fresh file object for each message
-                    file = discord.File(image_path, filename="checkin.png")
-                    
+                    # Update panel with new statistics. Create a fresh file object for each message.
+                    view = await self.create_daily_checkin_view(current_date)
+                    payload = clear_legacy_message_payload()
+                    payload["attachments"] = [self.create_checkin_image_file()]
+
                     try:
-                        await message.edit(embed=new_embed, attachments=[file])
+                        await message.edit(**payload, view=view)
                     except discord.HTTPException as e:
                         logging.error("Failed to update checkin embed in %s: %s", fmt_channel(channel), e)
                     except discord.Forbidden:
@@ -212,18 +194,14 @@ class ShopCog(commands.Cog):
         try:
             current_date = datetime.now().strftime('%Y-%m-%d')
             
-            # Create embed
-            embed = await self.create_daily_checkin_embed(current_date)
+            # Create Components v2 panel and image attachment.
+            view = await self.create_daily_checkin_view(current_date)
+            file = self.create_checkin_image_file()
             
-            # Read checkin image file
-            image_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'resources', 'images', 'checkin.png')
-            file = discord.File(image_path, filename="checkin.png")
-            
-            # Send embed with view
+            # Send panel with view
             message = await channel.send(
-                embed=embed, 
                 file=file, 
-                view=self.checkin_view
+                view=view
             )
             
             # Save to database (will automatically deactivate any existing embed)

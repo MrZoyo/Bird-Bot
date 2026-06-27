@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 from bot.cogs.shop.modals import BalanceModifyModal, CheckinMakeupModal
+from bot.cogs.shop.views import CheckinEmbedView
 from bot.cogs.shop.views import TransactionHistoryView
 
 
@@ -21,6 +22,15 @@ SHOP_TEXT = {
     "shop.modify_balance_reason_placeholder": "reason placeholder",
     "shop.history_prev_button_emoji": "⬅️",
     "shop.history_next_button_emoji": "➡️",
+    "shop.checkin_button_daily_text": "Daily",
+    "shop.checkin_button_makeup_text": "Makeup",
+    "shop.checkin_button_query_text": "Query",
+    "shop.checkin_embed_title": "Checkin {date}",
+    "shop.checkin_embed_description": "Intro",
+    "shop.checkin_embed_count_field": "Count",
+    "shop.checkin_embed_first_field": "First",
+    "shop.checkin_embed_no_checkin": "none",
+    "shop.checkin_embed_footer": "Footer",
 }
 
 
@@ -84,3 +94,28 @@ def test_transaction_history_button_emoji_comes_from_locale(monkeypatch):
 
     assert str(view.prev_button.emoji) == "⬅️"
     assert str(view.next_button.emoji) == "➡️"
+
+
+def test_checkin_panel_uses_components_v2_media_and_separators(monkeypatch):
+    monkeypatch.setattr("bot.cogs.shop.views.t", lambda key, **kwargs: SHOP_TEXT[key])
+
+    view = CheckinEmbedView(
+        cog=object(),
+        bot=object(),
+        db=object(),
+        conf={"checkin_embed_color": "FFD700"},
+        panel_date="2026-06-27",
+        today_count=12,
+        first_user_text="<@1>",
+    )
+    container = view.to_components()[0]
+
+    assert view.has_components_v2() is True
+    assert container["type"] == 17
+    assert [component["type"] for component in container["components"]] == [10, 14, 12, 14, 10, 1]
+    assert container["components"][2]["items"][0]["media"]["url"] == "attachment://checkin.png"
+    assert [button["label"] for button in container["components"][5]["components"]] == [
+        "Daily",
+        "Makeup",
+        "Query",
+    ]

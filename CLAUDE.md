@@ -155,7 +155,7 @@ Current pytest smoke coverage includes:
 - Locale key integrity.
 - Log helper formatting.
 - Static logging callsite scan for obvious raw Discord `.id` / `.name` / `.display_name` usage.
-- UI metadata smoke for locale-backed Shop, PrivateRoom, Welcome DM, and Achievement rank controls.
+- UI metadata smoke for locale-backed Shop, PrivateRoom, Welcome DM, Achievement rank controls, and Components v2 panels.
 - Ban fake interaction flow for tempban permission, duplicate-active checks, Discord ban failure, DB record, scheduling, and notification ordering.
 - Shop fake interaction flow for daily check-in and makeup check-in modal charging order.
 - Modal text inputs target discord.py 2.7.1+: wrap inputs with `discord.ui.Label` instead of using deprecated `discord.ui.TextInput(label=...)`.
@@ -171,13 +171,13 @@ Current pytest smoke coverage includes:
 - Temporary JSON-to-YAML migration smoke.
 - Background loop offline guard.
 - Offline DB manager smoke for retained modules.
-- Shared team invitation full-state formatting.
+- Shared team invitation full-state formatting for legacy embed messages and Components v2 panels.
 - Feature-linked achievement visibility: if `main.features.shop` is false, `checkin_sum` / `checkin_combo` disappear from achievement displays, rank buttons, and Role achievement pickup. Giveaway achievement categories are retired and remain hidden even when GiveawayCog is enabled.
 
 Current P3-9 status:
 
 - Done: current fake interaction flow list is complete for PrivateRoom, Shop, Tickets, Ban, VoiceChannel, Giveaway, Role / Signature, Achievement / Rank, Welcome / Games, CheckStatus / Backup.
-- Current baseline: `80 passed, 1 warning`.
+- Current baseline: `87 passed, 1 warning`.
 - Next default target: full automatic gate, then real test-server validation.
 - Add more fake interaction tests only for new bugs, payload replay work, or new features.
 

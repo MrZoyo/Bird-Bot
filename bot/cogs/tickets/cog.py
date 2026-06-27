@@ -8,6 +8,7 @@ from discord.app_commands import locale_str
 from discord.ext import commands
 
 from bot.utils import TicketsDatabaseManager, fmt_channel, fmt_guild, fmt_user
+from bot.utils.components_v2 import clear_legacy_message_payload
 from bot.utils.config import Config
 from bot.utils.i18n import t
 
@@ -167,29 +168,12 @@ class TicketsCog(commands.Cog):
     async def update_main_message(self, channel, message, ticket_types):
         """Update the main ticket message with current types"""
         try:
-            embed = discord.Embed(
-                title=t('tickets.messages.ticket_main_title'),
-                description=t('tickets.messages.ticket_main_description'),
-                color=EmbedColors.CREATE
-            )
-
-            # Add bot avatar as thumbnail if available
-            if self.bot.user.avatar:
-                embed.set_thumbnail(url=self.bot.user.avatar.url)
-
-            # Add fields for each ticket type
-            for type_name, type_data in ticket_types.items():
-                embed.add_field(
-                    name=type_name,
-                    value=type_data.get('description', '无描述'),
-                    inline=False
-                )
-
-            embed.set_footer(text=t('tickets.messages.ticket_main_footer'))
-
             # Create new view with current ticket types
             view = TicketCreateView(self, ticket_types)
-            await message.edit(embed=embed, view=view)
+            await message.edit(
+                **clear_legacy_message_payload(),
+                view=view,
+            )
 
         except Exception as e:
             logging.error(f"Error updating main message: {e}")
@@ -616,32 +600,11 @@ class TicketsCog(commands.Cog):
                     read_message_history=True
                 )
 
-            # Create main message in ticket channel
-            embed = discord.Embed(
-                title=t('tickets.messages.ticket_main_title'),
-                description=t('tickets.messages.ticket_main_description'),
-                color=EmbedColors.DEFAULT
-            )
-
-            # Add bot avatar as thumbnail if available
-            if self.bot.user.avatar:
-                embed.set_thumbnail(url=self.bot.user.avatar.url)
-
-            # Add fields for each ticket type
+            # Create main Components v2 message in ticket channel.
             ticket_types = self.ticket_types
-            for type_name, type_data in ticket_types.items():
-                embed.add_field(
-                    name=type_name,
-                    value=type_data.get('description', '无描述'),
-                    inline=False
-                )
-
-            embed.set_footer(text=t('tickets.messages.ticket_main_footer'))
-
-            # Create view with ticket type buttons
             view = TicketCreateView(self, ticket_types)
 
-            message = await ticket_channel.send(embed=embed, view=view)
+            message = await ticket_channel.send(view=view)
 
             # Save configuration to database
             success = await self.db_manager.set_config(

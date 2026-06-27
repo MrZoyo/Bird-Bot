@@ -55,14 +55,25 @@ def test_shop_checkin_view_labels_come_from_locale(monkeypatch):
         "shop.checkin_button_daily_text": "Daily",
         "shop.checkin_button_makeup_text": "Makeup",
         "shop.checkin_button_query_text": "Query",
+        "shop.checkin_embed_title": "Checkin {date}",
+        "shop.checkin_embed_description": "Intro",
+        "shop.checkin_embed_count_field": "Count",
+        "shop.checkin_embed_first_field": "First",
+        "shop.checkin_embed_no_checkin": "none",
+        "shop.checkin_embed_footer": "Footer",
     }
     monkeypatch.setattr("bot.cogs.shop.views.t", lambda key, **kwargs: labels[key])
 
-    view = CheckinEmbedView(cog=object(), bot=object(), db=object(), conf={})
+    view = CheckinEmbedView(
+        cog=object(),
+        bot=object(),
+        db=object(),
+        conf={"checkin_embed_color": "FFD700"},
+    )
 
     assert {
         item.custom_id: item.label
-        for item in view.children
+        for item in view.walk_children()
         if getattr(item, "custom_id", None)
     } == {
         "checkin_daily": "Daily",

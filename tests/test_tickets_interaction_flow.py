@@ -7,7 +7,7 @@ from bot.cogs.tickets import modals as tickets_modals
 from bot.cogs.tickets import views as tickets_views
 from bot.cogs.tickets.cog import TicketsCog
 from bot.cogs.tickets.modals import CloseTicketModal, TicketConfirmModal
-from bot.cogs.tickets.views import TicketThreadView
+from bot.cogs.tickets.views import TicketCreateView, TicketThreadView
 
 
 TICKET_TEXT = {
@@ -28,6 +28,9 @@ TICKET_TEXT = {
     "tickets.messages.ticket_created_dm_content": "Ticket #{number} {type_name}",
     "tickets.messages.ticket_jump_button": "Open ticket",
     "tickets.messages.ticket_thread_create_error": "ticket create error",
+    "tickets.messages.ticket_main_title": "Contact us",
+    "tickets.messages.ticket_main_description": "Choose a ticket type",
+    "tickets.messages.ticket_main_footer": "Pick one below",
     "tickets.messages.ticket_accept_button": "Accept",
     "tickets.messages.ticket_accept_button_disabled": "Accepted",
     "tickets.messages.ticket_add_user_button": "Add user",
@@ -279,6 +282,29 @@ def _install_translations(monkeypatch):
     monkeypatch.setattr(tickets_cog, "t", translator)
     monkeypatch.setattr(tickets_views, "t", translator)
     monkeypatch.setattr(tickets_modals, "t", translator)
+
+
+def test_ticket_create_panel_uses_components_v2_and_wraps_button_rows(monkeypatch):
+    _install_translations(monkeypatch)
+    ticket_types = {
+        f"type-{index}": {
+            "description": f"Description {index}",
+            "button_color": "b",
+        }
+        for index in range(6)
+    }
+
+    view = TicketCreateView(cog=object(), ticket_types=ticket_types)
+    container = view.to_components()[0]
+
+    assert view.has_components_v2() is True
+    assert container["type"] == 17
+    assert container["components"][0]["content"].startswith("### Contact us")
+    assert container["components"][1]["type"] == 14
+    assert container["components"][2]["content"] == "-# Pick one below"
+    assert [component["type"] for component in container["components"][3:]] == [1, 1]
+    assert len(container["components"][3]["components"]) == 5
+    assert len(container["components"][4]["components"]) == 1
 
 
 def _build_cog(events, db):

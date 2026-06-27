@@ -3,6 +3,7 @@ from datetime import datetime
 
 import discord
 
+from bot.utils.components_v2 import build_panel_container
 from bot.utils.i18n import t
 
 from .modals import PurchaseModal
@@ -83,10 +84,11 @@ class ConfirmPurchaseView(discord.ui.View):
         )
 
 
-class PrivateRoomShopView(discord.ui.View):
-    def __init__(self, cog):
+class PrivateRoomShopView(discord.ui.LayoutView):
+    def __init__(self, cog, *, available_rooms: int | None = None):
         super().__init__(timeout=None)  # 永久有效
         self.cog = cog
+        self.available_rooms = available_rooms
 
         # 加载消息文本
 
@@ -114,9 +116,32 @@ class PrivateRoomShopView(discord.ui.View):
         )
         restore_button.callback = self.restore_callback
 
-        self.add_item(purchase_button)
-        self.add_item(renewal_button)
-        self.add_item(restore_button)
+        thumbnail_url = None
+        if self.cog.bot.user.avatar:
+            thumbnail_url = self.cog.bot.user.avatar.url
+
+        max_rooms = self.cog.conf['max_rooms']
+        shown_available_rooms = (
+            available_rooms
+            if available_rooms is not None
+            else max_rooms
+        )
+
+        self.add_item(build_panel_container(
+            title=t('privateroom.messages.shop_title'),
+            description=t('privateroom.messages.shop_description').format(
+                points_cost=self.cog.conf['points_cost'],
+                duration=self.cog.conf['room_duration_days'],
+                hours_threshold=self.cog.conf['voice_hours_threshold'],
+                booster_hours=self.cog.conf.get('booster_discount_hours', 0),
+                available_rooms=shown_available_rooms,
+                max_rooms=max_rooms,
+            ),
+            footer=t('privateroom.messages.shop_footer'),
+            accent_color=discord.Color.purple(),
+            thumbnail_url=thumbnail_url,
+            buttons=[purchase_button, renewal_button, restore_button],
+        ))
 
     async def purchase_callback(self, interaction: discord.Interaction):
         await self.cog.handle_purchase_request(interaction)

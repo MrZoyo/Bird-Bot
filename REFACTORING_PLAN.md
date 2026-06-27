@@ -1138,9 +1138,9 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 - 第一优先级是刚暴露真实 bug 的 PrivateRoom 续费链路：必须证明续费先写 DB 并回读持久化到期时间，再扣款和发送成功通知；如果回读后仍过期，则不扣款。
 - 后续按风险扩展到 Shop 签到 / 补签、Tickets 主链路、Ban 临时封禁、VoiceChannel 控制面板，以及 Giveaway、Role / Signature、Achievement / Rank、Welcome / Games、CheckStatus / Backup。
 
-**当前状态（2026-05-03）**：
+**当前状态（2026-06-27）**：
 - 已完成并纳入自动化 gate：PrivateRoom 续费、Shop 签到 / 补签、Tickets 创建 / 接单 / 关闭、Ban `/tempban`、VoiceChannel 控制面板、Giveaway 参与 / 退出 / 开奖 / 取消、Role / Signature、Achievement / Rank、Welcome / Games、CheckStatus / Backup。
-- 当前 pytest 基线：`80 passed, 1 warning`。
+- 当前 pytest 基线：`87 passed, 1 warning`。
 - 当前清单内 fake interaction flow tests 已补完；后续只按新 bug、payload replay 或新增功能单独扩展。
 - 真实语音移动、频道权限、role hierarchy、persistent view 重启恢复、DM 投递、rate limit 和客户端可见 UI 仍归测试服。
 

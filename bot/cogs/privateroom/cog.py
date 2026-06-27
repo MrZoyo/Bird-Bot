@@ -15,6 +15,7 @@ from bot.utils import (
     fmt_channel,
     fmt_user,
 )
+from bot.utils.components_v2 import clear_legacy_message_payload
 from bot.utils.i18n import t
 from bot.utils.privateroom_db import PrivateRoomDatabaseManager
 from bot.utils.task_helpers import wait_until_ready_or_stop
@@ -535,32 +536,12 @@ class PrivateRoomCog(commands.Cog):
                 await interaction.followup.send("指定的频道必须是文字频道。", ephemeral=True)
                 return
 
-            # 创建商店嵌入消息
-            embed = discord.Embed(
-                title=t('privateroom.messages.shop_title'),
-                description=t('privateroom.messages.shop_description').format(
-                    points_cost=self.conf['points_cost'],
-                    duration=self.conf['room_duration_days'],
-                    hours_threshold=self.conf['voice_hours_threshold'],
-                    booster_hours=self.conf.get('booster_discount_hours', 0),
-                    available_rooms=self.conf['max_rooms'] - await self.db.get_active_rooms_count(),
-                    max_rooms=self.conf['max_rooms']
-                ),
-                color=discord.Color.purple()
-            )
-
-            # 设置页脚
-            embed.set_footer(text=t('privateroom.messages.shop_footer'))
-
-            # 如果机器人有头像，添加为嵌入消息的缩略图
-            if self.bot.user.avatar:
-                embed.set_thumbnail(url=self.bot.user.avatar.url)
-
             # 创建商店视图
-            view = PrivateRoomShopView(self)
+            available_rooms = self.conf['max_rooms'] - await self.db.get_active_rooms_count()
+            view = PrivateRoomShopView(self, available_rooms=available_rooms)
 
             # 发送消息到指定频道
-            message = await target_channel.send(embed=embed, view=view)
+            message = await target_channel.send(view=view)
 
             # 保存消息ID到数据库
             await self.db.save_shop_message(target_channel.id, message.id)
@@ -1635,9 +1616,12 @@ class PrivateRoomCog(commands.Cog):
             try:
                 message = await channel.fetch_message(message_id)
                 if message:
-                    # 重新添加商店视图
+                    # 重新添加商店视图，并把旧 embed 面板迁为 Components v2。
                     view = PrivateRoomShopView(self)
-                    await message.edit(view=view)
+                    await message.edit(
+                        **clear_legacy_message_payload(),
+                        view=view,
+                    )
 
                     logging.info(
                         "Restored private room shop view for message %s in %s",
@@ -1774,19 +1758,12 @@ class PrivateRoomCog(commands.Cog):
                     if not message:
                         continue
 
-                    # Update the embed description
-                    embed = message.embeds[0]
-                    embed.description = t('privateroom.messages.shop_description').format(
-                        points_cost=self.conf['points_cost'],
-                        duration=self.conf['room_duration_days'],
-                        hours_threshold=self.conf['voice_hours_threshold'],
-                        booster_hours=self.conf.get('booster_discount_hours', 0),
-                        available_rooms=available_count,
-                        max_rooms=self.conf.get('max_rooms', 40)
+                    # Update the Components v2 shop panel.
+                    view = PrivateRoomShopView(self, available_rooms=available_count)
+                    await message.edit(
+                        **clear_legacy_message_payload(),
+                        view=view,
                     )
-
-                    # Update the message
-                    await message.edit(embed=embed)
 
                 except (discord.NotFound, discord.Forbidden):
                     continue

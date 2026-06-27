@@ -151,8 +151,8 @@ class CreateInvitationCog(commands.Cog):
 
                     # ===== 步骤2: 立即创建并发送新的组队消息 =====
                     view = TeamInvitationView(self.bot, channel, message.author, self.role_db)
-                    embed = await view.create_embed(message)
-                    new_message = await message.reply(embed=embed, view=view)
+                    await view.populate_panel(message)
+                    new_message = await message.reply(view=view)
 
                     # ===== 步骤3: 添加到展示板并保存新消息ID =====
                     if teamup_cog:
@@ -225,14 +225,11 @@ class CreateInvitationCog(commands.Cog):
 
                 # ===== 步骤2: 立即创建并发送新的组队消息 =====
                 view = TeamInvitationView(self.bot, channel, interaction.user, self.role_db)
-                embed = await view.create_embed(interaction)
-                embed.title = title or self.default_invite_embed_title
-
-                # Truncate the content to 256 characters if longer
-                if len(embed.title) > 256:
-                    embed.title = embed.title[:253] + "..."
-
-                new_message = await interaction.followup.send(embed=embed, view=view)
+                await view.populate_panel(
+                    interaction,
+                    title=title or self.default_invite_embed_title,
+                )
+                new_message = await interaction.followup.send(view=view)
 
                 # ===== 步骤3: 添加到展示板并保存新消息ID =====
                 if teamup_cog:

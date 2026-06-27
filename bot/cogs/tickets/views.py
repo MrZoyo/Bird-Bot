@@ -2,6 +2,7 @@ import logging
 
 import discord
 
+from bot.utils.components_v2 import build_panel_container
 from bot.utils.i18n import t
 
 from .embeds import EmbedColors
@@ -13,13 +14,15 @@ from .modals import (
 )
 
 
-class TicketCreateView(discord.ui.View):
+class TicketCreateView(discord.ui.LayoutView):
     def __init__(self, cog, ticket_types):
         super().__init__(timeout=None)
         self.cog = cog
         self.ticket_types = ticket_types
 
         # Create buttons for each ticket type
+        buttons = []
+        type_lines = []
         for type_name, type_data in ticket_types.items():
             color_map = {
                 'r': discord.ButtonStyle.danger,
@@ -41,7 +44,20 @@ class TicketCreateView(discord.ui.View):
                 await self.create_ticket_callback(interaction, type_name)
 
             button.callback = button_callback
-            self.add_item(button)
+            buttons.append(button)
+            type_lines.append(f"**{type_name}**\n{type_data.get('description', '无描述')}")
+
+        description_parts = [t('tickets.messages.ticket_main_description')]
+        if type_lines:
+            description_parts.append("\n\n".join(type_lines))
+
+        self.add_item(build_panel_container(
+            title=t('tickets.messages.ticket_main_title'),
+            description="\n\n".join(part for part in description_parts if part),
+            footer=t('tickets.messages.ticket_main_footer'),
+            accent_color=EmbedColors.DEFAULT,
+            buttons=buttons,
+        ))
 
     async def create_ticket_callback(self, interaction: discord.Interaction, type_name: str):
         """Handle ticket creation button click"""

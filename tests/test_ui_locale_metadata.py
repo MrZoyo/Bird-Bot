@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from bot.cogs.achievement.views import RankView
 from bot.cogs.privateroom.modals import PurchaseModal
+from bot.cogs.privateroom.views import PrivateRoomShopView
 from bot.cogs.welcome.views import WelcomeDMView
 from bot.utils import achievement_visibility
 
@@ -26,6 +27,15 @@ PRIVATEROOM_TEXT = {
     "privateroom.messages.renewal_modal_title": "Renew confirm",
     "privateroom.messages.renewal_modal_label": "Type renew",
     "privateroom.messages.renewal_modal_placeholder": "renew",
+    "privateroom.messages.shop_button_label": "Buy room",
+    "privateroom.messages.shop_renewal_button_label": "Renew room",
+    "privateroom.messages.shop_restore_button_label": "Restore room",
+    "privateroom.messages.shop_title": "Room shop",
+    "privateroom.messages.shop_description": (
+        "cost={points_cost}; duration={duration}; hours={hours_threshold}; "
+        "booster={booster_hours}; available={available_rooms}/{max_rooms}"
+    ),
+    "privateroom.messages.shop_footer": "Rooms expire automatically.",
 }
 
 
@@ -52,6 +62,39 @@ def test_privateroom_purchase_modal_text_comes_from_locale(monkeypatch):
     assert renewal_modal.title == "Renew confirm"
     assert _modal_label_text(renewal_modal, renewal_modal.confirmation) == "Type renew"
     assert renewal_modal.confirmation.placeholder == "renew"
+
+
+def test_privateroom_shop_panel_uses_components_v2_with_separator(monkeypatch):
+    monkeypatch.setattr(
+        "bot.cogs.privateroom.views.t",
+        lambda key, **kwargs: PRIVATEROOM_TEXT[key],
+    )
+    cog = SimpleNamespace(
+        bot=SimpleNamespace(user=SimpleNamespace(avatar=None)),
+        conf={
+            "points_cost": 100,
+            "room_duration_days": 30,
+            "voice_hours_threshold": 10,
+            "booster_discount_hours": 2,
+            "max_rooms": 40,
+        },
+    )
+
+    view = PrivateRoomShopView(cog, available_rooms=33)
+    payload = view.to_components()
+    container = payload[0]
+
+    assert view.has_components_v2() is True
+    assert container["type"] == 17
+    assert container["components"][0]["content"].startswith("### Room shop")
+    assert container["components"][1]["type"] == 14
+    assert container["components"][1]["divider"] is True
+    assert container["components"][2]["content"] == "-# Rooms expire automatically."
+    assert [button["label"] for button in container["components"][3]["components"]] == [
+        "Buy room",
+        "Renew room",
+        "Restore room",
+    ]
 
 
 def test_welcome_dm_button_text_comes_from_locale(monkeypatch):

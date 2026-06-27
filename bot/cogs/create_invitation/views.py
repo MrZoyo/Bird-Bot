@@ -5,10 +5,11 @@ import discord
 from discord.utils import format_dt
 
 from bot.utils import config
+from bot.utils.components_v2 import build_panel_container
 from bot.utils.i18n import t
 
 
-class TeamInvitationView(discord.ui.View):
+class TeamInvitationView(discord.ui.LayoutView):
     def __init__(self, bot, channel, user, role_db):
         super().__init__(timeout=600)
         self.bot = bot
@@ -27,32 +28,31 @@ class TeamInvitationView(discord.ui.View):
         self.not_in_vc_message = t('invitation.not_in_vc_message')
         self.extract_channel_id_error = t('invitation.extract_channel_id_error')
 
-        # Adding the join room button
-        self.add_item(discord.ui.Button(style=discord.ButtonStyle.link, label=self.invite_button_label, url=self.url))
-
-        # Adding the room full button (for rooms without control panel, like private rooms)
+        self.invite_button = discord.ui.Button(
+            style=discord.ButtonStyle.link,
+            label=self.invite_button_label,
+            url=self.url,
+        )
         self.room_full_button = discord.ui.Button(
             style=discord.ButtonStyle.danger,
             label=self.roomfull_button_label,
             custom_id="room_full_button"
         )
         self.room_full_button.callback = self.room_full_button_callback
-        self.add_item(self.room_full_button)
 
-    async def create_embed(self, obj):
+    async def populate_panel(self, obj, *, title: str | None = None) -> None:
         # Get the current time
         current_time = discord.utils.utcnow()
         # Format the timestamp for the embed
         elapsed_time = format_dt(current_time, style='R')
-        original_time = format_dt(current_time, style='f')
 
         # Check if the passed object is a message or an interaction
-        if isinstance(obj, discord.Message):
+        if isinstance(obj, discord.Message) or hasattr(obj, "author"):
             author = obj.author
             content = obj.content
-        elif isinstance(obj, discord.Interaction):
+        elif isinstance(obj, discord.Interaction) or hasattr(obj, "user"):
             author = obj.user
-            content = obj.data.get('name')  # Get the name of the slash command
+            content = getattr(obj, "data", {}).get('name')  # Get the name of the slash command
         else:
             raise ValueError("The passed object must be a discord.Message or a discord.Interaction.")
 
@@ -64,36 +64,41 @@ class TeamInvitationView(discord.ui.View):
         channel_id = author.voice.channel.id
         vc_url_direct = f"https://discord.com/channels/{guild_id}/{channel_id}"
 
+        panel_title = title or content
         # Remove mentions from content
-        content = re.sub(r'<@\d+>', '', content)
-        content = re.sub(r'<@&\d+>', '', content)
+        panel_title = re.sub(r'<@\d+>', '', panel_title)
+        panel_title = re.sub(r'<@&\d+>', '', panel_title)
 
         # Truncate the content
-        if len(content) > 256:
-            content = content[:253] + "..."
+        if len(panel_title) > 256:
+            panel_title = panel_title[:253] + "..."
 
-        embed = discord.Embed(
-            title=content,
-            description=self.invite_embed_content.format(vc_url=vc_url_direct, mention=author.mention,
-                                                         time=elapsed_time),
-            color=discord.Color.blue()
-        )
+        description_parts = [
+            self.invite_embed_content.format(
+                vc_url=vc_url_direct,
+                mention=author.mention,
+                time=elapsed_time,
+            ),
+        ]
 
-        # Add signature field if exists
         if signature:
-            embed.add_field(name="", value=signature, inline=False)
+            description_parts.append(signature)
 
-        # Set thumbnail
+        thumbnail_url = None
         if author.avatar:
-            embed.set_thumbnail(url=author.avatar.url)
-        # If the author doesn't have an avatar, check if the bot has an avatar
+            thumbnail_url = author.avatar.url
         elif self.bot.user.avatar:
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
+            thumbnail_url = self.bot.user.avatar.url
 
-        embed.timestamp = current_time
-        embed.set_footer(text=self.invite_embed_footer)
-
-        return embed
+        self.clear_items()
+        self.add_item(build_panel_container(
+            title=panel_title,
+            description="\n\n".join(description_parts),
+            footer=self.invite_embed_footer,
+            accent_color=discord.Color.blue(),
+            thumbnail_url=thumbnail_url,
+            buttons=[self.invite_button, self.room_full_button],
+        ))
 
     async def room_full_button_callback(self, interaction: discord.Interaction):
         """房间满员按钮回调 - 使用抽象出来的满员逻辑"""
@@ -105,14 +110,7 @@ class TeamInvitationView(discord.ui.View):
             await interaction.followup.send(self.interaction_target_error_message, ephemeral=True)
             return
 
-        # Extract the channel ID from the URL in the embed description
-        embed = interaction.message.embeds[0]
-        match = re.search(r"https://discord.com/channels/\d+/(\d+)", embed.description)
-        if not match:
-            await interaction.followup.send(self.extract_channel_id_error, ephemeral=True)
-            return
-
-        original_channel_id = int(match.group(1))
+        original_channel_id = self.channel.id
 
         # 检查用户是否在语音频道
         if not self.user.voice or self.user.voice.channel.id != original_channel_id:

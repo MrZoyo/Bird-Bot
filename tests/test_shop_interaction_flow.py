@@ -12,6 +12,12 @@ SHOP_TEXT = {
     "shop.checkin_button_daily_text": "Daily",
     "shop.checkin_button_makeup_text": "Makeup",
     "shop.checkin_button_query_text": "Query",
+    "shop.checkin_embed_title": "Checkin panel {date}",
+    "shop.checkin_embed_description": "Panel intro",
+    "shop.checkin_embed_count_field": "Count",
+    "shop.checkin_embed_first_field": "First",
+    "shop.checkin_embed_no_checkin": "none",
+    "shop.checkin_embed_footer": "Panel footer",
     "shop.checkin_daily_not_in_voice_private": "not in voice",
     "shop.checkin_daily_success_private": "daily reward {reward}",
     "shop.checkin_daily_already_private": "already checked",
@@ -169,12 +175,16 @@ def _build_checkin_view(events, db):
             "checkin_daily_reward": 20,
             "makeup_checkin_limit_per_month": 2,
             "makeup_checkin_cost": 50,
+            "checkin_embed_color": "FFD700",
         },
     )
 
 
 async def _click(view, custom_id, interaction):
-    button = next(child for child in view.children if child.custom_id == custom_id)
+    button = next(
+        child for child in view.walk_children()
+        if getattr(child, "custom_id", None) == custom_id
+    )
     await button.callback(interaction)
 
 

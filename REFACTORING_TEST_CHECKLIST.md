@@ -1,7 +1,7 @@
 # 测试服真实 Discord 验证 Checklist
 
 > 目标：自动化先排除本地可验证的业务逻辑、DB、locale、handler 顺序和失败分支；手工测试只保留真实 Discord 环境才能验证的路径。
-> 当前清单按 2026-05-03 状态重写；NotebookCog、RatingCog 和旧 channel-based TicketsCog 已移除，不再作为现役功能测试项。
+> 当前清单按 2026-06-27 状态重写；NotebookCog、RatingCog 和旧 channel-based TicketsCog 已移除，不再作为现役功能测试项。
 
 标记规则：
 - `[ ]` 未测
@@ -21,12 +21,13 @@
 - JSON config 临时迁移到 YAML / locale / DB seed。
 - PrivateRoom 续费日期、持久化回读、扣款顺序和失败不扣款。
 - Shop、Tickets、Ban、VoiceChannel、Giveaway、Role / Signature、Achievement / Rank、Welcome / Games、CheckStatus / Backup 的 fake interaction flow。
-- 组队消息和房间面板“满员”共享样式。
+- PrivateRoom 商店、Shop 签到、Tickets 主入口和组队邀请的 Components v2 panel 结构。
+- 组队消息和房间面板“满员”共享样式；旧 embed 和新 Components v2 消息均有兼容覆盖。
 - 后台 loop 未登录离线 guard。
 
 最后一次通过基线：
 - [x] `./.venv/Scripts/python.exe -m pytest -q`
-  - 当前：`80 passed, 1 warning`
+  - 当前：`87 passed, 1 warning`
 - [x] `./.venv/Scripts/python.exe -m ruff check bot tests tools`
 - [x] `./.venv/Scripts/python.exe -m compileall bot tests tools`
 - [x] `./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`

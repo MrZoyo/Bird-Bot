@@ -29,9 +29,21 @@ class FakeFollowup:
         })
 
 
+class FakeResponse:
+    def __init__(self):
+        self.deferred = []
+
+    async def defer(self, *, ephemeral=False, **kwargs):
+        self.deferred.append({
+            "ephemeral": ephemeral,
+            **kwargs,
+        })
+
+
 class FakeInteraction:
     def __init__(self, user):
         self.user = user
+        self.response = FakeResponse()
         self.followup = FakeFollowup()
 
 
@@ -57,15 +69,18 @@ class FakeChannel:
     id: int = 555
     name: str = "private-room"
     jump_url: str = "https://discord.test/channels/1/555"
+    mention: str = "<#555>"
     messages: list = field(default_factory=list)
 
     async def send(self, content=None, *, embed=None, view=None, **kwargs):
+        message = SimpleNamespace(id=9001)
         self.messages.append({
             "content": content,
             "embed": embed,
             "view": view,
             **kwargs,
         })
+        return message
 
 
 class FakeBot:
@@ -116,6 +131,20 @@ class FakeShopDB:
         return self.balance + amount
 
 
+class FakeSetupPrivateRoomDB:
+    def __init__(self):
+        self.saved_shop_messages = []
+
+    async def get_category_id(self):
+        return 42
+
+    async def get_active_rooms_count(self):
+        return 7
+
+    async def save_shop_message(self, channel_id, message_id):
+        self.saved_shop_messages.append((channel_id, message_id))
+
+
 def _install_translations(monkeypatch):
     translations = {
         "privateroom.messages.error_insufficient_balance": "insufficient balance",
@@ -132,8 +161,22 @@ def _install_translations(monkeypatch):
         "privateroom.messages.renewal_dm_success_title": "dm renewal ok",
         "privateroom.messages.renewal_dm_success_description": "days={extend_days}; until={new_end_date}",
         "privateroom.messages.renewal_dm_success_button": "open room",
+        "privateroom.messages.setup_success": "setup in {channel}",
+        "privateroom.messages.setup_fail": "setup failed: {error}",
+        "privateroom.messages.error_no_category": "no category",
+        "privateroom.messages.shop_cleaned_old": "cleaned {count}",
+        "privateroom.messages.shop_button_label": "Buy room",
+        "privateroom.messages.shop_renewal_button_label": "Renew room",
+        "privateroom.messages.shop_restore_button_label": "Restore room",
+        "privateroom.messages.shop_title": "Room shop",
+        "privateroom.messages.shop_description": (
+            "cost={points_cost}; duration={duration}; hours={hours_threshold}; "
+            "booster={booster_hours}; available={available_rooms}/{max_rooms}"
+        ),
+        "privateroom.messages.shop_footer": "Room footer",
     }
     monkeypatch.setattr(privateroom_cog, "t", lambda key: translations[key])
+    monkeypatch.setattr("bot.cogs.privateroom.views.t", lambda key, **kwargs: translations[key])
 
 
 def _build_cog(*, channel, active_room, persisted_room, balance=2000):
@@ -226,5 +269,46 @@ def test_advance_renewal_does_not_charge_when_persisted_end_date_is_expired(monk
         assert interaction.followup.messages[-1]["content"] == "renewal failed"
         assert channel.messages == []
         assert user.dms == []
+
+    asyncio.run(scenario())
+
+
+def test_setup_shop_sends_components_v2_panel_without_embed(monkeypatch):
+    async def scenario():
+        _install_translations(monkeypatch)
+
+        async def allow_channel(_interaction):
+            return True
+
+        monkeypatch.setattr(privateroom_cog, "check_channel_validity", allow_channel)
+        monkeypatch.setattr(privateroom_cog.discord, "TextChannel", FakeChannel)
+
+        channel = FakeChannel(id=777, mention="<#777>")
+        cog = object.__new__(PrivateRoomCog)
+        cog.bot = FakeBot(channel)
+        cog.conf = {
+            "points_cost": 100,
+            "room_duration_days": 30,
+            "voice_hours_threshold": 10,
+            "booster_discount_hours": 2,
+            "max_rooms": 40,
+        }
+        cog.db = FakeSetupPrivateRoomDB()
+
+        async def verify_shop_messages():
+            return 0
+
+        cog.verify_shop_messages = verify_shop_messages
+        interaction = FakeInteraction(FakeUser())
+
+        await PrivateRoomCog.setup_shop.callback(cog, interaction, channel)
+
+        assert interaction.response.deferred == [{"ephemeral": True}]
+        assert channel.messages[0]["embed"] is None
+        view = channel.messages[0]["view"]
+        assert view.has_components_v2() is True
+        assert view.to_components()[0]["components"][1]["type"] == 14
+        assert cog.db.saved_shop_messages == [(777, 9001)]
+        assert interaction.followup.messages[-1]["content"] == "setup in <#777>"
 
     asyncio.run(scenario())

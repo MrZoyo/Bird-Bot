@@ -5,35 +5,70 @@ from datetime import datetime
 
 import discord
 
+from bot.utils.components_v2 import build_panel_container
 from bot.utils.i18n import t
 
 from .modals import CheckinMakeupModal
 
 
-class CheckinEmbedView(discord.ui.View):
-    def __init__(self, cog, bot, db, conf):
+class CheckinEmbedView(discord.ui.LayoutView):
+    def __init__(
+            self,
+            cog,
+            bot,
+            db,
+            conf,
+            *,
+            panel_date: str | None = None,
+            today_count: int | None = None,
+            first_user_text: str | None = None,
+    ):
         super().__init__(timeout=None)
         self.cog = cog
         self.bot = bot
         self.db = db
         self.conf = conf
-        
-        # Button labels live in locale files; YAML keeps only operational data.
-        for item in self.children:
-            if hasattr(item, 'custom_id'):
-                if item.custom_id == "checkin_daily":
-                    item.label = t('shop.checkin_button_daily_text')
-                elif item.custom_id == "checkin_makeup":
-                    item.label = t('shop.checkin_button_makeup_text')
-                elif item.custom_id == "checkin_query":
-                    item.label = t('shop.checkin_button_query_text')
-    
-    @discord.ui.button(
-        label="✅ 每日签到",
-        style=discord.ButtonStyle.primary,
-        custom_id="checkin_daily"
-    )
-    async def daily_checkin_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+
+        daily_button = discord.ui.Button(
+            label=t('shop.checkin_button_daily_text'),
+            style=discord.ButtonStyle.primary,
+            custom_id="checkin_daily",
+        )
+        daily_button.callback = self.daily_checkin_button
+        makeup_button = discord.ui.Button(
+            label=t('shop.checkin_button_makeup_text'),
+            style=discord.ButtonStyle.success,
+            custom_id="checkin_makeup",
+        )
+        makeup_button.callback = self.makeup_checkin_button
+        query_button = discord.ui.Button(
+            label=t('shop.checkin_button_query_text'),
+            style=discord.ButtonStyle.secondary,
+            custom_id="checkin_query",
+        )
+        query_button.callback = self.query_checkin_button
+
+        date_str = panel_date or datetime.now().strftime('%Y-%m-%d')
+        count_text = str(today_count) if today_count and today_count > 0 else t('shop.checkin_embed_no_checkin')
+        first_text = first_user_text or t('shop.checkin_embed_no_checkin')
+        description_parts = [
+            t('shop.checkin_embed_description'),
+            f"**{t('shop.checkin_embed_count_field')}**\n{count_text}",
+            f"**{t('shop.checkin_embed_first_field')}**\n{first_text}",
+        ]
+        description = "\n\n".join(part for part in description_parts if part)
+
+        self.add_item(build_panel_container(
+            title=t('shop.checkin_embed_title').format(date=date_str),
+            description=description,
+            footer=t('shop.checkin_embed_footer'),
+            accent_color=int(self.conf.get('checkin_embed_color', 'FFD700'), 16),
+            media_url="attachment://checkin.png",
+            media_description=t('shop.checkin_embed_title').format(date=date_str),
+            buttons=[daily_button, makeup_button, query_button],
+        ))
+
+    async def daily_checkin_button(self, interaction: discord.Interaction):
         
         # Check if user is in voice channel
         if not interaction.user.voice or not interaction.user.voice.channel:
@@ -99,12 +134,7 @@ class CheckinEmbedView(discord.ui.View):
                 ephemeral=True
             )
     
-    @discord.ui.button(
-        label="⏰ 补签",
-        style=discord.ButtonStyle.success,
-        custom_id="checkin_makeup"
-    )
-    async def makeup_checkin_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def makeup_checkin_button(self, interaction: discord.Interaction):
         
         user_id = interaction.user.id
         
@@ -149,12 +179,7 @@ class CheckinEmbedView(discord.ui.View):
         )
         await interaction.response.send_modal(modal)
     
-    @discord.ui.button(
-        label="🔍 签到查询",
-        style=discord.ButtonStyle.secondary,
-        custom_id="checkin_query"
-    )
-    async def query_checkin_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def query_checkin_button(self, interaction: discord.Interaction):
         
         await interaction.response.defer(ephemeral=True)
         
