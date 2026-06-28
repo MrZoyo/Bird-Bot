@@ -23,7 +23,8 @@ class TicketCreateView(discord.ui.LayoutView):
             discord.ui.TextDisplay(
                 f"### {t('tickets.messages.ticket_main_title')}\n"
                 f"{t('tickets.messages.ticket_main_description')}"
-            )
+            ),
+            discord.ui.Separator(),
         ]
 
         for index, (type_name, type_data) in enumerate(ticket_types.items()):
