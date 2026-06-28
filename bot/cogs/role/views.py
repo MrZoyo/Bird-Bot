@@ -16,6 +16,13 @@ from bot.utils.role_db import RoleDatabaseManager
 from .modals import SignatureModal
 
 
+GENDER_COPY_KEYS = {
+    "Tree": ("role.gender_tree_title", "role.gender_tree_description"),
+    "Sakura": ("role.gender_sakura_title", "role.gender_sakura_description"),
+    "Ninja": ("role.gender_ninja_title", "role.gender_ninja_description"),
+}
+
+
 async def ensure_optional_role(member: discord.Member, role_id: int | None, reason: str) -> None:
     """Add an optional starter role when configured and present in the guild.
 
@@ -60,7 +67,7 @@ async def ensure_optional_role(member: discord.Member, role_id: int | None, reas
         )
 
 
-class AchievementRoleView(View):
+class AchievementRoleView(discord.ui.LayoutView):
     def __init__(self, bot):
         super().__init__(timeout=None)  # No interaction time limit
         self.bot = bot
@@ -87,14 +94,36 @@ class AchievementRoleView(View):
         self.role_success_message = t('role.role_success_message')
         self.role_remove_message = t('role.role_remove_message')
 
+        container_items = [
+            discord.ui.TextDisplay(f"### {t('role.role_pickup_title')}"),
+            discord.ui.Separator(),
+        ]
         for index, role in enumerate(self.role_type_name):
-            row = index // 3  # Calculate row: 0, 1, 2 go to row 0; 3, 4, 5 go to row 1
             button = Button(style=components.ButtonStyle.green,
                             label=role['name'],
-                            custom_id=role['type'],
-                            row=row)
+                            custom_id=role['type'])
             button.callback = self.on_button_click
-            self.add_item(button)
+            achievement_info = "\n".join([
+                f"- **{achievement['name']}** : `{achievement['threshold']}`"
+                for achievement in self.achievements
+                if achievement['type'] == role['type']
+            ])
+
+            if index > 0:
+                container_items.append(discord.ui.Separator())
+            container_items.append(
+                discord.ui.Section(
+                    discord.ui.TextDisplay(f"**{role['name']}**\n{achievement_info}"),
+                    accessory=button,
+                )
+            )
+
+        container_items.append(discord.ui.TextDisplay(f"-# {t('role.role_pickup_footer')}"))
+
+        self.add_item(discord.ui.Container(
+            *container_items,
+            accent_color=discord.Color.blue(),
+        ))
 
     async def on_button_click(self, interaction: discord.Interaction):
         # Defer the interaction to avoid timeouts
@@ -367,11 +396,10 @@ class MBTIView(View):
         )
 
 
-class GenderView(View):
+class GenderView(discord.ui.LayoutView):
     def __init__(self, bot):
         super().__init__(timeout=None)
         self.bot = bot
-        self.buttons_per_row = 3  # Since we have 3 options
 
         self.main_config = config.get_config('main')
         self.role_db = RoleDatabaseManager(self.main_config['db_path'])
@@ -381,15 +409,42 @@ class GenderView(View):
         self.gender_success_message = t('role.gender_success_message')
         self.gender_remove_message = t('role.gender_remove_message')
 
+        container_items = [
+            discord.ui.TextDisplay(f"### {t('role.gender_pickup_title')}"),
+            discord.ui.Separator(),
+        ]
         for index, gender in enumerate(self.gender_name):
             button = Button(
                 style=components.ButtonStyle.primary,
                 label=gender['emoji'],
                 custom_id=gender['name'],
-                row=0  # All buttons in one row since we only have 3
             )
             button.callback = self.on_button_click
-            self.add_item(button)
+
+            if index > 0:
+                container_items.append(discord.ui.Separator())
+            title_key, description_key = GENDER_COPY_KEYS.get(
+                gender['name'],
+                (None, None),
+            )
+            title = t(title_key) if title_key else gender['name']
+            description = (
+                t(description_key).removeprefix("- ").strip()
+                if description_key
+                else gender['emoji']
+            )
+            container_items.append(
+                discord.ui.Section(
+                    f"**{title}**\n{description}",
+                    accessory=button,
+                )
+            )
+
+        container_items.append(discord.ui.TextDisplay(f"-# {t('role.gender_pickup_footer')}"))
+        self.add_item(discord.ui.Container(
+            *container_items,
+            accent_color=discord.Color.purple(),
+        ))
 
     async def on_button_click(self, interaction: discord.Interaction):
         await interaction.response.defer()

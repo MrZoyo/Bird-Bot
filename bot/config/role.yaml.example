@@ -19,7 +19,7 @@ role_type_name:
 - name: 🟠 成就-累计签到
   type: checkin_sum
   data: checkin_sum
-- name: 🟤 成就-连续签到
+- name: 🟢 成就-连续签到
   type: checkin_combo
   data: checkin_combo
 # 用户选择星座、MBTI 或性别身份组时额外授予的社交起始角色 ID。
@@ -131,9 +131,10 @@ gender_name:
 signature:
 # 签名 modal 输入最大长度，传给 discord.ui.TextInput(max_length=...)。
   max_length: 50
-# 历史配置字段；当前数据库固定提供 3 个 7 天冷却槽，运行时代码不读取该值。
-# P3-10 预备：后续会把签名冷却天数接入配置；普通部署保持默认即可。
+# 历史兼容字段；当前签名冷却固定为 3 个修改槽，运行时代码不读取该值。
   max_changes_per_week: 3
+# 签名修改槽冷却周期，单位是天；默认 7 天。
+  cooldown_days: 7
 # 设置/查看签名前需要的累计语音时长，单位是分钟；来源是 achievements.time_spent 秒数换算。
   time_requirement: 43200
 # 助力用户角色 ID；签名权限说明使用它，PrivateRoom 也用它判断助力加成。

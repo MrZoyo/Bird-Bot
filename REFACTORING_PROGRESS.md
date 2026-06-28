@@ -13,18 +13,27 @@
 ## 2026-06-28 当前状态同步
 
 - P3-9 fake Discord interaction flow tests 已按当前清单补完，状态为 ✅ 完成；已覆盖 PrivateRoom 续费、Shop 签到 / 补签、Tickets 创建 / 接单 / 关闭、Ban `/tempban`、VoiceChannel 控制面板、Giveaway 参与 / 退出 / 开奖 / 取消、Role / Signature、Achievement / Rank、Welcome / Games、CheckStatus / Backup。
-- 当前自动化基线：`./.venv/Scripts/python.exe -m pytest -q` 为 `93 passed, 1 warning`。
+- 当前自动化基线：`./.venv/Scripts/python.exe -m pytest -q` 为 `99 passed, 1 warning`。
 - 本轮新增 23 个离线 fake interaction tests；所有新增测试均使用最小 fake Discord 对象和临时状态，不联网、不触碰真实 `data/bot.db`。
-- 2026-05-04 补充：`/rank` 的分类按钮已使用 Discord Button `emoji` 字段补齐彩色圆点；当前色彩为全部排名 🟣、添加反应 🔴、发送消息 🟡、语音时长 🔵、累计签到 🟠、连续签到 🟤。连续签到从原先与全部排名重复的 🟣 改为 🟤。按钮上的语音时长不带 `(min)`；排行榜类型名仍保留单位说明。locale 里若已有圆点前缀，运行时会剥离 label 前缀，避免按钮显示重复 emoji。已移除本地 `bot/config/achievements.yaml` 的 legacy `rank:` UI 文案块；迁移脚本也会把旧 JSON 的 `achievements.rank` 显式标为 `drop`，不再迁到 YAML 或 locale。`shop` feature flag 关闭时，对应签到成就现在由共享 helper 同步隐藏，覆盖成就页、排行榜、`/rank` 按钮和 Role 成就领取面板；抽奖成就类别已退役，即使 GiveawayCog 启用也不会再显示或计数。
-- 2026-05-04 补充：所有 `bot/config/*.yaml.example` 和本地实际 `bot/config/*.yaml` 都已补充配置注释。注释按当前代码读取点编写，明确标出单位、ID 类型、DB/locale 分工，以及当前保留但运行时不读取的历史字段（如 `role.signature.max_changes_per_week`、`teamup_display.display.invitation_expire_minutes`）。本地实际 YAML 的真实值未打印；只通过 ruamel round-trip 写入注释。
-- 2026-05-04 补充：用户要求固定的签名 7 天冷却、组队邀请 5 分钟过期后续也要可配置，但作为下一步预备，不在本轮改运行逻辑。已在 `REFACTORING_PLAN.md` 新增 P3-10：后续接入配置时必须保持默认 7 天 / 5 分钟，并补测试；当前代码仍固定 `days >= 7` 和 SQL `+5 minutes`，所以现有 YAML 注释继续标注为“当前未读取 / 历史字段”。
+- 2026-05-04 补充：`/rank` 的分类按钮已使用 Discord Button `emoji` 字段补齐彩色圆点；当前色彩为全部排名 🟣、添加反应 🔴、发送消息 🟡、语音时长 🔵、累计签到 🟠、连续签到 🟢。连续签到从原先与全部排名重复的 🟣 改为 🟢。按钮上的语音时长不带 `(min)`；排行榜类型名仍保留单位说明。locale 里若已有圆点前缀，运行时会剥离 label 前缀，避免按钮显示重复 emoji。已移除本地 `bot/config/achievements.yaml` 的 legacy `rank:` UI 文案块；迁移脚本也会把旧 JSON 的 `achievements.rank` 显式标为 `drop`，不再迁到 YAML 或 locale。`shop` feature flag 关闭时，对应签到成就现在由共享 helper 同步隐藏，覆盖成就页、排行榜、`/rank` 按钮和 Role 成就领取面板；抽奖成就类别已退役，即使 GiveawayCog 启用也不会再显示或计数。
+- 2026-05-04 补充：所有 `bot/config/*.yaml.example` 和本地实际 `bot/config/*.yaml` 都已补充配置注释。注释按当前代码读取点编写，明确标出单位、ID 类型、DB/locale 分工，以及当前保留但运行时不读取的历史字段（如 `role.signature.max_changes_per_week`）。本地实际 YAML 的真实值未打印；只通过 ruamel round-trip 写入注释。
+- 2026-06-28 补充：签名冷却当前已正式生效：`RoleDatabaseManager` 固定提供 3 个修改槽，`role.signature.cooldown_days` 控制每个槽多少天后可复用，默认 7 天；`SignatureModal` 在无可用槽时返回冷却提示，不写入新签名。P3-10 已按“3 次固定、7 天可配置”收齐；组队邀请过期配置后续取消，因为组队应直接使用房间链接，不再生成需要过期时间的邀请。
 - 2026-06-27 补充：抽奖相关成就类别已退役；GiveawayCog 抽奖功能本身保留，但 `giveaway` 不再出现在成就定义、排行榜、`/rank` 按钮、Role 成就领取、手动成就增减参数或迁移输出中。历史数据库里的 `giveaway_count` 列保留作兼容，不再由运行时代码写入或展示。
 - 2026-06-27 补充：依赖声明已提升到 `discord.py>=2.7.1`；所有 modal 文本输入已改用 `discord.ui.Label(text=..., component=discord.ui.TextInput(...))`，不再使用 2.6 起 deprecated 的 `TextInput(label=...)`。
 - 2026-06-27 补充：PrivateRoom 商店面板、Shop 签到面板、Tickets 主入口和组队邀请消息已迁移到 Components v2 `LayoutView` / `Container`；组队“满员”共享 helper 同时兼容旧 embed 消息和新 Components v2 panel，便于平滑处理已发出的旧邀请。
 - 2026-06-28 补充：Gateway intents 已从 `Intents.all()` 收窄为显式所需集合：Members、Message Content、Voice States、Guild Messages、Guild Reactions，不再请求 Presence。SQLite runtime 连接已统一走 `bot.utils.db_connect.connect_database()`，支持 `sqlcipher3` / SQLCipher 加密；新增 `tools/encrypt_database.py` 将现有明文库迁移为加密库，生产可用 `DCGSH_DB_REQUIRE_ENCRYPTION=1` 强制密钥存在。密钥文件支持显式首次生成：配置 `DCGSH_DB_KEY_FILE` 且设置 `DCGSH_DB_CREATE_KEY_FILE=1` 时才创建，不会无配置静默落盘。
+- 2026-06-28 补充：本地测试加密库启动约定已同步到 `run.py`：启动器在导入 bot 前加载仓库根 `.env`，可指向忽略的 `.local_secrets/*.key`；`.env` 里的相对 `DCGSH_DB_KEY_FILE` 按 `.env` 所在目录解析，外部启动器已设置的环境变量优先。验证点为清空 DB env 后导入 `run.py`，`data/bot.db` 可通过 `connect_database()` 读取 schema。
 - `REFACTORING_TEST_CHECKLIST.md` 已从“逐功能穷举”缩减为“自动化 gate + 真实 Discord 必测链路”；手工测试只保留权限、真实频道/线程/语音、persistent view、DM、rate limit、图片/附件和真实客户端表现。
-- 下一步默认：按缩减后的 checklist 进入测试服手工验证；若继续配置清理，优先做 P3-10，把签名冷却天数和组队邀请过期分钟数真正接入配置。
-- 真实测试服仍必须覆盖：Discord 权限、role hierarchy、channel/thread/voice 真实操作、persistent view 重启恢复、DM 投递失败、rate limit、command sync、真实 ban/unban/mute、欢迎事件和图片/附件渲染。
+- 2026-06-28 真实测试服验证补充：使用 Chrome Discord 双账号 `mrzoyo`（管理员）和 `zoyoooo`（普通 / 部分测试配置内管理员）完成多轮手工验证。截图已发到 `测试2`：Tickets 主入口 Components v2、Shop 签到面板 Components v2、PrivateRoom 商店面板 Components v2，以及 Tickets 主入口统一按钮 / 类型右侧排列更新截图。
+- 2026-06-28 补充：按最终文案要求，Tickets 主入口按钮文案继续走 `tickets.messages.ticket_create_button_label` locale key，当前 zh_CN 为「创建」。已删除旧公共面板并重新生成全部公开面板：Tickets `1520784482809024533`、Shop 签到 `1520784491826905191`、PrivateRoom 商店 `1520784497652793468`、成就身份组 `1520784504988373024`、星座 `1520784510218670272`、MBTI `1520784515486978300`、性别 `1520784520801161458`、签名 `1520784526236713131`、组队展示板 `1520784531970592970`。Discord API 读回 Tickets 4 个按钮 label 均为「创建」。
+- 2026-06-28 补充：按后续 UI 文案微调，Shop 签到面板顶部统计改成两列，并将 footer 改为「每日签到日期变更时间：UTC+2 00:00」；PrivateRoom 商店 footer 改为「私人房间将到期后自动删除，文字频道的聊天记录会丢失。」；成就领取和性别标识面板在标题后加分割线，块间保留分割线，末尾说明改为 Components v2 `-#` footer 且最后一个块下不加分割线；连续签到颜色统一从棕色圆点改为 🟢，覆盖 `/rank` 按钮、排行榜类型名、Role 成就领取按钮和 YAML 示例。本轮已通过 Discord API 刷新线上消息：Shop `1520853151022973028`、PrivateRoom `1520784497652793468`、成就身份组 `1520784504988373024`、性别 `1520784520801161458`。
+- 2026-06-28 运行态注意：线上持久面板已手动 PATCH 到最新 payload；当前若仍有改动前启动的 bot 进程，后续动态消息和重启恢复逻辑需要重启 bot 后才会天然加载这批代码 / YAML 变更。
+- 2026-06-28 补充：语音 / 组队外观覆盖已补：临时语音房 `1520787099446673550` 的房间控制面板 `1520787100914421963`，以及组队邀请测试消息 `1520792728768614591`。截图审核集在 `.cache/panel_review_20260628_160738`，总览和 11 张单图已发到 `测试2`。随后真实 Discord API 回调 smoke 在临时频道 `1520799619913744565` 验证 Lock / Unlock / Soundboard / Full：Lock 后 `connect=false`，Unlock 后 `connect=true`，Soundboard 从开启切到关闭，Full 后组队邀请按钮数为 `0` 且包含「房间已满」，测试房 active 组队记录清空；临时频道、邀请消息和 `voice temp_channels` 已清理。
+- 2026-06-28 补充：用户恢复 Chrome Discord 双窗口登录态后，追加 Chrome Web 侧实拍补充到 `.cache/chrome_panel_review_20260628_1639`，确认最新 Tickets 面板按钮为「创建」、语音控制面板和组队邀请在真实网页端可见。由于 Discord Web 虚拟列表连续跳转同频道消息时存在截图捕到旧 viewport / skeleton 的不稳定性，完整逐项外观审核仍以 Discord API payload 渲染的 `.cache/panel_review_20260628_160738/contact_sheet_cropped.png` 为主证据。
+- 2026-06-28 真实测试服覆盖摘要：Tickets 创建 / 接单权限差异 / 关闭、PrivateRoom 余额不足和无房间失败路径、Achievement / Rank / Signature 双账号流程、Ban 管理配置只读 / 管理频道限制 / 临时封禁列表空态 / 邀请链接格式校验、Legacy command picker 抽查、Components v2 面板重启恢复均已记录到 `REFACTORING_TEST_CHECKLIST.md`。
+- 2026-06-28 本轮真实测试发现并修复：`ConfirmationView.on_timeout()` 访问不存在的 `self.message` 导致 timeout task exception；现已初始化 `self.message`，发送确认卡时保存返回 message，并补 `test_confirmation_timeout_edits_message_when_present`。另将 Tickets 缺失 thread cleanup 从 `cog_load` 延后到 `on_ready` 首次执行，避免启动早期 guild cache 未就绪的误报，并在测试服重启后实际关闭 3 条已不存在的旧工单记录。
+- 2026-06-28 本轮跳过项：真实语音进出/语音移动仍按用户说明跳过；真实 `/tempban` / `/mute` / `/ban` 以及 tempban 到期自动 unban / 活跃 tempban 重启恢复因副作用较重未执行。相关 DB / handler 顺序由 fake tests 覆盖；真实服务器当前无活跃临时封禁。
+- 下一步默认：后续若触碰 Ban / Voice 等副作用路径，再按需单独批准真实测试；当前没有遗留的默认配置清理项。
 
 ---
 
@@ -252,7 +261,7 @@
 - 未跟踪 `.codex` 与 `data/*.log.2026-*` / `data/*_activity.log.2026-*` 属本地状态，不碰。
 - `REFACTORING_TEST_CHECKLIST.md` 可能含用户手工测试勾选状态；提交文档变更时只暂存本轮说明性 hunk，避免覆盖用户勾选。
 - `bot/locales/zh_CN/*.yaml` 中除本轮明确修改的 locale 文件外，可能仍有本地旧配置迁移/运行文案差异；不要误纳入提交。
-- `run.py` 当前只有本地换行/格式差异；除非用户明确要求，不把它和重构提交混在一起。
+- `run.py` 已有有意改动：启动时加载仓库根 `.env` 以支持本地加密测试库；不要再把它当成仅换行/格式差异处理。
 
 ---
 
@@ -716,7 +725,7 @@
 
 **两条 source commit**：
 1. `refactor(voicechannel): extract control_panel text to locale` —— `control_panel.{title,footer,description_template,buttons,messages}` 从 yaml 抽到 `bot/locales/zh_CN/voicechannel.yaml`；yaml 只剩 `control_panel.colors.{public,private}` 两个 int。Cog 的 `self.messages` / `self.button_labels` / `self.control_panel_conf` 三个 dict 缓存全删，按钮 label + 所有 message 走 `t('voicechannel.control_panel.*')`。28 key。
-2. `refactor(role): extract signature text to locale` —— `signature.{pickup_*,modal_*,*_message,admin_check_*}` 等 30 text key 抽到 locale；yaml 只剩 `signature.{max_length,max_changes_per_week,time_requirement,helper_role_id}` 四个数据字段。cog 的 `self.signature_config` 整体删（没 caller 了），`SignatureModal` / `SignatureView` 的 callbacks + `RoleCog` 的 admin 命令全走 t()。顺带把硬编码 `"更新签名失败，请稍后重试。"` 也抽了（新 key `signature.update_failed_message`）；loop var `t` 改名 `ts` 避免 shadow i18n helper。
+2. `refactor(role): extract signature text to locale` —— `signature.{pickup_*,modal_*,*_message,admin_check_*}` 等 30 text key 抽到 locale；yaml 只剩 `signature.{max_length,max_changes_per_week,cooldown_days,time_requirement,helper_role_id}` 数据字段，其中 `max_changes_per_week` 为历史兼容字段、运行时不读取，`cooldown_days` 控制 3 个固定修改槽的复用天数。cog 的 `self.signature_config` 整体删（没 caller 了），`SignatureModal` / `SignatureView` 的 callbacks + `RoleCog` 的 admin 命令全走 t()。顺手把硬编码 `"更新签名失败，请稍后重试。"` 也抽了（新 key `signature.update_failed_message`）；loop var `t` 改名 `ts` 避免 shadow i18n helper。
 
 **welcome.dm 显式不抽**（决策记录）：
 - `welcome.dm.description0_title` = `"小鸟知道你在想什么・永久邀请链接"` —— 含服务器品牌名

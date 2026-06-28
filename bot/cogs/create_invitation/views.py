@@ -22,7 +22,6 @@ class TeamInvitationView(discord.ui.LayoutView):
         self.roomfull_button_label = t('invitation.roomfull_button_label')
         self.invite_button_label = t('invitation.invite_button_label')
         self.invite_embed_content = t('invitation.invite_embed_content')
-        self.invite_embed_footer = t('invitation.invite_embed_footer')
         self.interaction_target_error_message = t('invitation.interaction_target_error_message')
         self.roomfull_set_message = t('invitation.roomfull_set_message')
         self.not_in_vc_message = t('invitation.not_in_vc_message')
@@ -94,7 +93,6 @@ class TeamInvitationView(discord.ui.LayoutView):
         self.add_item(build_panel_container(
             title=panel_title,
             description="\n\n".join(description_parts),
-            footer=self.invite_embed_footer,
             accent_color=discord.Color.blue(),
             thumbnail_url=thumbnail_url,
             buttons=[self.invite_button, self.room_full_button],

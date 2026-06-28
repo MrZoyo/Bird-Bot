@@ -113,9 +113,29 @@ def test_checkin_panel_uses_components_v2_media_and_separators(monkeypatch):
     assert view.has_components_v2() is True
     assert container["type"] == 17
     assert [component["type"] for component in container["components"]] == [10, 14, 12, 14, 10, 1]
+    wide = "\u3000"
+    assert f"**Count**{wide * 5}**First**\n12{wide * 10}<@1>" in container["components"][0]["content"]
     assert container["components"][2]["items"][0]["media"]["url"] == "attachment://checkin.png"
     assert [button["label"] for button in container["components"][5]["components"]] == [
         "Daily",
         "Makeup",
         "Query",
     ]
+
+
+def test_checkin_panel_shows_zero_count_when_empty(monkeypatch):
+    monkeypatch.setattr("bot.cogs.shop.views.t", lambda key, **kwargs: SHOP_TEXT[key])
+
+    view = CheckinEmbedView(
+        cog=object(),
+        bot=object(),
+        db=object(),
+        conf={"checkin_embed_color": "FFD700"},
+        panel_date="2026-06-27",
+        today_count=0,
+        first_user_text=None,
+    )
+    container = view.to_components()[0]
+
+    wide = "\u3000"
+    assert f"**Count**{wide * 5}**First**\n0{wide * 11}none" in container["components"][0]["content"]

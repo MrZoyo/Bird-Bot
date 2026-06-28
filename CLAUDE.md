@@ -19,7 +19,8 @@ The current refactor target is config 2.0 and package-based cogs. Legacy JSON co
 
 ## Repository Structure
 
-- `run.py`: launcher; imports `bot.main.run_bot()`.
+- `run.py`: launcher; loads the repository-local `.env` through `runtime_env.load_env_file()` before importing `bot.main.run_bot()`.
+- `runtime_env.py`: minimal local `.env` loader used by `run.py`; it resolves relative `DCGSH_DB_KEY_FILE` values from the `.env` file's directory and does not override existing launcher-provided environment variables.
 - `bot/main.py`: bot factory, `COG_SPECS`, setup hook, cog loading, logging setup, command sync.
 - `bot/cogs/`: active feature packages. Each active cog is a package, not a flat `*_cog.py` module.
 - `bot/utils/`: shared helpers, config loader, DB managers, i18n, path helpers, logging format helpers.
@@ -63,7 +64,7 @@ Runtime config is YAML:
 - `Config` in `bot/utils/config.py` loads `bot/config/<name>.yaml`, caches it, validates `main`, and normalizes runtime paths from repo root.
 - Relative paths such as `./data/bot.db` resolve from the repository root, not the process CWD.
 - Keep both `.yaml.example` templates and local real YAML commented. Comments should explain units, Discord ID targets, DB/locale ownership, and whether a key is currently read by runtime code.
-- Known config follow-up: signature change cooldown is still hard-coded to 7 days in `RoleDatabaseManager`, and teamup invitation expiry is still hard-coded to 5 minutes in `TeamupDisplayManager`; P3-10 tracks making both configurable while preserving those defaults.
+- Signature change cooldown uses 3 fixed change slots and reads `role.signature.cooldown_days` for the slot reuse window; default is 7 days. `role.signature.max_changes_per_week` is a historical compatibility field and is not read by runtime code. Teamup invitation expiry is no longer a config follow-up because teamup should use direct room links instead of generated invites.
 
 Legacy JSON:
 
@@ -90,8 +91,9 @@ Never commit real YAML configs, real JSON configs, `tools/migration_db_seed.json
 - Main DB path comes from `main.db_path`, usually `data/bot.db`.
 - All runtime SQLite connections must go through `bot.utils.db_connect.connect_database()` so SQLCipher encryption is applied consistently when `DCGSH_DB_KEY` or `DCGSH_DB_KEY_FILE` is set.
 - Production encrypted deployments should set `DCGSH_DB_REQUIRE_ENCRYPTION=1`; keys must stay in environment/secret files, never YAML, logs, docs, or git.
+- Local bot startup may use the ignored repository-root `.env` loaded by `run.py`; the local test pattern is `.env` pointing `DCGSH_DB_KEY_FILE` at an ignored `.local_secrets/*.key` file. Do not write the key value into docs, YAML, logs, or git.
 - First-run key generation is explicit only: set `DCGSH_DB_KEY_FILE=/secure/path/db.key` and `DCGSH_DB_CREATE_KEY_FILE=1`; after the file is created, keep and back up that file securely and remove the create flag so a missing key fails loudly.
-- Existing plaintext databases are migrated with `tools/encrypt_database.py`; back up the plaintext source first and protect or delete that plaintext backup after validation.
+- Existing plaintext databases are migrated with `python -m tools.encrypt_database`; back up the plaintext source first and protect or delete that plaintext backup after validation.
 - Use feature DB managers in `bot/utils/*_db.py`; do not put raw SQL in cogs unless there is already an established local exception.
 - Several managers use persistent async connections. If a one-shot script creates one, close it explicitly before exiting.
 - DB schema migrations use `bot/utils/schema_migrations.py` where needed.
@@ -182,8 +184,8 @@ Current pytest smoke coverage includes:
 Current P3-9 status:
 
 - Done: current fake interaction flow list is complete for PrivateRoom, Shop, Tickets, Ban, VoiceChannel, Giveaway, Role / Signature, Achievement / Rank, Welcome / Games, CheckStatus / Backup.
-- Current baseline: `93 passed, 1 warning`.
-- Next default target: full automatic gate, then real test-server validation.
+- Current baseline: `99 passed, 1 warning`.
+- Next default target: targeted real test-server validation for new changes / side-effect paths only when explicitly approved.
 - Add more fake interaction tests only for new bugs, payload replay work, or new features.
 
 Real Discord behavior still needs test-server validation for slash commands, permission failures, persistent views, buttons, Discord rate limits, DMs, command sync, and UI screenshots/logs where relevant. Follow `REFACTORING_TEST_CHECKLIST.md`.

@@ -15,7 +15,7 @@ messages:
     积分\n⏰ 有效期: **{duration}** 天\n\n**老🐦福利:** 上个月__语音时长__满 **{hours_threshold}** 小时即可免费获得！可按比例抵扣积分~\n\
     🚀 **助力用户福利:** 额外享受 **{booster_hours}** 小时语音时长加成！\n\n🏠 当前可用: **{available_rooms}/{max_rooms}**"
   shop_button_label: 🛍️ 购买私人房间
-  shop_footer: 私人房间到期后将自动删除，包括所有聊天记录。
+  shop_footer: 私人房间将到期后自动删除，文字频道的聊天记录会丢失。
   confirm_title: 确认购买私人房间
   confirm_last_month: '📊 上个月语音时长: **{hours}** 小时'
   confirm_discount: '💯 享受折扣: **{discount}%** 折扣'

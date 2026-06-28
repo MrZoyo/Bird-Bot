@@ -1140,7 +1140,7 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 
 **当前状态（2026-06-27）**：
 - 已完成并纳入自动化 gate：PrivateRoom 续费、Shop 签到 / 补签、Tickets 创建 / 接单 / 关闭、Ban `/tempban`、VoiceChannel 控制面板、Giveaway 参与 / 退出 / 开奖 / 取消、Role / Signature、Achievement / Rank、Welcome / Games、CheckStatus / Backup。
-- 当前 pytest 基线：`93 passed, 1 warning`。
+- 当前 pytest 基线：`99 passed, 1 warning`。
 - 当前清单内 fake interaction flow tests 已补完；后续只按新 bug、payload replay 或新增功能单独扩展。
 - 真实语音移动、频道权限、role hierarchy、persistent view 重启恢复、DM 投递、rate limit 和客户端可见 UI 仍归测试服。
 
@@ -1157,30 +1157,32 @@ P2-3 列的 5 处运行时写回都在写"动态数据"：管理员列表、igno
 
 ---
 
-### P3-10. Configurable retained timers follow-up
+### P3-10. Configurable signature cooldown days follow-up
 
-**背景（2026-05-04）**：配置 YAML 已补注释时发现两处历史字段/固定值不够理想：
+> **状态（2026-06-28）**：已完成。签名冷却保持 3 个固定修改槽，只把槽位复用窗口接入 `role.signature.cooldown_days`，默认 7 天。组队邀请过期配置后续已取消：组队应直接使用房间链接，不再生成需要过期时间的邀请。
 
-- `role.signature.max_changes_per_week` 当前只是历史配置字段；签名修改冷却在 `RoleDatabaseManager.find_available_time_slot()` / `get_signature_remaining_changes()` 中固定为 7 天。
-- `teamup_display.display.invitation_expire_minutes` 当前只是历史配置字段；组队邀请过期时间在 `TeamupDisplayManager.add_teamup_invitation()` SQL 中固定为 `+5 minutes`。
+**背景（2026-06-28）**：
+
+- `role.signature.max_changes_per_week` 继续作为历史兼容字段保留，运行时代码不读取；签名修改次数固定为 3 个槽，贴合 `user_signatures.change_time1/2/3` 现有表结构。
+- `role.signature.cooldown_days` 控制修改槽多少天后可复用，默认 7 天。
 
 **目标**：
-- 后续把这两个固定值接入配置，但保持缺省行为不变：未配置时仍使用 7 天 / 5 分钟。
-- 配置建议作为高级项，不要求普通部署必须修改；`.yaml.example` 和本地 YAML 注释要明确“通常保持默认即可”。
-- 不再新增只写不读的配置项。若保留 `max_changes_per_week`，要么真正接入逻辑，要么改名 / 迁移为能准确表达行为的字段，例如签名修改冷却天数。
+- 保持缺省行为不变：3 个修改槽 / 7 天。
+- 只把冷却天数接入配置，不把修改次数配置化，避免为了可变次数引入额外历史表或复杂迁移。
+- `.yaml.example` 和本地 YAML 注释明确 `max_changes_per_week` 不读取、`cooldown_days` 读取。
 
-**实施建议**：
-1. 签名冷却：让 Role 相关 DB/helper 方法接收配置值，或把冷却计算上移到 RoleCog/SignatureModal 可注入配置的位置；补测试覆盖默认 7 天和自定义冷却天数。
-2. 组队邀请过期：让 `TeamupDisplayManager.add_teamup_invitation()` 接收 `expire_minutes`，由 `TeamupDisplayCog` 从 `teamup_display.display.invitation_expire_minutes` 传入；补测试覆盖默认 5 分钟和自定义分钟数。
-3. 同步 `.yaml.example`、本地 YAML 注释、`CLAUDE.md` 和 checklist；避免把“当前固定值”文档误写成“已配置生效”。
+**实现结果**：
+1. `RoleDatabaseManager.find_available_time_slot()` / `get_signature_remaining_changes()` 接收 `cooldown_days`，默认 7。
+2. `SignatureModal` 从 `role.signature.cooldown_days` 读取冷却天数；成功 / 冷却提示和签名面板规则文案同步填入当前天数。
+3. 测试覆盖默认三槽行为，以及 `cooldown_days=7` 与 `cooldown_days=14` 对槽位复用的差异。
 
-**当前状态**：预备项已记录，运行逻辑尚未改动；当前文档仍按现状标注这两个字段暂未被运行时代码读取。
+**当前状态**：已完成；当前没有遗留的签名冷却配置化默认后续项。
 
 ---
 
 ## 推进顺序建议
 
-> **当前状态（2026-05-04）**：P0/P1/P2/P3 重构主线已全部收齐；P3-9 fake interaction flow tests 当前清单已补完；P3-10 仅作为后续预备项记录，尚未改运行逻辑。当前以 `REFACTORING_PROGRESS.md` 顶部“2026-05-03 当前状态同步”为准。下一步默认跑完整自动化 gate，然后进入测试服全量功能验证；若继续配置清理，优先做 P3-10。
+> **当前状态（2026-06-28）**：P0/P1/P2/P3 重构主线已全部收齐；P3-9 fake interaction flow tests 当前清单已补完；P3-10 已按“3 次固定、冷却天数可配置”收齐。当前以 `REFACTORING_PROGRESS.md` 顶部“2026-06-28 当前状态同步”为准。下一步默认只对新改动 / 副作用路径做针对性真实测试服验证。
 
 1. **本轮冲刺（P0）**：P0-4（裸 except 治理，范围清晰、改动小、风险低）→ P0-1（giveaway 抽 db）→ P0-2（privateroom 规范化）→ P0-3（其余 cog 补 db manager，内部以 `check_status` 为首）。
 2. **下一轮（P1，小步）**：P1-5（日志 rotation）、P1-2（ban_cog 迁 cog_load）、P1-1（命令同步）—— 三个都是改动小、受益长期。

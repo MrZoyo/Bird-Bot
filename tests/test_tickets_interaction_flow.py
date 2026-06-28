@@ -30,7 +30,8 @@ TICKET_TEXT = {
     "tickets.messages.ticket_thread_create_error": "ticket create error",
     "tickets.messages.ticket_main_title": "Contact us",
     "tickets.messages.ticket_main_description": "Choose a ticket type",
-    "tickets.messages.ticket_main_footer": "Pick one below",
+    "tickets.messages.ticket_create_button_label": "Create",
+    "tickets.messages.ticket_main_footer": "Ticket system",
     "tickets.messages.ticket_accept_button": "Accept",
     "tickets.messages.ticket_accept_button_disabled": "Accepted",
     "tickets.messages.ticket_add_user_button": "Add user",
@@ -284,7 +285,7 @@ def _install_translations(monkeypatch):
     monkeypatch.setattr(tickets_modals, "t", translator)
 
 
-def test_ticket_create_panel_uses_components_v2_and_wraps_button_rows(monkeypatch):
+def test_ticket_create_panel_pairs_each_type_with_right_side_button(monkeypatch):
     _install_translations(monkeypatch)
     ticket_types = {
         f"type-{index}": {
@@ -300,11 +301,18 @@ def test_ticket_create_panel_uses_components_v2_and_wraps_button_rows(monkeypatc
     assert view.has_components_v2() is True
     assert container["type"] == 17
     assert container["components"][0]["content"].startswith("### Contact us")
-    assert container["components"][1]["type"] == 14
-    assert container["components"][2]["content"] == "-# Pick one below"
-    assert [component["type"] for component in container["components"][3:]] == [1, 1]
-    assert len(container["components"][3]["components"]) == 5
-    assert len(container["components"][4]["components"]) == 1
+    type_rows = container["components"][1:-2]
+    assert [component["type"] for component in type_rows] == [9, 14, 9, 14, 9, 14, 9, 14, 9, 14, 9]
+    assert container["components"][-2]["type"] == 14
+    assert container["components"][-1]["content"] == "-# Ticket system"
+
+    type_sections = type_rows[::2]
+    assert len(type_sections) == 6
+    for index, section in enumerate(type_sections):
+        assert section["type"] == 9
+        assert section["components"][0]["content"] == f"**type-{index}**\nDescription {index}"
+        assert section["accessory"]["label"] == "Create"
+        assert section["accessory"]["custom_id"] == f"create_ticket_type-{index}"
 
 
 def _build_cog(events, db):

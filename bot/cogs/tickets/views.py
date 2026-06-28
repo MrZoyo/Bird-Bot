@@ -2,7 +2,6 @@ import logging
 
 import discord
 
-from bot.utils.components_v2 import build_panel_container
 from bot.utils.i18n import t
 
 from .embeds import EmbedColors
@@ -20,10 +19,14 @@ class TicketCreateView(discord.ui.LayoutView):
         self.cog = cog
         self.ticket_types = ticket_types
 
-        # Create buttons for each ticket type
-        buttons = []
-        type_lines = []
-        for type_name, type_data in ticket_types.items():
+        components = [
+            discord.ui.TextDisplay(
+                f"### {t('tickets.messages.ticket_main_title')}\n"
+                f"{t('tickets.messages.ticket_main_description')}"
+            )
+        ]
+
+        for index, (type_name, type_data) in enumerate(ticket_types.items()):
             color_map = {
                 'r': discord.ButtonStyle.danger,
                 'g': discord.ButtonStyle.success,
@@ -35,7 +38,7 @@ class TicketCreateView(discord.ui.LayoutView):
 
             button = discord.ui.Button(
                 style=button_style,
-                label=type_name,
+                label=t('tickets.messages.ticket_create_button_label'),
                 custom_id=f'create_ticket_{type_name}'
             )
 
@@ -44,19 +47,24 @@ class TicketCreateView(discord.ui.LayoutView):
                 await self.create_ticket_callback(interaction, type_name)
 
             button.callback = button_callback
-            buttons.append(button)
-            type_lines.append(f"**{type_name}**\n{type_data.get('description', '无描述')}")
 
-        description_parts = [t('tickets.messages.ticket_main_description')]
-        if type_lines:
-            description_parts.append("\n\n".join(type_lines))
+            if index > 0:
+                components.append(discord.ui.Separator())
+            components.append(
+                discord.ui.Section(
+                    f"**{type_name}**\n{type_data.get('description', '无描述')}",
+                    accessory=button,
+                )
+            )
 
-        self.add_item(build_panel_container(
-            title=t('tickets.messages.ticket_main_title'),
-            description="\n\n".join(part for part in description_parts if part),
-            footer=t('tickets.messages.ticket_main_footer'),
+        footer = t('tickets.messages.ticket_main_footer')
+        if footer:
+            components.append(discord.ui.Separator())
+            components.append(discord.ui.TextDisplay(f"-# {footer}"))
+
+        self.add_item(discord.ui.Container(
+            *components,
             accent_color=EmbedColors.DEFAULT,
-            buttons=buttons,
         ))
 
     async def create_ticket_callback(self, interaction: discord.Interaction, type_name: str):

@@ -53,6 +53,16 @@ class FakeInteraction:
         })
 
 
+class FakeMessage:
+    def __init__(self, events):
+        self.events = events
+        self.edits = []
+
+    async def edit(self, *, content=None, view=None, **kwargs):
+        self.events.append(("message_edit", content, view))
+        self.edits.append({"content": content, "view": view, **kwargs})
+
+
 class FakeAchievementCog:
     def __init__(self, *, hidden_types=None):
         self.hidden_types = hidden_types or set()
@@ -176,6 +186,31 @@ def test_confirmation_button_applies_changes_logs_then_edits_original(monkeypatc
         assert db.applied == [(555, expected_changes, "increase")]
         assert db.logged == [(999, 555, "increase", expected_changes)]
         assert interaction.original_edits[0]["content"] == "**Operation increase complete!**"
+
+    asyncio.run(scenario())
+
+
+def test_confirmation_timeout_edits_message_when_present(monkeypatch):
+    async def scenario():
+        _install_achievement_config(monkeypatch)
+        events = []
+        view = ConfirmationView(
+            FakeBot(FakeAchievementCog()),
+            member_id=555,
+            reactions=1,
+            messages=0,
+            time_spent=0,
+            operation="increase",
+            db_manager=FakeAchievementDB(events),
+        )
+        view.message = FakeMessage(events)
+
+        await view.on_timeout()
+
+        assert events == [
+            ("message_edit", "**Timeout: No longer accepting interactions.**", view),
+        ]
+        assert all(child.disabled for child in view.children)
 
     asyncio.run(scenario())
 

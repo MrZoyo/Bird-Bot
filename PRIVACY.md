@@ -74,6 +74,14 @@ a key is configured. The runtime key must come from the environment, not YAML:
   does not exist.
 - `DCGSH_DB_REQUIRE_ENCRYPTION=1`: fail startup if no key is configured.
 
+For local test runs, `run.py` also reads a repository-root `.env` file before
+importing the bot. The file is gitignored and may point `DCGSH_DB_KEY_FILE` to
+an ignored local key file such as `.local_secrets/local-test-db.key`. Existing
+launcher-provided environment variables are not overwritten, and relative
+`DCGSH_DB_KEY_FILE` values in `.env` resolve from the `.env` file's directory.
+Production launchers should prefer host environment variables or a secret
+manager and may omit the local `.env` file entirely.
+
 When a key is configured, all runtime database managers open SQLite through
 `bot.utils.db_connect.connect_database()`, which applies `PRAGMA key` and
 verifies that the database is readable before feature SQL runs.
@@ -83,7 +91,7 @@ To encrypt an existing plaintext database:
 ```bash
 export DCGSH_DB_KEY_FILE='/secure/bird-bot/db.key'
 export DCGSH_DB_CREATE_KEY_FILE=1
-python tools/encrypt_database.py data/bot.db data/bot.encrypted.db \
+python -m tools.encrypt_database data/bot.db data/bot.encrypted.db \
   --backup-source backup/db_backup_manual/plain-before-encryption.db
 mv data/bot.encrypted.db data/bot.db
 unset DCGSH_DB_CREATE_KEY_FILE
@@ -95,7 +103,7 @@ For PowerShell:
 ```powershell
 $env:DCGSH_DB_KEY_FILE = 'C:\secure\bird-bot\db.key'
 $env:DCGSH_DB_CREATE_KEY_FILE = '1'
-python tools/encrypt_database.py data/bot.db data/bot.encrypted.db --backup-source backup/db_backup_manual/plain-before-encryption.db
+python -m tools.encrypt_database data/bot.db data/bot.encrypted.db --backup-source backup/db_backup_manual/plain-before-encryption.db
 Move-Item -Force data/bot.encrypted.db data/bot.db
 Remove-Item Env:DCGSH_DB_CREATE_KEY_FILE
 $env:DCGSH_DB_REQUIRE_ENCRYPTION = '1'
@@ -122,7 +130,7 @@ key is lost, existing encrypted database and backup files cannot be decrypted.
 
 - Enable only the required privileged intents in the Discord Developer Portal: Server Members Intent and Message Content Intent.
 - Do not enable Presence Intent unless a future feature explicitly needs presence data and this document is updated.
-- Keep `bot/config/*.yaml`, `.env` files, `data/*.db`, backup files, and logs out of git.
+- Keep `bot/config/*.yaml`, `.env` files, `.local_secrets/`, `data/*.db`, backup files, and logs out of git.
 - Set `DCGSH_DB_REQUIRE_ENCRYPTION=1` in production after migrating the database.
 - Store `DCGSH_DB_KEY` in the host secret manager, or store `DCGSH_DB_KEY_FILE` outside the repo with restricted permissions.
 - Use `DCGSH_DB_CREATE_KEY_FILE=1` only for first-run key-file generation, then remove it.

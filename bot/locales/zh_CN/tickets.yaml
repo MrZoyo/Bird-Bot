@@ -34,7 +34,8 @@ messages:
   close_dm_content: "你的工单已被关闭\n**关闭人:** {closer}\n**关闭原因:** {reason}"
   ticket_main_title: 联系我们
   ticket_main_description: 有问题或者建议？在这里你可以：
-  ticket_main_footer: '-----------点击下方按钮开始创建对应工单-----------'
+  ticket_create_button_label: 创建
+  ticket_main_footer: 小鸟助手工单系统
   command_thread_only: 此命令只能在工单子频道内使用
   ticket_closed_no_modify: 该工单已关闭，无法添加新用户
   add_user_error: '添加用户时发生错误, 请联系管理员。error: {error}'

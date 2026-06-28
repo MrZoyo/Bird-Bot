@@ -119,7 +119,6 @@ def _install_view_translations(monkeypatch):
         "invitation.invite_embed_content": (
             "voice={vc_url}; user={mention}; time={time}"
         ),
-        "invitation.invite_embed_footer": "Use buttons below",
         "invitation.interaction_target_error_message": "not yours",
         "invitation.roomfull_set_message": "marked full",
         "invitation.not_in_vc_message": "not in vc",
@@ -261,7 +260,7 @@ def test_team_invitation_view_uses_components_v2_with_separator(monkeypatch):
         assert container["type"] == 17
         assert _first_text_content(container["components"]).startswith("### 缺1")
         assert "<@999>" not in _first_text_content(container["components"])
-        assert any(component["type"] == 14 for component in container["components"])
+        assert not any(component["type"] == 14 for component in container["components"])
         action_row = container["components"][-1]
         assert [button["label"] for button in action_row["components"]] == ["Join", "Full"]
 

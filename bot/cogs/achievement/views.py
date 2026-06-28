@@ -125,6 +125,7 @@ class ConfirmationView(View):
         self.time_spent = time_spent
         self.operation = operation
         self.db = db_manager
+        self.message = None
 
         self.achievement_config = config.get_config('achievements')
 
@@ -132,6 +133,8 @@ class ConfirmationView(View):
         for item in self.children:
             item.disabled = True
         self.stop()  # Optionally stop further interactions if desired
+        if self.message is None:
+            return
         await self.message.edit(content="**Timeout: No longer accepting interactions.**", view=self)
 
     @discord.ui.button(label="Confirm", style=discord.ButtonStyle.green)

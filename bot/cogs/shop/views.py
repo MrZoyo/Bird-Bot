@@ -4,8 +4,6 @@ import tempfile
 from datetime import datetime
 
 import discord
-
-from bot.utils.components_v2 import build_panel_container
 from bot.utils.i18n import t
 
 from .modals import CheckinMakeupModal
@@ -49,23 +47,31 @@ class CheckinEmbedView(discord.ui.LayoutView):
         query_button.callback = self.query_checkin_button
 
         date_str = panel_date or datetime.now().strftime('%Y-%m-%d')
-        count_text = str(today_count) if today_count and today_count > 0 else t('shop.checkin_embed_no_checkin')
+        count_text = str(today_count or 0)
         first_text = first_user_text or t('shop.checkin_embed_no_checkin')
-        description_parts = [
-            t('shop.checkin_embed_description'),
-            f"**{t('shop.checkin_embed_count_field')}**\n{count_text}",
-            f"**{t('shop.checkin_embed_first_field')}**\n{first_text}",
-        ]
-        description = "\n\n".join(part for part in description_parts if part)
+        label_gap = "\u3000" * 5
+        value_gap = "\u3000" * max(3, 12 - len(count_text))
+        stats_line = (
+            f"**{t('shop.checkin_embed_count_field')}**{label_gap}"
+            f"**{t('shop.checkin_embed_first_field')}**\n"
+            f"{count_text}{value_gap}{first_text}"
+        )
+        title = t('shop.checkin_embed_title').format(date=date_str)
+        description = "\n".join(
+            part for part in [t('shop.checkin_embed_description'), stats_line] if part
+        )
 
-        self.add_item(build_panel_container(
-            title=t('shop.checkin_embed_title').format(date=date_str),
-            description=description,
-            footer=t('shop.checkin_embed_footer'),
+        gallery = discord.ui.MediaGallery()
+        gallery.add_item(media="attachment://checkin.png", description=title)
+
+        self.add_item(discord.ui.Container(
+            discord.ui.TextDisplay(f"### {title}\n{description}"),
+            discord.ui.Separator(),
+            gallery,
+            discord.ui.Separator(),
+            discord.ui.TextDisplay(f"-# {t('shop.checkin_embed_footer')}"),
+            discord.ui.ActionRow(daily_button, makeup_button, query_button),
             accent_color=int(self.conf.get('checkin_embed_color', 'FFD700'), 16),
-            media_url="attachment://checkin.png",
-            media_description=t('shop.checkin_embed_title').format(date=date_str),
-            buttons=[daily_button, makeup_button, query_button],
         ))
 
     async def daily_checkin_button(self, interaction: discord.Interaction):

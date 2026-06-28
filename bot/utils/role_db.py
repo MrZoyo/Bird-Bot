@@ -1,12 +1,16 @@
 # bot/utils/role_db.py
-import aiosqlite
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, List, Tuple, Any
 
 from .db_connect import connect_database
 from .db_lifecycle import BaseDatabaseManager
 from .log_helpers import fmt_user
+from .signature_cooldown import (
+    DEFAULT_SIGNATURE_COOLDOWN_DAYS,
+    DEFAULT_SIGNATURE_MAX_CHANGES,
+    normalize_signature_cooldown_days,
+)
 
 
 class RoleDatabaseManager(BaseDatabaseManager):
@@ -228,16 +232,21 @@ class RoleDatabaseManager(BaseDatabaseManager):
                 logging.error("Error updating signature for %s: %s", fmt_user(user_id), e)
                 return False
 
-    async def get_signature_remaining_changes(self, user_id: int) -> int:
+    async def get_signature_remaining_changes(
+        self,
+        user_id: int,
+        *,
+        cooldown_days: int = DEFAULT_SIGNATURE_COOLDOWN_DAYS,
+    ) -> int:
         """Calculate remaining signature changes for a user."""
+        cooldown_days = normalize_signature_cooldown_days(cooldown_days)
         signature_data = await self.get_user_signature(user_id)
         if not signature_data:
-            return 3  # First time user gets 3 changes
+            return DEFAULT_SIGNATURE_MAX_CHANGES
         
         current_time = datetime.now(timezone.utc)
         times = [signature_data['change_time1'], signature_data['change_time2'], signature_data['change_time3']]
         
-        # Count empty slots and slots older than 7 days
         remaining = 0
         for t in times:
             if not t:
@@ -245,15 +254,23 @@ class RoleDatabaseManager(BaseDatabaseManager):
             else:
                 try:
                     time_obj = datetime.fromisoformat(t)
-                    if (current_time - time_obj).days >= 7:
+                    if time_obj.tzinfo is None:
+                        time_obj = time_obj.replace(tzinfo=timezone.utc)
+                    if current_time - time_obj >= timedelta(days=cooldown_days):
                         remaining += 1
                 except (ValueError, TypeError):
                     remaining += 1
         
         return remaining
 
-    async def find_available_time_slot(self, user_id: int) -> Optional[int]:
+    async def find_available_time_slot(
+        self,
+        user_id: int,
+        *,
+        cooldown_days: int = DEFAULT_SIGNATURE_COOLDOWN_DAYS,
+    ) -> Optional[int]:
         """Find an available time slot for signature change."""
+        cooldown_days = normalize_signature_cooldown_days(cooldown_days)
         signature_data = await self.get_user_signature(user_id)
         if not signature_data:
             return 1  # First time user uses slot 1
@@ -270,15 +287,16 @@ class RoleDatabaseManager(BaseDatabaseManager):
             if not t:
                 return i
         
-        # Check for slots older than 7 days
+        # Check for slots older than the configured cooldown.
         oldest_time = None
         oldest_slot = None
         for i, t in enumerate(times, 1):
             if t:
                 try:
                     time_obj = datetime.fromisoformat(t)
-                    days_passed = (current_time - time_obj).days
-                    if days_passed >= 7:
+                    if time_obj.tzinfo is None:
+                        time_obj = time_obj.replace(tzinfo=timezone.utc)
+                    if current_time - time_obj >= timedelta(days=cooldown_days):
                         if oldest_time is None or time_obj < oldest_time:
                             oldest_time = time_obj
                             oldest_slot = i

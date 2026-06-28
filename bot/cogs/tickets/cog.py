@@ -36,6 +36,7 @@ class TicketsCog(commands.Cog):
         self.db_manager = TicketsDatabaseManager(self.main_conf['db_path'])
         # DB-backed cache refreshed on cog_load / after every CRUD.
         self.ticket_types: dict = {}
+        self._missing_ticket_cleanup_done = False
 
     async def cog_load(self):
         """Initialize the cog"""
@@ -46,9 +47,6 @@ class TicketsCog(commands.Cog):
         fixed_count = await self.db_manager.fix_null_ticket_numbers()
         if fixed_count > 0:
             logging.info(f"Fixed {fixed_count} tickets with NULL ticket_number")
-
-        # Check and close tickets for missing channels
-        await self.check_and_close_missing_tickets()
 
         logging.info(
             f"TicketsCog loaded successfully ({len(self.ticket_types)} ticket types)"
@@ -62,6 +60,10 @@ class TicketsCog(commands.Cog):
     async def on_ready(self):
         """Initialize views on bot ready"""
         try:
+            if not self._missing_ticket_cleanup_done:
+                await self.check_and_close_missing_tickets()
+                self._missing_ticket_cleanup_done = True
+
             # Get config data from database
             config_data = await self.db_manager.get_config()
             if not config_data:

@@ -31,7 +31,7 @@ checkin_embed_description: ''
 checkin_embed_count_field: 👥 今日签到人数
 checkin_embed_first_field: 👑 今日首签
 checkin_embed_no_checkin: 快来签到吧！
-checkin_embed_footer: =========点击下方按钮进行签到操作==========
+checkin_embed_footer: 每日签到日期变更时间：UTC+2 00:00
 checkin_button_daily_text: ✅ 每日签到
 checkin_button_makeup_text: ⏰ 补签
 checkin_button_query_text: 🔍 签到查询

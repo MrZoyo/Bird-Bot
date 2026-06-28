@@ -15,7 +15,7 @@ ACHIEVEMENT_RANK_TEXT = {
     "achievements.rank.type_button_labels.message": "🟡 Messages",
     "achievements.rank.type_button_labels.time_spent": "🔵 Voice",
     "achievements.rank.type_button_labels.checkin_sum": "🟠 Checkins",
-    "achievements.rank.type_button_labels.checkin_combo": "🟤 Streaks",
+    "achievements.rank.type_button_labels.checkin_combo": "🟢 Streaks",
 }
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 

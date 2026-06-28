@@ -7,7 +7,7 @@ RANK_BUTTON_EMOJIS = {
     'message': '🟡',
     'time_spent': '🔵',
     'checkin_sum': '🟠',
-    'checkin_combo': '🟤',
+    'checkin_combo': '🟢',
 }
 
 

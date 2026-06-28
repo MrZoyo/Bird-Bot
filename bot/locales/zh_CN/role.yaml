@@ -3,7 +3,7 @@ role_no_progress_message: 你还没有开始积累成就进度。
 role_no_achievement_message: 啊呀，你还没有完成这类成就呢~
 role_success_message: '恭喜你获得了成就： {name} '
 role_pickup_title: 请选择你想要领取的成就类型
-role_pickup_footer: '------点击按钮领取的成就，当前类型的成就将被替换为最高等级的成就------'
+role_pickup_footer: 成就领取后，当前类型的成就将被替换为最高等级的成就
 starsign_fire_title: 火象星座
 starsign_fire_description: "- ♈️ 白羊座 3月21日 - 4月19日\n- ♌️ 狮子座 7月23日 - 8月22日\n- ♐️ 射手座
   11月23日 - 12月21日"
@@ -59,24 +59,24 @@ signature:
 
     **⚖️规则：**
     - ❤️本功能目前暂向达成成就进度`箫管🐥雏来`以及`🦄助力用户`开放
-    - 💾每个签名最多50字
-    - 📆每周最多修改3次
+    - 💾每个签名最多{max_length}字
+    - 📆每{cooldown_days}天最多修改{max_changes}次
     - 🔇请遵守社区规范，和谐友善，否则可能被禁用此功能
   pickup_footer: '------点击按钮设置你的个性签名------'
   button_label: 设置签名
   modal_title: 设置个性签名
   modal_label: 在此输入你的新签名
   modal_placeholder: 请输入你的个性签名...
-  # Placeholders: {signature}, {remaining_times}
+  # Placeholders: {signature}, {remaining_times}, {cooldown_days}, {max_changes}
   success_message: |-
     签名设置成功！
     当前签名：{signature}
-    本周剩余修改次数：{remaining_times}次
+    当前{cooldown_days}天周期内剩余修改次数：{remaining_times}次
   update_failed_message: 更新签名失败，请稍后重试。
   disabled_message: 你已被禁用个性签名功能，如有疑问请联系管理员。
-  # Placeholders: {signature}
+  # Placeholders: {signature}, {cooldown_days}, {max_changes}
   cooldown_message: |-
-    修改次数已达本周上限，请等待先前修改超过7天后再试。
+    修改次数已达{cooldown_days}天内{max_changes}次上限，请等待先前修改超过{cooldown_days}天后再试。
     当前签名：{signature}
   view_button_label: 查看我的签名
   # Placeholders: {signature}

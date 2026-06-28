@@ -177,4 +177,4 @@ achievements_type_name:
 # 累计签到显示名；依赖 ShopCog 的签到记录，main.features.shop=false 时运行时隐藏。
   checkin_sum: 🟠 累计签到
 # 连续签到显示名；依赖 ShopCog 的最大连签记录，main.features.shop=false 时运行时隐藏。
-  checkin_combo: 🟤 连续签到
+  checkin_combo: 🟢 连续签到

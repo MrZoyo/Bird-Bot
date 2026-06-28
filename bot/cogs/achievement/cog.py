@@ -228,7 +228,7 @@ class AchievementCog(commands.Cog):
         embed.add_field(name="Messages to Add", value=str(messages), inline=True)
         embed.add_field(name="", value="\u200b", inline=False)
         embed.add_field(name="Time to Add (seconds)", value=str(time_spent), inline=True)
-        await interaction.edit_original_response(embed=embed, view=view)
+        view.message = await interaction.edit_original_response(embed=embed, view=view)
 
     @app_commands.command(
         name="decrease_achievement",
@@ -276,7 +276,7 @@ class AchievementCog(commands.Cog):
         embed.add_field(name="Messages to Subtract", value=str(messages), inline=True)
         embed.add_field(name="", value="\u200b", inline=False)
         embed.add_field(name="Time to Subtract (seconds)", value=str(time_spent), inline=True)
-        await interaction.edit_original_response(embed=embed, view=view)
+        view.message = await interaction.edit_original_response(embed=embed, view=view)
 
     @app_commands.command(
         name="achievement_ranking",

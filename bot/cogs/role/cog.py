@@ -12,8 +12,13 @@ from bot.utils.achievement_visibility import (
     filter_visible_role_types,
     resolve_hidden_achievement_types,
 )
+from bot.utils.components_v2 import clear_legacy_message_payload
 from bot.utils.i18n import t
 from bot.utils.role_db import RoleDatabaseManager
+from bot.utils.signature_cooldown import (
+    DEFAULT_SIGNATURE_MAX_CHANGES,
+    resolve_signature_cooldown_days,
+)
 
 from .views import AchievementRoleView, GenderView, MBTIView, SignatureView, StarSignView
 
@@ -129,6 +134,24 @@ class RoleCog(commands.Cog):
 
         return []
 
+    def _build_signature_pickup_embed(self) -> discord.Embed:
+        signature_config = self.role_config['signature']
+        cooldown_days = resolve_signature_cooldown_days(signature_config)
+        embed = discord.Embed(
+            title=t('role.signature.pickup_title'),
+            description=t('role.signature.pickup_description',
+                          max_length=signature_config['max_length'],
+                          max_changes=DEFAULT_SIGNATURE_MAX_CHANGES,
+                          cooldown_days=cooldown_days),
+            color=discord.Color.brand_green()
+        )
+        embed.set_footer(text=t('role.signature.pickup_footer'))
+
+        if self.bot.user.avatar:
+            embed.set_thumbnail(url=self.bot.user.avatar.url)
+
+        return embed
+
     def _build_role_check_report(self, guild: discord.Guild, panel_name: str, panel_type: str) -> tuple[bool, str]:
         targets = self._get_panel_role_targets(panel_type)
         passed_count = 0
@@ -211,20 +234,7 @@ class RoleCog(commands.Cog):
         # Create the role pickup message with the AchievementRoleView as its view
         view = AchievementRoleView(self.bot)
 
-        # Create an Embed for each type in the achievement
-        embed = discord.Embed(title=self.role_pickup_title, color=discord.Color.blue())
-        for role in self.role_type_name:
-            achievement_info = "\n".join([f"- **{a['name']}** : `{a['threshold']}`" for a in self.achievements if
-                                          a['type'] == role['type']])
-            embed.add_field(name=role['name'], value=achievement_info, inline=False)
-
-        embed.set_footer(text=self.role_pickup_footer)
-
-        # Set the thumbnail to the bot's avatar
-        if self.bot.user.avatar:
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
-
-        message = await channel.send(embed=embed, view=view)
+        message = await channel.send(view=view)
 
         # Save the view to the database
         await self.role_db.save_role_view(message.id, channel.id, table='role_views')
@@ -362,18 +372,7 @@ class RoleCog(commands.Cog):
 
         view = GenderView(self.bot)
 
-        embed = discord.Embed(title=self.gender_pickup_title, color=discord.Color.purple())
-        embed.add_field(name=self.gender_tree_title, value=self.gender_tree_description, inline=False)
-        embed.add_field(name=self.gender_sakura_title, value=self.gender_sakura_description, inline=False)
-        embed.add_field(name=self.gender_ninja_title, value=self.gender_ninja_description, inline=False)
-
-        embed.set_footer(text=self.gender_pickup_footer)
-
-        # Set the thumbnail to the bot's avatar
-        if self.bot.user.avatar:
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
-
-        message = await channel.send(embed=embed, view=view)
+        message = await channel.send(view=view)
 
         # Save the view to the database
         await self.role_db.save_role_view(message.id, channel.id, table='gender_views')
@@ -403,15 +402,7 @@ class RoleCog(commands.Cog):
         await interaction.response.defer()
 
         view = SignatureView(self.bot)
-        embed = discord.Embed(
-            title=t('role.signature.pickup_title'),
-            description=t('role.signature.pickup_description'),
-            color=discord.Color.brand_green()
-        )
-        embed.set_footer(text=t('role.signature.pickup_footer'))
-
-        if self.bot.user.avatar:
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
+        embed = self._build_signature_pickup_embed()
 
         message = await channel.send(embed=embed, view=view)
         await self.role_db.save_role_view(message.id, channel.id, table='signature_views')
@@ -527,7 +518,12 @@ class RoleCog(commands.Cog):
 
             logging.info("Recreating %s for message %s in %s", table, message_id, fmt_channel(channel))
 
-            await message.edit(view=view)
+            if table in {'role_views', 'gender_views'}:
+                await message.edit(**clear_legacy_message_payload(), view=view)
+            elif table == 'signature_views':
+                await message.edit(embed=self._build_signature_pickup_embed(), view=view)
+            else:
+                await message.edit(view=view)
 
 
     @app_commands.command(
@@ -588,7 +584,8 @@ class RoleCog(commands.Cog):
             await interaction.followup.send("User not found.", ephemeral=True)
             return
 
-        signature_data = await self.role_db.get_user_signature(int(user_id))
+        target_user_id = int(user_id)
+        signature_data = await self.role_db.get_user_signature(target_user_id)
 
         if not signature_data:
             await interaction.followup.send(
@@ -600,8 +597,7 @@ class RoleCog(commands.Cog):
 
         current_time = datetime.now(timezone.utc)
 
-        # 计算每个时间槽距今多少天 (loop var renamed from `t` to `ts`
-        # to avoid shadowing the i18n helper).
+        # Keep the loop variable away from the imported i18n helper name.
         times = []
         for ts in [signature_data['change_time1'], signature_data['change_time2'], signature_data['change_time3']]:
             try:

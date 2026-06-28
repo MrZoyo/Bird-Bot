@@ -13,6 +13,7 @@ from bot.utils.db_connect import (
     database_encryption_enabled,
     get_database_key,
 )
+from runtime_env import load_env_file
 from tools.encrypt_database import encrypt_database
 
 
@@ -76,6 +77,38 @@ def test_missing_database_key_file_requires_explicit_generation(tmp_path, monkey
         get_database_key()
 
     assert not key_file.exists()
+
+
+def test_load_env_file_resolves_local_key_file_path(tmp_path, monkeypatch):
+    _clear_database_key_env(monkeypatch)
+    env_file = tmp_path / ".env"
+    key_file = tmp_path / ".local_secrets" / "local-test-db.key"
+    environ = {}
+    env_file.write_text(
+        "\n".join(
+            [
+                f"{DB_KEY_FILE_ENV}={key_file.relative_to(tmp_path).as_posix()}",
+                f"{DB_REQUIRE_ENCRYPTION_ENV}=1",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    load_env_file(env_file, environ=environ)
+
+    assert environ[DB_KEY_FILE_ENV] == str(key_file.resolve())
+    assert environ[DB_REQUIRE_ENCRYPTION_ENV] == "1"
+
+
+def test_load_env_file_keeps_existing_environment_by_default(tmp_path, monkeypatch):
+    _clear_database_key_env(monkeypatch)
+    env_file = tmp_path / ".env"
+    environ = {DB_KEY_FILE_ENV: "configured-by-launcher"}
+    env_file.write_text(f"{DB_KEY_FILE_ENV}=local.key\n", encoding="utf-8")
+
+    load_env_file(env_file, environ=environ)
+
+    assert environ[DB_KEY_FILE_ENV] == "configured-by-launcher"
 
 
 def test_encrypt_database_outputs_sqlcipher_database(tmp_path, monkeypatch):

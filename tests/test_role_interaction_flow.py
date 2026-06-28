@@ -2,10 +2,14 @@ import asyncio
 from dataclasses import dataclass, field
 from types import SimpleNamespace
 
+import discord
+
+from bot.cogs.role import cog as role_cog_module
 from bot.cogs.role import modals as role_modals
 from bot.cogs.role import views as role_views
+from bot.cogs.role.cog import RoleCog
 from bot.cogs.role.modals import SignatureModal
-from bot.cogs.role.views import AchievementRoleView, SignatureView
+from bot.cogs.role.views import AchievementRoleView, GenderView, SignatureView
 
 
 ROLE_TEXT = {
@@ -14,11 +18,26 @@ ROLE_TEXT = {
     "role.role_no_achievement_message": "no achievement",
     "role.role_success_message": "awarded {name}",
     "role.role_remove_message": "removed {name}",
+    "role.role_pickup_title": "Pick achievement",
+    "role.role_pickup_footer": "Pickup footer",
+    "role.gender_pickup_title": "Pick gender",
+    "role.gender_tree_title": "Tree title",
+    "role.gender_tree_description": "- Tree description",
+    "role.gender_sakura_title": "Sakura title",
+    "role.gender_sakura_description": "- Sakura description",
+    "role.gender_ninja_title": "Ninja title",
+    "role.gender_ninja_description": "- Ninja description",
+    "role.gender_pickup_footer": "Gender footer",
+    "role.gender_success_message": "gender awarded {name}",
+    "role.gender_remove_message": "gender removed {name}",
     "role.signature.button_label": "Set signature",
     "role.signature.view_button_label": "View signature",
     "role.signature.modal_title": "Signature",
     "role.signature.modal_label": "Signature",
     "role.signature.modal_placeholder": "Write signature",
+    "role.signature.pickup_title": "Signature panel",
+    "role.signature.pickup_description": "max {max_length}; changes {max_changes}; days {cooldown_days}",
+    "role.signature.pickup_footer": "Signature footer",
     "role.signature.no_permission_message": "need {required_time}, have {current_time}",
     "role.signature.disabled_message": "disabled",
     "role.signature.cooldown_message": "cooldown {signature}",
@@ -133,8 +152,8 @@ class FakeSignatureDB:
         self.events.append(("db_get_signature", user_id))
         return None
 
-    async def find_available_time_slot(self, user_id):
-        self.events.append(("db_find_slot", user_id))
+    async def find_available_time_slot(self, user_id, **kwargs):
+        self.events.append(("db_find_slot", user_id, kwargs))
         return 1
 
     async def update_user_signature(self, user_id, signature, available_slot):
@@ -142,8 +161,8 @@ class FakeSignatureDB:
         self.signatures.append((user_id, signature, available_slot))
         return True
 
-    async def get_signature_remaining_changes(self, user_id):
-        self.events.append(("db_remaining", user_id))
+    async def get_signature_remaining_changes(self, user_id, **kwargs):
+        self.events.append(("db_remaining", user_id, kwargs))
         return 2
 
 
@@ -156,6 +175,34 @@ class FakeBot:
         if name == "RoleCog":
             return self.role_cog
         return None
+
+
+class FakeStoredRoleDB:
+    async def get_all_role_views(self, table):
+        return [(111, 222)]
+
+    async def remove_role_view(self, message_id, channel_id, table):
+        raise AssertionError("stored signature view should not be removed")
+
+
+class FakeStoredMessage:
+    def __init__(self):
+        self.edits = []
+
+    async def edit(self, **kwargs):
+        self.edits.append(kwargs)
+
+
+class FakeStoredChannel:
+    id = 222
+    name = "role-panels"
+
+    def __init__(self, message):
+        self.message = message
+
+    async def fetch_message(self, message_id):
+        assert message_id == 111
+        return self.message
 
 
 def _translate(key, **kwargs):
@@ -195,6 +242,7 @@ def _install_role_config(monkeypatch, role_db):
                     "time_requirement": 60,
                     "helper_role_id": 40,
                     "max_length": 20,
+                    "cooldown_days": 7,
                 },
             },
         }[name],
@@ -255,11 +303,63 @@ def test_achievement_role_view_hides_disabled_feature_role_types(monkeypatch):
 
     view = AchievementRoleView(FakeBot(role_cog=None))
 
-    assert [child.custom_id for child in view.children] == ["message"]
+    assert [
+        child.custom_id
+        for child in view.walk_children()
+        if getattr(child, "custom_id", None) is not None
+    ] == ["message"]
     assert [achievement["type"] for achievement in view.achievements] == [
         "message",
         "message",
     ]
+    assert view.has_components_v2() is True
+    container = view.to_components()[0]
+    assert [component["type"] for component in container["components"]] == [10, 14, 9, 10]
+    assert container["components"][0]["content"] == "### Pick achievement"
+    assert container["components"][1]["divider"] is True
+    sections = [component for component in container["components"] if component["type"] == 9]
+    assert len(sections) == 1
+    assert sections[0]["components"][0]["content"] == (
+        "**Messages**\n- **Chatter** : `10`\n- **Veteran** : `50`"
+    )
+    assert sections[0]["accessory"]["label"] == "Messages"
+    assert sections[0]["accessory"]["custom_id"] == "message"
+    assert container["components"][-1]["content"] == "-# Pickup footer"
+
+
+def test_gender_role_view_pairs_each_type_with_right_side_button(monkeypatch):
+    events = []
+    role_db = FakeRoleDB(events)
+    _install_role_config(monkeypatch, role_db)
+    original_get_config = role_views.config.get_config
+
+    def get_config(name=None):
+        base = original_get_config(name)
+        if name == "role":
+            return {
+                **base,
+                "gender_name": [
+                    {"name": "Tree", "emoji": "🌳", "role_id": 1},
+                    {"name": "Sakura", "emoji": "🌸", "role_id": 2},
+                    {"name": "Ninja", "emoji": "🥷", "role_id": 3},
+                ],
+            }
+        return base
+
+    monkeypatch.setattr(role_views.config, "get_config", get_config)
+
+    view = GenderView(FakeBot(role_cog=None))
+    container = view.to_components()[0]
+    sections = [component for component in container["components"] if component["type"] == 9]
+
+    assert view.has_components_v2() is True
+    assert [component["type"] for component in container["components"]] == [10, 14, 9, 14, 9, 14, 9, 10]
+    assert container["components"][0]["content"] == "### Pick gender"
+    assert container["components"][1]["divider"] is True
+    assert [section["accessory"]["label"] for section in sections] == ["🌳", "🌸", "🥷"]
+    assert [section["accessory"]["custom_id"] for section in sections] == ["Tree", "Sakura", "Ninja"]
+    assert sections[0]["components"][0]["content"] == "**Tree title**\nTree description"
+    assert container["components"][-1]["content"] == "-# Gender footer"
 
 
 def test_signature_button_rejects_user_without_voice_time_before_modal(monkeypatch):
@@ -273,6 +373,7 @@ def test_signature_button_rejects_user_without_voice_time_before_modal(monkeypat
                     "time_requirement": 60,
                     "helper_role_id": 40,
                     "max_length": 20,
+                    "cooldown_days": 7,
                 },
             },
             main_config={"db_path": "unused"},
@@ -307,7 +408,14 @@ def test_signature_modal_updates_signature_before_success_followup(monkeypatch):
         signature_db = FakeSignatureDB(events)
         monkeypatch.setattr(role_modals, "t", _translate)
         monkeypatch.setattr(role_modals, "RoleDatabaseManager", lambda db_path: signature_db)
-        role_cog = SimpleNamespace(main_config={"db_path": "unused"})
+        role_cog = SimpleNamespace(
+            main_config={"db_path": "unused"},
+            role_config={
+                "signature": {
+                    "cooldown_days": 14,
+                },
+            },
+        )
         bot = FakeBot(role_cog)
         modal = SignatureModal(bot, max_length=20)
         modal.signature._value = "hello"
@@ -327,10 +435,45 @@ def test_signature_modal_updates_signature_before_success_followup(monkeypatch):
             "db_remaining",
             "followup",
         ]
+        assert events[2] == ("db_find_slot", 123, {"cooldown_days": 14})
+        assert events[4] == ("db_remaining", 123, {"cooldown_days": 14})
         assert signature_db.signatures == [(123, "hello", 1)]
         assert interaction.followup.messages[0] == {
             "content": "saved hello; remaining 2",
             "ephemeral": True,
         }
+
+    asyncio.run(scenario())
+
+
+def test_signature_view_restore_refreshes_embed_with_configured_cooldown(monkeypatch):
+    async def scenario():
+        monkeypatch.setattr(role_cog_module, "t", _translate)
+        monkeypatch.setattr(role_views, "t", _translate)
+        stored_message = FakeStoredMessage()
+        stored_channel = FakeStoredChannel(stored_message)
+        role_cog = SimpleNamespace(
+            role_config={
+                "signature": {
+                    "max_length": 24,
+                    "cooldown_days": 14,
+                },
+            },
+            role_db=FakeStoredRoleDB(),
+            bot=SimpleNamespace(
+                user=SimpleNamespace(avatar=None),
+                get_channel=lambda channel_id: stored_channel if channel_id == 222 else None,
+            ),
+        )
+        role_cog._build_signature_pickup_embed = lambda: RoleCog._build_signature_pickup_embed(role_cog)
+
+        await RoleCog.load_role_views(role_cog, table="signature_views")
+
+        assert len(stored_message.edits) == 1
+        edit = stored_message.edits[0]
+        assert isinstance(edit["embed"], discord.Embed)
+        assert edit["embed"].title == "Signature panel"
+        assert edit["embed"].description == "max 24; changes 3; days 14"
+        assert isinstance(edit["view"], SignatureView)
 
     asyncio.run(scenario())
