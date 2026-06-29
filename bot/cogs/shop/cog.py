@@ -12,6 +12,7 @@ from bot.utils import check_channel_validity, config, fmt_channel, fmt_user
 from bot.utils.components_v2 import clear_legacy_message_payload
 from bot.utils.i18n import t
 from bot.utils.shop_db import ShopDatabaseManager
+from bot.utils.task_helpers import wait_until_ready_or_stop
 
 from .modals import BalanceModifyModal
 from .views import CheckinEmbedView, TransactionHistoryView
@@ -30,6 +31,7 @@ class ShopCog(commands.Cog):
 
         # Initialize database manager
         self.db = ShopDatabaseManager(self.db_path, self.conf)
+        self._embed_views_recovered = False
 
     async def cog_load(self):
         """Initialize database when cog loads."""
@@ -42,9 +44,18 @@ class ShopCog(commands.Cog):
         # Start daily panel update task
         if not self.update_daily_embeds.is_running():
             self.update_daily_embeds.start()
-        
-        # Recover existing panel views on bot restart
+
+    def cog_unload(self):
+        if self.update_daily_embeds.is_running():
+            self.update_daily_embeds.cancel()
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        """Recover existing check-in panels after channel caches are available."""
+        if self._embed_views_recovered:
+            return
         await self.recover_embed_views()
+        self._embed_views_recovered = True
 
     @tasks.loop(minutes=30)
     async def update_daily_embeds(self):
@@ -61,7 +72,7 @@ class ShopCog(commands.Cog):
                     
                     # Update the actual panel message
                     try:
-                        channel = self.bot.get_channel(embed_data['channel_id'])
+                        channel = await self._get_panel_channel(embed_data['channel_id'])
                         if channel:
                             message = await channel.fetch_message(embed_data['message_id'])
                             if message:
@@ -75,6 +86,28 @@ class ShopCog(commands.Cog):
         except Exception as e:
             logging.error(f"Error in daily embed update: {e}")
 
+    @update_daily_embeds.before_loop
+    async def before_update_daily_embeds(self):
+        await wait_until_ready_or_stop(
+            self.bot,
+            self.update_daily_embeds,
+            'ShopCog.update_daily_embeds',
+        )
+
+    async def _get_panel_channel(self, channel_id: int):
+        channel = self.bot.get_channel(channel_id)
+        if channel is not None:
+            return channel
+        try:
+            return await self.bot.fetch_channel(channel_id)
+        except discord.NotFound:
+            logging.warning("Checkin panel channel unknown (%s) was not found.", channel_id)
+        except discord.Forbidden:
+            logging.error("No permission to fetch checkin panel channel unknown (%s).", channel_id)
+        except discord.HTTPException as e:
+            logging.error("Failed to fetch checkin panel channel unknown (%s): %s", channel_id, e)
+        return None
+
     async def recover_embed_views(self):
         """Recover check-in panel views after bot restart."""
         try:
@@ -82,7 +115,7 @@ class ShopCog(commands.Cog):
             current_date = datetime.now().strftime('%Y-%m-%d')
             for embed_data in active_embeds:
                 try:
-                    channel = self.bot.get_channel(embed_data['channel_id'])
+                    channel = await self._get_panel_channel(embed_data['channel_id'])
                     if channel:
                         message = await channel.fetch_message(embed_data['message_id'])
                         if message:
@@ -134,6 +167,8 @@ class ShopCog(commands.Cog):
             for embed_data in active_embeds:
                 try:
                     channel = self.bot.get_channel(embed_data['channel_id'])
+                    if channel is None:
+                        channel = await self._get_panel_channel(embed_data['channel_id'])
                     if not channel:
                         await self.db.deactivate_checkin_embed(embed_data['id'])
                         continue
