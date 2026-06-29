@@ -22,12 +22,20 @@ def test_giveaway_record_participants_winners_and_views(tmp_path):
             reaction_req=1,
             message_req=2,
             timespent_req=3,
+            provider="Provider",
+            image_url="https://example.com/prize.png",
+            image_filename="prize.png",
+            ui_version=2,
         )
 
         record = await db.fetch_giveaway(1)
         assert record["giveaway_id"] == 1
         assert record["description"] == "Initial"
         assert record["reaction_req"] == 1
+        assert record["provider"] == "Provider"
+        assert record["image_url"] == "https://example.com/prize.png"
+        assert record["image_filename"] == "prize.png"
+        assert record["ui_version"] == 2
         assert await db.fetch_all_giveaway_ids() == [1]
         assert await db.fetch_giveaway_requirements(1) == (1, 2, 3)
 

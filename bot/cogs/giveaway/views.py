@@ -3,11 +3,41 @@ import logging
 
 import discord
 from discord import components, ui
-from discord.ui import Button, View
+from discord.ui import Button
 from discord.utils import format_dt
 
-from bot.utils import config, fmt_channel
+from bot.utils import fmt_channel
 from bot.utils.i18n import t
+
+
+INLINE_SPACER_VALUE = "\u200b"
+
+
+def add_lead_and_three_stat_fields(
+    embed: discord.Embed,
+    lead_label: str,
+    lead_value: str,
+    first_label: str,
+    first_value: str,
+    second_label: str,
+    second_value: str,
+    third_label: str,
+    third_value: str,
+) -> None:
+    """Render one full-width lead field followed by three compact stat fields."""
+    for label, value, inline in (
+        (lead_label, lead_value, False),
+        (first_label, first_value, True),
+        (second_label, second_value, True),
+        (third_label, third_value, True),
+    ):
+        embed.add_field(name=label, value=value or INLINE_SPACER_VALUE, inline=inline)
+
+
+def format_participant_count(participant_count: int, empty_text: str) -> str:
+    if int(participant_count or 0) <= 0:
+        return empty_text
+    return str(participant_count)
 
 
 class GiveawayParticipationView(ui.View):
@@ -18,7 +48,6 @@ class GiveawayParticipationView(ui.View):
         self.giveaway_channel_id = int(giveaway_channel_id)
         self.message_id = None
 
-        self.conf = config.get_config('giveaway')
         self.giveaway_join_button_label = t('giveaway.giveaway_join_button_label')
         self.giveaway_exit_button_label = t('giveaway.giveaway_exit_button_label')
         self.giveaway_already_joined_message = t('giveaway.giveaway_already_joined_message')
@@ -26,6 +55,7 @@ class GiveawayParticipationView(ui.View):
         self.giveaway_leave_message = t('giveaway.giveaway_leave_message')
         self.giveaway_not_access_message = t('giveaway.giveaway_not_access_message')
         self.giveaway_embed_participants_title = t('giveaway.giveaway_embed_participants_title')
+        self.giveaway_embed_participants_text = t('giveaway.giveaway_embed_participants_text')
         self.giveaway_end_message = t('giveaway.giveaway_end_message')
 
         # buttons definition
@@ -93,7 +123,7 @@ class GiveawayParticipationView(ui.View):
                 await interaction.response.send_message(self.giveaway_joined_message,
                                                         view=exit_view,
                                                         ephemeral=True)
-            else:
+            elif not interaction.response.is_done():
                 # The user does not meet the requirements to participate in the giveaway
                 await interaction.response.send_message(self.giveaway_not_access_message, ephemeral=True)
 
@@ -139,18 +169,50 @@ class GiveawayParticipationView(ui.View):
         if index is not None:
             # Update the "Number of Participants" field if it exists
             message.embeds[0].set_field_at(index, name=self.giveaway_embed_participants_title,
-                                           value=str(participant_count),
+                                           value=format_participant_count(
+                                               participant_count,
+                                               self.giveaway_embed_participants_text,
+                                           ),
                                            inline=True)
 
         await message.edit(embed=message.embeds[0])
 
-class GiveawayConfirmationView(View):
-    def __init__(self, bot):
-        super().__init__()
-        self.bot = bot
 
-        self.conf = config.get_config('giveaway')
+class GiveawayPanelView(ui.View):
+    def __init__(
+        self,
+        bot,
+        giveaway_id,
+        giveaway_channel_id,
+        *,
+        record=None,
+        participant_count=0,
+        status="open",
+        winners=None,
+        disabled=False,
+    ):
+        super().__init__(timeout=None)
+        self.bot = bot
+        self.giveaway_id = giveaway_id
+        self.giveaway_channel_id = int(giveaway_channel_id)
+        self.message_id = None
+        self.record = None
+        self.participant_count = participant_count
+        self.status = status
+        self.winners = winners or []
+
+        self.giveaway_default_provider = t('giveaway.giveaway_default_provider')
+        self.giveaway_join_button_label = t('giveaway.giveaway_join_button_label')
+        self.giveaway_exit_button_label = t('giveaway.giveaway_exit_button_label')
+        self.giveaway_already_joined_message = t('giveaway.giveaway_already_joined_message')
+        self.giveaway_joined_message = t('giveaway.giveaway_joined_message')
+        self.giveaway_leave_message = t('giveaway.giveaway_leave_message')
+        self.giveaway_not_access_message = t('giveaway.giveaway_not_access_message')
+        self.giveaway_end_message = t('giveaway.giveaway_end_message')
         self.giveaway_embed_title_open = t('giveaway.giveaway_embed_title_open')
+        self.giveaway_embed_end_label = t('giveaway.giveaway_embed_end_label')
+        self.giveaway_embed_cancel_label = t('giveaway.giveaway_embed_cancel_label')
+        self.giveaway_embed_earlyend_label = t('giveaway.giveaway_embed_earlyend_label')
         self.giveaway_embed_provider_title = t('giveaway.giveaway_embed_provider_title')
         self.giveaway_embed_timeend_title = t('giveaway.giveaway_embed_timeend_title')
         self.giveaway_embed_winner_number_title = t('giveaway.giveaway_embed_winner_number_title')
@@ -158,36 +220,231 @@ class GiveawayConfirmationView(View):
         self.giveaway_embed_participants_text = t('giveaway.giveaway_embed_participants_text')
         self.giveaway_embed_description_title = t('giveaway.giveaway_embed_description_title')
         self.giveaway_embed_footer = t('giveaway.giveaway_embed_footer')
+        self.giveaway_embed_winner_title = t('giveaway.giveaway_embed_winner_title')
+        self.giveaway_requirement_title = t('giveaway.giveaway_requirement_title')
+        self.giveaway_requirement_text = t('giveaway.giveaway_requirement_text')
+        self.giveaway_no_requirement_text = t('giveaway.giveaway_no_requirement_text')
 
-    def create_embed(self, giveaway_id, prizes, description, winners, duration, providers, interaction):
-        # Create an embed to show all the giveaway information
+        self.participate_button = Button(
+            label=self.giveaway_join_button_label,
+            style=components.ButtonStyle.primary,
+            custom_id=f"participate_{str(self.giveaway_id)}",
+            disabled=disabled,
+        )
+        self.participate_button.callback = self.participate
+
+        self.exit_button = Button(
+            label=self.giveaway_exit_button_label,
+            style=components.ButtonStyle.danger,
+            custom_id=f"exit_{str(self.giveaway_id)}",
+        )
+        self.exit_button.callback = self.exit
+
+        self.add_item(self.participate_button)
+
+        if record is not None:
+            self.populate_panel(
+                record,
+                participant_count=participant_count,
+                status=status,
+                winners=winners or [],
+                disabled=disabled,
+            )
+
+    def disable_all_buttons(self):
+        for item in self.walk_children():
+            if isinstance(item, ui.Button):
+                item.disabled = True
+
+    def populate_panel(
+        self,
+        record,
+        *,
+        participant_count=0,
+        status="open",
+        winners=None,
+        disabled=False,
+    ):
+        winners = winners or []
+        self.record = record
+        self.participant_count = participant_count
+        self.status = status
+        self.winners = winners
+        self.participate_button.disabled = disabled
+
+    def format_embed(self):
+        record = self.record or {}
+        participant_count = self.participant_count
+        winners = self.winners
+        status = self.status
+
         embed = discord.Embed(
-            title=self.giveaway_embed_title_open.format(prizes=prizes),
-            color=discord.Color.blue()
+            title=self._build_title(record, status),
+            color=self._status_color(status),
         )
 
-        # Calculate the end time and express it as elapsed_time
-        end_time = datetime.datetime.now() + datetime.timedelta(minutes=duration)
-        elapsed_time = format_dt(end_time, style='R')
+        provider = record.get('provider') or self.giveaway_default_provider
+        add_lead_and_three_stat_fields(
+            embed,
+            self.giveaway_embed_provider_title,
+            provider,
+            self.giveaway_embed_timeend_title,
+            self._format_end_time(record),
+            self.giveaway_embed_winner_number_title,
+            str(record.get('winner_number', 1)),
+            self.giveaway_embed_participants_title,
+            format_participant_count(participant_count, self.giveaway_embed_participants_text),
+        )
 
-        # Set the start time in the timestamp
-        embed.timestamp = datetime.datetime.now()
+        embed.add_field(
+            name=self.giveaway_requirement_title,
+            value=self._format_requirements(record),
+            inline=False,
+        )
+        description = record.get('description') or ""
+        if description:
+            embed.add_field(
+                name=self.giveaway_embed_description_title,
+                value=description,
+                inline=False,
+            )
+        if winners:
+            embed.add_field(
+                name=self.giveaway_embed_winner_title,
+                value=', '.join(winners),
+                inline=False,
+            )
 
-        # Add the fields to the embed
-        embed.add_field(name=self.giveaway_embed_provider_title, value=providers, inline=False)
-        embed.add_field(name=self.giveaway_embed_timeend_title, value=elapsed_time, inline=True)
-        embed.add_field(name=self.giveaway_embed_winner_number_title, value=str(winners), inline=True)
-        embed.add_field(name=self.giveaway_embed_participants_title, value=self.giveaway_embed_participants_text,
-                        inline=True)
-        embed.add_field(name=self.giveaway_embed_description_title, value=description, inline=False)
+        media_url = self._resolve_media_url(record)
+        if media_url:
+            embed.set_image(url=media_url)
 
-        embed.set_footer(text=self.giveaway_embed_footer.format(giveaway_id=giveaway_id))
-
-        # Set the thumbnail to the bot's avatar
         if self.bot.user.avatar:
             embed.set_thumbnail(url=self.bot.user.avatar.url)
 
+        embed.set_footer(text=self.giveaway_embed_footer.format(giveaway_id=self.giveaway_id))
         return embed
+
+    def _build_title(self, record, status):
+        title = self.giveaway_embed_title_open.format(prizes=record.get('prizes', ''))
+        if status == "cancelled":
+            return self.giveaway_embed_cancel_label + title
+        if status == "earlyended":
+            return self.giveaway_embed_earlyend_label + title
+        if status == "ended":
+            return self.giveaway_embed_end_label + title
+        return title
+
+    def _status_color(self, status):
+        if status == "cancelled":
+            return discord.Color.orange()
+        if status in {"earlyended", "ended"}:
+            return discord.Color.red()
+        return discord.Color.blue()
+
+    def _resolve_media_url(self, record):
+        image_url = record.get('image_url')
+        if image_url:
+            return image_url
+        image_filename = record.get('image_filename')
+        if image_filename:
+            return f"attachment://{image_filename}"
+        return None
+
+    def _format_end_time(self, record):
+        starttime = record.get('starttime')
+        duration = int(record.get('duration') or 0)
+        try:
+            start = datetime.datetime.fromisoformat(starttime)
+        except (TypeError, ValueError):
+            start = datetime.datetime.now()
+        return format_dt(start + datetime.timedelta(minutes=duration), style='R')
+
+    def _format_requirements(self, record):
+        reaction_req = int(record.get('reaction_req') or 0)
+        message_req = int(record.get('message_req') or 0)
+        timespent_req = int(record.get('timespent_req') or 0)
+        if not any((reaction_req, message_req, timespent_req)):
+            return self.giveaway_no_requirement_text
+        return self.giveaway_requirement_text.format(
+            reaction_req=reaction_req,
+            message_req=message_req,
+            timespent_req=timespent_req // 60,
+        )
+
+    async def participate(self, interaction: discord.Interaction):
+        if interaction.response.is_done():
+            return
+
+        giveaway_cog = self.bot.get_cog('GiveawayCog')
+
+        if await giveaway_cog.is_participant(self.giveaway_id, interaction.user.id):
+            exit_view = ui.View()
+            exit_view.add_item(self._make_exit_button())
+            await interaction.response.send_message(
+                self.giveaway_already_joined_message,
+                view=exit_view,
+                ephemeral=True,
+            )
+        else:
+            if await giveaway_cog.check_participant_eligibility(self.giveaway_id, interaction.user.id, interaction):
+                await giveaway_cog.add_participant_to_giveaway(self.giveaway_id, interaction.user.id, interaction)
+                exit_view = ui.View()
+                exit_view.add_item(self._make_exit_button())
+                await interaction.response.send_message(
+                    self.giveaway_joined_message,
+                    view=exit_view,
+                    ephemeral=True,
+                )
+            elif not interaction.response.is_done():
+                await interaction.response.send_message(self.giveaway_not_access_message, ephemeral=True)
+
+        await self.update_giveaway_embed()
+
+    def _make_exit_button(self):
+        exit_button = ui.Button(label=self.giveaway_exit_button_label, style=discord.ButtonStyle.danger)
+        exit_button.callback = self.exit
+        return exit_button
+
+    async def exit(self, interaction: discord.Interaction):
+        giveaway_cog = self.bot.get_cog('GiveawayCog')
+        giveaway_details = await giveaway_cog.fetch_giveaway(self.giveaway_id)
+
+        if giveaway_details['is_end']:
+            await interaction.response.send_message(self.giveaway_end_message, ephemeral=True)
+            return
+        if await giveaway_cog.is_participant(self.giveaway_id, interaction.user.id):
+            await giveaway_cog.remove_participant_from_giveaway(self.giveaway_id, interaction.user.id)
+            await interaction.response.send_message(self.giveaway_leave_message, ephemeral=True)
+            await self.update_giveaway_embed()
+
+    async def update_giveaway_embed(self):
+        channel = self.bot.get_channel(self.giveaway_channel_id)
+        if channel is None:
+            logging.error("Giveaway channel %s not found", fmt_channel(self.giveaway_channel_id))
+            return
+        message = await channel.fetch_message(self.message_id)
+
+        giveaway_cog = self.bot.get_cog('GiveawayCog')
+        record = await giveaway_cog.fetch_giveaway(self.giveaway_id)
+        if record is None:
+            return
+
+        participant_count = await giveaway_cog.get_participant_count(self.giveaway_id)
+        view = GiveawayPanelView(
+            self.bot,
+            self.giveaway_id,
+            self.giveaway_channel_id,
+            record=record,
+            participant_count=participant_count,
+        )
+        view.message_id = message.id
+        giveaway_cog.giveaways[self.giveaway_id] = view
+        if hasattr(giveaway_cog, 'edit_giveaway_panel_message'):
+            await giveaway_cog.edit_giveaway_panel_message(message, view)
+        else:
+            await message.edit(embed=view.format_embed(), view=view)
+
 
 class GiveawayCheckParticipantView(ui.View):
     def __init__(self, giveaway_id, participant_ids):

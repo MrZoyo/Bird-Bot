@@ -3,13 +3,14 @@ import discord
 from .config import config
 
 
-async def check_channel_validity(ctx_or_interaction, allowed_channel_id=None):
+async def check_channel_validity(ctx_or_interaction, allowed_channel_id=None, *, ephemeral=True):
     """
     Check if the command is used in the correct channel.
 
     Args:
         ctx_or_interaction: Context or Interaction from Discord
         allowed_channel_id: Optional specific channel ID to check. If None, uses default from config.
+        ephemeral: Whether interaction error responses should be visible only to the caller.
 
     Returns:
         bool: True if channel is valid, False otherwise
@@ -30,7 +31,7 @@ async def check_channel_validity(ctx_or_interaction, allowed_channel_id=None):
         if isinstance(ctx_or_interaction, discord.ext.commands.Context):
             await ctx_or_interaction.send(message)
         else:
-            await ctx_or_interaction.response.send_message(message, ephemeral=True)
+            await ctx_or_interaction.response.send_message(message, ephemeral=ephemeral)
         return False
     return True
 

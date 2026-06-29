@@ -96,7 +96,7 @@
 
 ## 4. Tickets / Giveaway
 
-真实 Discord 必测点：真实 thread、persistent buttons、DM 失败、抽奖消息恢复。
+真实 Discord 必测点：真实 thread、persistent buttons、DM 失败、抽奖消息恢复、图片附件显示。
 
 - [x] `/tickets_init` 初始化主面板和日志频道。
   - 2026-06-28：工单主面板重新生成到消息 `1520784482809024533`，旧消息 `1520774586730418329` 已删除；每个工单类型一行，右侧按钮统一显示 locale 文案「创建」。Discord API 读回 4 个按钮 label 均为「创建」，外观审核截图已发到 `测试2`。
@@ -104,7 +104,8 @@
 - [x] 管理员接单、添加协作者、关闭工单；thread 状态、日志频道和统计正确。
 - [x] Bot 重启后，Tickets 主面板和已存在工单按钮可恢复。
 - [x] 用户关闭 DM 时，Tickets 创建 / 关闭流程不因 DM 失败中断。
-- [x] `/ga_create` 创建测试抽奖，普通用户参与 / 退出后消息人数显示正确。
+- [x] `/ga_create` 通过草稿 modal 创建测试抽奖；基础信息、参与限制和可选图片可编辑，正式 embed 显示 bot 头像 / 奖品图片。
+- [x] 普通用户参与 / 退出后消息人数显示正确，个人操作反馈仅个人可见。
 - [x] `/ga_end` 手动开奖或 `/ga_cancel` 取消后，View 清理且不能继续参与。
 - [x] Bot 重启后，未结束抽奖按钮可恢复；`/ga_sendtowinner` 遇到 DM 失败不阻断整体流程。
 

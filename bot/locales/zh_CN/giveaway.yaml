@@ -26,3 +26,48 @@ giveaway_win_public_message: 欧皇诞生！恭喜{winner_mentions} 赢得了奖
 giveaway_win_private_message: 恭喜你，你在抽奖活动中赢得了奖品 {prizes}！不要忘记领奖哦！
 giveaway_fail_message: 啊呀，这次抽奖没有人能带走 {prizes}~~
 giveaway_end_message: 这次抽奖活动已经结束啦！
+giveaway_requirement_title: 参与条件
+giveaway_requirement_text: "表情反应 ≥ {reaction_req}；消息数 ≥ {message_req}；语音时长 ≥ {timespent_req} 分钟"
+giveaway_no_requirement_text: 无额外限制
+giveaway_create_modal_title: 创建抽奖
+giveaway_duration_label: 持续时间
+giveaway_duration_placeholder: 例如 1d / 24h / 30m
+giveaway_winners_label: 中奖人数
+giveaway_winners_placeholder: 输入中奖人数
+giveaway_prizes_label: 奖品
+giveaway_prizes_placeholder: 输入奖品名称
+giveaway_description_label: 抽奖说明
+giveaway_description_placeholder: 输入抽奖说明
+giveaway_description_default: 无额外说明
+giveaway_provider_label: 奖品提供者
+giveaway_provider_placeholder: 留空则使用默认提供者
+giveaway_duration_invalid_message: 持续时间格式不正确，请使用 1d、24h、30m 这类格式。
+giveaway_winners_invalid_message: 中奖人数必须是不小于 1 的整数。
+giveaway_limits_modal_title: 参与限制
+giveaway_reaction_limit_label: 最低表情反应数
+giveaway_message_limit_label: 最低消息数
+giveaway_timespent_limit_label: 最低语音时长（分钟）
+giveaway_limit_placeholder: 0 表示不限制
+giveaway_limit_invalid_message: 参与限制必须是非负整数。
+giveaway_image_modal_title: 抽奖图片
+giveaway_image_label: 可选图片
+giveaway_image_invalid_message: 请上传图片文件。
+giveaway_image_description: 抽奖奖品图片
+giveaway_draft_edit_button: 编辑基础信息
+giveaway_draft_limits_button: 参与限制
+giveaway_draft_image_button: 上传图片
+giveaway_draft_publish_button: 发布抽奖
+giveaway_draft_owner_only_message: 只有创建这次抽奖的人可以编辑这个草稿。
+giveaway_draft_no_image: 未上传
+giveaway_draft_title: 抽奖草稿
+giveaway_draft_prizes_title: 奖品
+giveaway_draft_missing_value: 待填写
+giveaway_draft_image_title: 图片
+giveaway_already_published_message: 这个抽奖草稿已经发布过了。
+giveaway_draft_missing_basic_message: 请先填写完整的抽奖基础信息。
+giveaway_channel_missing_message: 找不到抽奖公告频道，请检查 giveaway 配置。
+giveaway_published_title: 抽奖已发布
+giveaway_published_message: 抽奖已发布，ID：{giveaway_id}
+giveaway_modal_error_message: 抽奖表单处理失败，错误已写入日志。
+giveaway_modal_open_failed_message: 无法打开抽奖表单，请稍后重试。
+giveaway_draft_refresh_failed_message: 抽奖草稿刷新失败，请重新使用 /ga_create 创建。

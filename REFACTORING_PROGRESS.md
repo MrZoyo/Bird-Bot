@@ -13,7 +13,7 @@
 ## 2026-06-28 当前状态同步
 
 - P3-9 fake Discord interaction flow tests 已按当前清单补完，状态为 ✅ 完成；已覆盖 PrivateRoom 续费、Shop 签到 / 补签、Tickets 创建 / 接单 / 关闭、Ban `/tempban`、VoiceChannel 控制面板、Giveaway 参与 / 退出 / 开奖 / 取消、Role / Signature、Achievement / Rank、Welcome / Games、CheckStatus / Backup。
-- 当前自动化基线：`./.venv/Scripts/python.exe -m pytest -q` 为 `99 passed, 1 warning`。
+- 当前自动化基线：`./.venv/Scripts/python.exe -m pytest -q` 为 `104 passed, 1 warning`。
 - 本轮新增 23 个离线 fake interaction tests；所有新增测试均使用最小 fake Discord 对象和临时状态，不联网、不触碰真实 `data/bot.db`。
 - 2026-05-04 补充：`/rank` 的分类按钮已使用 Discord Button `emoji` 字段补齐彩色圆点；当前色彩为全部排名 🟣、添加反应 🔴、发送消息 🟡、语音时长 🔵、累计签到 🟠、连续签到 🟢。连续签到从原先与全部排名重复的 🟣 改为 🟢。按钮上的语音时长不带 `(min)`；排行榜类型名仍保留单位说明。locale 里若已有圆点前缀，运行时会剥离 label 前缀，避免按钮显示重复 emoji。已移除本地 `bot/config/achievements.yaml` 的 legacy `rank:` UI 文案块；迁移脚本也会把旧 JSON 的 `achievements.rank` 显式标为 `drop`，不再迁到 YAML 或 locale。`shop` feature flag 关闭时，对应签到成就现在由共享 helper 同步隐藏，覆盖成就页、排行榜、`/rank` 按钮和 Role 成就领取面板；抽奖成就类别已退役，即使 GiveawayCog 启用也不会再显示或计数。
 - 2026-05-04 补充：所有 `bot/config/*.yaml.example` 和本地实际 `bot/config/*.yaml` 都已补充配置注释。注释按当前代码读取点编写，明确标出单位、ID 类型、DB/locale 分工，以及当前保留但运行时不读取的历史字段（如 `role.signature.max_changes_per_week`）。本地实际 YAML 的真实值未打印；只通过 ruamel round-trip 写入注释。
@@ -27,6 +27,7 @@
 - 2026-06-28 真实测试服验证补充：使用 Chrome Discord 双账号 `mrzoyo`（管理员）和 `zoyoooo`（普通 / 部分测试配置内管理员）完成多轮手工验证。截图已发到 `测试2`：Tickets 主入口 Components v2、Shop 签到面板 Components v2、PrivateRoom 商店面板 Components v2，以及 Tickets 主入口统一按钮 / 类型右侧排列更新截图。
 - 2026-06-28 补充：按最终文案要求，Tickets 主入口按钮文案继续走 `tickets.messages.ticket_create_button_label` locale key，当前 zh_CN 为「创建」。已删除旧公共面板并重新生成全部公开面板：Tickets `1520784482809024533`、Shop 签到 `1520784491826905191`、PrivateRoom 商店 `1520784497652793468`、成就身份组 `1520784504988373024`、星座 `1520784510218670272`、MBTI `1520784515486978300`、性别 `1520784520801161458`、签名 `1520784526236713131`、组队展示板 `1520784531970592970`。Discord API 读回 Tickets 4 个按钮 label 均为「创建」。
 - 2026-06-28 补充：按后续 UI 文案微调，Shop 签到面板顶部统计改成两列，并将 footer 改为「每日签到日期变更时间：UTC+2 00:00」；PrivateRoom 商店 footer 改为「私人房间将到期后自动删除，文字频道的聊天记录会丢失。」；成就领取和性别标识面板在标题后加分割线，块间保留分割线，末尾说明改为 Components v2 `-#` footer 且最后一个块下不加分割线；连续签到颜色统一从棕色圆点改为 🟢，覆盖 `/rank` 按钮、排行榜类型名、Role 成就领取按钮和 YAML 示例。本轮已通过 Discord API 刷新线上消息：Shop `1520853151022973028`、PrivateRoom `1520784497652793468`、成就身份组 `1520784504988373024`、性别 `1520784520801161458`。
+- 2026-06-29 补充：Giveaway 创建流程改为 `/ga_create` 打开草稿 modal；基础信息、参与限制和可选图片由草稿按钮分别编辑。正式抽奖消息回到 classic embed + persistent `View`：奖品提供者单独一行，结束时间 / 中奖人数 / 参与人数同排，右上角显示 bot 头像，奖品图片作为 embed 大图保留到结束态；参与 / 退出 / 不满足条件等个人操作反馈仅个人可见，管理员 `ga_*` 操作反馈保持公开。兼容字段 `ui_version` 仍用于识别这批新面板并处理旧 Components v2 消息迁移。
 - 2026-06-28 运行态注意：线上持久面板已手动 PATCH 到最新 payload；当前若仍有改动前启动的 bot 进程，后续动态消息和重启恢复逻辑需要重启 bot 后才会天然加载这批代码 / YAML 变更。
 - 2026-06-28 补充：语音 / 组队外观覆盖已补：临时语音房 `1520787099446673550` 的房间控制面板 `1520787100914421963`，以及组队邀请测试消息 `1520792728768614591`。截图审核集在 `.cache/panel_review_20260628_160738`，总览和 11 张单图已发到 `测试2`。随后真实 Discord API 回调 smoke 在临时频道 `1520799619913744565` 验证 Lock / Unlock / Soundboard / Full：Lock 后 `connect=false`，Unlock 后 `connect=true`，Soundboard 从开启切到关闭，Full 后组队邀请按钮数为 `0` 且包含「房间已满」，测试房 active 组队记录清空；临时频道、邀请消息和 `voice temp_channels` 已清理。
 - 2026-06-28 补充：用户恢复 Chrome Discord 双窗口登录态后，追加 Chrome Web 侧实拍补充到 `.cache/chrome_panel_review_20260628_1639`，确认最新 Tickets 面板按钮为「创建」、语音控制面板和组队邀请在真实网页端可见。由于 Discord Web 虚拟列表连续跳转同频道消息时存在截图捕到旧 viewport / skeleton 的不稳定性，完整逐项外观审核仍以 Discord API payload 渲染的 `.cache/panel_review_20260628_160738/contact_sheet_cropped.png` 为主证据。
@@ -316,17 +317,17 @@
 | `load_giveaways` | 用 `load_giveaway_views` 拿 SQL | 保留 cog 方法（含 Discord `fetch_message`/`edit`） |
 | `update_participant_achievements` | `increment_giveaway_achievements` | 历史迁移项；2026-06-27 抽奖成就退役后该路径已删除 |
 | `on_ready` 里的两段建表 | `initialize_database()` | on_ready 只调一行 |
-| `GiveawayForm.insert_giveaway / fetch_all_giveaway_ids` | `db.*` 直接调 | **删 form 方法**，调用点改 `self.db.xxx()` |
-| `GiveawayForm.fetch_giveaway` | — | **删（零调用死代码）** |
+| 旧创建表单的 `insert_giveaway / fetch_all_giveaway_ids` | `db.*` 直接调 | **删 form 方法**，调用点改 `self.db.xxx()` |
+| 旧创建表单的 `fetch_giveaway` | — | **删（零调用死代码）** |
 
-**辅助类获取 db 的方式**：`GiveawayForm.__init__` 加 `db` 参数（显式），实例化点 `cog:654` 传 `db=self.db`。`GiveawayParticipationView` / `GiveawayConfirmationView` / `GiveawayCheckParticipantView` **不传 db** —— 它们原本就通过 `bot.get_cog('GiveawayCog').xxx()` 调 cog 上的 thin wrapper，cog wrapper 在，View 调用链无需改动。
+**辅助类获取 db 的方式（历史迁移记录）**：旧创建表单 `__init__` 加 `db` 参数（显式），实例化点 `cog:654` 传 `db=self.db`。`GiveawayParticipationView` / 旧确认视图 / `GiveawayCheckParticipantView` **不传 db** —— 它们原本就通过 `bot.get_cog('GiveawayCog').xxx()` 调 cog 上的 thin wrapper，cog wrapper 在，View 调用链无需改动。2026-06-29 当前实现已改为 `GiveawayCreateModal` + `GiveawayDraftView` + `GiveawayPanelView`，旧确认视图和旧兼容别名已删除。
 
 **顺手修的真实 bug**：
 - `update_giveaway_description` 原本缺 `await db.commit()`（`giveaway_cog.py:1082-1086` 旧代码），意味着 `/ga_description` 命令**实际不生效**（事务回滚）。迁到 manager 后补了 commit。这个 bug 不在文档里列出，是迁移路上发现的。
 
 **顺手清理的死代码**：
-- `GiveawayParticipationView.__init__` / `GiveawayConfirmationView.__init__` 里 `self.main_config` / `self.db_path`（仅赋值不使用）。
-- `GiveawayForm.fetch_giveaway`（方法本体无调用点）。
+- `GiveawayParticipationView.__init__` / 旧确认视图 `__init__` 里 `self.main_config` / `self.db_path`（仅赋值不使用）。
+- 旧创建表单 `fetch_giveaway`（方法本体无调用点）。
 
 **未做（留给其他任务）**：
 - `tickets_new_cog.py:14 import aiosqlite` 是死 import（该 cog 没直连），但不在 P0-1 范围，留给后续清理（顺便 P1-3 拆包时也会处理）。
@@ -1183,7 +1184,7 @@ README.md 原本存在双重入口——`Tickets_New_Cog` (当前) + `Tickets_Co
 |---:|---|---|---|---:|---|
 | 9 | `b716f3b` | achievement | 标准 | 928 | 5 View 入 views.py（AchievementRefreshView / ConfirmationView / AchievementRankingView / AchievementOperationView / RankView）；所有 View 通过 `bot.get_cog('AchievementCog')` 访问 cog，无静态循环；drop dead `import datetime`（被 `from datetime import datetime` 遮蔽）+ `from discord.ui import Button, View`（Button/View 全在 views.py 里）+ stale header |
 | 10 | `4fddadc` | voice_channel | 完整 | 1018 | modals.py 只放 AddChannelForm；views.py 放 CheckTempChannelView + RoomControlPanelView（含 persistent `custom_id=f"unlock_{id}" ...` 四按钮）；cog.py 收到 505 行（inner `DeleteChannelConfirmView` 保留在 `delete_channel_config_command` 方法内部）；**drop 模块级死 `DeleteChannelConfirmView`**（L70-L111，零 caller，enhanced inner 覆盖）；修 stale comment `create_invitation_cog` → `create_invitation`；hoist lazy `import re` 到顶 |
-| 11 | `f164ec1` | giveaway | 完整 | 1062 | views.py：GiveawayParticipationView（persistent participate/exit `custom_id = f"participate_{id}"`）+ GiveawayConfirmationView + GiveawayCheckParticipantView；modals.py：GiveawayForm（`send_modal`-triggered，`on_submit` 内实例化两个 View 并通过 `bot.get_cog('GiveawayCog').giveaways[id] = view` 交给 cog）；cog.py 收到 671 行；drop cog 层 dead imports (`ui`, `components`, `Button`, `View`, `string`, `re`) |
+| 11 | `f164ec1` | giveaway | 完整 | 1062 | 历史拆包时 views.py 放 `GiveawayParticipationView` + 旧确认视图 + `GiveawayCheckParticipantView`；modals.py 放旧创建表单；cog.py 收到 671 行；drop cog 层 dead imports (`ui`, `components`, `Button`, `View`, `string`, `re`)。2026-06-29 当前已演进为 `GiveawayCreateModal` + `GiveawayDraftView` + `GiveawayPanelView`。 |
 
 **骨架分档速记**（实际落地）：
 
@@ -1195,7 +1196,7 @@ README.md 原本存在双重入口——`Tickets_New_Cog` (当前) + `Tickets_Co
 
 **关键结论**：
 - Views → Cog 全部走 `bot.get_cog('<ClassName>')`（不是 static import），所以包化**不引入**新的 import cycle。
-- `modals → views` 在 giveaway 有一条单向依赖（GiveawayForm 构造 GiveawayParticipationView / GiveawayConfirmationView）；仅一个方向，顶层 import 即可，不需要 lazy import。
+- `modals → views` 在 giveaway 有一条单向依赖；当前 `GiveawayDraftView` 发布时构造 `GiveawayPanelView`，仅一个方向，顶层 import 即可，不需要 lazy import。
 - voice_channel 里发现的模块级死 `DeleteChannelConfirmView`（42 行）属于历史债 —— enhanced inner class 一直 shadow 它。按 Tier 1 相同的 drive-by 清死代码标准，一并删除 + 在 commit body 明示"dead（0 caller）"即可。
 
 **顺手做的轻量清理**（夹在 rename commit 里）：
@@ -1217,7 +1218,7 @@ README.md 原本存在双重入口——`Tickets_New_Cog` (当前) + `Tickets_Co
 
 - achievement 金路径：`/achievements_board`（触发 AchievementRefreshView）、`/achievement_ranking`（AchievementRankingView）、`/rank_board`（RankView）、`/achievement_operation_log`（AchievementOperationView）、`/update_achievements`（ConfirmationView）。
 - voice_channel 金路径：建房（on_voice_state_update）、`/add_channel_config`（AddChannelForm）、控制面板四按钮（unlock / lock / full / soundboard）、`/check_temp_channel`（CheckTempChannelView 分页）、`/delete_channel_config`（inner DeleteChannelConfirmView）、restart 后 `cog_load` 恢复 temp channels。
-- giveaway 金路径：`/ga_create`（GiveawayForm）→ participate（GiveawayParticipationView）→ 自动 / 手动 end → 查参与者（GiveawayCheckParticipantView）；以及 P1-8b 已修的冷启 `check_giveaways` 首 tick 不再 race building。
+- giveaway 金路径：`/ga_create` → `GiveawayCreateModal` → `GiveawayDraftView` 发布 → `GiveawayPanelView` 参与 / 退出 → 自动 / 手动 end → 查参与者（`GiveawayCheckParticipantView`）；以及 P1-8b 已修的冷启 `check_giveaways` 首 tick 不再 race building。
 
 **规划偏差 / errata**：
 

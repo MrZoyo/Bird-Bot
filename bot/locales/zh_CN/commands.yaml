@@ -143,10 +143,6 @@ spymode:
 giveaway:
   ga_create:
     description: "创建一个新的抽奖活动"
-    params:
-      reaction_req: "要求的表情反应数"
-      message_req: "要求的消息数"
-      timespent_req: "要求的语音时长（分钟）"
   check_giveaway:
     description: "查看当前所有抽奖活动"
   ga_cancel:

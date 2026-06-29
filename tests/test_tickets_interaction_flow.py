@@ -302,11 +302,11 @@ def test_ticket_create_panel_pairs_each_type_with_right_side_button(monkeypatch)
     assert container["type"] == 17
     assert container["components"][0]["content"].startswith("### Contact us")
     type_rows = container["components"][1:-2]
-    assert [component["type"] for component in type_rows] == [9, 14, 9, 14, 9, 14, 9, 14, 9, 14, 9]
+    assert [component["type"] for component in type_rows] == [14, 9, 14, 9, 14, 9, 14, 9, 14, 9, 14, 9]
     assert container["components"][-2]["type"] == 14
     assert container["components"][-1]["content"] == "-# Ticket system"
 
-    type_sections = type_rows[::2]
+    type_sections = type_rows[1::2]
     assert len(type_sections) == 6
     for index, section in enumerate(type_sections):
         assert section["type"] == 9

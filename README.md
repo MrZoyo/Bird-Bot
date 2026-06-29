@@ -216,10 +216,11 @@ Comprehensive giveaway management system with activity-based entry restrictions.
 - **Time-based giveaway management** with flexible duration formats
 - **Winner selection system** with configurable winner counts
 - **Archive system** preserving original giveaway information
-- **Interactive forms** for detailed giveaway configuration
+- **Modal draft flow** for prize details, duration, provider, entry restrictions, and optional prize images
+- **Embed-based public panel** with bot avatar thumbnail, optional prize image, persistent join button, and personal join/leave feedback
 
 **Commands:**
-- `/ga_create <reaction_req> <message_req> <timespent_req>`: Create new giveaway with requirements
+- `/ga_create`: Open the giveaway draft flow. Basic details, entry requirements, and optional image upload are configured from the draft controls.
 - `/ga_cancel <giveaway_id>`: Cancel active giveaway
 - `/ga_end <giveaway_id>`: End giveaway early and select winners
 - `/ga_time_extend <giveaway_id> <time>`: Extend giveaway duration

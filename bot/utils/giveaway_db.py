@@ -1,10 +1,36 @@
-# bot/utils/giveaway_db.py
 import aiosqlite
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 from .db_connect import connect_database
 from .db_lifecycle import BaseDatabaseManager
+from .schema_migrations import (
+    SchemaMigration,
+    add_column_if_missing,
+    apply_schema_migrations,
+)
+
+
+GIVEAWAY_COLUMNS = (
+    'giveaway_id',
+    'message_id',
+    'starttime',
+    'duration',
+    'winner_number',
+    'prizes',
+    'description',
+    'creator_id',
+    'reaction_req',
+    'message_req',
+    'timespent_req',
+    'participant_ids',
+    'winner_ids',
+    'is_end',
+    'provider',
+    'image_url',
+    'image_filename',
+    'ui_version',
+)
 
 
 class GiveawayDatabaseManager(BaseDatabaseManager):
@@ -39,7 +65,11 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
                     timespent_req INTEGER DEFAULT 0,
                     participant_ids TEXT,
                     winner_ids TEXT,
-                    is_end BOOLEAN DEFAULT 0
+                    is_end BOOLEAN DEFAULT 0,
+                    provider TEXT,
+                    image_url TEXT,
+                    image_filename TEXT,
+                    ui_version INTEGER DEFAULT 1
                 )
             ''')
             await db.execute('''
@@ -49,7 +79,36 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
                     message_id TEXT
                 )
             ''')
+            await apply_schema_migrations(
+                db,
+                namespace='giveaway',
+                migrations=[
+                    SchemaMigration(
+                        version=1,
+                        description='add provider, image, and ui version fields',
+                        migrate=self._migrate_giveaway_panel_fields,
+                    ),
+                ],
+            )
             await db.commit()
+
+    async def _migrate_giveaway_panel_fields(
+        self,
+        db: aiosqlite.Connection,
+    ) -> None:
+        columns_to_add = [
+            ('provider', 'TEXT'),
+            ('image_url', 'TEXT'),
+            ('image_filename', 'TEXT'),
+            ('ui_version', 'INTEGER DEFAULT 1'),
+        ]
+        for column_name, column_definition in columns_to_add:
+            await add_column_if_missing(
+                db,
+                table_name='giveaway',
+                column_name=column_name,
+                column_definition=column_definition,
+            )
 
     # ------------------------------------------------------------------
     # giveaway table
@@ -69,24 +128,30 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
         reaction_req,
         message_req,
         timespent_req,
+        provider=None,
+        image_url=None,
+        image_filename=None,
+        ui_version=1,
     ) -> None:
         async with connect_database(self.db_path) as db:
             await db.execute(
                 'INSERT INTO giveaway '
                 '(giveaway_id, message_id, starttime, duration, winner_number, '
                 'prizes, description, creator_id, winner_ids, '
-                'reaction_req, message_req, timespent_req) '
-                'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                'reaction_req, message_req, timespent_req, '
+                'provider, image_url, image_filename, ui_version) '
+                'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 (giveaway_id, message_id, starttime, duration, winner_number,
                  prizes, description, creator_id, winner_ids,
-                 reaction_req, message_req, timespent_req),
+                 reaction_req, message_req, timespent_req,
+                 provider, image_url, image_filename, ui_version),
             )
             await db.commit()
 
     async def fetch_giveaway(self, giveaway_id) -> Optional[Dict[str, Any]]:
         async with connect_database(self.db_path) as db:
             cursor = await db.execute(
-                'SELECT * FROM giveaway WHERE giveaway_id = ?',
+                f"SELECT {', '.join(GIVEAWAY_COLUMNS)} FROM giveaway WHERE giveaway_id = ?",
                 (giveaway_id,),
             )
             record = await cursor.fetchone()
@@ -110,6 +175,10 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
             'participant_ids': record[11],
             'winner_ids': record[12],
             'is_end': record[13],
+            'provider': record[14],
+            'image_url': record[15],
+            'image_filename': record[16],
+            'ui_version': record[17],
         }
 
     async def fetch_all_giveaway_ids(self) -> List[str]:
@@ -121,7 +190,12 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
 
     async def fetch_all_giveaways(self, include_ended: bool = True) -> List[Tuple]:
         """Raw row tuples; ordering matches the giveaway table's column order."""
-        query = 'SELECT * FROM giveaway' if include_ended else 'SELECT * FROM giveaway WHERE is_end = 0'
+        column_sql = ', '.join(GIVEAWAY_COLUMNS)
+        query = (
+            f'SELECT {column_sql} FROM giveaway'
+            if include_ended
+            else f'SELECT {column_sql} FROM giveaway WHERE is_end = 0'
+        )
         async with connect_database(self.db_path) as db:
             cursor = await db.execute(query)
             records = await cursor.fetchall()
@@ -158,6 +232,14 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
             await db.execute(
                 'UPDATE giveaway SET duration = ? WHERE giveaway_id = ?',
                 (new_duration, giveaway_id),
+            )
+            await db.commit()
+
+    async def update_giveaway_message_id(self, giveaway_id, message_id) -> None:
+        async with connect_database(self.db_path) as db:
+            await db.execute(
+                'UPDATE giveaway SET message_id = ? WHERE giveaway_id = ?',
+                (message_id, giveaway_id),
             )
             await db.commit()
 
