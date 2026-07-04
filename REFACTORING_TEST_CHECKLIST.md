@@ -23,7 +23,7 @@
 - Shop、Tickets、Ban、VoiceChannel、Giveaway、Role / Signature、Achievement / Rank、Welcome / Games、CheckStatus / Backup 的 fake interaction flow。
 - InviteGuard 邀请清理 / 排行榜逻辑：过期删除、dry-run、邀请 code 白名单、创建者白名单、`created_at` 缺失跳过、单条失败不中断、邀请链接同步、成员加入归因、重复加入不重复计数、Components v2 排行榜刷新 / 重建命令、有效邀请 Shop 积分奖励。
 - InviteGuard 池化归因 / 批结算 / 缓存锁串行化：`on_member_join` 入队 + 批窗口结算，单人单邀请行为不变，同窗口多人多邀请按各自 delta 池化记功发奖（`pooled_count`）、同窗口多人单邀请完整归因发多份奖，总量不匹配 / 含 ignored invite / 批内自邀 / 批内已锁定成员均降级为 ambiguous 且零奖励，`pooled_attribution_enabled=false` 维持旧行为，排行榜按 `invited_count+pooled_count` 排序，`/invite_check_user` 输出含 `pooled_count`，以及 `_invite_cache_lock` 序列化 `sync_invite_links` / `initialize_invite_cache` / 批结算的冒烟验证。
-- InviteGuard 邀请奖励通知 DM：单人归因 + 面板有效时邀请人收到 Components v2 通知（Container + 附图 MediaGallery + 容器外“查看排行榜”link 按钮，URL 精确指向面板消息），面板无效（channel/message id 缺失）或 `reward_notification_enabled=false` 时完全不发但归因与积分照常，池化路径各邀请人收到含人数与实得总积分的 body_pooled 版本，DM Forbidden 不影响归因与积分，`reward_points_per_invite=0` 时无积分也无 DM，以及“DB 归因 → 积分入账 → DM 发送”的顺序断言。
+- InviteGuard 邀请奖励通知 DM：单人归因 + 面板有效时邀请人收到 Components v2 通知（Container + 分割线 + 附图 MediaGallery + 总邀请数 footer + 容器外“查看排行榜”link 按钮，URL 精确指向面板消息），面板无效（channel/message id 缺失）或 `reward_notification_enabled=false` 时完全不发但归因与积分照常，池化路径各邀请人收到含人数、实得总积分与总邀请数 footer 的 body_pooled 汇总版本，DM Forbidden 不影响归因与积分，`reward_points_per_invite=0` 时无积分也无 DM，以及“DB 归因 → 积分入账 → DM 发送”的顺序断言。
 - PrivateRoom 商店、Shop 签到、Tickets 主入口和组队邀请的 Components v2 panel 结构。
 - 组队消息和房间面板“满员”共享样式；旧 embed 和新 Components v2 消息均有兼容覆盖。
 - 显式 gateway intents、SQLCipher 数据库加密连接、明文库迁移工具、显式 key 文件生成和 `run.py` 本地 `.env` 加载。
@@ -181,7 +181,7 @@
 - [ ] 测试服触发一次有效邀请归因（排行榜面板已配置 / 已创建），邀请人收到奖励通知 DM；Components v2 容器（紫色 accent）、标题、正文（成员 mention、积分数）在客户端渲染正常。
 - [ ] DM 中 `invite_reward.png` 附图正常显示（MediaGallery attachment 引用）。
 - [ ] DM 底部“查看排行榜”link 按钮点击后跳转到排行榜面板消息本体。
-- [ ] 多人同窗口加入触发池化归因时，各邀请人收到 body_pooled 版本 DM（人数与实得总积分正确）。
+- [ ] 多人同窗口加入触发池化归因时，各邀请人收到 body_pooled 汇总版本 DM（人数、实得总积分与总邀请数 footer 正确）。
 - [ ] 用关闭 DM 的账号作为邀请人：归因与积分照常入账，日志出现 `Cannot send reward DM ... (DMs disabled)` info 记录，无异常堆栈。
 - [ ] 排行榜面板未配置且未创建时（channel/message id 缺失），完全不发 DM，debug 日志说明原因。
 

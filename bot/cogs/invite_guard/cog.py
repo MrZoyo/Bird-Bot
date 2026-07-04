@@ -913,6 +913,7 @@ class InviteGuardCog(commands.Cog):
             code=record.code,
         )
         if awarded:
+            inviter_record = await self.db.get_user(member.guild.id, record.inviter_id)
             await self._send_reward_notification(
                 inviter_id=record.inviter_id,
                 guild=member.guild,
@@ -923,6 +924,7 @@ class InviteGuardCog(commands.Cog):
                     guild=member.guild.name,
                     points=reward_points,
                 ),
+                total_invited_count=_total_invited_count(inviter_record),
             )
 
     async def _award_pooled_invite_reward(
@@ -952,6 +954,7 @@ class InviteGuardCog(commands.Cog):
             code=code,
         )
         if awarded:
+            inviter_record = await self.db.get_user(guild.id, inviter_id)
             await self._send_reward_notification(
                 inviter_id=inviter_id,
                 guild=guild,
@@ -962,6 +965,7 @@ class InviteGuardCog(commands.Cog):
                     guild=guild.name,
                     points=total_points,
                 ),
+                total_invited_count=_total_invited_count(inviter_record),
             )
 
     async def _award_invite_points(
@@ -1010,6 +1014,7 @@ class InviteGuardCog(commands.Cog):
         guild: discord.Guild,
         settings: InviteLeaderboardSettings,
         body: str,
+        total_invited_count: int,
     ) -> None:
         """DM the inviter after reward points have actually been credited.
 
@@ -1056,6 +1061,7 @@ class InviteGuardCog(commands.Cog):
             file = self._build_reward_notification_file(settings)
             view = self._build_reward_notification_view(
                 body=body,
+                footer=t('invite_guard.notification.footer', count=total_invited_count),
                 guild_id=guild.id,
                 channel_id=channel_id,
                 message_id=message_id,
@@ -1111,6 +1117,7 @@ class InviteGuardCog(commands.Cog):
         self,
         *,
         body: str,
+        footer: str,
         guild_id: int,
         channel_id: int,
         message_id: int,
@@ -1124,7 +1131,14 @@ class InviteGuardCog(commands.Cog):
         if with_image:
             gallery = discord.ui.MediaGallery()
             gallery.add_item(media=f"attachment://{REWARD_NOTIFICATION_ATTACHMENT_NAME}")
+            container_items.append(discord.ui.Separator())
             container_items.append(gallery)
+        container_items.extend(
+            [
+                discord.ui.Separator(),
+                discord.ui.TextDisplay(f"-# {footer}"),
+            ]
+        )
 
         view = discord.ui.LayoutView(timeout=None)
         view.add_item(
@@ -1813,6 +1827,12 @@ def _fmt_user_id(user_id: int | None) -> str:
     if user_id is None:
         return "unknown"
     return f"<@{user_id}> ({user_id})"
+
+
+def _total_invited_count(record: dict[str, Any] | None) -> int:
+    if record is None:
+        return 0
+    return int(record.get('invited_count') or 0) + int(record.get('pooled_count') or 0)
 
 
 def _leaderboard_badge(rank: int) -> str:

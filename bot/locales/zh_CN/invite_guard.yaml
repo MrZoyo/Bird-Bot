@@ -28,15 +28,16 @@ messages:
     last_joined_at: {last_joined_at}
     last_left_at: {last_left_at}
 notification:
-  title: "🎉 邀请奖励到账"
-  body: "你邀请了 {member} 加入了 **{guild}**。你获得了 **{points}** 积分奖励。"
-  body_pooled: "你邀请的 **{count}** 位新成员加入了 **{guild}**。你获得了 **{points}** 积分奖励。"
+  title: "你的邀请奖励已到账"
+  body: "你成功邀请 {member} 加入了 {guild}，获得了 {points} 积分奖励！"
+  body_pooled: "你成功邀请 {count} 位新成员加入了 {guild}，获得了 {points} 积分奖励！"
+  footer: "你已经邀请了 {count} 人，感谢你为服务器做出的贡献"
   leaderboard_button: "查看排行榜"
 leaderboard:
   title: "🏆 邀请排行榜"
   updated_at: "更新于 {time}"
   empty: "暂无有效邀请计数。"
   entry: "{badge} {user}  **{count}** 人"
-  footer: "每个新成员只会被计入一次邀请；多人同时加入且总数吻合时，邀请人照常计数，但不记录具体对应关系。退出后重新加入不会重复计数。"
+  footer: "每个新成员只会被第一次有效普通邀请计入一次，退出后重新加入不会重复计数。"
 labels:
   none: "无"

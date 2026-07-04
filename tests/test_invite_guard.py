@@ -886,15 +886,21 @@ def test_reward_notification_dm_sent_with_panel_and_image(tmp_path):
 
             container = components[0]
             assert container["accent_color"] == 0x7C3AED
+            assert [component["type"] for component in container["components"]] == [10, 14, 12, 14, 10]
             text = container["components"][0]
             assert text["type"] == 10
+            assert "你的邀请奖励已到账" in text["content"]
             assert "<@200>" in text["content"]
             assert "60" in text["content"]
             assert "Test Guild" in text["content"]
+            assert "获得了 60 积分奖励" in text["content"]
 
-            gallery = container["components"][1]
+            gallery = container["components"][2]
             assert gallery["type"] == 12
             assert gallery["items"][0]["media"]["url"] == "attachment://invite_reward.png"
+
+            footer = container["components"][4]
+            assert footer["content"] == "-# 你已经邀请了 1 人，感谢你为服务器做出的贡献"
 
             action_row = components[1]
             button = action_row["components"][0]
@@ -1005,10 +1011,15 @@ def test_reward_notification_pooled_sends_body_pooled_to_each_inviter(tmp_path):
                 view = user.sent[0]["kwargs"]["view"]
                 components = view.to_components()
                 assert [component["type"] for component in components] == [17, 1]
+                assert [component["type"] for component in components[0]["components"]] == [10, 14, 12, 14, 10]
                 text = components[0]["components"][0]["content"]
-                assert "**1** 位新成员" in text
+                assert "你的邀请奖励已到账" in text
+                assert "你成功邀请 1 位新成员" in text
                 assert "Test Guild" in text
-                assert "**60**" in text
+                assert "获得了 60 积分奖励" in text
+                assert components[0]["components"][4]["content"] == (
+                    "-# 你已经邀请了 1 人，感谢你为服务器做出的贡献"
+                )
                 button = components[1]["components"][0]
                 assert button["url"] == "https://discord.com/channels/123/555/777"
         finally:
@@ -1326,8 +1337,7 @@ def test_invite_sync_refreshes_configured_message(monkeypatch, tmp_path):
         assert "active invite" not in container["components"][2]["components"][0]["content"]
         assert container["components"][3]["divider"] is True
         assert container["components"][4]["content"] == (
-            "-# 每个新成员只会被计入一次邀请；多人同时加入且总数吻合时，邀请人照常计数，"
-            "但不记录具体对应关系。退出后重新加入不会重复计数。"
+            "-# 每个新成员只会被第一次有效普通邀请计入一次，退出后重新加入不会重复计数。"
         )
 
     asyncio.run(scenario())
