@@ -1,6 +1,6 @@
 # Bird Bot
 
-`Version: 2.0.0`
+`Version: 2.0.1`
 
 ---
 
@@ -24,6 +24,7 @@ The bot's code is deeply optimised for low-performance devices, using asynchrono
 - [Function Introduction](#function-introduction)
   - [Voice_Channel_Cog](#voice_channel_cog)
   - [Create_Invitation_Cog](#create_invitation_cog)
+  - [InviteGuard_Cog](#inviteguard_cog)
   - [Welcome_Cog](#welcome_cog)
   - [Check_Status_Cog](#check_status_cog)
   - [Achievement_Cog](#achievement_cog)
@@ -79,6 +80,7 @@ discord.py, aiosqlite, sqlcipher3, aiohttp, requests, aiofiles, pillow, matplotl
 8. In the Discord Developer Portal, enable the privileged intents required by this bot: `Server Members Intent` and `Message Content Intent`. The runtime does not request `Presence Intent`.
 9. Run `python run.py`. If you are using a Linux server, you can use `nohup python3 run.py &` to run the bot in the background.
 10. Invite the bot to your server and give it the necessary permissions.(Required permissions: bot, application command, administrator)
+    - `InviteGuard_Cog` needs permission to list active guild invites and delete invites. In Discord terms this is usually `Manage Server` / `Manage Guild`; depending on where the invite was created, relevant channel `Manage Channels` permission may also be needed.
 11. Run automated smoke tests with `python -m pytest` when the test extra is installed. The suite covers config templates, runtime cog metadata, log helpers, UI locale metadata, the temporary JSON-to-YAML config migration smoke, background-loop offline guards, and pure DB-manager paths with temporary sqlite databases.
 12. Run the bare-except lint guard with `python -m ruff check bot tests` when the lint extra is installed.
 13. For updating the bot, you can use the `git pull` command to update the bot to the latest version, then rerun `uv sync`.
@@ -118,6 +120,26 @@ If the user is not currently on a channel, bot will prompt the user to create a 
 - `/invt_checkignorelist`: Check the current server's invitation channel ignore list.
 - `/invt_addignorelist <channel>`: Add a channel to the invitation channel ignore list.
 - `/invt_removeignorelist [channel] [channel_id]`: Remove a channel from the invitation channel ignore list. Use channel selection or channel ID (for deleted channels).
+
+### InviteGuard_Cog
+Silent invite cleanup for servers where long-lived 30-day invites accumulate and block new invite creation.
+
+**Features:**
+- Daily scan of the configured guild's active invites
+- Silent deletion of invites older than the configured age, default 3 days
+- Invite-code whitelist for official permanent invites
+- Creator whitelist for selected users; bot owner, Discord administrators, and members who can access the configured admin channel are treated as admin-side creators
+- Dry-run mode for testing without deleting invites
+- Console / bot log summary after every scheduled or manual run
+
+**Commands:**
+- `/invite_cleanup [dry_run]`: Manually run one scan from the configured admin channel. In this project, "owner / admin" generally means a user who has access to `main.admin_channel_id` through Discord channel permissions.
+
+**Config:**
+- Copy `bot/config/invite_guard.yaml.example` to `bot/config/invite_guard.yaml`
+- Set `features.invite_guard: true` in `main.yaml`
+- Add official invite codes to `invite_code_whitelist`
+- Optional: set `dry_run: true` first and inspect logs before allowing deletion
 
 ### Welcome_Cog
 When a new user joins the server, the bot sends a welcome message to the user in the welcome channel with enhanced features:
@@ -528,6 +550,13 @@ Media processing module with validation and security features.
 See [PRIVACY.md](./PRIVACY.md) for the data inventory, privileged-intent rationale, log/backup retention notes, and SQLCipher database encryption procedure.
 
 ## Update Log Latest
+### V2.0.1 - 2026-07-04
+- Added `InviteGuard_Cog` to silently clean active Discord invites older than the configured retention window.
+- Added dry-run support, invite-code and creator whitelists, admin-channel based manual trigger `/invite_cleanup`, and logging summaries.
+- Documented required Discord invite permissions and the project convention that default owner/admin command access maps to `main.admin_channel_id`.
+
+---
+
 ### V2.0.0 - 2026-06-27
 - Completed the config 2.0 runtime migration: YAML configuration, locale-backed UI text, package-based cogs, and DB-backed mutable feature data are now the active runtime path.
 - Removed runtime registration for legacy NotebookCog, RatingCog, and the old channel-based TicketsCog; archived historical code on `legacy-old-files-archive`.

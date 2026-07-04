@@ -40,6 +40,7 @@ The current refactor target is config 2.0 and package-based cogs. Legacy JSON co
 - `VoiceStateCog` in `bot.cogs.voice_channel`
 - `WelcomeCog` in `bot.cogs.welcome`
 - `CreateInvitationCog` in `bot.cogs.create_invitation`
+- `InviteGuardCog` in `bot.cogs.invite_guard`
 - `DnDCog` in `bot.cogs.games.dnd`
 - `CheckStatusCog` in `bot.cogs.check_status`
 - `AchievementCog` in `bot.cogs.achievement`
@@ -64,6 +65,7 @@ Runtime config is YAML:
 - `Config` in `bot/utils/config.py` loads `bot/config/<name>.yaml`, caches it, validates `main`, and normalizes runtime paths from repo root.
 - Relative paths such as `./data/bot.db` resolve from the repository root, not the process CWD.
 - Keep both `.yaml.example` templates and local real YAML commented. Comments should explain units, Discord ID targets, DB/locale ownership, and whether a key is currently read by runtime code.
+- Unless a feature has its own explicit permission table, "owner / admin" project wording means users who can use the default admin channel (`main.admin_channel_id`) through Discord channel permissions. Commands should reuse `check_channel_validity` for that default boundary.
 - Signature change cooldown uses 3 fixed change slots and reads `role.signature.cooldown_days` for the slot reuse window; default is 7 days. `role.signature.max_changes_per_week` is a historical compatibility field and is not read by runtime code. Teamup invitation expiry is no longer a config follow-up because teamup should use direct room links instead of generated invites.
 
 Legacy JSON:
@@ -174,6 +176,7 @@ Current pytest smoke coverage includes:
 - Achievement / Rank fake interaction flow for manual operation confirmation and rank type buttons.
 - Welcome / Games fake interaction flow for Welcome DM, SpyMode, and DnD roll response.
 - CheckStatus / Backup fake interaction flow for Where Is, voice status, log tail, and manual backup.
+- InviteGuard cleanup logic for expired invite deletion, dry-run, invite-code whitelist, creator whitelist, missing `created_at`, per-invite failure isolation, and manual `/invite_cleanup` summary flow.
 - Temporary JSON-to-YAML migration smoke.
 - Background loop offline guard.
 - Offline DB manager smoke for retained modules.
@@ -183,8 +186,8 @@ Current pytest smoke coverage includes:
 
 Current P3-9 status:
 
-- Done: current fake interaction flow list is complete for PrivateRoom, Shop, Tickets, Ban, VoiceChannel, Giveaway, Role / Signature, Achievement / Rank, Welcome / Games, CheckStatus / Backup.
-- Current baseline: `104 passed, 1 warning`.
+- Done: current fake interaction flow list is complete for PrivateRoom, Shop, Tickets, Ban, VoiceChannel, Giveaway, Role / Signature, Achievement / Rank, Welcome / Games, CheckStatus / Backup, and InviteGuard.
+- Current baseline: `109 passed, 1 warning`.
 - Next default target: targeted real test-server validation for new changes / side-effect paths only when explicitly approved.
 - Add more fake interaction tests only for new bugs, payload replay work, or new features.
 

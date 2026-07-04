@@ -10,10 +10,21 @@
 
 ---
 
+## 2026-07-04 InviteGuard / 2.0.1 同步
+
+- 版本号推进到 `2.0.1`，新增 `InviteGuardCog`：按配置每日扫描目标 guild 的 active invites，静默删除超过保留期且不在白名单中的邀请。
+- 新增配置模板 `bot/config/invite_guard.yaml.example` 和 feature flag `main.features.invite_guard`；支持 dry-run、邀请 code 白名单、创建者白名单、审计日志 reason，以及大写 `INVITE_*` YAML 别名 / 环境变量覆盖。
+- 手动命令 `/invite_cleanup [dry_run]` 复用默认管理频道边界；项目内“owner / 管理员”默认按能访问 `main.admin_channel_id` 的用户理解。邀请创建者白名单还会自动包含 bot owner、Discord administrator 和能访问管理频道的成员。
+- 离线覆盖新增 `tests/test_invite_guard.py`：过期删除、dry-run 不删除、邀请 code 白名单、创建者白名单、`created_at` 为空跳过、单条删除失败不中断、手动命令 summary。
+- 测试环境数据库演练：先备份 `data/bot.db` 到 `backup/db_backup_manual/invite_guard_db_test_20260704.db`，再用 SQLCipher 连接测试库，在事务内创建 `TEMP TABLE invite_guard_fixture` 驱动清理逻辑；结果为 `scanned=5 deleted=1 skipped_whitelist=2 skipped_young=1 skipped_missing_created_at=1 failed=0`，回滚后 `persistent_fixture_tables=0`。
+- 当前自动化基线：`./.venv/Scripts/python.exe -m pytest -q` 为 `109 passed, 1 warning`；`ruff check bot tests tools`、`compileall bot tests tools`、`tools/check_locales.py` 均通过。
+
+---
+
 ## 2026-06-28 当前状态同步
 
 - P3-9 fake Discord interaction flow tests 已按当前清单补完，状态为 ✅ 完成；已覆盖 PrivateRoom 续费、Shop 签到 / 补签、Tickets 创建 / 接单 / 关闭、Ban `/tempban`、VoiceChannel 控制面板、Giveaway 参与 / 退出 / 开奖 / 取消、Role / Signature、Achievement / Rank、Welcome / Games、CheckStatus / Backup。
-- 当前自动化基线：`./.venv/Scripts/python.exe -m pytest -q` 为 `104 passed, 1 warning`。
+- 当前自动化基线：`./.venv/Scripts/python.exe -m pytest -q` 为 `109 passed, 1 warning`。
 - 本轮新增 23 个离线 fake interaction tests；所有新增测试均使用最小 fake Discord 对象和临时状态，不联网、不触碰真实 `data/bot.db`。
 - 2026-05-04 补充：`/rank` 的分类按钮已使用 Discord Button `emoji` 字段补齐彩色圆点；当前色彩为全部排名 🟣、添加反应 🔴、发送消息 🟡、语音时长 🔵、累计签到 🟠、连续签到 🟢。连续签到从原先与全部排名重复的 🟣 改为 🟢。按钮上的语音时长不带 `(min)`；排行榜类型名仍保留单位说明。locale 里若已有圆点前缀，运行时会剥离 label 前缀，避免按钮显示重复 emoji。已移除本地 `bot/config/achievements.yaml` 的 legacy `rank:` UI 文案块；迁移脚本也会把旧 JSON 的 `achievements.rank` 显式标为 `drop`，不再迁到 YAML 或 locale。`shop` feature flag 关闭时，对应签到成就现在由共享 helper 同步隐藏，覆盖成就页、排行榜、`/rank` 按钮和 Role 成就领取面板；抽奖成就类别已退役，即使 GiveawayCog 启用也不会再显示或计数。
 - 2026-05-04 补充：所有 `bot/config/*.yaml.example` 和本地实际 `bot/config/*.yaml` 都已补充配置注释。注释按当前代码读取点编写，明确标出单位、ID 类型、DB/locale 分工，以及当前保留但运行时不读取的历史字段（如 `role.signature.max_changes_per_week`）。本地实际 YAML 的真实值未打印；只通过 ruamel round-trip 写入注释。

@@ -39,6 +39,13 @@ COG_SPECS = [
         "required_configs": ["invitation"],
     },
     {
+        "feature": "invite_guard",
+        "cog_name": "InviteGuardCog",
+        "module_path": "bot.cogs.invite_guard",
+        "class_name": "InviteGuardCog",
+        "required_configs": ["invite_guard"],
+    },
+    {
         "feature": "dnd",
         "cog_name": "DnDCog",
         "module_path": "bot.cogs.games.dnd",

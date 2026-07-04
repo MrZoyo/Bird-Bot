@@ -133,6 +133,12 @@ invitation:
       channel: "要移除的频道（若仍存在）"
       channel_id: "手动输入频道 ID（若频道已删除）"
 
+invite_guard:
+  invite_cleanup:
+    description: "立即扫描并清理过期邀请链接"
+    params:
+      dry_run: "只打印将会删除的邀请，不实际删除"
+
 spymode:
   spymode:
     description: "发起一局谁是卧底游戏"

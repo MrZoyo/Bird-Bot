@@ -29,6 +29,8 @@ features:
   welcome: true
 # 是否加载 CreateInvitationCog：组队关键词检测和 /invt。
   invitation: true
+# 是否加载 InviteGuardCog：每日静默清理超过保留期的 Discord 邀请链接。
+  invite_guard: true
 # 是否加载 DnDCog：D&D 掷骰命令。
   dnd: true
 # 是否加载 CheckStatusCog：语音状态、日志查看、Where Is 等状态命令。

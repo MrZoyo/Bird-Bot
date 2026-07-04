@@ -1,0 +1,11 @@
+messages:
+  summary: |
+    邀请清理完成：
+    scanned: {scanned}
+    deleted: {deleted}
+    would_delete: {would_delete}
+    skipped_whitelist: {skipped_whitelist}
+    skipped_young: {skipped_young}
+    skipped_missing_created_at: {skipped_missing_created_at}
+    failed: {failed}
+    dry_run: {dry_run}

@@ -1,0 +1,22 @@
+# Discord 邀请链接静默清理配置。
+# 运行时默认读取这些小写 YAML key；同时兼容同名大写别名（例如 INVITE_CLEANER_ENABLED）
+# 或环境变量，便于临时覆盖。
+# 启用后，InviteGuardCog 会每天扫描目标服务器 active invites，静默删除超过保留期且不在白名单中的邀请。
+enabled: true
+# 目标服务器 ID；为空时使用 main.guild_id。
+guild_id: 1145141919810
+# 邀请链接最大保留天数；超过该天数才会被删除，默认 3 天。
+max_age_days: 3
+# 后台扫描间隔，单位小时；默认 24 小时。
+interval_hours: 24
+# dry-run 模式只记录“将会删除”的邀请，不实际删除；上线前建议先设为 true 观察日志。
+dry_run: false
+# 邀请 code 白名单，只写 discord.gg/abc123 里的 abc123；也支持写完整邀请链接，运行时会提取 code。
+invite_code_whitelist:
+- YOUR_OFFICIAL_INVITE_CODE
+# 创建者白名单用户 ID；这些用户创建的邀请不会被清理。
+# 另外，bot owner、Discord 管理员，以及默认有管理员频道访问权限的成员也会被视作管理白名单。
+invite_creator_whitelist:
+- 1145141919810
+# 删除邀请时写入 Discord audit log 的原因；可使用 {max_age_days} 占位符。
+audit_reason: "Auto cleanup: invite older than {max_age_days} days"
