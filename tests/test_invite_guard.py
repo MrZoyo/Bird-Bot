@@ -567,7 +567,9 @@ def test_invite_sync_refreshes_configured_message(monkeypatch, tmp_path):
         container = view.to_components()[0]
         assert container["accent_color"] == 0x7C3AED
         assert [component["type"] for component in container["components"]] == [10, 14, 9, 14, 10]
-        assert container["components"][0]["content"].startswith("### 🏆 邀请排行榜\n更新时间：UTC+2 ")
+        header = container["components"][0]["content"]
+        assert header.startswith("### 🏆 邀请排行榜\n更新于 <t:")
+        assert header.rstrip().endswith(":R>")
         assert container["components"][1]["divider"] is True
         assert container["components"][2]["components"][0]["content"] == "🥇 <@100>  **1** 人"
         assert container["components"][2]["accessory"]["media"]["url"] == "https://cdn.example.test/bot.png"

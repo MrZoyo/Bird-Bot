@@ -806,7 +806,7 @@ class InviteGuardCog(commands.Cog):
 
     async def _build_leaderboard_view(self, settings: InviteLeaderboardSettings) -> discord.ui.LayoutView:
         rows = await self.db.get_leaderboard(settings.guild_id, settings.top_n)
-        updated_at = datetime.now(timezone(timedelta(hours=2))).strftime("UTC+2 %H:%M")
+        updated_at = discord.utils.format_dt(discord.utils.utcnow(), style='R')
         if not rows:
             leaderboard_body = t('invite_guard.leaderboard.empty')
         else:
@@ -1081,9 +1081,6 @@ class InviteGuardCog(commands.Cog):
     async def _can_run_admin_command(self, interaction: discord.Interaction) -> bool:
         return await check_channel_validity(interaction)
 
-    async def _can_run_manual_cleanup(self, interaction: discord.Interaction) -> bool:
-        return await self._can_run_admin_command(interaction)
-
     def _get_target_guild(self, settings: InviteCleanerSettings | InviteLeaderboardSettings) -> discord.Guild | None:
         if settings.guild_id is None:
             logging.warning("[InviteGuard] No target guild configured; set main.guild_id.")
@@ -1254,19 +1251,6 @@ class InviteGuardCog(commands.Cog):
             return settings.audit_reason.format(max_age_days=settings.max_age_days)
         except (KeyError, IndexError, ValueError):
             return settings.audit_reason
-
-    def _format_summary(self, summary: InviteCleanupSummary) -> str:
-        return t(
-            'invite_guard.messages.summary',
-            dry_run=str(summary.dry_run).lower(),
-            scanned=summary.scanned,
-            deleted=summary.deleted,
-            would_delete=summary.would_delete,
-            skipped_whitelist=summary.skipped_whitelist,
-            skipped_young=summary.skipped_young,
-            skipped_missing_created_at=summary.skipped_missing_created_at,
-            failed=summary.failed,
-        )
 
     def _format_user_record(self, record: dict[str, Any]) -> str:
         return t(

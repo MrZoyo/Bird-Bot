@@ -42,4 +42,6 @@ ambiguous_allow_reattribution: true
 # true 时只有“恰好一个 invite 增长且总增量为 1”才会归因；更保守，默认开启。
 require_single_delta_for_attribution: true
 # 每成功归因 1 个有效普通邀请时奖励给邀请人的积分；设为 0 可关闭奖励。默认 60。
+# 注意：奖励直接写入 Shop 积分余额，且有意不受 main.features.shop 开关限制——
+# 即使 Shop 功能被关闭，邀请积分仍会照常入账并保留，待 Shop 重新启用后可以使用。
 reward_points_per_invite: 60
