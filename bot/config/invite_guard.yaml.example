@@ -45,3 +45,10 @@ require_single_delta_for_attribution: true
 # 注意：奖励直接写入 Shop 积分余额，且有意不受 main.features.shop 开关限制——
 # 即使 Shop 功能被关闭，邀请积分仍会照常入账并保留，待 Shop 重新启用后可以使用。
 reward_points_per_invite: 60
+# 多人同一批次窗口内加入、且邀请 uses 总增量与批次人数吻合时，是否允许“池化归因”：
+# 邀请人照常计数（pooled_count）并照常发放积分，但成员一侧不记录具体对应哪个邀请人，
+# 直接标记为 pooled 并锁定，避免误判为 ambiguous/unknown。默认 true。
+pooled_attribution_enabled: true
+# 成员加入后的聚合等待窗口，单位秒；同一窗口内到达的多个新成员会被合并到同一次结算，
+# 一起 fetch 邀请、计算增量，避免逐个处理导致的竞态误判。默认 2 秒，可设为 0（不等待，多用于测试）。
+attribution_batch_window_seconds: 2

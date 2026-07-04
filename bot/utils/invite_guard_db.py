@@ -7,6 +7,7 @@ import aiosqlite
 
 from .db_connect import connect_database
 from .db_lifecycle import BaseDatabaseManager
+from .schema_migrations import SchemaMigration, add_column_if_missing, apply_schema_migrations
 
 
 @dataclass(frozen=True)
@@ -58,6 +59,17 @@ class InviteGuardDatabaseManager(BaseDatabaseManager):
                     PRIMARY KEY (guild_id, user_id)
                 )
             ''')
+            await apply_schema_migrations(
+                db,
+                namespace='invite_guard',
+                migrations=[
+                    SchemaMigration(
+                        version=1,
+                        description='add pooled_count to invite_users for pooled attribution',
+                        migrate=self._migrate_add_pooled_count,
+                    ),
+                ],
+            )
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS invite_links (
                     guild_id INTEGER NOT NULL,
@@ -91,6 +103,9 @@ class InviteGuardDatabaseManager(BaseDatabaseManager):
                 ON invite_links(guild_id, inviter_id, active)
             ''')
             await db.commit()
+
+    async def _migrate_add_pooled_count(self, db: aiosqlite.Connection) -> None:
+        await add_column_if_missing(db, 'invite_users', 'pooled_count', 'INTEGER DEFAULT 0')
 
     async def sync_invite_links(
         self,
@@ -355,6 +370,69 @@ class InviteGuardDatabaseManager(BaseDatabaseManager):
             await db.commit()
             return True
 
+    async def pool_attribute_members(
+        self,
+        guild_id: int,
+        member_ids: list[int],
+        awards: list[tuple[int, str, int]],
+        now: str,
+    ) -> bool:
+        """Attribute a batch of members to a 'pooled' status without a specific inviter.
+
+        Used when multiple members join in the same settlement window and the total
+        invite-use delta matches the batch size, but the exact member-to-invite
+        mapping cannot be determined (more than one invite grew at once). Every
+        member in ``member_ids`` is locked with attribution_status='pooled' and no
+        invited_by_user_id/invited_by_code; every ``(inviter_id, code, delta)`` in
+        ``awards`` accumulates ``pooled_count += delta`` on the inviter's row.
+
+        Returns False (and rolls back) if any member in the batch is already
+        attribution_locked or has allow_reattribution disabled at read-back time.
+        """
+        async with connect_database(self.db_path) as db:
+            await db.execute('BEGIN IMMEDIATE')
+
+            for member_id in member_ids:
+                await self._ensure_user_row(db, guild_id, member_id, now)
+                member_record = await self._get_user_record(db, guild_id, member_id)
+                if int(member_record['attribution_locked'] or 0):
+                    await db.rollback()
+                    return False
+                if not int(member_record['allow_reattribution'] or 0):
+                    await db.rollback()
+                    return False
+
+            for member_id in member_ids:
+                await db.execute(
+                    '''
+                    UPDATE invite_users
+                    SET invited_by_user_id = NULL,
+                        invited_by_code = NULL,
+                        attribution_status = 'pooled',
+                        attribution_locked = 1,
+                        allow_reattribution = 0,
+                        attributed_at = ?,
+                        updated_at = ?
+                    WHERE guild_id = ? AND user_id = ?
+                    ''',
+                    (now, now, guild_id, member_id),
+                )
+
+            for inviter_id, _code, delta in awards:
+                await self._ensure_user_row(db, guild_id, inviter_id, now)
+                await db.execute(
+                    '''
+                    UPDATE invite_users
+                    SET pooled_count = pooled_count + ?,
+                        updated_at = ?
+                    WHERE guild_id = ? AND user_id = ?
+                    ''',
+                    (delta, now, guild_id, inviter_id),
+                )
+
+            await db.commit()
+            return True
+
     async def set_member_attribution_status(
         self,
         guild_id: int,
@@ -411,6 +489,8 @@ class InviteGuardDatabaseManager(BaseDatabaseManager):
                 SELECT
                     u.user_id,
                     u.invited_count,
+                    u.pooled_count,
+                    (u.invited_count + u.pooled_count) AS total_count,
                     COALESCE(active_links.active_count, 0) AS active_invite_count
                 FROM invite_users u
                 LEFT JOIN (
@@ -421,8 +501,8 @@ class InviteGuardDatabaseManager(BaseDatabaseManager):
                 ) active_links
                   ON active_links.guild_id = u.guild_id
                  AND active_links.inviter_id = u.user_id
-                WHERE u.guild_id = ? AND u.invited_count > 0
-                ORDER BY u.invited_count DESC, u.user_id ASC
+                WHERE u.guild_id = ? AND (u.invited_count + u.pooled_count) > 0
+                ORDER BY total_count DESC, u.user_id ASC
                 LIMIT ?
                 ''',
                 (guild_id, guild_id, limit),
@@ -434,12 +514,17 @@ class InviteGuardDatabaseManager(BaseDatabaseManager):
             {
                 'user_id': row[0],
                 'invited_count': row[1],
-                'active_invite_count': row[2],
+                'pooled_count': row[2],
+                'total_count': row[3],
+                'active_invite_count': row[4],
             }
             for row in rows
         ]
 
     async def find_count_mismatches(self, guild_id: int) -> list[dict[str, Any]]:
+        # Only reconciles invited_count (single-inviter attributed members). Pooled
+        # attribution (pooled_count) has no per-member invited_by_user_id row to
+        # recompute from by design, so it is intentionally excluded here.
         async with connect_database(self.db_path) as db:
             cursor = await db.execute(
                 '''
@@ -535,6 +620,7 @@ class InviteGuardDatabaseManager(BaseDatabaseManager):
                 guild_id,
                 user_id,
                 invited_count,
+                pooled_count,
                 invited_by_user_id,
                 invited_by_code,
                 first_joined_at,
@@ -604,19 +690,20 @@ def _invite_user_row_to_dict(row: tuple[Any, ...]) -> dict[str, Any]:
         'guild_id': row[0],
         'user_id': row[1],
         'invited_count': row[2],
-        'invited_by_user_id': row[3],
-        'invited_by_code': row[4],
-        'first_joined_at': row[5],
-        'attributed_at': row[6],
-        'attribution_status': row[7],
-        'attribution_locked': row[8],
-        'allow_reattribution': row[9],
-        'join_count': row[10],
-        'leave_count': row[11],
-        'last_joined_at': row[12],
-        'last_left_at': row[13],
-        'created_at': row[14],
-        'updated_at': row[15],
+        'pooled_count': row[3],
+        'invited_by_user_id': row[4],
+        'invited_by_code': row[5],
+        'first_joined_at': row[6],
+        'attributed_at': row[7],
+        'attribution_status': row[8],
+        'attribution_locked': row[9],
+        'allow_reattribution': row[10],
+        'join_count': row[11],
+        'leave_count': row[12],
+        'last_joined_at': row[13],
+        'last_left_at': row[14],
+        'created_at': row[15],
+        'updated_at': row[16],
     }
 
 

@@ -127,3 +127,111 @@ def test_repair_detects_count_mismatch(tmp_path):
         assert mismatches == []
 
     asyncio.run(scenario())
+
+
+def test_pool_attribute_members_locks_members_and_credits_inviters(tmp_path):
+    async def scenario():
+        db = InviteGuardDatabaseManager(str(tmp_path / "invite.db"))
+        await db.initialize_database()
+
+        await db.record_member_join(1, 200, NOW)
+        await db.record_member_join(1, 201, NOW)
+
+        ok = await db.pool_attribute_members(
+            1,
+            [200, 201],
+            [(100, "abc", 1), (101, "def", 1)],
+            NOW,
+        )
+        assert ok is True
+
+        member_a = await db.get_user(1, 200)
+        member_b = await db.get_user(1, 201)
+        for member in (member_a, member_b):
+            assert member["attribution_status"] == "pooled"
+            assert member["attribution_locked"] == 1
+            assert member["allow_reattribution"] == 0
+            assert member["invited_by_user_id"] is None
+            assert member["invited_by_code"] is None
+
+        inviter_a = await db.get_user(1, 100)
+        inviter_b = await db.get_user(1, 101)
+        assert inviter_a["pooled_count"] == 1
+        assert inviter_a["invited_count"] == 0
+        assert inviter_b["pooled_count"] == 1
+
+    asyncio.run(scenario())
+
+
+def test_pool_attribute_members_rolls_back_when_member_already_locked(tmp_path):
+    async def scenario():
+        db = InviteGuardDatabaseManager(str(tmp_path / "invite.db"))
+        await db.initialize_database()
+
+        await db.record_member_join(1, 200, NOW)
+        await db.record_member_join(1, 201, NOW)
+        # Lock 201 ahead of time (e.g. already attributed by another path).
+        assert await db.attribute_member(1, 201, 999, "zzz", NOW) is True
+
+        ok = await db.pool_attribute_members(
+            1,
+            [200, 201],
+            [(100, "abc", 1), (101, "def", 1)],
+            NOW,
+        )
+        assert ok is False
+
+        member_a = await db.get_user(1, 200)
+        assert member_a["attribution_status"] == "unattributed"
+        assert member_a["attribution_locked"] == 0
+        inviter_a = await db.get_user(1, 100)
+        assert inviter_a is None
+
+    asyncio.run(scenario())
+
+
+def test_get_leaderboard_orders_by_invited_plus_pooled_count(tmp_path):
+    async def scenario():
+        db = InviteGuardDatabaseManager(str(tmp_path / "invite.db"))
+        await db.initialize_database()
+
+        await db.record_member_join(1, 200, NOW)
+        await db.attribute_member(1, 200, 100, "abc", NOW)  # inviter 100: invited_count=1
+
+        await db.record_member_join(1, 201, NOW)
+        await db.record_member_join(1, 202, NOW)
+        await db.pool_attribute_members(
+            1,
+            [201, 202],
+            [(101, "def", 2)],
+            NOW,
+        )  # inviter 101: pooled_count=2
+
+        rows = await db.get_leaderboard(1, 10)
+        assert [row["user_id"] for row in rows] == [101, 100]
+        assert rows[0]["total_count"] == 2
+        assert rows[0]["pooled_count"] == 2
+        assert rows[0]["invited_count"] == 0
+        assert rows[1]["total_count"] == 1
+
+    asyncio.run(scenario())
+
+
+def test_get_user_includes_pooled_count_for_invite_check_user(tmp_path):
+    async def scenario():
+        db = InviteGuardDatabaseManager(str(tmp_path / "invite.db"))
+        await db.initialize_database()
+
+        await db.record_member_join(1, 200, NOW)
+        await db.record_member_join(1, 201, NOW)
+        await db.pool_attribute_members(1, [200, 201], [(100, "abc", 2)], NOW)
+
+        inviter = await db.get_user(1, 100)
+        assert inviter["pooled_count"] == 2
+        assert inviter["invited_count"] == 0
+
+        member = await db.get_user(1, 200)
+        assert member["pooled_count"] == 0
+        assert member["attribution_status"] == "pooled"
+
+    asyncio.run(scenario())

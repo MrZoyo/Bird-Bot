@@ -22,6 +22,7 @@
 - PrivateRoom 续费日期、持久化回读、扣款顺序和失败不扣款。
 - Shop、Tickets、Ban、VoiceChannel、Giveaway、Role / Signature、Achievement / Rank、Welcome / Games、CheckStatus / Backup 的 fake interaction flow。
 - InviteGuard 邀请清理 / 排行榜逻辑：过期删除、dry-run、邀请 code 白名单、创建者白名单、`created_at` 缺失跳过、单条失败不中断、邀请链接同步、成员加入归因、重复加入不重复计数、Components v2 排行榜刷新 / 重建命令、有效邀请 Shop 积分奖励。
+- InviteGuard 池化归因 / 批结算 / 缓存锁串行化：`on_member_join` 入队 + 批窗口结算，单人单邀请行为不变，同窗口多人多邀请按各自 delta 池化记功发奖（`pooled_count`）、同窗口多人单邀请完整归因发多份奖，总量不匹配 / 含 ignored invite / 批内自邀 / 批内已锁定成员均降级为 ambiguous 且零奖励，`pooled_attribution_enabled=false` 维持旧行为，排行榜按 `invited_count+pooled_count` 排序，`/invite_check_user` 输出含 `pooled_count`，以及 `_invite_cache_lock` 序列化 `sync_invite_links` / `initialize_invite_cache` / 批结算的冒烟验证。
 - PrivateRoom 商店、Shop 签到、Tickets 主入口和组队邀请的 Components v2 panel 结构。
 - 组队消息和房间面板“满员”共享样式；旧 embed 和新 Components v2 消息均有兼容覆盖。
 - 显式 gateway intents、SQLCipher 数据库加密连接、明文库迁移工具、显式 key 文件生成和 `run.py` 本地 `.env` 加载。
@@ -29,7 +30,7 @@
 
 最后一次通过基线：
 - [x] `./.venv/Scripts/python.exe -m pytest -q`
-  - 当前：`120 passed, 1 warning`（2026-07-04）
+  - 当前：`135 passed, 1 warning`（2026-07-04）
 - [x] `./.venv/Scripts/python.exe -m ruff check bot tests tools`
 - [x] `./.venv/Scripts/python.exe -m compileall bot tests tools`
 - [x] `./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`

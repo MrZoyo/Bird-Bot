@@ -33,6 +33,8 @@ DEFAULT_AUDIT_REASON = "Auto cleanup: invite older than {max_age_days} days"
 DEFAULT_LEADERBOARD_INTERVAL_MINUTES = 5
 DEFAULT_LEADERBOARD_TOP_N = 15
 DEFAULT_INVITE_REWARD_POINTS = 60
+DEFAULT_POOLED_ATTRIBUTION_ENABLED = True
+DEFAULT_ATTRIBUTION_BATCH_WINDOW_SECONDS = 2
 LEADERBOARD_PANEL_COLOR = 0x7C3AED
 
 
@@ -62,6 +64,8 @@ class InviteLeaderboardSettings:
     ambiguous_allow_reattribution: bool = True
     require_single_delta_for_attribution: bool = True
     reward_points_per_invite: int = DEFAULT_INVITE_REWARD_POINTS
+    pooled_attribution_enabled: bool = DEFAULT_POOLED_ATTRIBUTION_ENABLED
+    attribution_batch_window_seconds: float = DEFAULT_ATTRIBUTION_BATCH_WINDOW_SECONDS
 
 
 @dataclass(frozen=True)
@@ -102,6 +106,8 @@ class InviteGuardCog(commands.Cog):
         self._invite_cache_lock = asyncio.Lock()
         self._runtime_leaderboard_channel_id = self.leaderboard_settings.channel_id
         self._runtime_leaderboard_message_id = self.leaderboard_settings.message_id
+        self._pending_joins: list[discord.Member] = []
+        self._settle_task: asyncio.Task | None = None
 
     async def cog_load(self):
         await self.db.initialize_database()
@@ -135,6 +141,8 @@ class InviteGuardCog(commands.Cog):
             self.invite_cleanup_task.cancel()
         if self.invite_leaderboard_task.is_running():
             self.invite_leaderboard_task.cancel()
+        if self._settle_task is not None and not self._settle_task.done():
+            self._settle_task.cancel()
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -232,23 +240,39 @@ class InviteGuardCog(commands.Cog):
         if not self._invite_cache_initialized:
             await self.initialize_invite_cache(source="join-before-cache")
 
-        previous_cache = dict(self.invite_cache)
-        invites = await self._fetch_guild_invites(member.guild)
-        if invites is None:
-            await self._mark_join_status(
-                member,
-                status='unknown',
-                code=None,
-                inviter_id=None,
-                allow_reattribution=settings.unknown_allow_reattribution,
-                now=now,
-            )
-            return
+        self._enqueue_pending_join(member, settings)
 
-        records = self._invites_to_records(member.guild.id, invites, settings)
-        deltas = self._find_invite_deltas(records, previous_cache)
-        await self._persist_invite_snapshot(member.guild.id, records, now, source="member_join")
-        await self._attribute_member_from_deltas(member, deltas, settings, now)
+    def _enqueue_pending_join(self, member: discord.Member, settings: InviteLeaderboardSettings) -> None:
+        if member.id not in {existing.id for existing in self._pending_joins}:
+            self._pending_joins.append(member)
+
+        if self._settle_task is None or self._settle_task.done():
+            self._settle_task = asyncio.create_task(
+                self._run_settlement_after_window(settings.attribution_batch_window_seconds)
+            )
+
+    async def _run_settlement_after_window(self, window_seconds: float) -> None:
+        try:
+            while True:
+                if window_seconds > 0:
+                    await asyncio.sleep(window_seconds)
+                await self._settle_pending_joins()
+                # Members enqueued while _settle_pending_joins was awaiting (invite
+                # fetch / DB I/O) land in _pending_joins without spawning a new task,
+                # because _enqueue_pending_join sees this task as not done yet. Loop
+                # until the queue is empty so they get settled too. Invariant: there
+                # must be NO await between this emptiness check and the coroutine
+                # returning — on the single-threaded event loop that guarantees no
+                # other coroutine can enqueue between "queue observed empty" and
+                # "task marked done", closing the stranded-member race window.
+                if not self._pending_joins:
+                    break
+        except Exception as e:
+            logging.error(
+                "[InviteLeaderboard] Pending join settlement task failed: %s",
+                e,
+                exc_info=True,
+            )
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
@@ -454,7 +478,7 @@ class InviteGuardCog(commands.Cog):
             if not settings.enabled:
                 return None
 
-            summary = await self.sync_invite_links(settings=settings, source=source)
+            summary = await self._sync_invite_links_locked(settings=settings, source=source)
             if summary is not None:
                 self._invite_cache_initialized = True
             return summary
@@ -465,6 +489,16 @@ class InviteGuardCog(commands.Cog):
         settings: InviteLeaderboardSettings | None = None,
         source: str,
     ) -> InviteLinkSyncSummary | None:
+        async with self._invite_cache_lock:
+            return await self._sync_invite_links_locked(settings=settings, source=source)
+
+    async def _sync_invite_links_locked(
+        self,
+        *,
+        settings: InviteLeaderboardSettings | None = None,
+        source: str,
+    ) -> InviteLinkSyncSummary | None:
+        """Fetch/diff/persist invites. Caller must already hold _invite_cache_lock."""
         settings = settings or self._load_leaderboard_settings()
         guild = self._get_target_guild(settings)
         if guild is None:
@@ -580,50 +614,179 @@ class InviteGuardCog(commands.Cog):
             )
             return InviteLinkSyncSummary(scanned=len(records))
 
-    async def _attribute_member_from_deltas(
-        self,
-        member: discord.Member,
-        deltas: list[tuple[InviteLinkRecord, int]],
-        settings: InviteLeaderboardSettings,
-        now: str,
-    ) -> None:
-        total_delta = sum(delta for _, delta in deltas)
-        if len(deltas) == 1 and (not settings.require_single_delta_for_attribution or total_delta == 1):
-            record, delta = deltas[0]
-            await self._attribute_member_from_single_invite(member, record, delta, settings, now)
+    async def _settle_pending_joins(self) -> None:
+        batch = list(self._pending_joins)
+        self._pending_joins.clear()
+        if not batch:
             return
 
-        if deltas:
-            codes = ", ".join(f"{record.code}(+{delta})" for record, delta in deltas)
-            logging.warning(
-                "[InviteLeaderboard] Ambiguous attribution for %s in %s; invite deltas: %s.",
-                fmt_user(member),
-                fmt_guild(member.guild),
-                codes,
-            )
-            await self._mark_join_status(
-                member,
-                status='ambiguous',
-                code=None,
-                inviter_id=None,
-                allow_reattribution=settings.ambiguous_allow_reattribution,
-                now=now,
-            )
-            return
+        settings = self._load_leaderboard_settings()
+        now = _now_iso()
+        guild = batch[0].guild
 
-        logging.info(
-            "[InviteLeaderboard] Unknown invite source for %s in %s; no invite uses increased.",
-            fmt_user(member),
-            fmt_guild(member.guild),
-        )
-        await self._mark_join_status(
-            member,
-            status='unknown',
-            code=None,
-            inviter_id=None,
-            allow_reattribution=settings.unknown_allow_reattribution,
-            now=now,
-        )
+        # Rewards collected while the lock is held, paid out after release so Shop
+        # DB I/O never blocks invite fetch/diff/persist for the next settlement or
+        # the background invite_leaderboard_task sync.
+        single_invite_rewards: list[tuple[discord.Member, InviteLinkRecord]] = []
+        pooled_rewards: list[tuple[int, str, int]] = []
+
+        async with self._invite_cache_lock:
+            previous_cache = dict(self.invite_cache)
+            invites = await self._fetch_guild_invites(guild)
+            if invites is None:
+                for member in batch:
+                    await self._mark_join_status(
+                        member,
+                        status='unknown',
+                        code=None,
+                        inviter_id=None,
+                        allow_reattribution=settings.unknown_allow_reattribution,
+                        now=now,
+                    )
+                return
+
+            records = self._invites_to_records(guild.id, invites, settings)
+            deltas = self._find_invite_deltas(records, previous_cache)
+            await self._persist_invite_snapshot(guild.id, records, now, source="member_join_settlement")
+
+            total_delta = sum(delta for _, delta in deltas)
+
+            if len(batch) == 1 and len(deltas) == 1 and (
+                not settings.require_single_delta_for_attribution or total_delta == 1
+            ):
+                record, delta = deltas[0]
+                await self._attribute_member_from_single_invite(batch[0], record, delta, settings, now)
+                return
+
+            batch_ids = {member.id for member in batch}
+            pooled_ok = (
+                settings.pooled_attribution_enabled
+                and bool(deltas)
+                and total_delta == len(batch)
+                and all(
+                    not record.ignored
+                    and record.inviter_id is not None
+                    and record.inviter_id not in batch_ids
+                    for record, _delta in deltas
+                )
+            )
+
+            if pooled_ok and len(deltas) == 1:
+                record, delta = deltas[0]
+                for member in batch:
+                    try:
+                        counted = await self.db.attribute_member(
+                            guild.id,
+                            member.id,
+                            record.inviter_id,
+                            record.code,
+                            now,
+                        )
+                    except Exception as e:
+                        logging.error(
+                            "[InviteLeaderboard] Failed to attribute %s in %s via %s: %s",
+                            fmt_user(member),
+                            fmt_guild(guild),
+                            record.code,
+                            e,
+                            exc_info=True,
+                        )
+                        continue
+                    if counted:
+                        single_invite_rewards.append((member, record))
+                        logging.info(
+                            "[InviteLeaderboard] Attributed %s in %s to %s via %s (single-invite multi-join) delta=%s.",
+                            fmt_user(member),
+                            fmt_guild(guild),
+                            _fmt_user_id(record.inviter_id),
+                            record.code,
+                            delta,
+                        )
+            elif pooled_ok:
+                member_ids = [member.id for member in batch]
+                awards = [(record.inviter_id, record.code, delta) for record, delta in deltas]
+                try:
+                    pooled = await self.db.pool_attribute_members(guild.id, member_ids, awards, now)
+                except Exception as e:
+                    logging.error(
+                        "[InviteLeaderboard] Failed to pool-attribute batch in %s: %s",
+                        fmt_guild(guild),
+                        e,
+                        exc_info=True,
+                    )
+                    pooled = False
+
+                if pooled:
+                    codes = ", ".join(f"{record.code}(+{delta})" for record, delta in deltas)
+                    logging.info(
+                        "[InviteLeaderboard] Pooled attribution settled for %s member(s) %s in %s via %s.",
+                        len(batch),
+                        [fmt_user(member) for member in batch],
+                        fmt_guild(guild),
+                        codes,
+                    )
+                    pooled_rewards.extend(awards)
+                else:
+                    logging.warning(
+                        "[InviteLeaderboard] Pooled attribution rejected (locked member in batch) for %s in %s; "
+                        "falling back to ambiguous.",
+                        [fmt_user(member) for member in batch],
+                        fmt_guild(guild),
+                    )
+                    for member in batch:
+                        await self._mark_join_status(
+                            member,
+                            status='ambiguous',
+                            code=None,
+                            inviter_id=None,
+                            allow_reattribution=settings.ambiguous_allow_reattribution,
+                            now=now,
+                        )
+            elif deltas:
+                codes = ", ".join(f"{record.code}(+{delta})" for record, delta in deltas)
+                logging.warning(
+                    "[InviteLeaderboard] Ambiguous attribution for batch %s in %s; invite deltas: %s.",
+                    [fmt_user(member) for member in batch],
+                    fmt_guild(guild),
+                    codes,
+                )
+                for member in batch:
+                    await self._mark_join_status(
+                        member,
+                        status='ambiguous',
+                        code=None,
+                        inviter_id=None,
+                        allow_reattribution=settings.ambiguous_allow_reattribution,
+                        now=now,
+                    )
+            else:
+                logging.info(
+                    "[InviteLeaderboard] Unknown invite source for batch %s in %s; no invite uses increased.",
+                    [fmt_user(member) for member in batch],
+                    fmt_guild(guild),
+                )
+                for member in batch:
+                    await self._mark_join_status(
+                        member,
+                        status='unknown',
+                        code=None,
+                        inviter_id=None,
+                        allow_reattribution=settings.unknown_allow_reattribution,
+                        now=now,
+                    )
+
+        for member, record in single_invite_rewards:
+            await self._award_invite_reward(member, record, settings)
+
+        batch_member_ids = [member.id for member in batch]
+        for inviter_id, code, delta in pooled_rewards:
+            await self._award_pooled_invite_reward(
+                inviter_id=inviter_id,
+                code=code,
+                delta=delta,
+                batch_member_ids=batch_member_ids,
+                settings=settings,
+            )
 
     async def _attribute_member_from_single_invite(
         self,
@@ -731,30 +894,73 @@ class InviteGuardCog(commands.Cog):
         if reward_points <= 0:
             return
 
+        await self._award_invite_points(
+            inviter_id=record.inviter_id,
+            points=reward_points,
+            note=f"Invite reward: {member.id} via {record.code}",
+            log_target=fmt_user(member),
+            code=record.code,
+        )
+
+    async def _award_pooled_invite_reward(
+        self,
+        *,
+        inviter_id: int,
+        code: str,
+        delta: int,
+        batch_member_ids: list[int],
+        settings: InviteLeaderboardSettings,
+    ) -> None:
+        reward_points = settings.reward_points_per_invite
+        if reward_points <= 0 or delta <= 0:
+            return
+
+        total_points = reward_points * delta
+        member_ids_text = ", ".join(str(member_id) for member_id in batch_member_ids)
+        await self._award_invite_points(
+            inviter_id=inviter_id,
+            points=total_points,
+            note=(
+                f"Pooled invite reward: {delta} join(s) via {code} "
+                f"among batch members [{member_ids_text}]"
+            ),
+            log_target=f"pooled batch of {len(batch_member_ids)} member(s)",
+            code=code,
+        )
+
+    async def _award_invite_points(
+        self,
+        *,
+        inviter_id: int,
+        points: int,
+        note: str,
+        log_target: str,
+        code: str,
+    ) -> None:
         operator_id = _get_bot_user_id(self.bot)
         try:
             new_balance = await self.shop_db.update_user_balance_with_record(
-                record.inviter_id,
-                reward_points,
+                inviter_id,
+                points,
                 "invite_reward",
                 operator_id,
-                f"Invite reward: {member.id} via {record.code}",
+                note,
             )
             logging.info(
                 "[InviteReward] Awarded %s point(s) to %s for inviting %s via %s. new_balance=%s",
-                reward_points,
-                _fmt_user_id(record.inviter_id),
-                fmt_user(member),
-                record.code,
+                points,
+                _fmt_user_id(inviter_id),
+                log_target,
+                code,
                 new_balance,
             )
         except Exception as e:
             logging.error(
                 "[InviteReward] Failed to award %s point(s) to %s for inviting %s via %s: %s",
-                reward_points,
-                _fmt_user_id(record.inviter_id),
-                fmt_user(member),
-                record.code,
+                points,
+                _fmt_user_id(inviter_id),
+                log_target,
+                code,
                 e,
                 exc_info=True,
             )
@@ -815,7 +1021,7 @@ class InviteGuardCog(commands.Cog):
                     'invite_guard.leaderboard.entry',
                     badge=_leaderboard_badge(index),
                     user=f"<@{row['user_id']}>",
-                    count=row['invited_count'],
+                    count=row['total_count'],
                 )
                 for index, row in enumerate(rows, start=1)
             )
@@ -1189,6 +1395,18 @@ class InviteGuardCog(commands.Cog):
                 default=DEFAULT_INVITE_REWARD_POINTS,
             ),
         )
+        attribution_batch_window_seconds = max(
+            0.0,
+            _coerce_float(
+                _setting_value(
+                    raw,
+                    'attribution_batch_window_seconds',
+                    'INVITE_ATTRIBUTION_BATCH_WINDOW_SECONDS',
+                    default=DEFAULT_ATTRIBUTION_BATCH_WINDOW_SECONDS,
+                ),
+                default=DEFAULT_ATTRIBUTION_BATCH_WINDOW_SECONDS,
+            ),
+        )
 
         return InviteLeaderboardSettings(
             enabled=_coerce_bool(
@@ -1236,6 +1454,16 @@ class InviteGuardCog(commands.Cog):
                 default=True,
             ),
             reward_points_per_invite=reward_points_per_invite,
+            pooled_attribution_enabled=_coerce_bool(
+                _setting_value(
+                    raw,
+                    'pooled_attribution_enabled',
+                    'INVITE_POOLED_ATTRIBUTION_ENABLED',
+                    default=DEFAULT_POOLED_ATTRIBUTION_ENABLED,
+                ),
+                default=DEFAULT_POOLED_ATTRIBUTION_ENABLED,
+            ),
+            attribution_batch_window_seconds=attribution_batch_window_seconds,
         )
 
     def _apply_loop_interval(self, settings: InviteCleanerSettings) -> None:
@@ -1257,6 +1485,7 @@ class InviteGuardCog(commands.Cog):
             'invite_guard.messages.user_summary',
             user=f"<@{record['user_id']}>",
             invited_count=record['invited_count'],
+            pooled_count=record['pooled_count'],
             invited_by=_fmt_user_id(record['invited_by_user_id']),
             invited_by_code=record['invited_by_code'] or t('invite_guard.labels.none'),
             attribution_status=record['attribution_status'],
@@ -1308,6 +1537,15 @@ def _coerce_int(value: Any, *, default: int | None) -> int | None:
         return default
     try:
         return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _coerce_float(value: Any, *, default: float) -> float:
+    if isinstance(value, bool) or value in (None, ""):
+        return default
+    try:
+        return float(value)
     except (TypeError, ValueError):
         return default
 

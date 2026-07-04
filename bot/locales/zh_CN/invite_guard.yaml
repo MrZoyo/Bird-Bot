@@ -17,6 +17,7 @@ messages:
   user_summary: |
     邀请用户统计：{user}
     invited_count: {invited_count}
+    pooled_count: {pooled_count}
     invited_by: {invited_by}
     invited_by_code: {invited_by_code}
     attribution_status: {attribution_status}
@@ -31,6 +32,6 @@ leaderboard:
   updated_at: "更新于 {time}"
   empty: "暂无有效邀请计数。"
   entry: "{badge} {user}  **{count}** 人"
-  footer: "每个新成员只会被第一次有效普通邀请计入一次，退出后重新加入不会重复计数。"
+  footer: "每个新成员只会被计入一次邀请；多人同时加入且总数吻合时，邀请人照常计数，但不记录具体对应关系。退出后重新加入不会重复计数。"
 labels:
   none: "无"

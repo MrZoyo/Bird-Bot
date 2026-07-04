@@ -10,6 +10,24 @@
 
 ---
 
+## 2026-07-04 InviteGuard 池化归因 + 缓存锁串行化
+
+- 修复两个已知竞态：(a) 多人同窗口加入时逐个处理 `on_member_join` 会导致第一个处理器看到多个 delta 判 ambiguous、后续处理器看到 delta=0 判 unknown；(b) 后台 `invite_leaderboard_task` 的 `sync_invite_links` 可能在“加入事件发生”和“处理器读缓存”之间刷新缓存吞掉增量。
+- 缓存锁串行化：`sync_invite_links` 拆成对外加锁入口和内部无锁的 `_sync_invite_links_locked`；`initialize_invite_cache` 已持有锁时直接调用内部版本，避免 `asyncio.Lock` 不可重入导致的死锁。
+- 池化归因：`on_member_join` 改为把成员追加到 `self._pending_joins` 队列并（若无活跃结算任务）用 `asyncio.create_task` 调度一个 `attribution_batch_window_seconds`（默认 2 秒，可设 0）之后运行的结算任务 `_settle_pending_joins`；结算在 `_invite_cache_lock` 内一次性 fetch/diff/persist 整批邀请状态：
+  - 单人单邀请（`len(batch)==1` 且 `len(deltas)==1`）：行为与改动前完全一致，走原有 `_attribute_member_from_single_invite`。
+  - 池化条件（`pooled_attribution_enabled` 且总 delta == 批次人数且每个涉及的 invite 都非 ignored / 有 inviter / 非批内自邀）：`len(deltas)==1` 时对每个成员调用现有 `attribute_member` 完整归因（`invited_count` 逐一 +1，各发一份奖励）；`len(deltas)>=2` 时调用新方法 `pool_attribute_members` 把整批成员标记 `attribution_status='pooled'` 并锁定（不记录具体 inviter），每个 inviter 按各自 delta 累计新列 `pooled_count`，随后按 `delta × reward_points_per_invite` 发一份奖励，`note` 注明 pooled 及批内成员数。
+  - 不满足池化条件时降级：有 delta 判 `ambiguous`，无 delta 判 `unknown`，均不发奖励，与改动前语义一致。
+  - Shop 积分奖励发放全部放在锁外执行，避免网络 I/O 阻塞下一次结算或后台 sync。
+  - 结算任务是循环结构：每轮 `_settle_pending_joins` 结束后检查 `_pending_joins`，非空则再跑一轮（结算执行期间加入的成员不会因“任务未 done 不新建、任务结束后无人消费”而滞留队列）；“检查队列为空”与协程 return 之间不含任何 await，在单线程事件循环上关闭了 enqueue 竞态窗口（代码内有注释说明该不变量）。
+- DB 变更（`bot/utils/invite_guard_db.py`）：`invite_users` 新增 `pooled_count` 列，通过 `schema_migrations.add_column_if_missing` 在 `initialize_database` 时自动给旧库补列（已用手工脚本验证：先建一张缺列的旧表，再跑 `initialize_database`，`pooled_count` 自动出现且默认值为 0）；新增 `pool_attribute_members` 方法（单个 `BEGIN IMMEDIATE` 事务，readback 校验锁定 / `allow_reattribution` 后整批 rollback 或整批提交）；`get_leaderboard` 排序 / 过滤改用 `invited_count + pooled_count` 总和并返回 `pooled_count` / `total_count`；`_get_user_record` 与 `_invite_user_row_to_dict` 增加 `pooled_count`；`find_count_mismatches` 保持只对账 `invited_count`（新增注释说明池化计数设计上无成员行可对账）。
+- Locale：`messages.user_summary` 新增 `pooled_count` 行；`leaderboard.footer` 更新为同时覆盖池化情形的说明文案。
+- 配置模板与真实配置新增 `pooled_attribution_enabled`（默认 true）与 `attribution_batch_window_seconds`（默认 2，可设 0，负数钳到 0），沿用既有 `_setting_value` / 大写别名模式（`INVITE_POOLED_ATTRIBUTION_ENABLED` / `INVITE_ATTRIBUTION_BATCH_WINDOW_SECONDS`）。
+- 测试：`tests/test_invite_guard.py` 中原本直接调用 `on_member_join` 并立即断言的用例改为通过新增的 `_join_and_settle` 辅助函数（`attribution_batch_window_seconds=0`，join 后 await 结算任务）驱动，保持断言语义不变；新增两人两邀请池化记功发奖、两人单邀请完整归因发两份奖、总量不匹配降级、含 ignored invite 降级、批内自邀降级、批内已锁定成员触发 `pool_attribute_members` 回滚降级、`pooled_attribution_enabled=false` 时维持旧行为、排行榜按 `invited_count+pooled_count` 排序、`/invite_check_user` 输出含 `pooled_count`、缓存锁串行化冒烟（结算持锁时并发 `sync_invite_links` 会等待）、结算执行期间加入的成员由同一任务循环补结算（不滞留队列）共 10 个 cog 级用例；`tests/test_invite_guard_db.py` 新增 `pool_attribute_members` 记功 / 回滚、`get_leaderboard` 排序、`get_user` 含 `pooled_count` 共 4 个 DB 级用例。
+- 当前自动化基线：`./.venv/Scripts/python.exe -m pytest -q` 为 `135 passed, 1 warning`；`ruff check bot tests tools`、`compileall bot tests tools`、`tools/check_locales.py` 均通过。
+
+---
+
 ## 2026-07-04 InviteGuard / 2.0.1 同步
 
 - 版本号推进到 `2.0.1`，新增 `InviteGuardCog`：按配置每日扫描目标 guild 的 active invites，静默删除超过保留期且不在白名单中的邀请。

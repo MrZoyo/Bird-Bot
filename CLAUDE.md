@@ -177,6 +177,7 @@ Current pytest smoke coverage includes:
 - Welcome / Games fake interaction flow for Welcome DM, SpyMode, and DnD roll response.
 - CheckStatus / Backup fake interaction flow for Where Is, voice status, log tail, and manual backup.
 - InviteGuard cleanup and leaderboard logic for expired invite deletion, dry-run, invite-code whitelist, creator whitelist, missing `created_at`, per-invite failure isolation, invite-link sync, member-join attribution, rejoin lockout, Components v2 leaderboard refresh/create commands, and Shop point rewards for valid invites.
+- InviteGuard pooled attribution and batch settlement: `on_member_join` now enqueues into `_pending_joins` and a single background task settles the batch after `attribution_batch_window_seconds`; `_invite_cache_lock` serializes every fetch/diff/persist critical section (`sync_invite_links` / `_sync_invite_links_locked`, `initialize_invite_cache`, `_settle_pending_joins`) so a concurrent leaderboard sync cannot steal a join's invite-use delta. Covered: single-invite multi-member full attribution (`invited_count`), same-window multi-invite pooled credit (`pooled_count` + per-inviter reward), total-delta mismatch/ignored-invite/self-invite/already-locked-member fallback to ambiguous with zero reward, `pooled_attribution_enabled=false` legacy fallback, leaderboard ordering by `invited_count + pooled_count`, `/invite_check_user` exposing `pooled_count`, a lock-serialization smoke test proving a concurrent `sync_invite_links` waits for an in-flight settlement, and a regression test proving members who join while a settlement is mid-await are settled by the same task loop instead of stranding in the queue (the settlement task loops until `_pending_joins` is empty, with no await between the emptiness check and task completion).
 - Temporary JSON-to-YAML migration smoke.
 - Background loop offline guard.
 - Offline DB manager smoke for retained modules.
@@ -187,7 +188,7 @@ Current pytest smoke coverage includes:
 Current P3-9 status:
 
 - Done: current fake interaction flow list is complete for PrivateRoom, Shop, Tickets, Ban, VoiceChannel, Giveaway, Role / Signature, Achievement / Rank, Welcome / Games, CheckStatus / Backup, and InviteGuard.
-- Current baseline: `120 passed, 1 warning`.
+- Current baseline: `135 passed, 1 warning`.
 - Next default target: targeted real test-server validation for new changes / side-effect paths only when explicitly approved.
 - Add more fake interaction tests only for new bugs, payload replay work, or new features.
 
