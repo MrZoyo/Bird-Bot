@@ -1,10 +1,8 @@
 # Discord 邀请链接静默清理配置。
 # 运行时默认读取这些小写 YAML key；同时兼容同名大写别名（例如 INVITE_CLEANER_ENABLED）
 # 或环境变量，便于临时覆盖。
-# 启用后，InviteGuardCog 会每天扫描目标服务器 active invites，静默删除超过保留期且不在白名单中的邀请。
+# 启用后，InviteGuardCog 会每天扫描 main.guild_id 对应服务器 active invites，静默删除超过保留期且不在白名单中的邀请。
 enabled: true
-# 目标服务器 ID；为空时使用 main.guild_id。
-guild_id: 1145141919810
 # 邀请链接最大保留天数；超过该天数才会被删除，默认 3 天。
 max_age_days: 3
 # 后台扫描间隔，单位小时；默认 24 小时。
@@ -20,3 +18,28 @@ invite_creator_whitelist:
 - 1145141919810
 # 删除邀请时写入 Discord audit log 的原因；可使用 {max_age_days} 占位符。
 audit_reason: "Auto cleanup: invite older than {max_age_days} days"
+
+# 邀请排行榜功能。启用后会维护 invite_users / invite_links 两张表，并根据 on_member_join
+# 时的 invite uses 增量推断邀请归因。计数只在成员加入时发生，定时任务只同步链接和编辑排行榜。
+leaderboard_enabled: true
+# 排行榜消息所在频道 ID。未配置时不会发送排行榜，只会同步数据库并记录 warning。
+leaderboard_channel_id: 1145141919810
+# 已有排行榜消息 ID。为空时 bot 会在目标频道创建一条新消息，并在日志提示保存该 ID。
+leaderboard_message_id:
+# 邀请链接同步和排行榜编辑间隔，单位分钟；默认 5。
+leaderboard_interval_minutes: 5
+# 排行榜显示前 N 名。
+leaderboard_top_n: 15
+# 不计入排行榜的邀请 code，例如 vanity/官方入口 birdgaming。这里会与 invite_code_whitelist 合并。
+ignored_codes:
+- birdgaming
+# 这些用户创建的邀请不计入排行榜；用于官方账号或 bot 账号。普通管理员不建议默认加入。
+ignored_inviter_ids: []
+# 无法判断来源时是否允许该用户未来重新被普通邀请归因。
+unknown_allow_reattribution: true
+# 多个 invite 同时增长、无法可靠归因时，是否允许该用户未来重新归因。
+ambiguous_allow_reattribution: true
+# true 时只有“恰好一个 invite 增长且总增量为 1”才会归因；更保守，默认开启。
+require_single_delta_for_attribution: true
+# 每成功归因 1 个有效普通邀请时奖励给邀请人的积分；设为 0 可关闭奖励。默认 60。
+reward_points_per_invite: 60

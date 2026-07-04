@@ -21,7 +21,7 @@
 - JSON config 临时迁移到 YAML / locale / DB seed。
 - PrivateRoom 续费日期、持久化回读、扣款顺序和失败不扣款。
 - Shop、Tickets、Ban、VoiceChannel、Giveaway、Role / Signature、Achievement / Rank、Welcome / Games、CheckStatus / Backup 的 fake interaction flow。
-- InviteGuard 邀请清理逻辑：过期删除、dry-run、邀请 code 白名单、创建者白名单、`created_at` 缺失跳过、单条失败不中断、手动 `/invite_cleanup` summary。
+- InviteGuard 邀请清理 / 排行榜逻辑：过期删除、dry-run、邀请 code 白名单、创建者白名单、`created_at` 缺失跳过、单条失败不中断、邀请链接同步、成员加入归因、重复加入不重复计数、Components v2 排行榜刷新 / 重建命令、有效邀请 Shop 积分奖励。
 - PrivateRoom 商店、Shop 签到、Tickets 主入口和组队邀请的 Components v2 panel 结构。
 - 组队消息和房间面板“满员”共享样式；旧 embed 和新 Components v2 消息均有兼容覆盖。
 - 显式 gateway intents、SQLCipher 数据库加密连接、明文库迁移工具、显式 key 文件生成和 `run.py` 本地 `.env` 加载。
@@ -29,7 +29,7 @@
 
 最后一次通过基线：
 - [x] `./.venv/Scripts/python.exe -m pytest -q`
-  - 当前：`109 passed, 1 warning`（2026-07-04）
+  - 当前：`120 passed, 1 warning`（2026-07-04）
 - [x] `./.venv/Scripts/python.exe -m ruff check bot tests tools`
 - [x] `./.venv/Scripts/python.exe -m compileall bot tests tools`
 - [x] `./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`
@@ -192,7 +192,7 @@
 - [x] 全部手工异常项 `[!]` 已复测或记录为后续 bug。
   - 2026-06-28：当前 checklist 无 `[!]` 条目；本轮发现的 `ConfirmationView.message` 超时异常已修复并补测试。
 - [x] 再跑一次 `./.venv/Scripts/python.exe -m pytest -q`。
-  - 2026-07-04：`109 passed, 1 warning`。
+  - 2026-07-04：`120 passed, 1 warning`。
 - [x] 再跑一次 `./.venv/Scripts/python.exe -m ruff check bot tests tools`。
   - 2026-06-28：All checks passed。
 - [x] 再跑一次 `./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`。

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from dataclasses import dataclass, field
@@ -11,7 +12,17 @@ from discord import app_commands
 from discord.app_commands import locale_str
 from discord.ext import commands, tasks
 
-from bot.utils import check_channel_validity, config, fmt_channel, fmt_guild, fmt_user
+from bot.utils import (
+    InviteGuardDatabaseManager,
+    ShopDatabaseManager,
+    check_channel_validity,
+    config,
+    fmt_channel,
+    fmt_guild,
+    fmt_user,
+)
+from bot.utils.components_v2 import clear_legacy_message_payload
+from bot.utils.invite_guard_db import InviteLinkRecord, InviteLinkSyncSummary
 from bot.utils.i18n import t
 from bot.utils.task_helpers import wait_until_ready_or_stop
 
@@ -19,6 +30,10 @@ from bot.utils.task_helpers import wait_until_ready_or_stop
 DEFAULT_MAX_AGE_DAYS = 3
 DEFAULT_INTERVAL_HOURS = 24
 DEFAULT_AUDIT_REASON = "Auto cleanup: invite older than {max_age_days} days"
+DEFAULT_LEADERBOARD_INTERVAL_MINUTES = 5
+DEFAULT_LEADERBOARD_TOP_N = 15
+DEFAULT_INVITE_REWARD_POINTS = 60
+LEADERBOARD_PANEL_COLOR = 0x7C3AED
 
 
 @dataclass(frozen=True)
@@ -31,6 +46,30 @@ class InviteCleanerSettings:
     invite_code_whitelist: frozenset[str] = field(default_factory=frozenset)
     invite_creator_whitelist: frozenset[int] = field(default_factory=frozenset)
     audit_reason: str = DEFAULT_AUDIT_REASON
+
+
+@dataclass(frozen=True)
+class InviteLeaderboardSettings:
+    enabled: bool = True
+    guild_id: int | None = None
+    channel_id: int | None = None
+    message_id: int | None = None
+    interval_minutes: int = DEFAULT_LEADERBOARD_INTERVAL_MINUTES
+    top_n: int = DEFAULT_LEADERBOARD_TOP_N
+    ignored_codes: frozenset[str] = field(default_factory=frozenset)
+    ignored_inviter_ids: frozenset[int] = field(default_factory=frozenset)
+    unknown_allow_reattribution: bool = True
+    ambiguous_allow_reattribution: bool = True
+    require_single_delta_for_attribution: bool = True
+    reward_points_per_invite: int = DEFAULT_INVITE_REWARD_POINTS
+
+
+@dataclass(frozen=True)
+class InviteSnapshot:
+    code: str
+    uses: int
+    inviter_id: int | None
+    ignored: bool
 
 
 @dataclass
@@ -53,8 +92,22 @@ class InviteGuardCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.settings = self._load_settings()
+        self.leaderboard_settings = self._load_leaderboard_settings()
+        self.db_path = config.get_config('main')['db_path']
+        self.db = InviteGuardDatabaseManager(self.db_path)
+        shop_config = config.get_config('shop', silent=True)
+        self.shop_db = ShopDatabaseManager(self.db_path, shop_config if isinstance(shop_config, dict) else {})
+        self.invite_cache: dict[str, InviteSnapshot] = {}
+        self._invite_cache_initialized = False
+        self._invite_cache_lock = asyncio.Lock()
+        self._runtime_leaderboard_channel_id = self.leaderboard_settings.channel_id
+        self._runtime_leaderboard_message_id = self.leaderboard_settings.message_id
 
     async def cog_load(self):
+        await self.db.initialize_database()
+        if self.leaderboard_settings.reward_points_per_invite > 0:
+            await self.shop_db.initialize_database()
+
         self._apply_loop_interval(self.settings)
         if self.settings.enabled and not self.invite_cleanup_task.is_running():
             self.invite_cleanup_task.start()
@@ -66,9 +119,153 @@ class InviteGuardCog(commands.Cog):
         else:
             logging.info("[InviteCleaner] Scheduled cleanup is disabled by config.")
 
+        self._apply_leaderboard_loop_interval(self.leaderboard_settings)
+        if self.leaderboard_settings.enabled and not self.invite_leaderboard_task.is_running():
+            self.invite_leaderboard_task.start()
+            logging.info(
+                "[InviteLeaderboard] Scheduled sync every %s minute(s) for %s.",
+                self.leaderboard_settings.interval_minutes,
+                fmt_guild(self.leaderboard_settings.guild_id),
+            )
+        else:
+            logging.info("[InviteLeaderboard] Scheduled leaderboard sync is disabled by config.")
+
     def cog_unload(self):
         if self.invite_cleanup_task.is_running():
             self.invite_cleanup_task.cancel()
+        if self.invite_leaderboard_task.is_running():
+            self.invite_leaderboard_task.cancel()
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        if not self.leaderboard_settings.enabled or self._invite_cache_initialized:
+            return
+        await self.initialize_invite_cache(source="ready")
+
+    @commands.Cog.listener()
+    async def on_invite_create(self, invite: discord.Invite):
+        settings = self._load_leaderboard_settings()
+        if not settings.enabled:
+            return
+
+        guild = getattr(invite, "guild", None)
+        if guild is None or guild.id != settings.guild_id:
+            return
+
+        now = _now_iso()
+        record = self._invite_to_record(guild.id, invite, settings)
+        if record is None:
+            return
+
+        try:
+            await self.db.upsert_invite_link(guild.id, record, now)
+            self.invite_cache[record.code] = _record_to_snapshot(record)
+            logging.info(
+                "[InviteLeaderboard] Recorded new invite %s for %s by %s.",
+                record.code,
+                fmt_guild(guild),
+                _fmt_user_id(record.inviter_id),
+            )
+        except Exception as e:
+            logging.error(
+                "[InviteLeaderboard] Failed to persist invite create %s in %s: %s",
+                record.code,
+                fmt_guild(guild),
+                e,
+                exc_info=True,
+            )
+
+    @commands.Cog.listener()
+    async def on_invite_delete(self, invite: discord.Invite):
+        settings = self._load_leaderboard_settings()
+        if not settings.enabled:
+            return
+
+        guild = getattr(invite, "guild", None)
+        if guild is None or guild.id != settings.guild_id:
+            return
+
+        code = _normalize_invite_code(getattr(invite, "code", ""))
+        if not code:
+            return
+
+        try:
+            await self.db.mark_invite_inactive(guild.id, code, _now_iso())
+            self.invite_cache.pop(code, None)
+            logging.info("[InviteLeaderboard] Marked invite %s inactive in %s.", code, fmt_guild(guild))
+        except Exception as e:
+            logging.error(
+                "[InviteLeaderboard] Failed to mark deleted invite %s in %s: %s",
+                code,
+                fmt_guild(guild),
+                e,
+                exc_info=True,
+            )
+
+    @commands.Cog.listener()
+    async def on_member_join(self, member: discord.Member):
+        settings = self._load_leaderboard_settings()
+        if not settings.enabled or member.guild.id != settings.guild_id:
+            return
+
+        now = _now_iso()
+        try:
+            user_record = await self.db.record_member_join(member.guild.id, member.id, now)
+        except Exception as e:
+            logging.error(
+                "[InviteLeaderboard] Failed to record join for %s in %s: %s",
+                fmt_user(member),
+                fmt_guild(member.guild),
+                e,
+                exc_info=True,
+            )
+            return
+
+        if int(user_record.get('attribution_locked') or 0):
+            logging.info(
+                "[InviteLeaderboard] %s rejoined %s but attribution is already locked.",
+                fmt_user(member),
+                fmt_guild(member.guild),
+            )
+            return
+
+        if not self._invite_cache_initialized:
+            await self.initialize_invite_cache(source="join-before-cache")
+
+        previous_cache = dict(self.invite_cache)
+        invites = await self._fetch_guild_invites(member.guild)
+        if invites is None:
+            await self._mark_join_status(
+                member,
+                status='unknown',
+                code=None,
+                inviter_id=None,
+                allow_reattribution=settings.unknown_allow_reattribution,
+                now=now,
+            )
+            return
+
+        records = self._invites_to_records(member.guild.id, invites, settings)
+        deltas = self._find_invite_deltas(records, previous_cache)
+        await self._persist_invite_snapshot(member.guild.id, records, now, source="member_join")
+        await self._attribute_member_from_deltas(member, deltas, settings, now)
+
+    @commands.Cog.listener()
+    async def on_member_remove(self, member: discord.Member):
+        settings = self._load_leaderboard_settings()
+        if not settings.enabled or member.guild.id != settings.guild_id:
+            return
+
+        try:
+            await self.db.record_member_leave(member.guild.id, member.id, _now_iso())
+        except Exception as e:
+            logging.error(
+                "[InviteLeaderboard] Failed to record leave for %s in %s: %s",
+                fmt_user(member),
+                fmt_guild(member.guild),
+                e,
+                exc_info=True,
+            )
 
     @tasks.loop(hours=DEFAULT_INTERVAL_HOURS)
     async def invite_cleanup_task(self):
@@ -82,34 +279,120 @@ class InviteGuardCog(commands.Cog):
             'InviteGuardCog.invite_cleanup_task',
         )
 
+    @tasks.loop(minutes=DEFAULT_LEADERBOARD_INTERVAL_MINUTES)
+    async def invite_leaderboard_task(self):
+        settings = self._load_leaderboard_settings()
+        self.leaderboard_settings = settings
+        self._apply_leaderboard_loop_interval(settings)
+        if not settings.enabled:
+            return
+
+        await self.sync_invite_links(settings=settings, source="scheduled")
+        await self.update_leaderboard_message(settings=settings)
+
+    @invite_leaderboard_task.before_loop
+    async def before_invite_leaderboard_task(self):
+        await wait_until_ready_or_stop(
+            self.bot,
+            self.invite_leaderboard_task,
+            'InviteGuardCog.invite_leaderboard_task',
+        )
+        if self.leaderboard_settings.enabled and not self._invite_cache_initialized:
+            await self.initialize_invite_cache(source="task-before-loop")
+
     @app_commands.command(
-        name="invite_cleanup",
+        name="invite_sync",
         description=locale_str(
-            "Run invite cleanup once and return a short summary",
-            key="invite_guard.invite_cleanup.description",
+            "Sync current Discord invite links and refresh the leaderboard",
+            key="invite_guard.invite_sync.description",
         ),
     )
-    @app_commands.describe(
-        dry_run=locale_str(
-            "Only report invites that would be deleted; do not delete them.",
-            key="invite_guard.invite_cleanup.params.dry_run",
-        ),
-    )
-    async def invite_cleanup(
-        self,
-        interaction: discord.Interaction,
-        dry_run: bool | None = None,
-    ):
-        if not await self._can_run_manual_cleanup(interaction):
+    async def invite_sync(self, interaction: discord.Interaction):
+        if not await self._can_run_admin_command(interaction):
             return
 
         await interaction.response.defer(ephemeral=True, thinking=True)
-        summary = await self.run_cleanup(
-            dry_run=dry_run,
-            source="manual",
-            respect_enabled=False,
+        settings = self._load_leaderboard_settings()
+        summary = await self.sync_invite_links(settings=settings, source="manual")
+        if summary is None:
+            await interaction.followup.send(t('invite_guard.messages.sync_failed'), ephemeral=True)
+            return
+        message_id = await self.update_leaderboard_message(settings=settings)
+        await interaction.followup.send(
+            t(
+                'invite_guard.messages.sync_summary',
+                scanned=summary.scanned,
+                inserted=summary.inserted,
+                updated=summary.updated,
+                marked_inactive=summary.marked_inactive,
+                message_id=message_id or t('invite_guard.labels.none'),
+            ),
+            ephemeral=True,
         )
-        await interaction.followup.send(self._format_summary(summary), ephemeral=True)
+
+    @app_commands.command(
+        name="invite_check_user",
+        description=locale_str(
+            "Show invite attribution and leaderboard stats for a member",
+            key="invite_guard.invite_check_user.description",
+        ),
+    )
+    @app_commands.describe(
+        member=locale_str(
+            "Member to inspect.",
+            key="invite_guard.invite_check_user.params.member",
+        ),
+    )
+    async def invite_check_user(self, interaction: discord.Interaction, member: discord.Member):
+        if not await self._can_run_admin_command(interaction):
+            return
+
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        settings = self._load_leaderboard_settings()
+        record = await self.db.get_user(settings.guild_id, member.id)
+        if record is None:
+            await interaction.followup.send(t('invite_guard.messages.user_not_found'), ephemeral=True)
+            return
+        await interaction.followup.send(self._format_user_record(record), ephemeral=True)
+
+    @app_commands.command(
+        name="invite_create_embed",
+        description=locale_str(
+            "Create a new invite leaderboard panel in a channel",
+            key="invite_guard.invite_create_embed.description",
+        ),
+    )
+    @app_commands.describe(
+        channel=locale_str(
+            "Channel where the invite leaderboard panel should be created.",
+            key="invite_guard.invite_create_embed.params.channel",
+        ),
+    )
+    async def invite_create_embed(self, interaction: discord.Interaction, channel: discord.TextChannel):
+        if not await self._can_run_admin_command(interaction):
+            return
+
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        settings = self._load_leaderboard_settings()
+        if channel.guild.id != settings.guild_id:
+            await interaction.followup.send(t('invite_guard.messages.channel_wrong_guild'), ephemeral=True)
+            return
+
+        summary = await self.sync_invite_links(settings=settings, source="manual-create-panel")
+        message_id = await self.update_leaderboard_message(
+            settings=settings,
+            channel_id=channel.id,
+            create_new=True,
+        )
+        await interaction.followup.send(
+            t(
+                'invite_guard.messages.create_panel',
+                scanned=summary.scanned if summary else 0,
+                channel=channel.mention,
+                message_id=message_id or t('invite_guard.labels.none'),
+            ),
+            ephemeral=True,
+        )
 
     async def run_cleanup(
         self,
@@ -137,24 +420,9 @@ class InviteGuardCog(commands.Cog):
             self._log_summary(summary, source)
             return summary
 
-        try:
-            invites = await guild.invites()
-        except discord.Forbidden:
+        invites = await self._fetch_guild_invites(guild, log_prefix="[InviteCleaner]")
+        if invites is None:
             summary.failed += 1
-            logging.error(
-                "[InviteCleaner] Cannot list invites for %s. The bot needs permission to view server "
-                "invites before it can clean them; usually Manage Guild / Manage Server is required.",
-                fmt_guild(guild),
-            )
-            self._log_summary(summary, source)
-            return summary
-        except discord.HTTPException as e:
-            summary.failed += 1
-            logging.error(
-                "[InviteCleaner] Failed to list invites for %s: %s",
-                fmt_guild(guild),
-                e,
-            )
             self._log_summary(summary, source)
             return summary
 
@@ -176,6 +444,481 @@ class InviteGuardCog(commands.Cog):
 
         self._log_summary(summary, source)
         return summary
+
+    async def initialize_invite_cache(self, *, source: str) -> InviteLinkSyncSummary | None:
+        async with self._invite_cache_lock:
+            if self._invite_cache_initialized:
+                return None
+
+            settings = self._load_leaderboard_settings()
+            if not settings.enabled:
+                return None
+
+            summary = await self.sync_invite_links(settings=settings, source=source)
+            if summary is not None:
+                self._invite_cache_initialized = True
+            return summary
+
+    async def sync_invite_links(
+        self,
+        *,
+        settings: InviteLeaderboardSettings | None = None,
+        source: str,
+    ) -> InviteLinkSyncSummary | None:
+        settings = settings or self._load_leaderboard_settings()
+        guild = self._get_target_guild(settings)
+        if guild is None:
+            return None
+
+        invites = await self._fetch_guild_invites(guild, log_prefix="[InviteLeaderboard]")
+        if invites is None:
+            return None
+
+        records = self._invites_to_records(guild.id, invites, settings)
+        summary = await self._persist_invite_snapshot(guild.id, records, _now_iso(), source=source)
+        logging.info(
+            "[InviteLeaderboard] source=%s scanned=%s inserted=%s updated=%s marked_inactive=%s",
+            source,
+            summary.scanned,
+            summary.inserted,
+            summary.updated,
+            summary.marked_inactive,
+        )
+        return summary
+
+    async def update_leaderboard_message(
+        self,
+        *,
+        settings: InviteLeaderboardSettings | None = None,
+        channel_id: int | None = None,
+        create_new: bool = False,
+    ) -> int | None:
+        settings = settings or self._load_leaderboard_settings()
+        if not settings.enabled:
+            return None
+        effective_channel_id = channel_id or self._runtime_leaderboard_channel_id or settings.channel_id
+        if not effective_channel_id:
+            logging.warning("[InviteLeaderboard] No leaderboard channel configured.")
+            return None
+        if settings.message_id and not self._runtime_leaderboard_message_id and not create_new:
+            self._runtime_leaderboard_message_id = settings.message_id
+
+        channel = await self._get_message_channel(effective_channel_id)
+        if channel is None:
+            return None
+
+        view = await self._build_leaderboard_view(settings)
+        message_id = None if create_new else (self._runtime_leaderboard_message_id or settings.message_id)
+
+        if message_id:
+            try:
+                message = await channel.fetch_message(message_id)
+                await message.edit(view=view, **clear_legacy_message_payload())
+                self._runtime_leaderboard_channel_id = channel.id
+                self._runtime_leaderboard_message_id = message.id
+                return message.id
+            except discord.NotFound:
+                logging.warning(
+                    "[InviteLeaderboard] Configured message %s was not found in %s; creating a new one.",
+                    message_id,
+                    fmt_channel(channel),
+                )
+            except discord.Forbidden:
+                logging.error(
+                    "[InviteLeaderboard] No permission to edit leaderboard message %s in %s.",
+                    message_id,
+                    fmt_channel(channel),
+                )
+                return None
+            except discord.HTTPException as e:
+                logging.error(
+                    "[InviteLeaderboard] Failed to edit leaderboard message %s in %s: %s",
+                    message_id,
+                    fmt_channel(channel),
+                    e,
+                )
+                return None
+
+        try:
+            message = await channel.send(view=view)
+            self._runtime_leaderboard_channel_id = channel.id
+            self._runtime_leaderboard_message_id = message.id
+            logging.warning(
+                "[InviteLeaderboard] Created leaderboard message %s in %s. Save it as invite_guard.leaderboard_message_id.",
+                message.id,
+                fmt_channel(channel),
+            )
+            return message.id
+        except discord.Forbidden:
+            logging.error("[InviteLeaderboard] No permission to send leaderboard message in %s.", fmt_channel(channel))
+        except discord.HTTPException as e:
+            logging.error("[InviteLeaderboard] Failed to send leaderboard message in %s: %s", fmt_channel(channel), e)
+        return None
+
+    async def _persist_invite_snapshot(
+        self,
+        guild_id: int,
+        records: list[InviteLinkRecord],
+        now: str,
+        *,
+        source: str,
+    ) -> InviteLinkSyncSummary:
+        try:
+            summary = await self.db.sync_invite_links(guild_id, records, now)
+            self.invite_cache = {
+                record.code: _record_to_snapshot(record)
+                for record in records
+            }
+            return summary
+        except Exception as e:
+            logging.error(
+                "[InviteLeaderboard] Failed to persist invite snapshot from %s for %s: %s",
+                source,
+                fmt_guild(guild_id),
+                e,
+                exc_info=True,
+            )
+            return InviteLinkSyncSummary(scanned=len(records))
+
+    async def _attribute_member_from_deltas(
+        self,
+        member: discord.Member,
+        deltas: list[tuple[InviteLinkRecord, int]],
+        settings: InviteLeaderboardSettings,
+        now: str,
+    ) -> None:
+        total_delta = sum(delta for _, delta in deltas)
+        if len(deltas) == 1 and (not settings.require_single_delta_for_attribution or total_delta == 1):
+            record, delta = deltas[0]
+            await self._attribute_member_from_single_invite(member, record, delta, settings, now)
+            return
+
+        if deltas:
+            codes = ", ".join(f"{record.code}(+{delta})" for record, delta in deltas)
+            logging.warning(
+                "[InviteLeaderboard] Ambiguous attribution for %s in %s; invite deltas: %s.",
+                fmt_user(member),
+                fmt_guild(member.guild),
+                codes,
+            )
+            await self._mark_join_status(
+                member,
+                status='ambiguous',
+                code=None,
+                inviter_id=None,
+                allow_reattribution=settings.ambiguous_allow_reattribution,
+                now=now,
+            )
+            return
+
+        logging.info(
+            "[InviteLeaderboard] Unknown invite source for %s in %s; no invite uses increased.",
+            fmt_user(member),
+            fmt_guild(member.guild),
+        )
+        await self._mark_join_status(
+            member,
+            status='unknown',
+            code=None,
+            inviter_id=None,
+            allow_reattribution=settings.unknown_allow_reattribution,
+            now=now,
+        )
+
+    async def _attribute_member_from_single_invite(
+        self,
+        member: discord.Member,
+        record: InviteLinkRecord,
+        delta: int,
+        settings: InviteLeaderboardSettings,
+        now: str,
+    ) -> None:
+        if record.ignored:
+            logging.info(
+                "[InviteLeaderboard] %s joined %s via ignored invite %s.",
+                fmt_user(member),
+                fmt_guild(member.guild),
+                record.code,
+            )
+            await self._mark_join_status(
+                member,
+                status='ignored',
+                code=record.code,
+                inviter_id=None,
+                allow_reattribution=True,
+                now=now,
+            )
+            return
+
+        if record.inviter_id is None:
+            logging.info(
+                "[InviteLeaderboard] %s joined %s via invite %s without an inviter.",
+                fmt_user(member),
+                fmt_guild(member.guild),
+                record.code,
+            )
+            await self._mark_join_status(
+                member,
+                status='unknown',
+                code=record.code,
+                inviter_id=None,
+                allow_reattribution=settings.unknown_allow_reattribution,
+                now=now,
+            )
+            return
+
+        if record.inviter_id == member.id:
+            logging.info(
+                "[InviteLeaderboard] %s joined %s via self-owned invite %s; not counting it.",
+                fmt_user(member),
+                fmt_guild(member.guild),
+                record.code,
+            )
+            await self._mark_join_status(
+                member,
+                status='unknown',
+                code=record.code,
+                inviter_id=record.inviter_id,
+                allow_reattribution=settings.unknown_allow_reattribution,
+                now=now,
+            )
+            return
+
+        try:
+            counted = await self.db.attribute_member(
+                member.guild.id,
+                member.id,
+                record.inviter_id,
+                record.code,
+                now,
+            )
+        except Exception as e:
+            logging.error(
+                "[InviteLeaderboard] Failed to attribute %s in %s via %s: %s",
+                fmt_user(member),
+                fmt_guild(member.guild),
+                record.code,
+                e,
+                exc_info=True,
+            )
+            return
+
+        if counted:
+            await self._award_invite_reward(member, record, settings)
+            logging.info(
+                "[InviteLeaderboard] Attributed %s in %s to %s via %s delta=%s.",
+                fmt_user(member),
+                fmt_guild(member.guild),
+                _fmt_user_id(record.inviter_id),
+                record.code,
+                delta,
+            )
+        else:
+            logging.info(
+                "[InviteLeaderboard] Did not count %s in %s via %s because attribution is locked or disabled.",
+                fmt_user(member),
+                fmt_guild(member.guild),
+                record.code,
+            )
+
+    async def _award_invite_reward(
+        self,
+        member: discord.Member,
+        record: InviteLinkRecord,
+        settings: InviteLeaderboardSettings,
+    ) -> None:
+        reward_points = settings.reward_points_per_invite
+        if reward_points <= 0:
+            return
+
+        operator_id = _get_bot_user_id(self.bot)
+        try:
+            new_balance = await self.shop_db.update_user_balance_with_record(
+                record.inviter_id,
+                reward_points,
+                "invite_reward",
+                operator_id,
+                f"Invite reward: {member.id} via {record.code}",
+            )
+            logging.info(
+                "[InviteReward] Awarded %s point(s) to %s for inviting %s via %s. new_balance=%s",
+                reward_points,
+                _fmt_user_id(record.inviter_id),
+                fmt_user(member),
+                record.code,
+                new_balance,
+            )
+        except Exception as e:
+            logging.error(
+                "[InviteReward] Failed to award %s point(s) to %s for inviting %s via %s: %s",
+                reward_points,
+                _fmt_user_id(record.inviter_id),
+                fmt_user(member),
+                record.code,
+                e,
+                exc_info=True,
+            )
+
+    async def _mark_join_status(
+        self,
+        member: discord.Member,
+        *,
+        status: str,
+        code: str | None,
+        inviter_id: int | None,
+        allow_reattribution: bool,
+        now: str,
+    ) -> None:
+        try:
+            await self.db.set_member_attribution_status(
+                member.guild.id,
+                member.id,
+                status,
+                code=code,
+                inviter_id=inviter_id,
+                allow_reattribution=allow_reattribution,
+                now=now,
+            )
+        except Exception as e:
+            logging.error(
+                "[InviteLeaderboard] Failed to mark %s as %s in %s: %s",
+                fmt_user(member),
+                status,
+                fmt_guild(member.guild),
+                e,
+                exc_info=True,
+            )
+
+    def _find_invite_deltas(
+        self,
+        records: list[InviteLinkRecord],
+        previous_cache: dict[str, InviteSnapshot],
+    ) -> list[tuple[InviteLinkRecord, int]]:
+        deltas = []
+        for record in records:
+            previous = previous_cache.get(record.code)
+            if previous is None:
+                continue
+            delta = record.uses - previous.uses
+            if delta > 0:
+                deltas.append((record, delta))
+        return deltas
+
+    async def _build_leaderboard_view(self, settings: InviteLeaderboardSettings) -> discord.ui.LayoutView:
+        rows = await self.db.get_leaderboard(settings.guild_id, settings.top_n)
+        updated_at = datetime.now(timezone(timedelta(hours=2))).strftime("UTC+2 %H:%M")
+        if not rows:
+            leaderboard_body = t('invite_guard.leaderboard.empty')
+        else:
+            leaderboard_body = "\n".join(
+                t(
+                    'invite_guard.leaderboard.entry',
+                    badge=_leaderboard_badge(index),
+                    user=f"<@{row['user_id']}>",
+                    count=row['invited_count'],
+                )
+                for index, row in enumerate(rows, start=1)
+            )
+
+        bot_avatar_url = _get_bot_avatar_url(self.bot)
+        leaderboard_item = (
+            discord.ui.Section(
+                leaderboard_body,
+                accessory=discord.ui.Thumbnail(bot_avatar_url),
+            )
+            if bot_avatar_url
+            else discord.ui.TextDisplay(leaderboard_body)
+        )
+
+        view = discord.ui.LayoutView(timeout=None)
+        view.add_item(
+            discord.ui.Container(
+                discord.ui.TextDisplay(
+                    f"### {t('invite_guard.leaderboard.title')}\n"
+                    f"{t('invite_guard.leaderboard.updated_at', time=updated_at)}"
+                ),
+                discord.ui.Separator(),
+                leaderboard_item,
+                discord.ui.Separator(),
+                discord.ui.TextDisplay(f"-# {t('invite_guard.leaderboard.footer')}"),
+                accent_color=LEADERBOARD_PANEL_COLOR,
+            )
+        )
+        return view
+
+    async def _get_message_channel(self, channel_id: int):
+        channel = self.bot.get_channel(channel_id)
+        if channel is not None:
+            return channel
+        try:
+            return await self.bot.fetch_channel(channel_id)
+        except discord.NotFound:
+            logging.warning("[InviteLeaderboard] Leaderboard channel %s was not found.", fmt_channel(channel_id))
+        except discord.Forbidden:
+            logging.error("[InviteLeaderboard] No permission to fetch leaderboard channel %s.", fmt_channel(channel_id))
+        except discord.HTTPException as e:
+            logging.error("[InviteLeaderboard] Failed to fetch leaderboard channel %s: %s", fmt_channel(channel_id), e)
+        return None
+
+    async def _fetch_guild_invites(
+        self,
+        guild: discord.Guild,
+        *,
+        log_prefix: str = "[InviteLeaderboard]",
+    ) -> list[discord.Invite] | None:
+        try:
+            return await guild.invites()
+        except discord.Forbidden:
+            logging.error(
+                "%s Cannot list invites for %s. The bot needs permission to view server invites; "
+                "usually Manage Guild / Manage Server is required.",
+                log_prefix,
+                fmt_guild(guild),
+            )
+        except discord.HTTPException as e:
+            logging.error("%s Failed to list invites for %s: %s", log_prefix, fmt_guild(guild), e)
+        return None
+
+    def _invites_to_records(
+        self,
+        guild_id: int,
+        invites: list[discord.Invite],
+        settings: InviteLeaderboardSettings,
+    ) -> list[InviteLinkRecord]:
+        records = []
+        for invite in invites:
+            record = self._invite_to_record(guild_id, invite, settings)
+            if record is not None:
+                records.append(record)
+        return records
+
+    def _invite_to_record(
+        self,
+        guild_id: int,
+        invite: discord.Invite,
+        settings: InviteLeaderboardSettings,
+    ) -> InviteLinkRecord | None:
+        code = _normalize_invite_code(getattr(invite, "code", ""))
+        if not code:
+            return None
+
+        inviter = getattr(invite, "inviter", None)
+        inviter_id = getattr(inviter, "id", None)
+        ignored = code in settings.ignored_codes or inviter_id in settings.ignored_inviter_ids
+        channel = getattr(invite, "channel", None)
+
+        return InviteLinkRecord(
+            guild_id=guild_id,
+            code=code,
+            channel_id=getattr(channel, "id", None),
+            inviter_id=inviter_id,
+            created_at=_datetime_to_iso(getattr(invite, "created_at", None)),
+            max_age=_coerce_int(getattr(invite, "max_age", None), default=None),
+            max_uses=_coerce_int(getattr(invite, "max_uses", None), default=None),
+            uses=max(0, _coerce_int(getattr(invite, "uses", 0), default=0) or 0),
+            temporary=bool(getattr(invite, "temporary", False)),
+            ignored=ignored,
+        )
 
     async def _process_invite(
         self,
@@ -335,18 +1078,21 @@ class InviteGuardCog(commands.Cog):
 
         return bool(getattr(permissions_for(member), "view_channel", False))
 
-    async def _can_run_manual_cleanup(self, interaction: discord.Interaction) -> bool:
+    async def _can_run_admin_command(self, interaction: discord.Interaction) -> bool:
         return await check_channel_validity(interaction)
 
-    def _get_target_guild(self, settings: InviteCleanerSettings) -> discord.Guild | None:
+    async def _can_run_manual_cleanup(self, interaction: discord.Interaction) -> bool:
+        return await self._can_run_admin_command(interaction)
+
+    def _get_target_guild(self, settings: InviteCleanerSettings | InviteLeaderboardSettings) -> discord.Guild | None:
         if settings.guild_id is None:
-            logging.warning("[InviteCleaner] No target guild configured; set invite_guard.guild_id or main.guild_id.")
+            logging.warning("[InviteGuard] No target guild configured; set main.guild_id.")
             return None
 
         guild = self.bot.get_guild(settings.guild_id)
         if guild is None:
             logging.warning(
-                "[InviteCleaner] Target guild %s was not found in bot cache; cleanup skipped.",
+                "[InviteGuard] Target guild %s was not found in bot cache; operation skipped.",
                 fmt_guild(settings.guild_id),
             )
             return None
@@ -358,10 +1104,7 @@ class InviteGuardCog(commands.Cog):
         if not isinstance(raw, dict):
             raw = {}
 
-        guild_id = _coerce_int(
-            _setting_value(raw, 'guild_id', 'INVITE_CLEANER_GUILD_ID', default=main_config.get('guild_id')),
-            default=None,
-        )
+        guild_id = _coerce_int(main_config.get('guild_id'), default=None)
         max_age_days = max(
             1,
             _coerce_int(
@@ -401,9 +1144,110 @@ class InviteGuardCog(commands.Cog):
             ),
         )
 
+    def _load_leaderboard_settings(self) -> InviteLeaderboardSettings:
+        raw = config.get_config('invite_guard', silent=True)
+        if not isinstance(raw, dict):
+            raw = {}
+
+        cleaner_settings = self._load_settings()
+        ignored_codes = set(cleaner_settings.invite_code_whitelist)
+        ignored_codes.update(
+            _coerce_code_set(
+                _setting_value(raw, 'ignored_codes', 'INVITE_IGNORED_CODES', default=[]),
+            )
+        )
+        ignored_inviter_ids = _coerce_int_set(
+            _setting_value(raw, 'ignored_inviter_ids', 'INVITE_IGNORED_INVITER_IDS', default=[]),
+        )
+
+        guild_id = cleaner_settings.guild_id
+        interval_minutes = max(
+            1,
+            _coerce_int(
+                _setting_value(
+                    raw,
+                    'leaderboard_interval_minutes',
+                    'INVITE_LEADERBOARD_INTERVAL_MINUTES',
+                    default=DEFAULT_LEADERBOARD_INTERVAL_MINUTES,
+                ),
+                default=DEFAULT_LEADERBOARD_INTERVAL_MINUTES,
+            ),
+        )
+        top_n = max(
+            1,
+            _coerce_int(
+                _setting_value(raw, 'leaderboard_top_n', 'INVITE_LEADERBOARD_TOP_N', default=DEFAULT_LEADERBOARD_TOP_N),
+                default=DEFAULT_LEADERBOARD_TOP_N,
+            ),
+        )
+        reward_points_per_invite = max(
+            0,
+            _coerce_int(
+                _setting_value(
+                    raw,
+                    'reward_points_per_invite',
+                    'INVITE_REWARD_POINTS_PER_INVITE',
+                    default=DEFAULT_INVITE_REWARD_POINTS,
+                ),
+                default=DEFAULT_INVITE_REWARD_POINTS,
+            ),
+        )
+
+        return InviteLeaderboardSettings(
+            enabled=_coerce_bool(
+                _setting_value(raw, 'leaderboard_enabled', 'INVITE_LEADERBOARD_ENABLED', default=True),
+                default=True,
+            ),
+            guild_id=guild_id,
+            channel_id=_coerce_int(
+                _setting_value(raw, 'leaderboard_channel_id', 'INVITE_LEADERBOARD_CHANNEL_ID', default=None),
+                default=None,
+            ),
+            message_id=_coerce_int(
+                _setting_value(raw, 'leaderboard_message_id', 'INVITE_LEADERBOARD_MESSAGE_ID', default=None),
+                default=None,
+            ),
+            interval_minutes=interval_minutes,
+            top_n=top_n,
+            ignored_codes=frozenset(ignored_codes),
+            ignored_inviter_ids=ignored_inviter_ids,
+            unknown_allow_reattribution=_coerce_bool(
+                _setting_value(
+                    raw,
+                    'unknown_allow_reattribution',
+                    'INVITE_UNKNOWN_ALLOW_REATTRIBUTION',
+                    default=True,
+                ),
+                default=True,
+            ),
+            ambiguous_allow_reattribution=_coerce_bool(
+                _setting_value(
+                    raw,
+                    'ambiguous_allow_reattribution',
+                    'INVITE_AMBIGUOUS_ALLOW_REATTRIBUTION',
+                    default=True,
+                ),
+                default=True,
+            ),
+            require_single_delta_for_attribution=_coerce_bool(
+                _setting_value(
+                    raw,
+                    'require_single_delta_for_attribution',
+                    'INVITE_REQUIRE_SINGLE_DELTA_FOR_ATTRIBUTION',
+                    default=True,
+                ),
+                default=True,
+            ),
+            reward_points_per_invite=reward_points_per_invite,
+        )
+
     def _apply_loop_interval(self, settings: InviteCleanerSettings) -> None:
         if self.invite_cleanup_task.hours != settings.interval_hours:
             self.invite_cleanup_task.change_interval(hours=settings.interval_hours)
+
+    def _apply_leaderboard_loop_interval(self, settings: InviteLeaderboardSettings) -> None:
+        if self.invite_leaderboard_task.minutes != settings.interval_minutes:
+            self.invite_leaderboard_task.change_interval(minutes=settings.interval_minutes)
 
     def _audit_reason(self, settings: InviteCleanerSettings) -> str:
         try:
@@ -422,6 +1266,22 @@ class InviteGuardCog(commands.Cog):
             skipped_young=summary.skipped_young,
             skipped_missing_created_at=summary.skipped_missing_created_at,
             failed=summary.failed,
+        )
+
+    def _format_user_record(self, record: dict[str, Any]) -> str:
+        return t(
+            'invite_guard.messages.user_summary',
+            user=f"<@{record['user_id']}>",
+            invited_count=record['invited_count'],
+            invited_by=_fmt_user_id(record['invited_by_user_id']),
+            invited_by_code=record['invited_by_code'] or t('invite_guard.labels.none'),
+            attribution_status=record['attribution_status'],
+            attribution_locked=record['attribution_locked'],
+            allow_reattribution=record['allow_reattribution'],
+            join_count=record['join_count'],
+            leave_count=record['leave_count'],
+            last_joined_at=record['last_joined_at'] or t('invite_guard.labels.none'),
+            last_left_at=record['last_left_at'] or t('invite_guard.labels.none'),
         )
 
     def _log_summary(self, summary: InviteCleanupSummary, source: str) -> None:
@@ -509,3 +1369,49 @@ def _as_aware_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
+
+
+def _datetime_to_iso(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    return _as_aware_utc(value).isoformat()
+
+
+def _now_iso() -> str:
+    return discord.utils.utcnow().isoformat()
+
+
+def _record_to_snapshot(record: InviteLinkRecord) -> InviteSnapshot:
+    return InviteSnapshot(
+        code=record.code,
+        uses=record.uses,
+        inviter_id=record.inviter_id,
+        ignored=record.ignored,
+    )
+
+
+def _fmt_user_id(user_id: int | None) -> str:
+    if user_id is None:
+        return "unknown"
+    return f"<@{user_id}> ({user_id})"
+
+
+def _leaderboard_badge(rank: int) -> str:
+    return {
+        1: "🥇",
+        2: "🥈",
+        3: "🥉",
+    }.get(rank, f"🔹 #{rank:02d}")
+
+
+def _get_bot_avatar_url(bot: commands.Bot) -> str | None:
+    user = getattr(bot, "user", None)
+    avatar = getattr(user, "display_avatar", None)
+    url = getattr(avatar, "url", None)
+    return str(url) if url else None
+
+
+def _get_bot_user_id(bot: commands.Bot) -> int:
+    user = getattr(bot, "user", None)
+    user_id = getattr(user, "id", None)
+    return int(user_id) if user_id else 0

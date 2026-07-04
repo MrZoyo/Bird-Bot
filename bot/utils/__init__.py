@@ -16,6 +16,7 @@ from .ban_db import BanDatabaseManager
 from .role_db import RoleDatabaseManager
 from .achievement_db import AchievementDatabaseManager
 from .giveaway_db import GiveawayDatabaseManager
+from .invite_guard_db import InviteGuardDatabaseManager
 from .check_status_db import CheckStatusDatabaseManager
 from .voice_channel_db import VoiceChannelDatabaseManager
 from .role_helpers import safe_member_role_edit
@@ -39,6 +40,7 @@ __all__ = [
     'RoleDatabaseManager',
     'AchievementDatabaseManager',
     'GiveawayDatabaseManager',
+    'InviteGuardDatabaseManager',
     'CheckStatusDatabaseManager',
     'VoiceChannelDatabaseManager',
     'safe_member_role_edit',

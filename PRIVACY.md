@@ -9,7 +9,7 @@ service controlled by this repository.
 
 Bird Bot requests only the gateway intents it currently needs:
 
-- `Guild Members`: welcome messages, member-count display, role-based ticket admin expansion, and member objects selected in slash commands.
+- `Guild Members`: welcome messages, member-count display, role-based ticket admin expansion, invite join/leave attribution, and member objects selected in slash commands.
 - `Message Content`: team-up keyword detection and message-count achievements.
 - `Voice States`: temporary voice rooms, voice-time achievements, private-room eligibility, and voice status commands.
 - `Guild Messages` and `Guild Reactions`: message/reaction achievements, panels, and interaction recovery.
@@ -39,6 +39,7 @@ panels, track progress, and continue scheduled tasks after restart.
 - Role and signature features: persistent role panel message IDs, user IDs, user-provided signatures, signature change timestamps, and signature-disable flags.
 - Ban features: user IDs, guild IDs, moderator IDs, ban reasons, unban timestamps, active/inactive state, and Discord delete-message-day setting.
 - Giveaways: giveaway IDs, channel/message IDs, creator IDs, prize/description text, participant IDs, winner IDs, requirements, and end state.
+- Invite guard and leaderboard: guild/user IDs, inviter user IDs, invite codes, invite channel IDs, invite use counts, attribution status, join/leave counters, leaderboard message/channel IDs, and ignored/active invite-link state. Invite rewards are recorded in the Shop balance and transaction tables.
 - Check-status samples: timestamped aggregate voice counts and active channel counts.
 - Config tables: feature setup state such as ticket types, voice-channel rules, game-type mapping, and panel message locations.
 

@@ -9,3 +9,38 @@ messages:
     skipped_missing_created_at: {skipped_missing_created_at}
     failed: {failed}
     dry_run: {dry_run}
+  sync_failed: "邀请同步失败：无法读取服务器邀请链接，请检查权限和日志。"
+  sync_summary: |
+    邀请链接已同步，排行榜已刷新：
+    scanned: {scanned}
+    inserted: {inserted}
+    updated: {updated}
+    marked_inactive: {marked_inactive}
+    message_id: {message_id}
+  create_panel: |
+    邀请排行榜面板已创建。
+    channel: {channel}
+    scanned: {scanned}
+    message_id: {message_id}
+  channel_wrong_guild: "这个频道不属于当前 bot 配置的服务器。"
+  user_not_found: "数据库中还没有这个用户的邀请记录。"
+  user_summary: |
+    邀请用户统计：{user}
+    invited_count: {invited_count}
+    invited_by: {invited_by}
+    invited_by_code: {invited_by_code}
+    attribution_status: {attribution_status}
+    attribution_locked: {attribution_locked}
+    allow_reattribution: {allow_reattribution}
+    join_count: {join_count}
+    leave_count: {leave_count}
+    last_joined_at: {last_joined_at}
+    last_left_at: {last_left_at}
+leaderboard:
+  title: "🏆 邀请排行榜"
+  updated_at: "更新时间：{time}"
+  empty: "暂无有效邀请计数。"
+  entry: "{badge} {user}  **{count}** 人"
+  footer: "每个新成员只会被第一次有效普通邀请计入一次，退出后重新加入不会重复计数。"
+labels:
+  none: "无"

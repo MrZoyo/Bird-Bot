@@ -134,10 +134,16 @@ invitation:
       channel_id: "手动输入频道 ID（若频道已删除）"
 
 invite_guard:
-  invite_cleanup:
-    description: "立即扫描并清理过期邀请链接"
+  invite_sync:
+    description: "同步邀请链接并刷新邀请排行榜"
+  invite_check_user:
+    description: "查看指定成员的邀请统计和归因状态"
     params:
-      dry_run: "只打印将会删除的邀请，不实际删除"
+      member: "要查看的成员"
+  invite_create_embed:
+    description: "在指定频道重新创建邀请排行榜面板"
+    params:
+      channel: "用于发送排行榜面板的频道"
 
 spymode:
   spymode:

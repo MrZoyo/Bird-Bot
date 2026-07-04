@@ -81,6 +81,7 @@ discord.py, aiosqlite, sqlcipher3, aiohttp, requests, aiofiles, pillow, matplotl
 9. Run `python run.py`. If you are using a Linux server, you can use `nohup python3 run.py &` to run the bot in the background.
 10. Invite the bot to your server and give it the necessary permissions.(Required permissions: bot, application command, administrator)
     - `InviteGuard_Cog` needs permission to list active guild invites and delete invites. In Discord terms this is usually `Manage Server` / `Manage Guild`; depending on where the invite was created, relevant channel `Manage Channels` permission may also be needed.
+    - Invite leaderboard attribution also needs `Server Members Intent` for join/leave events and permission to list guild invites. To update the leaderboard message, the bot needs View Channel, Send Messages, Read Message History, and permission to edit its own message in the target channel.
 11. Run automated smoke tests with `python -m pytest` when the test extra is installed. The suite covers config templates, runtime cog metadata, log helpers, UI locale metadata, the temporary JSON-to-YAML config migration smoke, background-loop offline guards, and pure DB-manager paths with temporary sqlite databases.
 12. Run the bare-except lint guard with `python -m ruff check bot tests` when the lint extra is installed.
 13. For updating the bot, you can use the `git pull` command to update the bot to the latest version, then rerun `uv sync`.
@@ -122,7 +123,7 @@ If the user is not currently on a channel, bot will prompt the user to create a 
 - `/invt_removeignorelist [channel] [channel_id]`: Remove a channel from the invitation channel ignore list. Use channel selection or channel ID (for deleted channels).
 
 ### InviteGuard_Cog
-Silent invite cleanup for servers where long-lived 30-day invites accumulate and block new invite creation.
+Silent invite cleanup for servers where long-lived 30-day invites accumulate and block new invite creation, plus an invite leaderboard that attributes new members by comparing Discord invite `uses` deltas.
 
 **Features:**
 - Daily scan of the configured guild's active invites
@@ -130,16 +131,32 @@ Silent invite cleanup for servers where long-lived 30-day invites accumulate and
 - Invite-code whitelist for official permanent invites
 - Creator whitelist for selected users; bot owner, Discord administrators, and members who can access the configured admin channel are treated as admin-side creators
 - Dry-run mode for testing without deleting invites
-- Console / bot log summary after every scheduled or manual run
+- Console / bot log summary after every scheduled cleanup run
+- Invite leaderboard DB tables: `invite_users` stores invite counts and attribution locks; `invite_links` stores invite code metadata, uses, active state, and ignored status
+- Startup invite cache plus 5-minute invite-link sync and leaderboard message edit
+- Components v2 invite leaderboard panel with Top 15 entries, UTC+2 update time, separators, and bot avatar thumbnail
+- Member join attribution based on exactly one invite `uses` delta; ignored, unknown, or ambiguous joins remain re-attributable, while a successful ordinary attribution locks the joined member permanently
+- Member leave tracking without reducing counts, so rejoin loops do not add more points
+- Configurable Shop point reward for each newly counted valid invite; default is 60 points
 
 **Commands:**
-- `/invite_cleanup [dry_run]`: Manually run one scan from the configured admin channel. In this project, "owner / admin" generally means a user who has access to `main.admin_channel_id` through Discord channel permissions.
+- `/invite_sync`: Sync current Discord invite links and refresh the leaderboard panel.
+- `/invite_check_user <member>`: Show one member's invite count, attribution status, join count, and leave count.
+- `/invite_create_embed <channel>`: Create a new leaderboard panel in the target channel; the name keeps "embed" for operator familiarity, but the panel uses Discord Components v2.
 
 **Config:**
 - Copy `bot/config/invite_guard.yaml.example` to `bot/config/invite_guard.yaml`
 - Set `features.invite_guard: true` in `main.yaml`
 - Add official invite codes to `invite_code_whitelist`
 - Optional: set `dry_run: true` first and inspect logs before allowing deletion
+- Invite cleanup and leaderboard both use `main.guild_id`; InviteGuard does not have a separate guild setting.
+- Set `leaderboard_channel_id`; optionally set `leaderboard_message_id` if a message already exists. If no message ID is configured, the bot creates one and logs the ID to save.
+- Put official / vanity entry codes such as `birdgaming` in `ignored_codes` or `invite_code_whitelist` so they never count toward the leaderboard.
+- Set `reward_points_per_invite` to control the points awarded for each newly counted valid invite; default is `60`, and `0` disables invite rewards.
+
+**Attribution limits:**
+- Discord does not expose the invite code directly in `on_member_join`; the bot infers it by comparing cached invite uses against a fresh `guild.invites()` snapshot.
+- Attribution can be unknown or ambiguous when the bot was offline, lacks invite-list permissions, the user joined through vanity / Discovery / official entry, or multiple invite uses changed in the same window.
 
 ### Welcome_Cog
 When a new user joins the server, the bot sends a welcome message to the user in the welcome channel with enhanced features:
@@ -552,7 +569,9 @@ See [PRIVACY.md](./PRIVACY.md) for the data inventory, privileged-intent rationa
 ## Update Log Latest
 ### V2.0.1 - 2026-07-04
 - Added `InviteGuard_Cog` to silently clean active Discord invites older than the configured retention window.
-- Added dry-run support, invite-code and creator whitelists, admin-channel based manual trigger `/invite_cleanup`, and logging summaries.
+- Added dry-run support, invite-code and creator whitelists, scheduled cleanup, and logging summaries.
+- Added invite attribution storage and a Components v2 invite leaderboard panel with Top 15 ranking, UTC+2 update time, bot avatar thumbnail, and `/invite_sync`, `/invite_check_user`, `/invite_create_embed` operator commands.
+- Added configurable invite rewards through the Shop balance system: each newly counted valid invite awards `reward_points_per_invite` points, defaulting to 60.
 - Documented required Discord invite permissions and the project convention that default owner/admin command access maps to `main.admin_channel_id`.
 
 ---

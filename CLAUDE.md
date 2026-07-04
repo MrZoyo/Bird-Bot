@@ -176,7 +176,7 @@ Current pytest smoke coverage includes:
 - Achievement / Rank fake interaction flow for manual operation confirmation and rank type buttons.
 - Welcome / Games fake interaction flow for Welcome DM, SpyMode, and DnD roll response.
 - CheckStatus / Backup fake interaction flow for Where Is, voice status, log tail, and manual backup.
-- InviteGuard cleanup logic for expired invite deletion, dry-run, invite-code whitelist, creator whitelist, missing `created_at`, per-invite failure isolation, and manual `/invite_cleanup` summary flow.
+- InviteGuard cleanup and leaderboard logic for expired invite deletion, dry-run, invite-code whitelist, creator whitelist, missing `created_at`, per-invite failure isolation, invite-link sync, member-join attribution, rejoin lockout, Components v2 leaderboard refresh/create commands, and Shop point rewards for valid invites.
 - Temporary JSON-to-YAML migration smoke.
 - Background loop offline guard.
 - Offline DB manager smoke for retained modules.
@@ -187,7 +187,7 @@ Current pytest smoke coverage includes:
 Current P3-9 status:
 
 - Done: current fake interaction flow list is complete for PrivateRoom, Shop, Tickets, Ban, VoiceChannel, Giveaway, Role / Signature, Achievement / Rank, Welcome / Games, CheckStatus / Backup, and InviteGuard.
-- Current baseline: `109 passed, 1 warning`.
+- Current baseline: `120 passed, 1 warning`.
 - Next default target: targeted real test-server validation for new changes / side-effect paths only when explicitly approved.
 - Add more fake interaction tests only for new bugs, payload replay work, or new features.
 
