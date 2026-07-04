@@ -134,10 +134,12 @@ Silent invite cleanup for servers where long-lived 30-day invites accumulate and
 - Console / bot log summary after every scheduled cleanup run
 - Invite leaderboard DB tables: `invite_users` stores invite counts and attribution locks; `invite_links` stores invite code metadata, uses, active state, and ignored status
 - Startup invite cache plus 5-minute invite-link sync and leaderboard message edit
-- Components v2 invite leaderboard panel with Top 15 entries, UTC+2 update time, separators, and bot avatar thumbnail
-- Member join attribution based on exactly one invite `uses` delta; ignored, unknown, or ambiguous joins remain re-attributable, while a successful ordinary attribution locks the joined member permanently
+- Components v2 invite leaderboard panel with Top 15 entries, viewer-local relative update time, separators, and bot avatar thumbnail
+- Member join attribution based on invite `uses` deltas, settled in a short batch window (default 2 seconds); ignored, unknown, or ambiguous joins remain re-attributable, while a successful attribution locks the joined member permanently
+- Pooled attribution for same-window joins: when the total invite-use delta matches the batch size, each inviter is credited (full attribution if a single invite absorbed the whole batch, `pooled_count` otherwise) and rewarded; inconsistent batches degrade to ambiguous with zero reward
 - Member leave tracking without reducing counts, so rejoin loops do not add more points
 - Configurable Shop point reward for each newly counted valid invite; default is 60 points
+- Reward notification DM to the inviter after points are credited: a Components v2 message with the reward summary, the `resources/images/invite_reward.png` image, and a leaderboard link button jumping to the panel message; only sent while a valid leaderboard panel exists
 
 **Commands:**
 - `/invite_sync`: Sync current Discord invite links and refresh the leaderboard panel.
@@ -153,10 +155,12 @@ Silent invite cleanup for servers where long-lived 30-day invites accumulate and
 - Set `leaderboard_channel_id`; optionally set `leaderboard_message_id` if a message already exists. If no message ID is configured, the bot creates one and logs the ID to save.
 - Put official / vanity entry codes such as `birdgaming` in `ignored_codes` or `invite_code_whitelist` so they never count toward the leaderboard.
 - Set `reward_points_per_invite` to control the points awarded for each newly counted valid invite; default is `60`, and `0` disables invite rewards.
+- `pooled_attribution_enabled` (default `true`) enables pooled crediting for same-window multi-invite joins; `attribution_batch_window_seconds` (default `2`) controls the join settlement window.
+- `reward_notification_enabled` (default `true`) sends the reward DM to the inviter when points are credited and a valid leaderboard panel exists; `reward_notification_image` names the image file under `resources/images/`.
 
 **Attribution limits:**
 - Discord does not expose the invite code directly in `on_member_join`; the bot infers it by comparing cached invite uses against a fresh `guild.invites()` snapshot.
-- Attribution can be unknown or ambiguous when the bot was offline, lacks invite-list permissions, the user joined through vanity / Discovery / official entry, or multiple invite uses changed in the same window.
+- Attribution can be unknown or ambiguous when the bot was offline, lacks invite-list permissions, the user joined through vanity / Discovery / official entry, or same-window invite-use deltas do not add up to the number of joined members; pooled attribution covers the matching multi-join cases.
 
 ### Welcome_Cog
 When a new user joins the server, the bot sends a welcome message to the user in the welcome channel with enhanced features:
@@ -570,8 +574,10 @@ See [PRIVACY.md](./PRIVACY.md) for the data inventory, privileged-intent rationa
 ### V2.0.1 - 2026-07-04
 - Added `InviteGuard_Cog` to silently clean active Discord invites older than the configured retention window.
 - Added dry-run support, invite-code and creator whitelists, scheduled cleanup, and logging summaries.
-- Added invite attribution storage and a Components v2 invite leaderboard panel with Top 15 ranking, UTC+2 update time, bot avatar thumbnail, and `/invite_sync`, `/invite_check_user`, `/invite_create_embed` operator commands.
+- Added invite attribution storage and a Components v2 invite leaderboard panel with Top 15 ranking, viewer-local relative update time, bot avatar thumbnail, and `/invite_sync`, `/invite_check_user`, `/invite_create_embed` operator commands.
 - Added configurable invite rewards through the Shop balance system: each newly counted valid invite awards `reward_points_per_invite` points, defaulting to 60.
+- Added pooled invite attribution with batch settlement: same-window joins settle together, inviters are credited and rewarded when the total invite-use delta matches the batch size, and invite cache access is serialized against the background sync.
+- Added a reward notification DM to the inviter with a Components v2 layout, reward image, and a leaderboard link button jumping to the panel message; active only while a valid leaderboard panel exists.
 - Documented required Discord invite permissions and the project convention that default owner/admin command access maps to `main.admin_channel_id`.
 
 ---

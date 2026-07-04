@@ -5,6 +5,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 import discord
@@ -24,6 +25,7 @@ from bot.utils import (
 from bot.utils.components_v2 import clear_legacy_message_payload
 from bot.utils.invite_guard_db import InviteLinkRecord, InviteLinkSyncSummary
 from bot.utils.i18n import t
+from bot.utils.paths import project_path
 from bot.utils.task_helpers import wait_until_ready_or_stop
 
 
@@ -35,6 +37,8 @@ DEFAULT_LEADERBOARD_TOP_N = 15
 DEFAULT_INVITE_REWARD_POINTS = 60
 DEFAULT_POOLED_ATTRIBUTION_ENABLED = True
 DEFAULT_ATTRIBUTION_BATCH_WINDOW_SECONDS = 2
+DEFAULT_REWARD_NOTIFICATION_IMAGE = "invite_reward.png"
+REWARD_NOTIFICATION_ATTACHMENT_NAME = "invite_reward.png"
 LEADERBOARD_PANEL_COLOR = 0x7C3AED
 
 
@@ -66,6 +70,8 @@ class InviteLeaderboardSettings:
     reward_points_per_invite: int = DEFAULT_INVITE_REWARD_POINTS
     pooled_attribution_enabled: bool = DEFAULT_POOLED_ATTRIBUTION_ENABLED
     attribution_batch_window_seconds: float = DEFAULT_ATTRIBUTION_BATCH_WINDOW_SECONDS
+    reward_notification_enabled: bool = True
+    reward_notification_image: str = DEFAULT_REWARD_NOTIFICATION_IMAGE
 
 
 @dataclass(frozen=True)
@@ -93,6 +99,10 @@ class InviteCleanupSummary:
 
 
 class InviteGuardCog(commands.Cog):
+    # Class-level default so the missing-image warning is logged only once per
+    # process even across settlement batches.
+    _reward_image_warned = False
+
     def __init__(self, bot):
         self.bot = bot
         self.settings = self._load_settings()
@@ -786,6 +796,7 @@ class InviteGuardCog(commands.Cog):
                 delta=delta,
                 batch_member_ids=batch_member_ids,
                 settings=settings,
+                guild=guild,
             )
 
     async def _attribute_member_from_single_invite(
@@ -894,13 +905,25 @@ class InviteGuardCog(commands.Cog):
         if reward_points <= 0:
             return
 
-        await self._award_invite_points(
+        awarded = await self._award_invite_points(
             inviter_id=record.inviter_id,
             points=reward_points,
             note=f"Invite reward: {member.id} via {record.code}",
             log_target=fmt_user(member),
             code=record.code,
         )
+        if awarded:
+            await self._send_reward_notification(
+                inviter_id=record.inviter_id,
+                guild=member.guild,
+                settings=settings,
+                body=t(
+                    'invite_guard.notification.body',
+                    member=f"<@{member.id}>",
+                    guild=member.guild.name,
+                    points=reward_points,
+                ),
+            )
 
     async def _award_pooled_invite_reward(
         self,
@@ -910,6 +933,7 @@ class InviteGuardCog(commands.Cog):
         delta: int,
         batch_member_ids: list[int],
         settings: InviteLeaderboardSettings,
+        guild: discord.Guild,
     ) -> None:
         reward_points = settings.reward_points_per_invite
         if reward_points <= 0 or delta <= 0:
@@ -917,7 +941,7 @@ class InviteGuardCog(commands.Cog):
 
         total_points = reward_points * delta
         member_ids_text = ", ".join(str(member_id) for member_id in batch_member_ids)
-        await self._award_invite_points(
+        awarded = await self._award_invite_points(
             inviter_id=inviter_id,
             points=total_points,
             note=(
@@ -927,6 +951,18 @@ class InviteGuardCog(commands.Cog):
             log_target=f"pooled batch of {len(batch_member_ids)} member(s)",
             code=code,
         )
+        if awarded:
+            await self._send_reward_notification(
+                inviter_id=inviter_id,
+                guild=guild,
+                settings=settings,
+                body=t(
+                    'invite_guard.notification.body_pooled',
+                    count=delta,
+                    guild=guild.name,
+                    points=total_points,
+                ),
+            )
 
     async def _award_invite_points(
         self,
@@ -936,7 +972,7 @@ class InviteGuardCog(commands.Cog):
         note: str,
         log_target: str,
         code: str,
-    ) -> None:
+    ) -> bool:
         operator_id = _get_bot_user_id(self.bot)
         try:
             new_balance = await self.shop_db.update_user_balance_with_record(
@@ -954,6 +990,7 @@ class InviteGuardCog(commands.Cog):
                 code,
                 new_balance,
             )
+            return True
         except Exception as e:
             logging.error(
                 "[InviteReward] Failed to award %s point(s) to %s for inviting %s via %s: %s",
@@ -964,6 +1001,148 @@ class InviteGuardCog(commands.Cog):
                 e,
                 exc_info=True,
             )
+            return False
+
+    async def _send_reward_notification(
+        self,
+        *,
+        inviter_id: int,
+        guild: discord.Guild,
+        settings: InviteLeaderboardSettings,
+        body: str,
+    ) -> None:
+        """DM the inviter after reward points have actually been credited.
+
+        Notification is strictly best-effort: it runs after attribution and Shop
+        credit, and any failure here must never affect either of them.
+        """
+        if not settings.reward_notification_enabled:
+            return
+
+        # Same resolution order as update_leaderboard_message: runtime panel ids
+        # first, config fallback second. Without a valid panel there is nothing
+        # for the link button to point at, so the notification is disabled.
+        channel_id = self._runtime_leaderboard_channel_id or settings.channel_id
+        message_id = self._runtime_leaderboard_message_id or settings.message_id
+        if not channel_id or not message_id:
+            logging.debug(
+                "[InviteReward] Skipping reward DM to %s: no active leaderboard panel "
+                "(channel_id=%s, message_id=%s).",
+                _fmt_user_id(inviter_id),
+                channel_id,
+                message_id,
+            )
+            return
+
+        user = self.bot.get_user(inviter_id)
+        if user is None:
+            try:
+                user = await self.bot.fetch_user(inviter_id)
+            except discord.NotFound:
+                logging.warning(
+                    "[InviteReward] Cannot send reward DM: user %s was not found.",
+                    _fmt_user_id(inviter_id),
+                )
+                return
+            except discord.HTTPException as e:
+                logging.error(
+                    "[InviteReward] Failed to fetch user %s for reward DM: %s",
+                    _fmt_user_id(inviter_id),
+                    e,
+                )
+                return
+
+        try:
+            file = self._build_reward_notification_file(settings)
+            view = self._build_reward_notification_view(
+                body=body,
+                guild_id=guild.id,
+                channel_id=channel_id,
+                message_id=message_id,
+                with_image=file is not None,
+            )
+            if file is not None:
+                await user.send(view=view, file=file)
+            else:
+                await user.send(view=view)
+            logging.info(
+                "[InviteReward] Sent reward notification DM to %s for %s.",
+                fmt_user(user),
+                fmt_guild(guild),
+            )
+        except discord.Forbidden:
+            logging.info(
+                "[InviteReward] Cannot send reward DM to %s (DMs disabled).",
+                fmt_user(user),
+            )
+        except discord.HTTPException as e:
+            logging.error(
+                "[InviteReward] Failed to send reward DM to %s: %s",
+                fmt_user(user),
+                e,
+            )
+        except Exception as e:
+            logging.error(
+                "[InviteReward] Unexpected error while sending reward DM to %s: %s",
+                fmt_user(user),
+                e,
+                exc_info=True,
+            )
+
+    def _build_reward_notification_file(
+        self,
+        settings: InviteLeaderboardSettings,
+    ) -> discord.File | None:
+        image_path = str(
+            project_path("resources", "images", Path(settings.reward_notification_image).name)
+        )
+        if os.path.exists(image_path):
+            return discord.File(image_path, filename=REWARD_NOTIFICATION_ATTACHMENT_NAME)
+
+        if not InviteGuardCog._reward_image_warned:
+            InviteGuardCog._reward_image_warned = True
+            logging.warning(
+                "[InviteReward] Reward notification image %s is missing; sending text-only DMs.",
+                image_path,
+            )
+        return None
+
+    def _build_reward_notification_view(
+        self,
+        *,
+        body: str,
+        guild_id: int,
+        channel_id: int,
+        message_id: int,
+        with_image: bool,
+    ) -> discord.ui.LayoutView:
+        container_items: list[discord.ui.Item] = [
+            discord.ui.TextDisplay(
+                f"### {t('invite_guard.notification.title')}\n{body}"
+            ),
+        ]
+        if with_image:
+            gallery = discord.ui.MediaGallery()
+            gallery.add_item(media=f"attachment://{REWARD_NOTIFICATION_ATTACHMENT_NAME}")
+            container_items.append(gallery)
+
+        view = discord.ui.LayoutView(timeout=None)
+        view.add_item(
+            discord.ui.Container(
+                *container_items,
+                accent_color=LEADERBOARD_PANEL_COLOR,
+            )
+        )
+        view.add_item(
+            discord.ui.ActionRow(
+                discord.ui.Button(
+                    label=t('invite_guard.notification.leaderboard_button'),
+                    style=discord.ButtonStyle.link,
+                    url=f"https://discord.com/channels/{guild_id}/{channel_id}/{message_id}",
+                )
+            )
+        )
+        return view
 
     async def _mark_join_status(
         self,
@@ -1464,6 +1643,24 @@ class InviteGuardCog(commands.Cog):
                 default=DEFAULT_POOLED_ATTRIBUTION_ENABLED,
             ),
             attribution_batch_window_seconds=attribution_batch_window_seconds,
+            reward_notification_enabled=_coerce_bool(
+                _setting_value(
+                    raw,
+                    'reward_notification_enabled',
+                    'INVITE_REWARD_NOTIFICATION_ENABLED',
+                    default=True,
+                ),
+                default=True,
+            ),
+            reward_notification_image=str(
+                _setting_value(
+                    raw,
+                    'reward_notification_image',
+                    'INVITE_REWARD_NOTIFICATION_IMAGE',
+                    default=DEFAULT_REWARD_NOTIFICATION_IMAGE,
+                )
+                or DEFAULT_REWARD_NOTIFICATION_IMAGE
+            ),
         )
 
     def _apply_loop_interval(self, settings: InviteCleanerSettings) -> None:

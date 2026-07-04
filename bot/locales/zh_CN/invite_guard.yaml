@@ -27,6 +27,11 @@ messages:
     leave_count: {leave_count}
     last_joined_at: {last_joined_at}
     last_left_at: {last_left_at}
+notification:
+  title: "🎉 邀请奖励到账"
+  body: "你邀请了 {member} 加入了 **{guild}**。你获得了 **{points}** 积分奖励。"
+  body_pooled: "你邀请的 **{count}** 位新成员加入了 **{guild}**。你获得了 **{points}** 积分奖励。"
+  leaderboard_button: "查看排行榜"
 leaderboard:
   title: "🏆 邀请排行榜"
   updated_at: "更新于 {time}"

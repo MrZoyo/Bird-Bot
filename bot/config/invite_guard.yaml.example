@@ -52,3 +52,9 @@ pooled_attribution_enabled: true
 # 成员加入后的聚合等待窗口，单位秒；同一窗口内到达的多个新成员会被合并到同一次结算，
 # 一起 fetch 邀请、计算增量，避免逐个处理导致的竞态误判。默认 2 秒，可设为 0（不等待，多用于测试）。
 attribution_batch_window_seconds: 2
+# 积分实际入账后是否给邀请人发送一条奖励通知私信（DM）。默认 true。
+# 仅当邀请排行榜面板有效（排行榜频道 ID 和消息 ID 均已知，无论来自配置还是运行时创建的面板）时才会发送；
+# 面板无效或本开关为 false 时完全不发 DM，不影响归因与积分。
+reward_notification_enabled: true
+# 通知 DM 中展示的图片文件名，从 resources/images/ 目录读取；文件缺失时只发文字并记录一次 warning。
+reward_notification_image: invite_reward.png

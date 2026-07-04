@@ -84,7 +84,7 @@ Never commit real YAML configs, real JSON configs, `tools/migration_db_seed.json
 - Slash command names/descriptions use locale keys under `bot/locales/zh_CN/commands.yaml`.
 - Run `./.venv/Scripts/python.exe -X utf8 tools/check_locales.py` after adding or moving locale keys.
 - `welcome_text` is the current explicit exception: it may embed real Discord URLs/custom emoji IDs, so it remains in ignored `welcome.yaml` and has a sanitized `.yaml.example` form.
-- Welcome DM copy, Shop modal labels, PrivateRoom modal labels, and Achievement rank UI text are locale-backed. Their YAML config should only carry runtime data such as IDs, colours, image paths, prices, limits, and time formats.
+- Welcome DM copy, Shop modal labels, PrivateRoom modal labels, Achievement rank UI text, and InviteGuard reward notification DM copy (`invite_guard.notification.*`) are locale-backed. Their YAML config should only carry runtime data such as IDs, colours, image paths, prices, limits, and time formats.
 - `/rank` category buttons use the Discord Button `emoji` field for colored circles; keep the canonical mapping in `bot/cogs/achievement/rank_locale.py` and strip any locale emoji prefix before assigning the button label. Do not keep or regenerate `rank:` UI text in `bot/config/achievements.yaml`.
 - Achievement definitions, role pick-up option names, and ranking type names remain YAML content metadata because they are coupled to thresholds, type ids, and role ids. Treat these as content/config data, not generic UI chrome.
 
@@ -178,6 +178,7 @@ Current pytest smoke coverage includes:
 - CheckStatus / Backup fake interaction flow for Where Is, voice status, log tail, and manual backup.
 - InviteGuard cleanup and leaderboard logic for expired invite deletion, dry-run, invite-code whitelist, creator whitelist, missing `created_at`, per-invite failure isolation, invite-link sync, member-join attribution, rejoin lockout, Components v2 leaderboard refresh/create commands, and Shop point rewards for valid invites.
 - InviteGuard pooled attribution and batch settlement: `on_member_join` now enqueues into `_pending_joins` and a single background task settles the batch after `attribution_batch_window_seconds`; `_invite_cache_lock` serializes every fetch/diff/persist critical section (`sync_invite_links` / `_sync_invite_links_locked`, `initialize_invite_cache`, `_settle_pending_joins`) so a concurrent leaderboard sync cannot steal a join's invite-use delta. Covered: single-invite multi-member full attribution (`invited_count`), same-window multi-invite pooled credit (`pooled_count` + per-inviter reward), total-delta mismatch/ignored-invite/self-invite/already-locked-member fallback to ambiguous with zero reward, `pooled_attribution_enabled=false` legacy fallback, leaderboard ordering by `invited_count + pooled_count`, `/invite_check_user` exposing `pooled_count`, a lock-serialization smoke test proving a concurrent `sync_invite_links` waits for an in-flight settlement, and a regression test proving members who join while a settlement is mid-await are settled by the same task loop instead of stranding in the queue (the settlement task loops until `_pending_joins` is empty, with no await between the emptiness check and task completion).
+- InviteGuard reward notification DM: after reward points are actually credited, the inviter receives a Components v2 DM (Container with locale-backed title/body and `resources/images/invite_reward.png` MediaGallery attachment, plus a top-level ActionRow link button jumping to the leaderboard panel message). Sending is gated on `reward_notification_enabled` and a valid leaderboard panel (runtime or configured channel + message id); notification failures (Forbidden, HTTPException, missing image) never affect attribution or points. Covered: DM view structure and link URL, invalid-panel and disabled-config skips, pooled per-inviter `body_pooled` notifications, Forbidden isolation, zero-points skip, and attribution-then-points-then-DM ordering.
 - Temporary JSON-to-YAML migration smoke.
 - Background loop offline guard.
 - Offline DB manager smoke for retained modules.
@@ -188,7 +189,7 @@ Current pytest smoke coverage includes:
 Current P3-9 status:
 
 - Done: current fake interaction flow list is complete for PrivateRoom, Shop, Tickets, Ban, VoiceChannel, Giveaway, Role / Signature, Achievement / Rank, Welcome / Games, CheckStatus / Backup, and InviteGuard.
-- Current baseline: `135 passed, 1 warning`.
+- Current baseline: `142 passed, 1 warning`.
 - Next default target: targeted real test-server validation for new changes / side-effect paths only when explicitly approved.
 - Add more fake interaction tests only for new bugs, payload replay work, or new features.
 

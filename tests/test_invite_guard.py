@@ -24,6 +24,7 @@ class FakeBot:
         self.owner_ids = set()
         self.admin_channel = None
         self.channels = {}
+        self.users = {}
         self.user = SimpleNamespace(id=9999, display_avatar=SimpleNamespace(url="https://cdn.example.test/bot.png"))
 
     def get_guild(self, guild_id):
@@ -42,8 +43,32 @@ class FakeBot:
             raise discord.NotFound(SimpleNamespace(status=404, reason="missing"), "not found")
         return channel
 
+    def get_user(self, user_id):
+        return self.users.get(user_id)
+
+    async def fetch_user(self, user_id):
+        user = self.users.get(user_id)
+        if user is None:
+            raise discord.NotFound(SimpleNamespace(status=404, reason="missing"), "not found")
+        return user
+
     async def is_owner(self, user):
         return getattr(user, "id", None) in self.owner_ids
+
+
+class FakeUser:
+    def __init__(self, user_id, name="user"):
+        self.id = user_id
+        self.display_name = name
+        self.name = name
+        self.mention = f"<@{user_id}>"
+        self.sent = []
+        self.send_exception = None
+
+    async def send(self, *args, **kwargs):
+        if self.send_exception is not None:
+            raise self.send_exception
+        self.sent.append({"args": args, "kwargs": kwargs})
 
 
 class FakeGuild:
@@ -213,6 +238,8 @@ def _leaderboard_settings(**overrides):
         # Tests settle synchronously via cog._settle_pending_joins(), so the batch
         # window is irrelevant to them; keep it at 0 to avoid any real sleep.
         "attribution_batch_window_seconds": 0,
+        "reward_notification_enabled": True,
+        "reward_notification_image": "invite_reward.png",
     }
     data.update(overrides)
     return InviteLeaderboardSettings(**data)
@@ -812,6 +839,303 @@ def test_pooled_attribution_disabled_falls_back_to_ambiguous(tmp_path):
         assert await cog.db.get_user(123, 100) is None
         assert await cog.db.get_user(123, 101) is None
         assert cog.shop_db.transactions == []
+
+    asyncio.run(scenario())
+
+
+def _close_sent_files(user):
+    for sent in user.sent:
+        file = sent["kwargs"].get("file")
+        if file is not None:
+            file.close()
+
+
+def test_reward_notification_dm_sent_with_panel_and_image(tmp_path):
+    async def scenario():
+        inviter = SimpleNamespace(id=100, display_name="Inviter", name="inviter")
+        guild = FakeGuild([])
+        member = SimpleNamespace(id=200, display_name="Newbie", name="newbie", guild=guild)
+        cog = await _build_leaderboard_cog(
+            tmp_path,
+            guild,
+            _leaderboard_settings(channel_id=555, message_id=777),
+        )
+        inviter_user = FakeUser(100, name="inviter")
+        cog.bot.users[100] = inviter_user
+
+        cog.invite_cache = {
+            "abc": InviteSnapshot(code="abc", uses=0, inviter_id=100, ignored=False),
+        }
+        guild._invites = [
+            FakeInvite("abc", NOW, inviter=inviter, uses=1, guild=guild),
+        ]
+
+        try:
+            await _join_and_settle(cog, member)
+
+            assert len(inviter_user.sent) == 1
+            kwargs = inviter_user.sent[0]["kwargs"]
+
+            file = kwargs["file"]
+            assert isinstance(file, discord.File)
+            assert file.filename == "invite_reward.png"
+
+            view = kwargs["view"]
+            components = view.to_components()
+            assert [component["type"] for component in components] == [17, 1]
+
+            container = components[0]
+            assert container["accent_color"] == 0x7C3AED
+            text = container["components"][0]
+            assert text["type"] == 10
+            assert "<@200>" in text["content"]
+            assert "60" in text["content"]
+            assert "Test Guild" in text["content"]
+
+            gallery = container["components"][1]
+            assert gallery["type"] == 12
+            assert gallery["items"][0]["media"]["url"] == "attachment://invite_reward.png"
+
+            action_row = components[1]
+            button = action_row["components"][0]
+            assert button["type"] == 2
+            assert button["style"] == discord.ButtonStyle.link.value
+            assert button["url"] == "https://discord.com/channels/123/555/777"
+            assert button["label"] == "查看排行榜"
+        finally:
+            _close_sent_files(inviter_user)
+
+    asyncio.run(scenario())
+
+
+def test_reward_notification_skipped_without_valid_panel(tmp_path):
+    async def scenario():
+        inviter = SimpleNamespace(id=100, display_name="Inviter", name="inviter")
+        guild = FakeGuild([])
+        member = SimpleNamespace(id=200, display_name="Newbie", name="newbie", guild=guild)
+        # channel_id set but message_id missing -> panel invalid, no DM.
+        cog = await _build_leaderboard_cog(
+            tmp_path,
+            guild,
+            _leaderboard_settings(channel_id=555, message_id=None),
+        )
+        inviter_user = FakeUser(100, name="inviter")
+        cog.bot.users[100] = inviter_user
+
+        cog.invite_cache = {
+            "abc": InviteSnapshot(code="abc", uses=0, inviter_id=100, ignored=False),
+        }
+        guild._invites = [
+            FakeInvite("abc", NOW, inviter=inviter, uses=1, guild=guild),
+        ]
+
+        await _join_and_settle(cog, member)
+
+        assert inviter_user.sent == []
+        joined = await cog.db.get_user(123, 200)
+        assert joined["attribution_status"] == "attributed"
+        assert len(cog.shop_db.transactions) == 1
+
+    asyncio.run(scenario())
+
+
+def test_reward_notification_disabled_by_config(tmp_path):
+    async def scenario():
+        inviter = SimpleNamespace(id=100, display_name="Inviter", name="inviter")
+        guild = FakeGuild([])
+        member = SimpleNamespace(id=200, display_name="Newbie", name="newbie", guild=guild)
+        cog = await _build_leaderboard_cog(
+            tmp_path,
+            guild,
+            _leaderboard_settings(channel_id=555, message_id=777, reward_notification_enabled=False),
+        )
+        inviter_user = FakeUser(100, name="inviter")
+        cog.bot.users[100] = inviter_user
+
+        cog.invite_cache = {
+            "abc": InviteSnapshot(code="abc", uses=0, inviter_id=100, ignored=False),
+        }
+        guild._invites = [
+            FakeInvite("abc", NOW, inviter=inviter, uses=1, guild=guild),
+        ]
+
+        await _join_and_settle(cog, member)
+
+        assert inviter_user.sent == []
+        joined = await cog.db.get_user(123, 200)
+        assert joined["attribution_status"] == "attributed"
+        assert len(cog.shop_db.transactions) == 1
+
+    asyncio.run(scenario())
+
+
+def test_reward_notification_pooled_sends_body_pooled_to_each_inviter(tmp_path):
+    async def scenario():
+        inviter_a = SimpleNamespace(id=100, display_name="A", name="a")
+        inviter_b = SimpleNamespace(id=101, display_name="B", name="b")
+        guild = FakeGuild([])
+        member_a = SimpleNamespace(id=700, display_name="Pooled A", name="pooled_a", guild=guild)
+        member_b = SimpleNamespace(id=701, display_name="Pooled B", name="pooled_b", guild=guild)
+        cog = await _build_leaderboard_cog(
+            tmp_path,
+            guild,
+            _leaderboard_settings(channel_id=555, message_id=777),
+        )
+        user_a = FakeUser(100, name="a")
+        user_b = FakeUser(101, name="b")
+        cog.bot.users[100] = user_a
+        cog.bot.users[101] = user_b
+
+        cog.invite_cache = {
+            "a": InviteSnapshot(code="a", uses=0, inviter_id=100, ignored=False),
+            "b": InviteSnapshot(code="b", uses=0, inviter_id=101, ignored=False),
+        }
+        guild._invites = [
+            FakeInvite("a", NOW, inviter=inviter_a, uses=1, guild=guild),
+            FakeInvite("b", NOW, inviter=inviter_b, uses=1, guild=guild),
+        ]
+
+        try:
+            await _enqueue_join(cog, member_a)
+            await _enqueue_join(cog, member_b)
+            await cog._settle_pending_joins()
+
+            for user in (user_a, user_b):
+                assert len(user.sent) == 1
+                view = user.sent[0]["kwargs"]["view"]
+                components = view.to_components()
+                assert [component["type"] for component in components] == [17, 1]
+                text = components[0]["components"][0]["content"]
+                assert "**1** 位新成员" in text
+                assert "Test Guild" in text
+                assert "**60**" in text
+                button = components[1]["components"][0]
+                assert button["url"] == "https://discord.com/channels/123/555/777"
+        finally:
+            _close_sent_files(user_a)
+            _close_sent_files(user_b)
+
+    asyncio.run(scenario())
+
+
+def test_reward_notification_forbidden_does_not_affect_attribution_or_points(tmp_path):
+    async def scenario():
+        inviter = SimpleNamespace(id=100, display_name="Inviter", name="inviter")
+        guild = FakeGuild([])
+        member = SimpleNamespace(id=200, display_name="Newbie", name="newbie", guild=guild)
+        cog = await _build_leaderboard_cog(
+            tmp_path,
+            guild,
+            _leaderboard_settings(channel_id=555, message_id=777),
+        )
+        inviter_user = FakeUser(100, name="inviter")
+        inviter_user.send_exception = discord.Forbidden(
+            SimpleNamespace(status=403, reason="forbidden"), "cannot dm"
+        )
+        cog.bot.users[100] = inviter_user
+
+        cog.invite_cache = {
+            "abc": InviteSnapshot(code="abc", uses=0, inviter_id=100, ignored=False),
+        }
+        guild._invites = [
+            FakeInvite("abc", NOW, inviter=inviter, uses=1, guild=guild),
+        ]
+
+        await _join_and_settle(cog, member)
+
+        assert inviter_user.sent == []
+        joined = await cog.db.get_user(123, 200)
+        inviter_record = await cog.db.get_user(123, 100)
+        assert joined["attribution_status"] == "attributed"
+        assert inviter_record["invited_count"] == 1
+        assert len(cog.shop_db.transactions) == 1
+
+    asyncio.run(scenario())
+
+
+def test_reward_notification_not_sent_when_points_disabled(tmp_path):
+    async def scenario():
+        inviter = SimpleNamespace(id=100, display_name="Inviter", name="inviter")
+        guild = FakeGuild([])
+        member = SimpleNamespace(id=200, display_name="Newbie", name="newbie", guild=guild)
+        cog = await _build_leaderboard_cog(
+            tmp_path,
+            guild,
+            _leaderboard_settings(channel_id=555, message_id=777, reward_points_per_invite=0),
+        )
+        inviter_user = FakeUser(100, name="inviter")
+        cog.bot.users[100] = inviter_user
+
+        cog.invite_cache = {
+            "abc": InviteSnapshot(code="abc", uses=0, inviter_id=100, ignored=False),
+        }
+        guild._invites = [
+            FakeInvite("abc", NOW, inviter=inviter, uses=1, guild=guild),
+        ]
+
+        await _join_and_settle(cog, member)
+
+        assert cog.shop_db.transactions == []
+        assert inviter_user.sent == []
+        joined = await cog.db.get_user(123, 200)
+        assert joined["attribution_status"] == "attributed"
+
+    asyncio.run(scenario())
+
+
+def test_reward_notification_order_attribution_points_then_dm(tmp_path):
+    async def scenario():
+        inviter = SimpleNamespace(id=100, display_name="Inviter", name="inviter")
+        guild = FakeGuild([])
+        member = SimpleNamespace(id=200, display_name="Newbie", name="newbie", guild=guild)
+        cog = await _build_leaderboard_cog(
+            tmp_path,
+            guild,
+            _leaderboard_settings(channel_id=555, message_id=777),
+        )
+        inviter_user = FakeUser(100, name="inviter")
+        cog.bot.users[100] = inviter_user
+
+        events = []
+
+        original_attribute = cog.db.attribute_member
+
+        async def tracking_attribute(*args, **kwargs):
+            result = await original_attribute(*args, **kwargs)
+            events.append("db_attribute")
+            return result
+
+        cog.db.attribute_member = tracking_attribute
+
+        original_update = cog.shop_db.update_user_balance_with_record
+
+        async def tracking_update(*args, **kwargs):
+            result = await original_update(*args, **kwargs)
+            events.append("points")
+            return result
+
+        cog.shop_db.update_user_balance_with_record = tracking_update
+
+        original_send = inviter_user.send
+
+        async def tracking_send(*args, **kwargs):
+            await original_send(*args, **kwargs)
+            events.append("dm")
+
+        inviter_user.send = tracking_send
+
+        cog.invite_cache = {
+            "abc": InviteSnapshot(code="abc", uses=0, inviter_id=100, ignored=False),
+        }
+        guild._invites = [
+            FakeInvite("abc", NOW, inviter=inviter, uses=1, guild=guild),
+        ]
+
+        try:
+            await _join_and_settle(cog, member)
+            assert events == ["db_attribute", "points", "dm"]
+        finally:
+            _close_sent_files(inviter_user)
 
     asyncio.run(scenario())
 
