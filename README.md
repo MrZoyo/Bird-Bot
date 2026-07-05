@@ -566,6 +566,20 @@ Media processing module with validation and security features.
 
 ---
 
+## Production Deployment Notes
+
+This repository is the generic upstream. A production server clones it, fills in real `bot/config/*.yaml` from the `*.yaml.example` templates (gitignored), and may further customize locale text under `bot/locales/` and images under `resources/images/` for its own community. Those server-local edits are expected — treat the repo copies as defaults, and never assume a production checkout is clean.
+
+Upgrading a deployment:
+
+1. Back up `data/bot.db` (and the DB key file for encrypted deployments).
+2. `git stash` — preserves server-local locale/image edits.
+3. `git pull`
+4. `git stash pop` — resolve conflicts keeping the server-side text where intended.
+5. Re-sync dependencies if the lockfile changed, then restart the bot. DB schema migrations run automatically at startup.
+
+Do not run `git checkout -- .` or `git reset --hard` on a production box; both destroy the server-local content customizations.
+
 ## Privacy and Data Security
 
 See [PRIVACY.md](./PRIVACY.md) for the data inventory, privileged-intent rationale, log/backup retention notes, and SQLCipher database encryption procedure.

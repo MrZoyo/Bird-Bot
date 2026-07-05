@@ -77,6 +77,15 @@ Legacy JSON:
 
 Never commit real YAML configs, real JSON configs, `tools/migration_db_seed.json`, or `tools/migration_report.md`.
 
+## Deployment And Production Drift
+
+- This repository is the generic upstream codebase. Production deployments run a clone of it and intentionally customize user-facing content in place, so a production checkout is not expected to be clean against HEAD.
+- Config YAML already follows the template model: only `*.yaml.example` is committed; each deployment writes its own gitignored real `*.yaml`.
+- Tracked locale YAML under `bot/locales/` and tracked images under `resources/images/` are default/sample content. Production servers may edit them locally; that drift is expected and correct.
+- Never run `git checkout -- .`, `git reset --hard`, or any force-overwriting pull over `bot/locales/` or `resources/images/` on a production box. Upgrade with `git stash && git pull && git stash pop` (or an equivalent diff-preserving flow) and keep the server-side text when conflicts appear.
+- Direction of sync: generic wording and feature text belong in the repo; server-specific branding stays server-local. When a production-only edit turns out to be generally useful, port it back into the repo instead of leaving it as drift.
+- Do not hardcode host environment facts (timezone, server names, entry invite codes) into locale text; derive them at runtime (see the check-in footer `{tz_label}`) or keep them in per-server config.
+
 ## Locale And Text
 
 - User-facing text should live in `bot/locales/zh_CN/<cog>.yaml`.
@@ -189,7 +198,7 @@ Current pytest smoke coverage includes:
 Current P3-9 status:
 
 - Done: current fake interaction flow list is complete for PrivateRoom, Shop, Tickets, Ban, VoiceChannel, Giveaway, Role / Signature, Achievement / Rank, Welcome / Games, CheckStatus / Backup, and InviteGuard.
-- Current baseline: `142 passed, 1 warning`.
+- Current baseline: `143 passed, 1 warning`.
 - Next default target: targeted real test-server validation for new changes / side-effect paths only when explicitly approved.
 - Add more fake interaction tests only for new bugs, payload replay work, or new features.
 
