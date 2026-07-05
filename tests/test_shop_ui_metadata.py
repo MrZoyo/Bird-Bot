@@ -139,3 +139,16 @@ def test_checkin_panel_shows_zero_count_when_empty(monkeypatch):
 
     wide = "\u3000"
     assert f"**Count**{wide * 5}**First**\n0{wide * 11}none" in container["components"][0]["content"]
+
+
+def test_checkin_footer_tz_label_formats_host_offsets():
+    from datetime import timedelta
+
+    from bot.cogs.shop.views import _format_utc_offset_label
+
+    assert _format_utc_offset_label(timedelta(hours=8)) == "UTC+8"
+    assert _format_utc_offset_label(timedelta(hours=2)) == "UTC+2"
+    assert _format_utc_offset_label(timedelta(0)) == "UTC+0"
+    assert _format_utc_offset_label(timedelta(hours=-5)) == "UTC-5"
+    assert _format_utc_offset_label(timedelta(hours=5, minutes=30)) == "UTC+5:30"
+    assert _format_utc_offset_label(timedelta(hours=-9, minutes=-30)) == "UTC-9:30"

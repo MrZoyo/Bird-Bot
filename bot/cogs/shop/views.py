@@ -1,12 +1,29 @@
 import logging
 import os
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import discord
 from bot.utils.i18n import t
 
 from .modals import CheckinMakeupModal
+
+
+def _format_utc_offset_label(offset: timedelta) -> str:
+    total_minutes = int(offset.total_seconds() // 60)
+    sign = "+" if total_minutes >= 0 else "-"
+    hours, minutes = divmod(abs(total_minutes), 60)
+    if minutes:
+        return f"UTC{sign}{hours}:{minutes:02d}"
+    return f"UTC{sign}{hours}"
+
+
+def _host_utc_offset_label() -> str:
+    # The check-in day rolls over at host-local midnight (datetime.now() in
+    # ShopCog), so the panel label must reflect the host timezone instead of
+    # a hardcoded offset that breaks when the deployment host changes.
+    offset = datetime.now().astimezone().utcoffset() or timedelta(0)
+    return _format_utc_offset_label(offset)
 
 
 class CheckinEmbedView(discord.ui.LayoutView):
@@ -69,7 +86,7 @@ class CheckinEmbedView(discord.ui.LayoutView):
             discord.ui.Separator(),
             gallery,
             discord.ui.Separator(),
-            discord.ui.TextDisplay(f"-# {t('shop.checkin_embed_footer')}"),
+            discord.ui.TextDisplay(f"-# {t('shop.checkin_embed_footer', tz_label=_host_utc_offset_label())}"),
             discord.ui.ActionRow(daily_button, makeup_button, query_button),
             accent_color=int(self.conf.get('checkin_embed_color', 'FFD700'), 16),
         ))
