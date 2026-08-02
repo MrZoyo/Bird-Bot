@@ -10,6 +10,17 @@
 
 ---
 
+## 2026-08-02 Shop 签到面板恢复 / 2.0.2
+
+- 根因：签到面板在启动恢复或每日刷新时遇到 Discord 临时 HTTP 失败（生产日志中为 522），旧逻辑把 `HTTPException` / `Forbidden` 与真正的 `NotFound` 一并处理为永久停用。停用后的记录不再进入 active panel 查询，因此消息上的按钮仍可交互，但面板日期不会继续自动刷新。
+- 修复：面板刷新收敛到共享 helper；仅在 Discord 明确返回 `NotFound` 时停用记录，权限错误、HTTP 错误和意外异常都保留 active 状态等待下次重试。频道不在 cache 时继续通过 API 获取。
+- 一致性：每日日期与当日统计改为逐面板更新，并且只在对应 Discord 消息编辑成功后写入；单个面板失败不会提前推进其他失败面板的日期状态。
+- 测试：新增 `tests/test_shop_panel_refresh.py`，覆盖临时 522 保持 active、404 停用、成功编辑后才 reset、失败不推进日期；扩展 DB smoke，验证按 `embed_id` 只重置目标面板。全量基线为 `147 passed, 1 warning`；ruff、compileall、locale、`pip check`、`uv lock --check`、frozen sync dry-run 与 `git diff --check` 均通过。
+- 生产恢复：修改前已备份数据库和相关源码；重新激活原面板记录并刷新消息后，面板显示当前签到日期、按钮可用，重启后 16 个 cog 加载且 85 个命令同步成功。
+- 版本号推进到 `2.0.2`。
+
+---
+
 ## 2026-07-04 InviteGuard 池化归因 + 缓存锁串行化
 
 - 修复两个已知竞态：(a) 多人同窗口加入时逐个处理 `on_member_join` 会导致第一个处理器看到多个 delta 判 ambiguous、后续处理器看到 delta=0 判 unknown；(b) 后台 `invite_leaderboard_task` 的 `sync_invite_links` 可能在“加入事件发生”和“处理器读缓存”之间刷新缓存吞掉增量。
@@ -25,7 +36,7 @@
 - 配置模板与真实配置新增 `pooled_attribution_enabled`（默认 true）与 `attribution_batch_window_seconds`（默认 2，可设 0，负数钳到 0），沿用既有 `_setting_value` / 大写别名模式（`INVITE_POOLED_ATTRIBUTION_ENABLED` / `INVITE_ATTRIBUTION_BATCH_WINDOW_SECONDS`）。
 - 测试：`tests/test_invite_guard.py` 中原本直接调用 `on_member_join` 并立即断言的用例改为通过新增的 `_join_and_settle` 辅助函数（`attribution_batch_window_seconds=0`，join 后 await 结算任务）驱动，保持断言语义不变；新增两人两邀请池化记功发奖、两人单邀请完整归因发两份奖、总量不匹配降级、含 ignored invite 降级、批内自邀降级、批内已锁定成员触发 `pool_attribute_members` 回滚降级、`pooled_attribution_enabled=false` 时维持旧行为、排行榜按 `invited_count+pooled_count` 排序、`/invite_check_user` 输出含 `pooled_count`、缓存锁串行化冒烟（结算持锁时并发 `sync_invite_links` 会等待）、结算执行期间加入的成员由同一任务循环补结算（不滞留队列）共 10 个 cog 级用例；`tests/test_invite_guard_db.py` 新增 `pool_attribute_members` 记功 / 回滚、`get_leaderboard` 排序、`get_user` 含 `pooled_count` 共 4 个 DB 级用例。
 - 邀请奖励通知 DM（同日新增）：积分实际入账后（`_award_invite_points` 成功返回）给邀请人发送一条 Components v2 私信——Container（紫色 accent）内为 locale 标题 + 正文（单人路径含成员 mention / 服务器名 / 积分数；池化路径含人数与实得总积分 delta×单价）和 `resources/images/invite_reward.png` 附图（MediaGallery + `attachment://` 引用，`project_path` 解析、缺失时只发文字并记录一次 warning），Container 外顶层 ActionRow 放一个“查看排行榜”link 按钮，URL 直接跳到排行榜面板消息（`https://discord.com/channels/{guild}/{channel}/{message}`）。激活门槛：`reward_notification_enabled`（默认 true）且排行榜面板有效（运行时或配置的频道 ID + 消息 ID 都非空，取值顺序与 `update_leaderboard_message` 一致），否则完全不发并 debug 说明。邀请人解析 `get_user` → `fetch_user`（NotFound / HTTPException 分别处理）；DM Forbidden 记 info、HTTPException 记 error，任何通知失败都不影响归因与积分（通知严格在两者之后执行）。新配置 `reward_notification_enabled` / `reward_notification_image`（含大写别名）写入模板与真实配置；locale 新增 `notification:` 段。新增 7 个通知用例：DM view 结构与按钮 URL 精确断言、面板无效不发、配置关闭不发、池化各邀请人各收一条 body_pooled、Forbidden 不影响归因与积分、`reward_points_per_invite=0` 无积分无 DM、“DB 归因 → 积分入账 → DM 发送”顺序断言。
-- 当前自动化基线：`./.venv/Scripts/python.exe -m pytest -q` 为 `143 passed, 1 warning`；`ruff check bot tests tools`、`compileall bot tests tools`、`tools/check_locales.py` 均通过。
+- 当时自动化基线：`./.venv/Scripts/python.exe -m pytest -q` 为 `143 passed, 1 warning`；`ruff check bot tests tools`、`compileall bot tests tools`、`tools/check_locales.py` 均通过。
 
 ---
 

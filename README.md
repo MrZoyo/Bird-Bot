@@ -1,6 +1,6 @@
 # Bird Bot
 
-`Version: 2.0.1`
+`Version: 2.0.2`
 
 ---
 
@@ -585,6 +585,14 @@ Do not run `git checkout -- .` or `git reset --hard` on a production box; both d
 See [PRIVACY.md](./PRIVACY.md) for the data inventory, privileged-intent rationale, log/backup retention notes, and SQLCipher database encryption procedure.
 
 ## Update Log Latest
+### V2.0.2 - 2026-08-02
+- Fixed check-in panels becoming permanently inactive after a transient Discord API failure during refresh or startup recovery.
+- Check-in panel records are now deactivated only when Discord confirms that the channel or message no longer exists; permission and HTTP failures remain active for a later retry.
+- Daily rollover state is now advanced per panel only after that panel message was edited successfully, preventing the displayed date and stored date from diverging.
+- Added regression coverage for transient HTTP failures, genuinely missing messages, successful edit-before-reset ordering, and per-panel daily-stat resets.
+
+---
+
 ### V2.0.1 - 2026-07-04
 - Added `InviteGuard_Cog` to silently clean active Discord invites older than the configured retention window.
 - Added dry-run support, invite-code and creator whitelists, scheduled cleanup, and logging summaries.

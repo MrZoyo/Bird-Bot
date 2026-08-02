@@ -56,14 +56,30 @@ def test_shop_balance_checkin_makeup_and_embed_state(tmp_path):
             assert embeds[0]["today_checkin_count"] == 1
             assert embeds[0]["today_first_checkin_user_id"] == 42
 
-            assert await db.reset_daily_embed_stats("2099-01-01") is True
+            assert await db.create_checkin_embed_record(11, 21, today) is True
+            second_embed_id = next(
+                embed["id"] for embed in await db.get_active_checkin_embeds()
+                if embed["channel_id"] == 11
+            )
+            assert await db.update_embed_checkin_stats(second_embed_id, 99) is True
+
+            assert await db.reset_daily_embed_stats(
+                "2099-01-01",
+                embed_id=embed_id,
+            ) is True
             embeds = await db.get_active_checkin_embeds()
-            assert embeds[0]["created_date"] == "2099-01-01"
-            assert embeds[0]["today_checkin_count"] == 0
-            assert embeds[0]["today_first_checkin_user_id"] is None
+            first_embed = next(embed for embed in embeds if embed["id"] == embed_id)
+            second_embed = next(embed for embed in embeds if embed["id"] == second_embed_id)
+            assert first_embed["created_date"] == "2099-01-01"
+            assert first_embed["today_checkin_count"] == 0
+            assert first_embed["today_first_checkin_user_id"] is None
+            assert second_embed["created_date"] == today
+            assert second_embed["today_checkin_count"] == 1
+            assert second_embed["today_first_checkin_user_id"] == 99
 
             assert await db.deactivate_checkin_embed(embed_id) is True
-            assert await db.get_active_checkin_embeds() == []
+            remaining_embeds = await db.get_active_checkin_embeds()
+            assert [embed["id"] for embed in remaining_embeds] == [second_embed_id]
         finally:
             await db.close()
 

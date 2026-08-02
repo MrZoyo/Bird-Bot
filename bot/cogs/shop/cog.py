@@ -63,26 +63,18 @@ class ShopCog(commands.Cog):
         try:
             current_date = datetime.now().strftime('%Y-%m-%d')
             active_embeds = await self.db.get_active_checkin_embeds()
-            
+
             for embed_data in active_embeds:
-                # Check if panel needs daily update
                 if embed_data['created_date'] != current_date:
-                    # Reset daily stats in database
-                    await self.db.reset_daily_embed_stats(current_date)
-                    
-                    # Update the actual panel message
-                    try:
-                        channel = await self._get_panel_channel(embed_data['channel_id'])
-                        if channel:
-                            message = await channel.fetch_message(embed_data['message_id'])
-                            if message:
-                                view = await self.create_daily_checkin_view(current_date)
-                                payload = clear_legacy_message_payload()
-                                payload["attachments"] = [self.create_checkin_image_file()]
-                                await message.edit(**payload, view=view)
-                    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                        # If embed message no longer exists, deactivate it
-                        await self.db.deactivate_checkin_embed(embed_data['id'])
+                    refreshed = await self._refresh_checkin_panel_message(
+                        embed_data,
+                        current_date,
+                    )
+                    if refreshed:
+                        await self.db.reset_daily_embed_stats(
+                            current_date,
+                            embed_id=embed_data['id'],
+                        )
         except Exception as e:
             logging.error(f"Error in daily embed update: {e}")
 
@@ -98,15 +90,54 @@ class ShopCog(commands.Cog):
         channel = self.bot.get_channel(channel_id)
         if channel is not None:
             return channel
+        return await self.bot.fetch_channel(channel_id)
+
+    async def _refresh_checkin_panel_message(
+        self,
+        embed_data: dict,
+        date_str: str,
+    ) -> bool:
+        """Refresh one panel, retaining it when Discord has a transient failure."""
+        channel = None
         try:
-            return await self.bot.fetch_channel(channel_id)
+            channel = await self._get_panel_channel(embed_data['channel_id'])
+            message = await channel.fetch_message(embed_data['message_id'])
+            view = await self.create_daily_checkin_view(date_str)
+            payload = clear_legacy_message_payload()
+            payload["attachments"] = [self.create_checkin_image_file()]
+            await message.edit(**payload, view=view)
+            return True
         except discord.NotFound:
-            logging.warning("Checkin panel channel unknown (%s) was not found.", channel_id)
+            logging.warning(
+                "Checkin panel message unknown (%s) in %s no longer exists; deactivating it.",
+                embed_data['message_id'],
+                fmt_channel(channel or embed_data['channel_id']),
+            )
+            await self.db.deactivate_checkin_embed(embed_data['id'])
         except discord.Forbidden:
-            logging.error("No permission to fetch checkin panel channel unknown (%s).", channel_id)
+            logging.error(
+                "No permission to refresh checkin panel message unknown (%s) in %s; "
+                "keeping it active for retry.",
+                embed_data['message_id'],
+                fmt_channel(channel or embed_data['channel_id']),
+            )
         except discord.HTTPException as e:
-            logging.error("Failed to fetch checkin panel channel unknown (%s): %s", channel_id, e)
-        return None
+            logging.warning(
+                "Discord HTTP %s (code %s) while refreshing checkin panel message "
+                "unknown (%s) in %s; keeping it active for retry.",
+                e.status,
+                e.code,
+                embed_data['message_id'],
+                fmt_channel(channel or embed_data['channel_id']),
+            )
+        except Exception:
+            logging.exception(
+                "Unexpected error refreshing checkin panel message unknown (%s) in %s; "
+                "keeping it active for retry.",
+                embed_data['message_id'],
+                fmt_channel(channel or embed_data['channel_id']),
+            )
+        return False
 
     async def recover_embed_views(self):
         """Recover check-in panel views after bot restart."""
@@ -114,22 +145,15 @@ class ShopCog(commands.Cog):
             active_embeds = await self.db.get_active_checkin_embeds()
             current_date = datetime.now().strftime('%Y-%m-%d')
             for embed_data in active_embeds:
-                try:
-                    channel = await self._get_panel_channel(embed_data['channel_id'])
-                    if channel:
-                        message = await channel.fetch_message(embed_data['message_id'])
-                        if message:
-                            # Re-add the view and migrate old embed panels to Components v2.
-                            view = await self.create_daily_checkin_view(current_date)
-                            payload = clear_legacy_message_payload()
-                            payload["attachments"] = [self.create_checkin_image_file()]
-                            await message.edit(**payload, view=view)
-                        else:
-                            # Message not found, deactivate
-                            await self.db.deactivate_checkin_embed(embed_data['id'])
-                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                    # Channel or message not accessible, deactivate
-                    await self.db.deactivate_checkin_embed(embed_data['id'])
+                refreshed = await self._refresh_checkin_panel_message(
+                    embed_data,
+                    current_date,
+                )
+                if refreshed and embed_data['created_date'] != current_date:
+                    await self.db.reset_daily_embed_stats(
+                        current_date,
+                        embed_id=embed_data['id'],
+                    )
         except Exception as e:
             logging.error(f"Error recovering embed views: {e}")
 
@@ -163,48 +187,11 @@ class ShopCog(commands.Cog):
         try:
             current_date = datetime.now().strftime('%Y-%m-%d')
             active_embeds = await self.db.get_active_checkin_embeds()
-            
-            for embed_data in active_embeds:
-                try:
-                    channel = self.bot.get_channel(embed_data['channel_id'])
-                    if channel is None:
-                        channel = await self._get_panel_channel(embed_data['channel_id'])
-                    if not channel:
-                        await self.db.deactivate_checkin_embed(embed_data['id'])
-                        continue
-                    
-                    try:
-                        message = await channel.fetch_message(embed_data['message_id'])
-                    except discord.NotFound:
-                        await self.db.deactivate_checkin_embed(embed_data['id'])
-                        continue
-                    except discord.Forbidden:
-                        logging.error("No permission to fetch message in %s", fmt_channel(channel))
-                        continue
-                    
-                    # Update panel with new statistics. Create a fresh file object for each message.
-                    view = await self.create_daily_checkin_view(current_date)
-                    payload = clear_legacy_message_payload()
-                    payload["attachments"] = [self.create_checkin_image_file()]
 
-                    try:
-                        await message.edit(**payload, view=view)
-                    except discord.HTTPException as e:
-                        logging.error("Failed to update checkin embed in %s: %s", fmt_channel(channel), e)
-                    except discord.Forbidden:
-                        logging.error("No permission to edit message in %s", fmt_channel(channel))
-                        
-                except Exception as e:
-                    logging.error(f"Error processing embed {embed_data.get('id', 'unknown')}: {e}")
-                    try:
-                        await self.db.deactivate_checkin_embed(embed_data['id'])
-                    except Exception:
-                        logging.exception(f"Failed to deactivate checkin embed {embed_data.get('id', 'unknown')}")
-                        
+            for embed_data in active_embeds:
+                await self._refresh_checkin_panel_message(embed_data, current_date)
         except Exception as e:
             logging.error(f"Critical error in update_checkin_embeds_after_checkin: {e}")
-            import traceback
-            logging.error(traceback.format_exc())
 
     @app_commands.command(
         name="create_checkin_embed",

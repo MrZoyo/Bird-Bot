@@ -805,18 +805,26 @@ class ShopDatabaseManager(BaseDatabaseManager):
                 logging.error(f"Error updating embed checkin stats: {e}")
                 return False
 
-    async def reset_daily_embed_stats(self, date_str: str) -> bool:
-        """Reset daily statistics for all embeds on date change."""
+    async def reset_daily_embed_stats(
+        self,
+        date_str: str,
+        *,
+        embed_id: Optional[int] = None,
+    ) -> bool:
+        """Reset daily statistics after one or all active panels are refreshed."""
         try:
+            embed_filter = ' AND id = ?' if embed_id is not None else ''
+            parameters = (date_str, embed_id) if embed_id is not None else (date_str,)
             await self._execute_write(
-                '''
+                f'''
                 UPDATE shop_checkin_embeds
                 SET created_date = ?,
                     today_checkin_count = 0,
                     today_first_checkin_user_id = NULL
                 WHERE is_active = 1
+                {embed_filter}
                 ''',
-                (date_str,),
+                parameters,
             )
             return True
         except Exception as e:

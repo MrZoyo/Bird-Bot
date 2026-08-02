@@ -25,13 +25,14 @@
 - InviteGuard 池化归因 / 批结算 / 缓存锁串行化：`on_member_join` 入队 + 批窗口结算，单人单邀请行为不变，同窗口多人多邀请按各自 delta 池化记功发奖（`pooled_count`）、同窗口多人单邀请完整归因发多份奖，总量不匹配 / 含 ignored invite / 批内自邀 / 批内已锁定成员均降级为 ambiguous 且零奖励，`pooled_attribution_enabled=false` 维持旧行为，排行榜按 `invited_count+pooled_count` 排序，`/invite_check_user` 输出含 `pooled_count`，以及 `_invite_cache_lock` 序列化 `sync_invite_links` / `initialize_invite_cache` / 批结算的冒烟验证。
 - InviteGuard 邀请奖励通知 DM：单人归因 + 面板有效时邀请人收到 Components v2 通知（Container + 分割线 + 附图 MediaGallery + 总邀请数 footer + 容器外“查看排行榜”link 按钮，URL 精确指向面板消息），面板无效（channel/message id 缺失）或 `reward_notification_enabled=false` 时完全不发但归因与积分照常，池化路径各邀请人收到含人数、实得总积分与总邀请数 footer 的 body_pooled 汇总版本，DM Forbidden 不影响归因与积分，`reward_points_per_invite=0` 时无积分也无 DM，以及“DB 归因 → 积分入账 → DM 发送”的顺序断言。
 - PrivateRoom 商店、Shop 签到、Tickets 主入口和组队邀请的 Components v2 panel 结构。
+- Shop 签到面板刷新恢复：临时 Discord HTTP 失败保持 active 等待重试、真实 404 才停用、消息编辑成功后才逐面板推进日期与清零当日统计。
 - 组队消息和房间面板“满员”共享样式；旧 embed 和新 Components v2 消息均有兼容覆盖。
 - 显式 gateway intents、SQLCipher 数据库加密连接、明文库迁移工具、显式 key 文件生成和 `run.py` 本地 `.env` 加载。
 - 后台 loop 未登录离线 guard。
 
 最后一次通过基线：
 - [x] `./.venv/Scripts/python.exe -m pytest -q`
-  - 当前：`143 passed, 1 warning`（2026-07-05）
+  - 当前：`147 passed, 1 warning`（2026-08-02）
 - [x] `./.venv/Scripts/python.exe -m ruff check bot tests tools`
 - [x] `./.venv/Scripts/python.exe -m compileall bot tests tools`
 - [x] `./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`
@@ -86,6 +87,7 @@
 
 - [x] `/create_checkin_embed` 创建签到面板，图片和按钮显示正常；重启后按钮仍可点击。
   - 2026-06-28：当前 active 签到面板 `1520853151022973028` 已通过 Discord API 刷新；顶部统计为两列显示，footer 为「每日签到日期变更时间：UTC+2 00:00」，读回 Components v2 payload 与本地 `CheckinEmbedView` 一致。
+  - 2026-08-03（生产服务器本地日期）：确认 7 月 22 日 Discord 522 曾将面板记录误停用；备份后重新激活并刷新，面板日期恢复为 `2026-08-03`、当日签到人数显示 8、三个按钮均启用。机器人重启后 16 个 cog 加载、85 个命令同步成功。
 - [x] 普通用户每日签到一次，余额增加、连签显示更新；重复点击不重复加钱。
 - [x] 补签一次，余额扣减、补签记录和 Discord 响应正确。
 - [x] `/privateroom_setup` 配置测试 category / 价格 / 时长；`/privateroom_init` 创建或刷新商店面板。
