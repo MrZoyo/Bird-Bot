@@ -1,809 +1,268 @@
 # Bird Bot
 
-`Version: 2.0.2`
-
----
-
-Here are the maximum uses and testbeds for Bird Bot. Note that this is a server mainly for Chinese speakers in Europe, anyone is welcome to join, but please respect the culture of the server and follow the server rules.
-
-[![Discord Banner 2](https://discord.com/api/guilds/1146359014968537089/widget.png?style=banner2)](https://discord.gg/birdgaming)<br>
-
----
-
-The purpose of developing this bot is to avoid the use of various current e.g. MEE6, ProBot and other existing server managed robots. This allows for maximum personalisation and control of features and interfaces and avoids the introduction of too many public bots.
-
-The bot incorporates the functionality used in several bots and has been developed with additional fun features. Therefore, the bot is currently only intended for use with a single server and there are no plans to support multiple servers at this time. Anyone can download the bot and run it on their own server. All data processing and storage is done locally.
-
-The bot's code is deeply optimised for low-performance devices, using asynchronous handling of API responses and database operations. Therefore, for this bot working on a 10k members and 500 online voice users server, a 1 vCPU + 1GB RAM cloud server for about $5 a month is perfectly adequate for performance.
-
----
-
-## Table of Contents
-- [Package Usage](#package-usage)
-- [Setup](#setup)
-- [Function Introduction](#function-introduction)
-  - [Voice_Channel_Cog](#voice_channel_cog)
-  - [Create_Invitation_Cog](#create_invitation_cog)
-  - [InviteGuard_Cog](#inviteguard_cog)
-  - [Welcome_Cog](#welcome_cog)
-  - [Check_Status_Cog](#check_status_cog)
-  - [Achievement_Cog](#achievement_cog)
-  - [Role_Cog](#role_cog)
-  - [Backup_Cog](#backup_cog)
-  - [Giveaway_Cog](#giveaway_cog)
-  - [TeamupDisplay_Cog](#teamupdisplay_cog)
-  - [Tickets_Cog](#tickets_cog)
-  - [Ban_Cog](#ban_cog)
-  - [Shop_Cog](#shop_cog)
-  - [PrivateRoom_Cog](#privateroom_cog)
-  - [Game_DnD_Cog](#game_dnd_cog)
-  - [Game_Spymode_Cog](#game_spymode_cog)
-  - [Legacy / Removed](#legacy--removed)
-- [Utilities and Tools](#utilities-and-tools)
-  - [config](#config)
-  - [channel_validator](#channel_validator)
-  - [tickets_db](#tickets_db)
-  - [file_utils](#file_utils)
-  - [media_handler](#media_handler)
-  - [shop_db](#shop_db)
-  - [privateroom_db](#privateroom_db)
-  - [achievement_db](#achievement_db)
-  - [role_db](#role_db)
-  - [ban_db](#ban_db)
-- [Privacy and Data Security](#privacy-and-data-security)
-- [Update Log](#update-log)
-
----
-## Package Usage
-
-discord.py, aiosqlite, sqlcipher3, aiohttp, requests, aiofiles, pillow, matplotlib, tqdm, PySimpleGUI, ruamel.yaml
-
----
-## Setup
-0. Clone the repository and enter the directory.
-1. Recommended: sync the virtual environment with the locked Python version in `.python-version`.
-   - `uv sync --python 3.12.3`
-   - `source .venv/bin/activate`
-   - Optional test tooling: `uv sync --extra test`
-   - Optional lint tooling: `uv sync --extra lint`
-2. Dependency management is centralized in `pyproject.toml` and `uv.lock`.
-   - `pyproject.toml` is the human-maintained direct dependency list.
-   - `uv.lock` is the canonical reproducible lock file.
-   - `requirements.lock` is a compatibility export generated from `uv.lock`; do not edit it by hand.
-4. Copy only the required `*.yaml.example` files in `bot/config/`, rename them to `*.yaml`, and fill in the values. Run-time configs are YAML (since config 2.0); legacy `config_*.json.example` templates were moved to the `legacy-old-files-archive` branch for historical reference.
-5. In `main.yaml`, use `features` to enable only the modules you need.
-   - Relative runtime paths such as `./data/bot.db` and `./data/bot.log` are resolved from the repository root.
-   - For encrypted database storage, set `DCGSH_DB_KEY_FILE` to a secret file outside the repository in production. For first-run key-file generation, also set `DCGSH_DB_CREATE_KEY_FILE=1`, run the migration with `python -m tools.encrypt_database`, then remove the create flag and set `DCGSH_DB_REQUIRE_ENCRYPTION=1` in production.
-   - `run.py` loads a repository-local ignored `.env` file before importing the bot. This is intended for local test environments; if `.env` uses a relative `DCGSH_DB_KEY_FILE`, the path is resolved from the `.env` file's directory. Environment variables supplied by the launcher take precedence.
-6. Disabled modules, or modules without a valid config file, will be skipped during startup and their commands will not be registered.
-7. If migrating from a pre-config-2.0 deployment: run `python tools/migrate_config_to_yaml.py` to produce YAML + locale files from your existing `config_*.json`, review `tools/migration_report.md`, then run `python tools/seed_db.py` to load `voicechannel.channel_configs` / `tickets.ticket_types` into the database (these were JSON-subtree-turned-DB-tables in P2-5; note: legacy `config_tickets_new.json` sources are auto-mapped to the new `tickets` name, while removed-system sources `config_tickets.json` and `config_rating.json` are skipped). See `REFACTORING_PROGRESS.md` "Upgrade 协议" for the full sequence.
-8. In the Discord Developer Portal, enable the privileged intents required by this bot: `Server Members Intent` and `Message Content Intent`. The runtime does not request `Presence Intent`.
-9. Run `python run.py`. If you are using a Linux server, you can use `nohup python3 run.py &` to run the bot in the background.
-10. Invite the bot to your server and give it the necessary permissions.(Required permissions: bot, application command, administrator)
-    - `InviteGuard_Cog` needs permission to list active guild invites and delete invites. In Discord terms this is usually `Manage Server` / `Manage Guild`; depending on where the invite was created, relevant channel `Manage Channels` permission may also be needed.
-    - Invite leaderboard attribution also needs `Server Members Intent` for join/leave events and permission to list guild invites. To update the leaderboard message, the bot needs View Channel, Send Messages, Read Message History, and permission to edit its own message in the target channel.
-11. Run automated smoke tests with `python -m pytest` when the test extra is installed. The suite covers config templates, runtime cog metadata, log helpers, UI locale metadata, the temporary JSON-to-YAML config migration smoke, background-loop offline guards, and pure DB-manager paths with temporary sqlite databases.
-12. Run the bare-except lint guard with `python -m ruff check bot tests` when the lint extra is installed.
-13. For updating the bot, you can use the `git pull` command to update the bot to the latest version, then rerun `uv sync`.
-14. For the Tickets cog, use `/tickets_init` to initialize the ticket system. Please check function introduction for more details.
-
----
-## Function Introduction
-### Voice_Channel_Cog
-When a user enters a specific channel, the bot creates a new channel of the corresponding type and moves the user to the new channel.
-Similarly, if the channel was created by the bot, the bot will delete the channel when the last user leaves the channel.
-
-**Enhanced Features:**
-- **Interactive control panel** with 4-button interface in voice channel text chat
-- **Room management buttons**: Unlock (public), Lock (private), Full (mark teamup as full), Soundboard (toggle)
-- **Dynamic panel appearance** with color-coded embeds based on room type
-- **Auto-recovery system** restoring control panels after bot restart
-- **Startup-safe temp channel cleanup** that creates/migrates `temp_channels` before background cleanup starts
-
-**Commands:**
-- `/check_temp_channel_records`: Query the temporary voice channel records of the current server. This command is mainly used to check that the robot's mechanism of automatically deleting rooms that no longer exist every hour is working properly.
-- `/vc_add <channel>`: Add a voice channel that automatically creates new voice channels.
-- `/vc_remove [channel] [channel_id]`: Remove a voice channel that automatically creates new voice channels. Use channel selection or channel ID (for deleted channels).
-- `/vc_list`: List all voice channels that automatically create new voice channels.
-
-### Create_Invitation_Cog
-A user sends a teaming message and bot replies with an invitation link to that user's channel to make it easy for other users to quickly join the user's room.
-If the user is not currently on a channel, bot will prompt the user to create a new channel using `Voice_Channel_Cog` first.
-
-**Enhanced Features:**
-- **Intelligent keyword detection** using regex patterns to automatically detect team-up requests
-- **User signature system** allowing personalized signatures in invitations
-- **Room status tracking** with "room full" functionality
-- **Separate logging system** for keyword detection activities
-
-**Commands:**
-- `/invt <title>`: Create an invitation with a specified title(optional).
-- `/invt_checkignorelist`: Check the current server's invitation channel ignore list.
-- `/invt_addignorelist <channel>`: Add a channel to the invitation channel ignore list.
-- `/invt_removeignorelist [channel] [channel_id]`: Remove a channel from the invitation channel ignore list. Use channel selection or channel ID (for deleted channels).
-
-### InviteGuard_Cog
-Silent invite cleanup for servers where long-lived 30-day invites accumulate and block new invite creation, plus an invite leaderboard that attributes new members by comparing Discord invite `uses` deltas.
-
-**Features:**
-- Daily scan of the configured guild's active invites
-- Silent deletion of invites older than the configured age, default 3 days
-- Invite-code whitelist for official permanent invites
-- Creator whitelist for selected users; bot owner, Discord administrators, and members who can access the configured admin channel are treated as admin-side creators
-- Dry-run mode for testing without deleting invites
-- Console / bot log summary after every scheduled cleanup run
-- Invite leaderboard DB tables: `invite_users` stores invite counts and attribution locks; `invite_links` stores invite code metadata, uses, active state, and ignored status
-- Startup invite cache plus 5-minute invite-link sync and leaderboard message edit
-- Components v2 invite leaderboard panel with Top 15 entries, viewer-local relative update time, separators, and bot avatar thumbnail
-- Member join attribution based on invite `uses` deltas, settled in a short batch window (default 2 seconds); ignored, unknown, or ambiguous joins remain re-attributable, while a successful attribution locks the joined member permanently
-- Pooled attribution for same-window joins: when the total invite-use delta matches the batch size, each inviter is credited (full attribution if a single invite absorbed the whole batch, `pooled_count` otherwise) and rewarded; inconsistent batches degrade to ambiguous with zero reward
-- Member leave tracking without reducing counts, so rejoin loops do not add more points
-- Configurable Shop point reward for each newly counted valid invite; default is 60 points
-- Reward notification DM to the inviter after points are credited: a Components v2 message with the reward summary, the `resources/images/invite_reward.png` image, and a leaderboard link button jumping to the panel message; only sent while a valid leaderboard panel exists
-
-**Commands:**
-- `/invite_sync`: Sync current Discord invite links and refresh the leaderboard panel.
-- `/invite_check_user <member>`: Show one member's invite count, attribution status, join count, and leave count.
-- `/invite_create_embed <channel>`: Create a new leaderboard panel in the target channel; the name keeps "embed" for operator familiarity, but the panel uses Discord Components v2.
-
-**Config:**
-- Copy `bot/config/invite_guard.yaml.example` to `bot/config/invite_guard.yaml`
-- Set `features.invite_guard: true` in `main.yaml`
-- Add official invite codes to `invite_code_whitelist`
-- Optional: set `dry_run: true` first and inspect logs before allowing deletion
-- Invite cleanup and leaderboard both use `main.guild_id`; InviteGuard does not have a separate guild setting.
-- Set `leaderboard_channel_id`; optionally set `leaderboard_message_id` if a message already exists. If no message ID is configured, the bot creates one and logs the ID to save.
-- Put official / vanity entry codes such as `birdgaming` in `ignored_codes` or `invite_code_whitelist` so they never count toward the leaderboard.
-- Set `reward_points_per_invite` to control the points awarded for each newly counted valid invite; default is `60`, and `0` disables invite rewards.
-- `pooled_attribution_enabled` (default `true`) enables pooled crediting for same-window multi-invite joins; `attribution_batch_window_seconds` (default `2`) controls the join settlement window.
-- `reward_notification_enabled` (default `true`) sends the reward DM to the inviter when points are credited and a valid leaderboard panel exists; `reward_notification_image` names the image file under `resources/images/`.
-
-**Attribution limits:**
-- Discord does not expose the invite code directly in `on_member_join`; the bot infers it by comparing cached invite uses against a fresh `guild.invites()` snapshot.
-- Attribution can be unknown or ambiguous when the bot was offline, lacks invite-list permissions, the user joined through vanity / Discovery / official entry, or same-window invite-use deltas do not add up to the number of joined members; pooled attribution covers the matching multi-join cases.
-
-### Welcome_Cog
-When a new user joins the server, the bot sends a welcome message to the user in the welcome channel with enhanced features:
-
-**Features:**
-- **Dynamic welcome images** with user avatars and member count
-- **Customizable welcome messages** with font and styling support
-- **Automatic DM system** sending personalized direct messages to new members
-- **Resource verification system** to ensure required assets are available
-- **Server statistics integration** displaying current member count
-
-**Commands:**
-- `/testwelcome <member> <member_number>` - Send the welcome message for specific member with specific number.
-  - For default `<member>` is the user who uses the command, `<member_number>` is the total number of people in the server.
-
-### Check_Status_Cog
-Provide enhanced monitoring and status checking functions with comprehensive data tracking.
-
-**Enhanced Logging System:**
-- **Triple log system** supporting main application, keyword detection, and room activity logs
-- **Log file size management** with automatic file generation for large logs
-- **Chinese interface** for better user experience
-
-**Voice Monitoring:**
-- **Real-time voice statistics** with database storage
-- **Automated data collection** every 10 minutes for trend analysis
-- **Chart generation** capabilities for activity visualization
-- **Category-based tracking** of voice channel usage
-
-**Commands:**
-- `/check_log <number=x> [log_type=main]` - Returns the last `x` lines of the specified log file. Choose from main, keyword, or room activity logs.
-- `/check_voice_status` - Returns comprehensive voice channel statistics and member counts.
-- `/where_is <member>` - Returns the position of the selected member within the channel. Only visible to user.
-- `/print_voice_status` - Print the longtime server voice channel and number information.
-- `/test_keyword_log [test_message]` - Test the keyword detection logging system.
-
-### Achievement_Cog
-Comprehensive achievement tracking system for user activity monitoring.
-
-**Features:**
-- **Message Count Tracking**: Monitor user message activity with milestone achievements
-- **Reaction Count Tracking**: Track reaction usage with progress rewards  
-- **Voice Time Tracking**: Monitor time spent in voice channels with time-based achievements
-- **Monthly Statistics**: View achievements and rankings by specific months
-- **Admin Management**: Manual adjustment capabilities for achievement progress
-- **Feature-linked visibility**: achievement categories tied to disabled modules are automatically hidden from progress pages, rankings, and manual adjustment flows
-
-**Commands:**
-- `/achievements [member] [date]`: View user achievements. Use `<date>` format like "2024-07" for monthly views.
-- `/increase_achievement <member> [reactions] [messages] [time_spent]`: Manually increase achievement progress.
-- `/decrease_achievement <member> [reactions] [messages] [time_spent]`: Manually decrease achievement progress.
-- `/achievement_ranking [date]`: Show top 10 users in various achievement categories.
-- `/check_ach_ops`: Check manual operation history for the achievement system.
-- `/rank`: Enhanced ranking system interface for server leaderboards.
-
-### Role_Cog
-Comprehensive role assignment system with multiple assignment categories.
-
-**Features:**
-- **Achievement-based role assignment** with automatic role updates
-- **Star sign role system** with 12 zodiac options
-- **MBTI personality role system** with all 16 types
-- **Gender role assignment** with inclusive options
-- **User signature system** with permission management and voice time requirements
-- **Role panel preflight validation** blocking panel creation when referenced role IDs are missing or invalid
-- **Optional starter roles** allowing `achievement_start_role_id` and `social_start_role_id` to be left empty without runtime errors
-
-**Commands:**
-- `/create_role_pickup <channel>`: Create achievement role selection interface
-- `/create_starsign_pickup <channel>`: Create star sign role selection interface
-- `/create_mbti_pickup <channel>`: Create MBTI role selection interface
-- `/create_gender_pickup <channel>`: Create gender role selection interface
-- `/create_signature_pickup <channel>`: Create signature management interface
-- `/signature_permission_toggle <user_id> <disable>`: Toggle user's signature permissions
-- `/signature_clear <user_id>`: Clear user's signature and history
-- `/signature_set_requirement <minutes>`: Set voice time requirement for signatures
-- `/signature_check <user_id>`: Check user's signature information
-
-### Backup_Cog
-Automated database backup system with scheduled and manual backup capabilities.
-
-**Features:**
-- **Automated backups** every 6 hours (0:00, 6:00, 12:00, 18:00)
-- **Backup rotation** maintaining latest 20 backups with automatic cleanup
-- **Manual backup capability** for immediate backup needs
-- **Backup limit management** to prevent storage overflow
-
-**Commands:**
-- `/backup_now`: Create an immediate backup file manually
-
-### Giveaway_Cog
-Comprehensive giveaway management system with activity-based entry restrictions.
-
-**Features:**
-- **Activity-count entry requirements** for reaction, message, and voice time thresholds
-- **Time-based giveaway management** with flexible duration formats
-- **Winner selection system** with configurable winner counts
-- **Archive system** preserving original giveaway information
-- **Modal draft flow** for prize details, duration, provider, entry restrictions, and optional prize images
-- **Embed-based public panel** with bot avatar thumbnail, optional prize image, persistent join button, and personal join/leave feedback
-
-**Commands:**
-- `/ga_create`: Open the giveaway draft flow. Basic details, entry requirements, and optional image upload are configured from the draft controls.
-- `/ga_cancel <giveaway_id>`: Cancel active giveaway
-- `/ga_end <giveaway_id>`: End giveaway early and select winners
-- `/ga_time_extend <giveaway_id> <time>`: Extend giveaway duration
-- `/ga_participant <giveaway_id>`: List all giveaway participants
-- `/ga_description <giveaway_id> <description>`: Update giveaway description
-- `/ga_sendtowinner <giveaway_id> <message>`: Send message to giveaway winners
-
-### TeamupDisplay_Cog
-Real-time teamup information display system for organizing team activities.
-
-**Features:**
-- **Real-time display board** with automatic updates every 2 minutes
-- **Game type categorization** for organized teamup information
-- **Automatic cleanup** of expired invitations and invalid data
-- **Discord integration** with native time formatting and channel links
-
-**Commands:**
-- `/teamup_init <channel>`: Create teamup display board in specified channel
-- `/teamup_type_add <channel> <game_type>`: Add game type configuration
-- `/teamup_type_delete [channel] [channel_id]`: Delete game type configuration. Use channel selection or channel ID (for deleted channels).
-- `/teamup_type_list`: View all game type configurations
-
-### Tickets_Cog
-**🆕 Recommended ticket system** using Discord's native thread architecture for enhanced performance and user experience.
-
-**Key Features:**
-- **Thread-based tickets** leveraging Discord's native functionality
-- **Modal confirmations** preventing accidental ticket creation
-- **Dynamic button states** that update based on ticket status (pending/accepted/closed)
-- **Comprehensive admin system** with type-specific and global permissions
-- **Automatic admin notifications** via DM with jump buttons
-- **Persistent state management** surviving bot restarts
-- **Statistics and analytics** for ticket system monitoring
-- **Automatic cleanup** for tickets with missing channels on startup
-- **Public initialization feedback** from `/tickets_init` so setup status is visible in-channel
-
-**Admin Management:**
-- **Type-specific permissions** allowing different admins for different ticket types
-- **Global admin system** for overall ticket management
-- **Automatic admin addition** to ticket threads with rate limiting
-- **Permission inheritance** from Discord roles and individual user assignments
-
-**Commands:**
-- `/tickets_init`: Initialize the new ticket system
-- `/tickets_stats`: Display comprehensive ticket statistics
-- `/tickets_admin_list`: Show current admin configuration
-- `/tickets_admin_add_role <role>`: Add admin role with type selection
-- `/tickets_admin_remove_role <role>`: Remove admin role from system
-- `/tickets_admin_add_user <user>`: Add individual admin user
-- `/tickets_admin_remove_user <user>`: Remove individual admin user
-- `/tickets_add_user <user>`: Add user to current ticket
-- `/tickets_accept`: Accept current ticket (admin only)
-- `/tickets_close <reason>`: Close current ticket with reason
-- `/tickets_refresh_buttons`: Refresh all ticket button states
-- `/tickets_refresh_main`: Refresh main ticket creation page
-- `/tickets_add_type`: Add a ticket type shown on the main panel
-- `/tickets_edit_type`: Edit a ticket type's metadata, guide, button color, or admins
-- `/tickets_delete_type`: Delete a ticket type and refresh the main panel
-
-**User Experience:**
-- **Jump buttons** for easy navigation to ticket threads
-- **Rich embeds** with comprehensive ticket information
-- **Button state indicators** showing ticket status at a glance
-- **Modal confirmations** for important actions
-
-### Shop_Cog
-**🔥 Enhanced point-based economy system** with makeup check-in functionality and improved user experience.
-
-**Core Features:**
-- **Balance management** with point tracking and transfer capabilities
-- **Daily check-in system** with streak bonuses and reward tracking
-- **Advanced makeup check-in system** for missed days (NEW in v1.7.1b)
-- **Transaction history** with detailed logging and monthly views
-- **Admin controls** for manual balance adjustments with audit trails
-- **Check-in streaks** encouraging daily engagement with accurate tracking
-
-**🆕 Makeup Check-in System:**
-- **Monthly limit**: 3 makeup check-ins per month with intelligent quota management
-- **Smart validation**: Prevents makeup before first manual check-in
-- **Cost-based system**: 20 points per makeup (configurable) vs 10 points earned per check-in
-- **Automatic streak recalculation** ensuring accurate statistics after makeup
-- **Comprehensive UI** showing remaining quotas and streak information
-
-**Interactive Check-in System:**
-The new check-in system is completely interface-based using interactive embeds with buttons:
-- **✅ Daily Check-in Button**: Perform daily check-in to earn points (must be in voice channel)
-- **⏰ Makeup Check-in Button**: Make up for missed check-in days (costs 20 points, 3 times per month)
-- **🔍 Query Button**: View personal check-in status and history
-
-**Commands:**
-- `/create_checkin_embed <channel>`: (Admin) Create interactive check-in panel in specified channel
-- `/checkin_history <user>`: (Admin) View comprehensive check-in details for a specific user
-- `/balance_change <user>`: (Admin) Modify user balance with detailed forms
-- `/balance_history [user]`: View transaction history with pagination
-
-### PrivateRoom_Cog
-**🏠 Enhanced private voice channel system** with flexible purchasing and restoration capabilities.
-
-**Core Features:**
-- **Temporary ownership system** with configurable expiration periods (32 days default)
-- **Point-based purchasing** integrated with shop system and voice activity discounts
-- **Activity-based discounts** rewarding active voice users (up to 100% off)
-- **Room restoration** for accidentally deleted channels within validity period
-- **Automatic cleanup** of expired rooms with smart scheduling
-- **Renewal reminder system** with automated DM notifications when rooms approach expiration
-
-**Enhanced User Experience:**
-- **Purchase and restoration options**: Buy new rooms or restore existing ones
-- **Seamless room creation** with proper room information messages
-- **Voice activity rewards** encouraging engagement with discount system
-- **Automatic notifications** via DM for expiration and renewal opportunities
-
-**Commands:**
-- `/privateroom_init`: (Admin) Initialize private room system with settings table
-- `/privateroom_setup <channel>`: (Admin) Configure private room shop interface
-- `/privateroom_reset`: (Admin) Reset entire private room system
-- `/privateroom_list`: List all active private rooms with pagination
-- `/privateroom_ban <user>`: (Admin) Ban user from private room system
-- `/privateroom_fix <user> <days>`: (Admin) Repair an active private room's expiration state
-
-**Shop Interface:**
-- **🛍️ Purchase Button**: Buy new private room with intelligent settings detection
-- **🔄 Restore Button**: Restore previously owned room if available within validity period
-- **⚙️ Smart Settings Choice**: Automatically detects saved settings and offers restoration options
-
-### Game_DnD_Cog
-Advanced Dungeons & Dragons dice rolling system with comprehensive notation support.
-
-**Features:**
-- **Advanced dice notation** supporting complex expressions (3+4d6, 2d04 for 0-4 range)
-- **Multiple roll support** with detailed breakdown of each roll
-- **Zero-inclusive dice** (d06 for 0-6 range vs d6 for 1-6 range)
-- **Batch rolling** with expression-based repetition (5#3+4d6)
-- **Table format results** for easy reading
-
-**Commands:**
-- `/dnd_roll <expression> [x]`: Roll dice using DnD notation
-  - Examples: `3+4d6` (roll 4 six-sided dice and add 3)
-  - `d02` (roll 0-2 inclusive die)
-  - `5#3+4d6` (repeat `3+4d6` roll 5 times)
-  - Parameter `x` specifies repetition count (overridden by `#` in expression)
-
-### Game_Spymode_Cog
-Interactive spy-based team game system for voice channel activities.
-
-**Features:**
-- **Team formation system** with button-based signup
-- **Voice channel validation** ensuring participants are in voice
-- **Spy randomization** with secret DM notifications
-- **Multi-stage game flow** from setup to reveal
-- **Interactive buttons** for team management and game control
-
-**Commands:**
-- `/spymode <team_size> <spy>`: Create spy mode game with specified team size and spy count
-  - Example: `/spymode 5 1` creates 5v5 teams with 1 spy per team
-
-**Game Flow:**
-1. **Setup Phase**: Define team sizes and spy counts
-2. **Registration Phase**: Players join teams via buttons
-3. **Game Start**: Spy assignments sent via DM
-4. **Reveal Phase**: Show spy identities to all participants
-
-### Ban_Cog
-**🔨 Comprehensive moderation system** providing ban, tempban, and mute functionality with automated management.
-
-**Key Features:**
-- **Permanent bans** with configurable message deletion periods
-- **Temporary bans** with automatic unban scheduling and DM notifications
-- **Mute system** using Discord's native timeout feature (up to 28 days)
-- **Admin permission system** with role and user-based access control
-- **Notification system** with customizable channel alerts
-- **Automatic recovery** of active tempbans after bot restart
-
-**Enhanced Functionality:**
-- **Duration parsing** supporting multiple formats (1m, 1h, 1d, 1w)
-- **Database persistence** for tempban tracking and recovery
-- **User DM notifications** with server rejoin links for tempbans
-- **Rich embed notifications** with user avatars and timestamps
-- **Comprehensive admin management** with role and user assignment
-
-**Commands:**
-- `/ban <user> <reason> [delete_message_days]`: Permanently ban a user
-- `/tempban <user> <duration> <reason> [delete_message_days]`: Temporarily ban a user
-- `/mute <user> <duration> <reason>`: Mute a user using Discord timeout
-- `/ban_list_tempbans`: List all active temporary bans in the server
-- `/ban_admin_list`: Display current admin permissions and settings
-- `/ban_admin_add_role <role>`: Add role to ban admin permissions
-- `/ban_admin_delete_role <role>`: Remove role from ban admin permissions
-- `/ban_admin_add_user <user>`: Add user to ban admin permissions
-- `/ban_admin_delete_user <user>`: Remove user from ban admin permissions
-- `/ban_set_notification_channel <channel>`: Set ban notification channel
-- `/ban_remove_notification_channel`: Remove ban notification channel
-- `/ban_set_invite_link <invite_link>`: Set rejoin link for tempbanned users
-- `/ban_remove_invite_link`: Remove rejoin link setting
-
-### Legacy / Removed
-RatingCog, NotebookCog, and the old channel-based TicketsCog are removed from runtime. They should not appear in Discord command picker, active config templates, or active test flows.
-
-Old implementation snapshots and sanitized legacy templates live on the `legacy-old-files-archive` branch. See `LEGACY_ARCHIVE.md` on main and `LEGACY_ARCHIVE_INDEX.md` on that branch.
-
----
-
-## Utilities and Tools
-
-### config
-YAML-based configuration singleton with lazy loading, caching, and i18n.
-- **YAML-first** (ruamel.yaml round-trip): per-cog `bot/config/<name>.yaml`; comments survive writes.
-- **Atomic writes** via sibling tempfile + `os.replace` (crash-safe).
-- **i18n locale loader** via `get_locale(name, lang)` reading `bot/locales/<lang>/<name>.yaml`; `bot.utils.i18n.t(...)` is the call-site helper.
-- **Text split**: user-facing UI text should be in locale YAML; runtime YAML keeps IDs, paths, colours, limits, prices, and content metadata. `welcome_text` remains in config because it can embed deployment-specific Discord URLs/custom emoji IDs.
-- **Lazy loading** with in-memory cache; `reload_config` / `reload_locale` for runtime refresh.
-
-### channel_validator
-Unified validation system supporting both Context and Interaction objects.
-- **Admin channel validation** for command restrictions
-- **Voice state checking** utilities for voice-dependent features
-- **Flexible validation** supporting multiple Discord API patterns
-
-### tickets_db
-Comprehensive database manager for the thread-based ticket system (renamed from `tickets_new_db` in P1-3c).
-- **Thread-based ticket management** with full CRUD operations
-- **Member tracking** with addition timestamps and relationship management
-- **Statistics collection** for reporting and analytics
-- **Configuration storage** in database for dynamic updates
-
-### file_utils
-Enhanced file operations module with advanced capabilities.
-- **Directory tree generation** for archive organization
-- **File size validation** before processing
-- **Automatic cleanup** of temporary files
-- **Archive creation** with compression support
-
-### media_handler
-Media processing module with validation and security features.
-- **File size validation** before download with configurable limits
-- **Hash-based file naming** preventing conflicts and duplicates
-- **Automatic directory creation** for organized storage
-- **Size limit enforcement** for resource management
-
-### shop_db
-**🔥 Enhanced database integration module** for the comprehensive economy system.
-- **Transaction tracking** with detailed logging and categorization
-- **Balance management** with comprehensive audit trails
-- **Advanced check-in streak tracking** with makeup support and accurate recalculation
-- **Makeup check-in management** with monthly quota tracking and intelligent validation
-- **Monthly statistics** generation for reporting and analytics
-- **First check-in tracking** for makeup validation and user progress monitoring
-
-### privateroom_db
-**🏠 Enhanced database manager** for the private voice channel system.
-- **Room ownership tracking** with comprehensive expiration management
-- **Purchase history** with pricing calculations and discount tracking
-- **Activity-based discount** calculations for user engagement rewards
-- **Automatic cleanup** of expired room data with configurable retention
-- **Shop message management** for purchase interface persistence
-
-### achievement_db
-**🏆 Comprehensive achievement tracking database manager** for user progress monitoring.
-- **Multi-category achievement tracking** for messages, reactions, voice time, and check-ins
-- **Monthly statistics system** with separate tracking for monthly achievements
-- **Voice session management** with start/stop tracking and time calculation
-- **Leaderboard generation** with ranking and extended leaderboard support
-- **Manual operation logging** for admin adjustments with audit trails
-- **Checkin integration** with shop system for total and streak-based achievements
-
-### role_db
-**🎭 Role assignment database manager** for interactive role systems.
-- **View persistence management** for role selection interfaces across different types
-- **Achievement progress queries** with unified data retrieval from multiple sources
-- **Signature system management** with time-slot based change tracking and cooldowns
-- **Voice time requirement checking** for signature permissions
-- **Permission management** with user signature enable/disable functionality
-- **Database operations** for role views, star sign, MBTI, gender, and signature systems
-
-### ban_db
-**🔨 Comprehensive moderation database manager** for the ban system.
-- **Tempban tracking** with automatic expiration management
-- **Ban history storage** with detailed logging and timestamps
-- **Active tempban recovery** ensuring continuity after bot restarts
-- **Database cleanup** of expired records with configurable retention
-- **Admin permission persistence** with role and user tracking
-
----
-
-## Development Guidelines
-
-### Code Organization
-- **Main functionality** should be placed in the `bot/` directory
-- **Deprecated or removed code** should normally rely on git history instead of staying in main.
-- **Old archived material** lives on the `legacy-old-files-archive` branch. See `LEGACY_ARCHIVE.md` on main and `LEGACY_ARCHIVE_INDEX.md` on that branch.
-
-### File Management Rules
-- Keep runtime code in `bot/` and reusable tests in `tests/`.
-- Do not force-add real legacy configs or local scratch files.
-- Update documentation to reflect code organization changes
-
-### Logging Rules
-- Use `bot.utils.fmt_user`, `fmt_channel`, and `fmt_role` when logging Discord users, channels, threads, or roles.
-- The standard log shape is `name (id)` for channels/roles and `display_name / username (id)` for users when those names differ. Raw IDs are logged as `unknown (id)` when no cached Discord object is available. Numeric IDs use ASCII parentheses.
-
----
-
-## Production Deployment Notes
-
-This repository is the generic upstream. A production server clones it, fills in real `bot/config/*.yaml` from the `*.yaml.example` templates (gitignored), and may further customize locale text under `bot/locales/` and images under `resources/images/` for its own community. Those server-local edits are expected — treat the repo copies as defaults, and never assume a production checkout is clean.
-
-Upgrading a deployment:
-
-1. Back up `data/bot.db` (and the DB key file for encrypted deployments).
-2. `git stash` — preserves server-local locale/image edits.
-3. `git pull`
-4. `git stash pop` — resolve conflicts keeping the server-side text where intended.
-5. Re-sync dependencies if the lockfile changed, then restart the bot. DB schema migrations run automatically at startup.
-
-Do not run `git checkout -- .` or `git reset --hard` on a production box; both destroy the server-local content customizations.
-
-## Privacy and Data Security
-
-See [PRIVACY.md](./PRIVACY.md) for the data inventory, privileged-intent rationale, log/backup retention notes, and SQLCipher database encryption procedure.
-
-## Update Log Latest
-### V2.0.2 - 2026-08-02
-- Fixed check-in panels becoming permanently inactive after a transient Discord API failure during refresh or startup recovery.
-- Check-in panel records are now deactivated only when Discord confirms that the channel or message no longer exists; permission and HTTP failures remain active for a later retry.
-- Daily rollover state is now advanced per panel only after that panel message was edited successfully, preventing the displayed date and stored date from diverging.
-- Added regression coverage for transient HTTP failures, genuinely missing messages, successful edit-before-reset ordering, and per-panel daily-stat resets.
-
----
-
-### V2.0.1 - 2026-07-04
-- Added `InviteGuard_Cog` to silently clean active Discord invites older than the configured retention window.
-- Added dry-run support, invite-code and creator whitelists, scheduled cleanup, and logging summaries.
-- Added invite attribution storage and a Components v2 invite leaderboard panel with Top 15 ranking, viewer-local relative update time, bot avatar thumbnail, and `/invite_sync`, `/invite_check_user`, `/invite_create_embed` operator commands.
-- Added configurable invite rewards through the Shop balance system: each newly counted valid invite awards `reward_points_per_invite` points, defaulting to 60.
-- Added pooled invite attribution with batch settlement: same-window joins settle together, inviters are credited and rewarded when the total invite-use delta matches the batch size, and invite cache access is serialized against the background sync.
-- Added a reward notification DM to the inviter with a Components v2 layout, reward image, and a leaderboard link button jumping to the panel message; active only while a valid leaderboard panel exists.
-- Documented required Discord invite permissions and the project convention that default owner/admin command access maps to `main.admin_channel_id`.
-
----
-
-### V2.0.0 - 2026-06-27
-- Completed the config 2.0 runtime migration: YAML configuration, locale-backed UI text, package-based cogs, and DB-backed mutable feature data are now the active runtime path.
-- Removed runtime registration for legacy NotebookCog, RatingCog, and the old channel-based TicketsCog; archived historical code on `legacy-old-files-archive`.
-- Added fake Discord interaction flow tests for the retained modules, covering local handler behavior without requiring live Discord.
-- Improved PrivateRoom renewal semantics so stale active rooms renew from the current time instead of charging users for already-expired days.
-- Standardized Discord entity logging with name and ID formatting for users, channels, roles, and guilds.
-- Added migration tooling for pre-config-2.0 JSON deployments and expanded public YAML template documentation.
-- Retired giveaway-related achievement categories while keeping GiveawayCog itself active.
-
----
-
-### V1.9.1 - 2026-04-14
-- Locked the Python runtime and dependency environment with `.python-version` and the project lock files.
-- Added preflight role validation before creating achievement, star sign, MBTI, and gender pickup panels.
-- Allowed optional starter roles in `Role_Cog` so empty `achievement_start_role_id` and `social_start_role_id` no longer crash role assignment flows.
-- Hid feature-linked achievement content when the related module is disabled.
-- Changed `/tickets_init` follow-up messages to public responses instead of only-visible-to-user replies.
-- Fixed `VoiceStateCog` startup ordering so `temp_channels` is created or migrated before cleanup tasks run.
-- Updated `BanCog` task creation to `asyncio.create_task(...)` for current runtime compatibility and cleaner task cleanup.
-
----
-
-
-## Update Log Archive
-<details>
-<summary><strong>From V1.4.0b</strong></summary>
-
-### V1.9.0 - 2026-04-14
-- Added feature toggles in `config_main.json` for per-module loading.
-- Disabled modules, or modules without config, are now skipped cleanly without startup errors.
-- Commands for skipped modules are no longer registered.
-
----
-
-### V1.8.4 - 2026-1-11
-#### 🐛 Critical Bug Fixes
-- **Private Room System**: 
-  - Fixed an issue that previously allowed users to infinitely renew private rooms under specific conditions.
-  - If the user has disabled DMs, the bot will now send a reminder in the private room that could be renewed.
-
----
-
-### V1.8.3 - 2025-12-19
-- Extend the makeup signup application window to 180 days
-- Optimised behaviour for full party composition: Removed synchronisation buttons and bottom prompts for existing parties or when full, preventing residual information from causing disruption.
-- Enhanced `/print_voice_status`: Highlight daily/monthly peaks, display yearly data as monthly bar charts, and optimised date axis and annotation styles.
-- Slash command synchronisation fixes: Eliminated duplicate guild-level synchronisation; duplicate commands no longer appear after restarting or executing `/synccommands`.
-
----
-### V1.8.2b - 2025-10-23
-#### 🐛 Critical Bug Fixes
-- **Private Room System**: Fixed critical error preventing room creation
-  - Cleaned up unused database methods and tables
-- **Command Sync**: Now all commands will automatically sync with the bot
-
----
-### V1.8.1b - 2025-10-21
-#### 🆕 New Features
-- **Room Activity Logging System**: Separate log file for room-related activities
-  - Control panel creation and teamup cleanup events
-- **Private Room Renewal Reminders**: Automated DM notifications for expiring rooms
-#### 🔧 System Improvements
-- **Check Log Command Refactor**: Simplified parameter system
-  - Dropdown selection for log types (main/keyword/room)
-- **Database Migration Cleanup**: Removed legacy compatibility code
-  - Streamlined database initialization
-
----
-### V1.8.0b - 2025-10-10
-#### 🆕 Major New Features
-- **Voice Room Control Panel**: Interactive control panel in voice channels
-  - 4-button interface for room management (unlock, lock, full, soundboard)
-  - Direct room type switching without commands
-  - Dynamic color-coded embeds based on room type
-  - Auto-recovery system after bot restart
-- **Teamup Auto-Full System**: Automatic marking of previous teamup messages as full when new messages are sent
-  - Database tracking of teamup message IDs
-  - Non-blocking async processing for smooth user experience
-
----
-### V1.7.0b - 2025-09-09
-#### 🆕 Major New Features
-- New check-in system
-  - Embed interface based system, easier to use
-  - Daily check-in automatic refresh
-- All commands related to channel selection have been reworked, replacing channel IDs with a more modern and user-friendly selection list.
-  - Improved user experience with Discord's native channel selection interface
-  - Enhanced remove/delete commands with hybrid parameters (channel selection + manual ID for deleted channels)
----
-### V1.6.5b - 2025-08-20
-#### 🐛 Critical Bug Fixes
-- Fixed an issue where room creation failed due to user IDs being blocked by Discord.
-#### 🧽 System Cleanup
-- Completely removed old ticket system (`tickets_cog.py`) and migration functionality
-- Added automatic cleanup of tickets with missing channels
-
----
-### V1.6.4b - 2025-08-13
-#### 🐛 Critical Bug Fixes
-- Fixed an issue with ticket permissions, which now correctly uses private tickets.
-- Fixed the archiving function for old tickets. Now you can conveniently archive old tickets with one click.
-- Added a temporary command to convert non-private tickets in the new version to private tickets.
-
----
-### V1.6.3b - 2025-07-08
-#### 🐛 Critical Bug Fixes
-- Quick fix for the achievement check crash when there are too many achievements.
----
-### V1.6.2b - 2025-07-06
-#### New Features
-- Reconstructed the achievement cog and role cog. Used a more advanced database and logic separation architecture.
-- Support for achievements related to total check-ins and consecutive check-ins has been created.
-#### Bug Fixes
-- Fixed an issue where the ‘Accept’ button displayed an incorrect status in closed tickets.
-
----
-### V1.6.1 - 2025-07-04
-#### 🐛 Critical Bug Fixes
-- **TeamupDisplay System Fixes**: 
-  - Optimised the display of the teamup dashboard and blocked the display of the @ section.
-  
-- **Old Tickets System**: 
-  - Restored the `/tickets_archive` command to archive all tickets.
-  
----
-### V1.6.0b - 2025-07-02
-#### 🆕 Major New Features
-- **TeamupDisplay System Implementation**: Added comprehensive `TeamupDisplay_Cog` with real-time team organization capabilities
-  - Real-time display board with automatic updates every 2 minutes
-  - Game type categorization for organized teamup information
-  - Automatic cleanup of expired invitations and invalid data
-  - Discord integration with native time formatting and channel links
-
-#### ⚠️ Important Changes
-- **Rating System Removal**: Completely removed `Rating_Cog` functionality
-  - All rating-related commands and features have been discontinued
-  - Rating data will be preserved in database but no longer accessible through bot commands
-
-### V1.5.2b - 2025-06-30
-#### 🐛 Critical Bug Fixes
-- **Ban System Fixes**: 
-  - Fixed database unique errors
-  - Fixed ban logging issues
-
----
-### V1.5.1b - 2025-06-29
-#### 🐛 Critical Bug Fixes
-- **Tempban System Fixes**: Resolved major issues with temporary ban management
-  - Fixed automatic unban logic that wasn't processing expired tempbans correctly
-#### 📋 New Features
-- **Administrative Tools**: 
-  - `/ban_list_tempbans` - View all active temporary bans in the server
-  - Improved startup logic with better expired tempban processing
----
-
-### V1.5.0b - 2025-06-29
-#### 🆕 Major New Features
-- **Ban System Implementation**: Added comprehensive `Ban_Cog` with moderation capabilities
-  - Permanent ban functionality with configurable message deletion
-  - Temporary ban system with automatic unban scheduling
-  - Mute system using Discord's native timeout feature
-  - Advanced admin permission management with roles and users
-  - Rich notification system with channel alerts and user DMs
-  - Database persistence and automatic recovery after restarts
-
-#### ⚠️ Important Changes
-- **Tickets System Update**: Modified command structure in new ticket system
-  - Updated command names and functionality for better user experience
-  - Enhanced thread-based ticket management
-- **Legacy Tickets Deprecation**: Old `Tickets_Cog` marked as deprecated
-  - Legacy system will be removed in future versions
-  - Users should migrate to `Tickets_New_Cog` for continued support
----
-
-### V1.4.1b2 - 2025-06-17
-#### 🐛 Bug Fixes
-- Fixed an issue with close ticket number display in the new ticket system.
-
-### V1.4.1b - 2025-06-17
-#### 🎯 Major Feature Enhancements
-- **Private room system extend**
-  - Users can now extend their private rooms by one month in advance.
-- **Check In make up**
-  - Users can now spend a certain number of points each month to make up for three missed sign-ins.
----
-
-### V1.4.0b - 2025-06-16
-#### 🆕 Major New Features
-- **Complete Ticket System Overhaul**: Introduced `Tickets_New_Cog` with thread-based architecture
-  - Thread-based tickets using Discord's native functionality
-  - Modal confirmations for ticket creation
-  - Dynamic button states with persistent management
-  - Comprehensive admin system with type-specific permissions
-  - Automatic DM notifications with jump buttons
-  - Rate-limited admin addition to prevent API limits
-
-- **Dual Logging System**: Implemented separate logging for main application and keyword detection
-  - Main application logs: `./data/bot.log`
-  - Keyword detection logs: `./data/keyword_detection.log`
-  - Enhanced `/check_log` command with `keyword_log` parameter
-  - UTF-8 encoding support and configurable log paths
----
-</details>
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![discord.py 2.7.1+](https://img.shields.io/badge/discord.py-2.7.1%2B-5865F2?logo=discord&logoColor=white)](https://discordpy.readthedocs.io/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+Bird Bot is a self-hosted Discord bot for Chinese-speaking gaming communities. It combines temporary voice rooms, team-up tools, achievements, an economy, tickets, moderation, and server operations in one modular service.
+
+All persistent data stays in the operator's local SQLite database, logs, and backups. SQLCipher encryption is available for deployments that need encrypted storage at rest.
+
+[![Bird Gaming Discord](https://discord.com/api/guilds/1146359014968537089/widget.png?style=banner2)](https://discord.gg/birdgaming)
+
+> Bird Bot currently supports one Discord guild per process. The bundled interface language is `zh_CN`; multi-guild operation and additional locales are not implemented.
+
+## Features
+
+| Area | What Bird Bot provides |
+| --- | --- |
+| Voice rooms and team-up | Temporary voice rooms, room control panels, keyword-triggered invitations, and a live team-up board |
+| Community onboarding | Welcome images, welcome-channel messages, and configurable welcome DMs |
+| Achievements and roles | Message, reaction, voice-time, and check-in achievements; rankings; role pickup panels; user signatures |
+| Economy and private rooms | Daily check-in, makeup check-in, balances, transaction history, private-room purchase, renewal, and expiry |
+| Tickets | Thread-based tickets, per-type administrators, persistent controls, status tracking, and statistics |
+| Moderation | Permanent bans, temporary bans, timeouts, notification channels, and restart-safe temporary-ban recovery |
+| Invite management | Expired-invite cleanup, invite attribution, pooled batch settlement, leaderboards, and configurable point rewards |
+| Giveaways and games | Persistent giveaways, D&D dice expressions, and an interactive SpyMode game |
+| Operations | Log inspection, voice activity reports, automatic database backups, and manual backups |
+
+Persistent Discord panels recover after a restart where the corresponding feature supports them. Feature flags let each deployment load only the cogs it needs.
+
+For command-by-command behavior and feature-specific gotchas, see the [feature reference](docs/FEATURES.md). The runtime boundaries and shared helpers are described in [ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Preview
+
+| Team-up panel | Achievement panel | Ranking panel |
+| --- | --- | --- |
+| ![Team-up panel](pics/discord-intent-review/teamup-panel.png) | ![Achievement panel](pics/discord-intent-review/achievement-panel.png) | ![Ranking panel](pics/discord-intent-review/rank-panel.png) |
+
+## Requirements
+
+- Python 3.12 or newer; this repository pins Python 3.12.3 in `.python-version`
+- [`uv`](https://docs.astral.sh/uv/) for the locked environment
+- A Discord application with a bot user
+- Discord **Server Members Intent** and **Message Content Intent** enabled
+- A host that can write the configured database, log, and backup paths
+
+Bird Bot does not request Presence Intent. The simplest initial permission setup uses the `bot` and `applications.commands` scopes with Administrator permission. Operators can reduce permissions after validating every enabled feature; InviteGuard, temporary rooms, tickets, moderation, and role assignment require their corresponding Discord permissions.
+
+## Quick start
+
+### 1. Create the Discord bot
+
+In the [Discord Developer Portal](https://discord.com/developers/applications):
+
+1. Create an application and add a bot user.
+2. Enable **Server Members Intent** and **Message Content Intent** under the bot settings.
+3. Invite the bot with the `bot` and `applications.commands` scopes.
+4. Save the bot token, guild ID, and an administrator channel ID for configuration.
+
+See [DISCORD_INTENT_APPLICATION_GUIDE.md](DISCORD_INTENT_APPLICATION_GUIDE.md) if the application needs Discord's privileged-intent review.
+
+### 2. Install the project
+
+```bash
+git clone https://github.com/MrZoyo/Bird-Bot.git
+cd Bird-Bot
+uv sync --python 3.12.3
+```
+
+The direct dependencies live in `pyproject.toml`; `uv.lock` is the reproducible lock file. Do not edit `requirements.lock` by hand—it is a compatibility export.
+
+### 3. Create local configuration
+
+Copy the main template and the templates for the features you plan to enable:
+
+```bash
+cp bot/config/main.yaml.example bot/config/main.yaml
+cp bot/config/voicechannel.yaml.example bot/config/voicechannel.yaml
+```
+
+On PowerShell, replace `cp` with `Copy-Item`.
+
+Edit `bot/config/main.yaml` and set at least:
+
+- `token`
+- `guild_id`
+- `admin_channel_id`
+- the database and log paths, if the defaults do not fit the deployment
+- each key under `features`
+
+Disable every feature you have not configured. Enabled cogs with a missing or empty required config are skipped at startup, and their commands are not registered.
+
+Real `bot/config/*.yaml` files are gitignored because they contain deployment IDs and secrets. Commit only the sanitized `*.yaml.example` templates.
+
+### 4. Start the bot
+
+```bash
+uv run python run.py
+```
+
+At startup, Bird Bot loads enabled cogs, restores supported persistent views and background tasks, then synchronizes global slash commands. The console lists loaded and skipped cogs.
+
+## Configuration
+
+`bot/main.py::COG_SPECS` is the source of truth for active cogs and their required config files.
+
+| Feature key | Cog | Required local config |
+| --- | --- | --- |
+| `voicechannel` | Temporary voice rooms | `voicechannel.yaml` |
+| `welcome` | Welcome image, channel message, and DM | `welcome.yaml` |
+| `invitation` | Team-up keyword detection and invitations | `invitation.yaml` |
+| `invite_guard` | Invite cleanup, attribution, leaderboard, and rewards | `invite_guard.yaml` |
+| `dnd` | D&D dice roller | None |
+| `checkstatus` | Log and voice status tools | None |
+| `achievements` | Achievements and rankings | `achievements.yaml` |
+| `spymode` | SpyMode game | None |
+| `giveaway` | Giveaways | `giveaway.yaml` |
+| `role` | Role pickup and signatures | `role.yaml`, `achievements.yaml` |
+| `backup` | Database backups | None |
+| `tickets` | Thread-based tickets | `tickets.yaml` |
+| `shop` | Check-in and point economy | `shop.yaml` |
+| `privateroom` | Private-room purchase and renewal | `privateroom.yaml`, `role.yaml` |
+| `ban` | Ban, temporary ban, and timeout tools | `ban.yaml` |
+| `teamup_display` | Team-up display board | `teamup_display.yaml` |
+
+Configuration follows four rules:
+
+1. Relative paths such as `./data/bot.db` resolve from the repository root, not the process working directory.
+2. User-facing text belongs in `bot/locales/<lang>/`; runtime IDs, paths, colors, prices, limits, and content metadata belong in config YAML.
+3. Mutable setup data, including voice-room entry rules and ticket types, is stored in SQLite and managed through Discord commands.
+4. `welcome_text` remains in `welcome.yaml` because deployments commonly embed server-specific URLs and custom emoji IDs in it.
+
+## First-run Discord setup
+
+After the bot is online, initialize only the features you enabled:
+
+| Feature | Common setup commands |
+| --- | --- |
+| Temporary voice rooms | `/vc_add`, `/vc_list`, `/vc_remove` |
+| Team-up board | `/teamup_init`, `/teamup_type_add`, `/teamup_type_list` |
+| Tickets | `/tickets_init`, `/tickets_add_type`, `/tickets_admin_list` |
+| Check-in economy | `/create_checkin_embed` |
+| Private rooms | `/privateroom_setup`, `/privateroom_init` |
+| Role and signature panels | `/create_role_pickup`, `/create_starsign_pickup`, `/create_mbti_pickup`, `/create_gender_pickup`, `/create_signature_pickup` |
+| Invite leaderboard | `/invite_create_embed`, `/invite_sync` |
+| Welcome flow | `/testwelcome` |
+
+Slash command descriptions and option help appear in Discord's command picker. Some administrative commands must run in `main.admin_channel_id` or require feature-specific role and user permissions.
+
+## Data, privacy, and encryption
+
+Bird Bot stores only the state needed for enabled features: Discord IDs, panel locations, achievements, balances, tickets, moderation records, invite attribution, logs, and backups. It does not send this data to a service operated by this repository.
+
+Keep these files out of source control and support messages:
+
+- `bot/config/*.yaml`
+- `.env` and `.local_secrets/`
+- `data/*.db`
+- logs and database backups
+- SQLCipher keys
+
+Database encryption is controlled through environment variables:
+
+| Variable | Purpose |
+| --- | --- |
+| `DCGSH_DB_KEY` | Supplies the SQLCipher passphrase directly |
+| `DCGSH_DB_KEY_FILE` | Reads the passphrase from a file |
+| `DCGSH_DB_CREATE_KEY_FILE=1` | Generates the key file once when it does not exist |
+| `DCGSH_DB_REQUIRE_ENCRYPTION=1` | Refuses to start without an encryption key |
+
+`run.py` reads an ignored repository-root `.env` file for local deployments without overriding variables already supplied by the launcher. Production deployments should use host environment variables or a secret manager.
+
+Read [PRIVACY.md](PRIVACY.md) before production use. It contains the complete data inventory, retention behavior, backup notes, and the plaintext-to-SQLCipher migration procedure.
+
+## Upgrading a deployment
+
+Production servers may customize tracked locale files under `bot/locales/` and images under `resources/images/`. Preserve those changes during upgrades:
+
+```bash
+git stash push -m "production overrides"
+git pull --ff-only
+git stash pop
+uv sync --frozen --python 3.12.3
+```
+
+Before upgrading:
+
+1. Back up `data/bot.db`.
+2. Back up the matching SQLCipher key file if encryption is enabled.
+3. Review upstream config-template changes and apply relevant keys to the local YAML files.
+4. Restart the bot and inspect startup logs for skipped cogs or migration errors.
+
+Database schema migrations run during startup where required. Never use `git reset --hard` or another force-overwriting update on a production checkout with server-specific locale or image changes.
+
+## Migrating from pre-2.0 JSON configuration
+
+Config 2.0 uses YAML, locale files, and database-backed mutable setup data. Test migration against copies of the old configuration and database:
+
+```bash
+uv run python tools/migrate_config_to_yaml.py
+# Review tools/migration_report.md and the generated YAML/locale output.
+uv run python tools/seed_db.py
+```
+
+The migration maps legacy `config_tickets_new.json` data to the current ticket system and skips removed RatingCog and old TicketsCog sources. Migration outputs can contain real Discord IDs and are gitignored.
+
+See [REFACTORING_PROGRESS.md](REFACTORING_PROGRESS.md) for the full upgrade protocol and historical decisions.
+
+## Project layout
+
+```text
+.
+├── run.py                    # Loads local environment data and starts the bot
+├── bot/
+│   ├── main.py               # Bot factory, feature registry, cog loading, command sync
+│   ├── cogs/                 # Active feature packages
+│   ├── config/               # Public *.yaml.example and ignored local *.yaml
+│   ├── locales/              # User-facing locale text
+│   └── utils/                # Config, database, i18n, logging, media, and shared helpers
+├── resources/                # Runtime fonts and images
+├── docs/                     # Detailed feature and architecture references
+├── tools/                    # Migration, encryption, locale, and maintenance tools
+├── tests/                    # Offline pytest and fake Discord interaction coverage
+├── data/                     # Local database and logs; runtime files are ignored
+└── backup/                   # Automatic and manual database backups
+```
+
+Each active cog is a package under `bot/cogs/`. Runtime database access goes through `bot.utils.db_connect.connect_database()` so plaintext and SQLCipher deployments use the same connection path.
+
+## Development
+
+Install the test and lint extras:
+
+```bash
+uv sync --extra test --extra lint --python 3.12.3
+```
+
+Run the local verification suite:
+
+```bash
+uv run pytest -q
+uv run ruff check bot tests tools
+uv run python -m compileall bot tests tools
+uv run python -X utf8 tools/check_locales.py
+uv lock --check
+```
+
+The automated suite uses temporary databases and fake Discord interactions. Use a staging guild for behavior that depends on Discord itself, including permissions, command synchronization, persistent views after restart, rate limits, DMs, and client rendering. Follow [REFACTORING_TEST_CHECKLIST.md](REFACTORING_TEST_CHECKLIST.md) for manual validation.
+
+Before contributing, read [CLAUDE.md](CLAUDE.md). It defines the current architecture, logging format, migration rules, testing commands, and safety requirements. Keep active docs and tests aligned with `bot/main.py::COG_SPECS`; NotebookCog, RatingCog, and the old channel-based TicketsCog are retired.
+
+## Documentation
+
+| Document | Purpose |
+| --- | --- |
+| [FEATURES.md](docs/FEATURES.md) | Detailed active-cog behavior, commands, defaults, and gotchas |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Runtime flow, data ownership, database layer, UI, and extension points |
+| [CHANGELOG.md](CHANGELOG.md) | Release history moved out of the README |
+| [PRIVACY.md](PRIVACY.md) | Stored data, privileged intents, retention, backups, and SQLCipher |
+| [DISCORD_INTENT_APPLICATION_GUIDE.md](DISCORD_INTENT_APPLICATION_GUIDE.md) | Discord privileged-intent application guidance |
+| [REFACTORING_PROGRESS.md](REFACTORING_PROGRESS.md) | Config 2.0 state, upgrade protocol, and completed work |
+| [REFACTORING_PLAN.md](REFACTORING_PLAN.md) | Refactor design and migration rationale |
+| [REFACTORING_TEST_CHECKLIST.md](REFACTORING_TEST_CHECKLIST.md) | Automated gate and staging-guild checklist |
+| [LEGACY_ARCHIVE.md](LEGACY_ARCHIVE.md) | Location of archived legacy implementations and templates |
+
+## License
+
+Bird Bot is available under the [MIT License](LICENSE).
