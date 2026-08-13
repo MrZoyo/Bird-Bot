@@ -6,9 +6,17 @@
   </a>
 </p>
 
-[![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![discord.py 2.7.1+](https://img.shields.io/badge/discord.py-2.7.1%2B-5865F2?logo=discord&logoColor=white)](https://discordpy.readthedocs.io/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+<p align="center">
+  <a href="https://www.python.org/">
+    <img src="https://img.shields.io/badge/PYTHON-3.12-3776AB?style=for-the-badge&amp;logo=python&amp;logoColor=white" alt="Python 3.12">
+  </a>
+  <a href="https://discordpy.readthedocs.io/">
+    <img src="https://img.shields.io/badge/DISCORD.PY-2.7.1%2B-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="discord.py 2.7.1 or newer">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/LICENSE-MIT-2EA44F?style=for-the-badge&amp;logo=opensourceinitiative&amp;logoColor=white" alt="MIT License">
+  </a>
+</p>
 
 Bird Bot is a self-hosted Discord bot for Chinese-speaking gaming communities. It combines temporary voice rooms, team-up tools, achievements, an economy, tickets, moderation, and server operations in one modular service.
 
