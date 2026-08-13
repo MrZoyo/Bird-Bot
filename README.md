@@ -1,5 +1,11 @@
 # Bird Bot
 
+<p align="center">
+  <a href="CHANGELOG.md">
+    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.2-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="Current release: Bird Bot v2.0.2">
+  </a>
+</p>
+
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![discord.py 2.7.1+](https://img.shields.io/badge/discord.py-2.7.1%2B-5865F2?logo=discord&logoColor=white)](https://discordpy.readthedocs.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
