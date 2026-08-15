@@ -18,13 +18,15 @@
   </a>
 </p>
 
-Bird Bot is a self-hosted Discord bot for Chinese-speaking gaming communities. It combines temporary voice rooms, team-up tools, achievements, an economy, tickets, moderation, and server operations in one modular service.
+Bird Bot is a self-hosted Discord bot for gaming communities. It combines temporary voice rooms, team-up tools, achievements, an economy, tickets, moderation, and server operations in one modular service. Its i18n layer keeps user-facing text in locale packs so each deployment can use the language that fits its community.
 
 All persistent data stays in the operator's local SQLite database, logs, and backups. SQLCipher encryption is available for deployments that need encrypted storage at rest.
 
 [![Bird Gaming Discord](https://discord.com/api/guilds/1146359014968537089/widget.png?style=banner2)](https://discord.gg/birdgaming)
 
-> Bird Bot currently supports one Discord guild per process. The bundled interface language is `zh_CN`; multi-guild operation and additional locales are not implemented.
+> The public Bird Gaming Discord linked above is the project's sample deployment and serves a Chinese-speaking community. This sample does not limit Bird Bot to Chinese communities.
+>
+> Bird Bot currently supports one Discord guild per process. The repository ships `zh_CN` as its complete sample and fallback locale. Additional languages require a matching `bot/locales/<lang>/` pack; slash-command descriptions also require a locale mapping in `bot/utils/slash_translator.py`.
 
 ## Features
 

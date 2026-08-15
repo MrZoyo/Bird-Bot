@@ -66,7 +66,7 @@ Bird Bot 将部署设置、翻译文本、可变状态和二进制资源分开�
 
 运行时相对路径通过 `bot.utils.paths` 从仓库根目录解析。从其他工作目录启动 Bot 不会改变数据库或日志位置。
 
-`bot.utils.i18n.t()` 从 `bot/locales/<lang>/` 解析 locale 键。Slash 命令名称和说明使用 `bot/locales/zh_CN/commands.yaml` 中的 `locale_str` 键。仓库当前只提供 `zh_CN`。
+`bot.utils.i18n.t()` 根据部署的 `main.locale` 从 `bot/locales/<lang>/` 解析运行时回复文案，并以 `zh_CN` 作为回退语言。`bot.utils.slash_translator.SlashTranslator` 根据 Discord 客户端语言翻译 slash 命令说明和参数帮助；命令名称保持英文。仓库将 `zh_CN` 作为完整样例 locale。添加其他语言时，需要提供对应 locale 文件，并在 `slash_translator.py` 中映射 Discord locale。
 
 ID、路径、颜色、时间格式、数值限制和功能元数据放在配置中；通用回复、表单标签、按钮文本和面板文案放在 locale 文件中。
 

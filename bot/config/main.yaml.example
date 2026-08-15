@@ -16,9 +16,11 @@ db_path: ./data/bot.db
 guild_id: 1145141919810
 # 管理员命令允许执行的频道 ID；check_channel_validity 会用它限制部分命令。
 admin_channel_id: 1145141919810
-# locale controls runtime-response language via bot.utils.i18n.t();
-# currently only zh_CN is delivered (P1-6 decision B2).
-# 运行时响应文案语言；bot.utils.i18n.t() 使用该值，当前仓库提供 zh_CN。
+# locale controls runtime-response language via bot.utils.i18n.t().
+# Add a complete bot/locales/<lang>/ pack before selecting another value;
+# zh_CN is the bundled sample and fallback locale.
+# 运行时响应文案语言；选择其他值前需提供完整的 bot/locales/<lang>/ locale 包。
+# zh_CN 是仓库自带的样例和回退语言。
 locale: zh_CN
 # Feature toggles — set false to skip loading a cog.
 # Cog 加载开关。缺失的 feature 默认视为启用；显式写 false 会跳过对应 cog。

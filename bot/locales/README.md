@@ -5,7 +5,9 @@
   <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/READ_IN-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in Simplified Chinese"></a>
 </p>
 
-`bot/locales/<lang>/<cog>.yaml` contains generic default copy. Production deployments may edit these tracked files directly to customize a server. Those differences from the repository are expected deployment overrides, not drift that needs to be fixed.
+`bot/locales/<lang>/<cog>.yaml` contains generic default copy. The repository ships `zh_CN` as its complete sample and fallback locale; deployments may add another complete language directory and select it through `main.locale`. Slash-command descriptions for a new Discord language also need a mapping in `bot/utils/slash_translator.py`.
+
+Production deployments may edit tracked locale files directly to customize a server. Those differences from the repository are expected deployment overrides, not drift that needs to be fixed.
 
 Rules:
 

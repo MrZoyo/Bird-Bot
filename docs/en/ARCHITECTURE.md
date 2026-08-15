@@ -66,7 +66,7 @@ Bird Bot separates deployment settings, translated text, mutable state, and bina
 
 Relative runtime paths resolve from the repository root through `bot.utils.paths`; launching the bot from another working directory does not redirect the database or logs.
 
-`bot.utils.i18n.t()` resolves locale keys under `bot/locales/<lang>/`. Slash command names and descriptions use `locale_str` keys stored in `bot/locales/zh_CN/commands.yaml`. The repository currently ships `zh_CN` only.
+`bot.utils.i18n.t()` resolves runtime response text under `bot/locales/<lang>/` using the deployment's `main.locale`, with `zh_CN` as the fallback. `bot.utils.slash_translator.SlashTranslator` localizes slash-command descriptions and parameter help per Discord client; command names remain English. The repository ships `zh_CN` as its complete sample locale. To add another language, provide the matching locale files and map the Discord locale in `slash_translator.py`.
 
 Keep IDs, paths, colors, time formats, numeric limits, and feature metadata in config. Keep general responses, form labels, button text, and panel copy in locale files.
 

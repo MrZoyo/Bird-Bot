@@ -5,7 +5,9 @@
   <a href="README.md"><img src="https://img.shields.io/badge/READ_IN-ENGLISH-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in English"></a>
 </p>
 
-`bot/locales/<lang>/<cog>.yaml` 是**通用默认文案（样本）**。生产部署可以直接在服务器上修改这些文件做本服定制，这类与仓库的差异是**预期行为**，不是需要"修复"的漂移。
+`bot/locales/<lang>/<cog>.yaml` 保存通用默认文案。仓库将 `zh_CN` 作为完整样例和回退 locale；部署可以添加其他语言的完整目录，并通过 `main.locale` 选择。新的 Discord 语言如果需要 slash 命令说明翻译，还要在 `bot/utils/slash_translator.py` 中添加映射。
+
+生产部署可以直接在服务器上修改已追踪的 locale 文件做本服定制。这类与仓库的差异是预期行为，不是需要“修复”的漂移。
 
 约定：
 

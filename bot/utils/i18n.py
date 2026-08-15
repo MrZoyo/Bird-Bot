@@ -14,9 +14,9 @@ a ``CommandTree.Translator``; do not route slash metadata through here.
 Fallback chain on a missing key:
     <requested lang> -> 'zh_CN' (baseline) -> KeyError
 
-``zh_CN`` is the only delivered language in this PR (P1-6 decision B2),
-so for now the chain only performs real fallback when a caller passes
-an explicit non-default ``lang=`` and the key is missing there.
+The repository ships ``zh_CN`` as its complete sample and fallback locale.
+Deployments may add another ``bot/locales/<lang>/`` pack and select it through
+``main.locale``; missing keys continue to fall back to ``zh_CN``.
 """
 from typing import Any, List, Optional
 

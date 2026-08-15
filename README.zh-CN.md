@@ -18,13 +18,15 @@
   </a>
 </p>
 
-Bird Bot 是一款面向中文游戏社区的自托管 Discord Bot。它以模块化服务整合临时语音房、组队工具、成就、积分经济、工单、管理和服务器运维功能。
+Bird Bot 是一款面向游戏社区的自托管 Discord Bot。它以模块化服务整合临时语音房、组队工具、成就、积分经济、工单、管理和服务器运维功能，并通过 i18n 将用户可见文案拆分为 locale 包，让每个部署选择适合自己社区的语言。
 
 所有持久化数据均保存在运营者本地的 SQLite 数据库、日志和备份中。需要静态加密的部署可以启用 SQLCipher。
 
 [![Bird Gaming Discord](https://discord.com/api/guilds/1146359014968537089/widget.png?style=banner2)](https://discord.gg/birdgaming)
 
-> Bird Bot 当前每个进程只支持一个 Discord 服务器。仓库内置界面语言为 `zh_CN`；暂未实现多服务器运行和其他 locale。
+> 上方链接的 Bird Gaming Discord 是项目的公开样例部署，服务于中文社区；这不代表 Bird Bot 只适用于中文社区。
+>
+> Bird Bot 当前每个进程只支持一个 Discord 服务器。仓库提供完整的 `zh_CN` 样例 locale，并将其作为回退语言。添加其他语言时，需要提供对应的 `bot/locales/<lang>/` locale 包；slash 命令说明还需要在 `bot/utils/slash_translator.py` 中添加 locale 映射。
 
 ## 功能
 

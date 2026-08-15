@@ -86,9 +86,9 @@ Never commit real YAML configs, real JSON configs, `tools/migration_db_seed.json
 
 ## Locale And Text
 
-- User-facing text should live in `bot/locales/zh_CN/<cog>.yaml`.
+- User-facing text should live in `bot/locales/<lang>/<cog>.yaml`. The repository ships `zh_CN` as its complete sample and fallback locale; deployments may add complete locale packs for other languages.
 - Code reads text with `bot.utils.i18n.t("cog.key")`.
-- Slash command names/descriptions use locale keys under `bot/locales/zh_CN/commands.yaml`.
+- Slash command descriptions and parameter help use locale keys under `bot/locales/<lang>/commands.yaml`; command names remain English. New Discord languages also need a mapping in `bot/utils/slash_translator.py`.
 - Run `./.venv/Scripts/python.exe -X utf8 tools/check_locales.py` after adding or moving locale keys.
 - `welcome_text` is the current explicit exception: it may embed real Discord URLs/custom emoji IDs, so it remains in ignored `welcome.yaml` and has a sanitized `.yaml.example` form.
 - Welcome DM copy, Shop modal labels, PrivateRoom modal labels, Achievement rank UI text, and InviteGuard reward notification DM copy (`invite_guard.notification.*`) are locale-backed. Their YAML config should only carry runtime data such as IDs, colours, image paths, prices, limits, and time formats.

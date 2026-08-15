@@ -14,9 +14,10 @@ Design choices (see REFACTORING_PLAN.md §P1-7):
   (lowercase ASCII / digits / ``_`` / ``-``), and Chinese names would be
   rejected at registration. Accordingly, ``command_name`` / ``group_name``
   / ``parameter_name`` / ``choice_name`` contexts all return ``None``.
-* Only ``zh_CN`` is delivered in the first cut (P1-6 decision B2). Any
-  other Discord locale returns ``None`` so Discord falls back to the
-  ``locale_str`` message (which we keep as the English literal).
+* The bundled locale map currently contains ``zh_CN``. Deployments can add
+  another locale pack and map its Discord locale in ``_LOCALE_MAP``. Unmapped
+  Discord locales return ``None`` and fall back to the English ``locale_str``
+  message.
 * Call sites pass ``locale_str("english text", key="cog.command.field")``:
   ``message`` is the English fallback Discord shows to non-zh-CN clients;
   ``extras['key']`` is the dot-path into ``commands.yaml``. Strings that
