@@ -1,6 +1,11 @@
 # Bird Bot feature reference
 
-Last reviewed: 2026-08-11
+<p align="center">
+  <a href="../README.md"><img src="https://img.shields.io/badge/README-HOME-2EA44F?style=for-the-badge" alt="Back to the English README"></a>
+  <a href="FEATURES.zh-CN.md"><img src="https://img.shields.io/badge/READ_IN-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in Simplified Chinese"></a>
+</p>
+
+Last reviewed: 2026-08-15
 
 This document describes every active cog, its runtime behavior, and its slash commands. For installation and the shortest setup path, start with the [project README](../README.md).
 

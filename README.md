@@ -1,6 +1,12 @@
 # Bird Bot
 
 <p align="center">
+  <a href="README.zh-CN.md">
+    <img src="https://img.shields.io/badge/READ_IN-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in Simplified Chinese">
+  </a>
+</p>
+
+<p align="center">
   <a href="CHANGELOG.md">
     <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.3-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="Current release: Bird Bot v2.0.3">
   </a>
@@ -218,8 +224,6 @@ uv run python tools/seed_db.py
 
 The migration maps legacy `config_tickets_new.json` data to the current ticket system and skips removed RatingCog and old TicketsCog sources. Migration outputs can contain real Discord IDs and are gitignored.
 
-See [REFACTORING_PROGRESS.md](REFACTORING_PROGRESS.md) for the full upgrade protocol and historical decisions.
-
 ## Project layout
 
 ```text
@@ -259,7 +263,7 @@ uv run python -X utf8 tools/check_locales.py
 uv lock --check
 ```
 
-The automated suite uses temporary databases and fake Discord interactions. Use a staging guild for behavior that depends on Discord itself, including permissions, command synchronization, persistent views after restart, rate limits, DMs, and client rendering. Follow [REFACTORING_TEST_CHECKLIST.md](REFACTORING_TEST_CHECKLIST.md) for manual validation.
+The automated suite uses temporary databases and fake Discord interactions. Use a staging guild for behavior that depends on Discord itself, including permissions, command synchronization, persistent views after restart, rate limits, DMs, and client rendering.
 
 Before contributing, read [CLAUDE.md](CLAUDE.md). It defines the current architecture, logging format, migration rules, testing commands, and safety requirements. Keep active docs and tests aligned with `bot/main.py::COG_SPECS`; NotebookCog, RatingCog, and the old channel-based TicketsCog are retired.
 
@@ -272,9 +276,6 @@ Before contributing, read [CLAUDE.md](CLAUDE.md). It defines the current archite
 | [CHANGELOG.md](CHANGELOG.md) | Release history moved out of the README |
 | [PRIVACY.md](PRIVACY.md) | Stored data, privileged intents, retention, backups, and SQLCipher |
 | [DISCORD_INTENT_APPLICATION_GUIDE.md](DISCORD_INTENT_APPLICATION_GUIDE.md) | Discord privileged-intent application guidance |
-| [REFACTORING_PROGRESS.md](REFACTORING_PROGRESS.md) | Config 2.0 state, upgrade protocol, and completed work |
-| [REFACTORING_PLAN.md](REFACTORING_PLAN.md) | Refactor design and migration rationale |
-| [REFACTORING_TEST_CHECKLIST.md](REFACTORING_TEST_CHECKLIST.md) | Automated gate and staging-guild checklist |
 | [LEGACY_ARCHIVE.md](LEGACY_ARCHIVE.md) | Location of archived legacy implementations and templates |
 
 ## License

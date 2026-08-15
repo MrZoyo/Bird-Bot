@@ -1,5 +1,10 @@
 # Changelog
 
+<p align="center">
+  <a href="README.md"><img src="https://img.shields.io/badge/README-HOME-2EA44F?style=for-the-badge" alt="Back to the English README"></a>
+  <a href="CHANGELOG.zh-CN.md"><img src="https://img.shields.io/badge/LATEST_IN-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read the latest release notes in Simplified Chinese"></a>
+</p>
+
 This file preserves the release notes that previously lived at the bottom of `README.md`. Entries describe the code at the time of each release; current runtime behavior is documented in [FEATURES.md](docs/FEATURES.md).
 
 ## 2.0.3 — 2026-08-15

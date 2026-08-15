@@ -1,10 +1,15 @@
 # Locales
 
-`bot/locales/<lang>/<cog>.yaml` 是**通用默认文案（样本）**。生产部署可以直接在服务器上修改这些文件做本服定制，这类与仓库的差异是**预期行为**，不是需要"修复"的漂移。
+<p align="center">
+  <a href="../../README.md"><img src="https://img.shields.io/badge/README-HOME-2EA44F?style=for-the-badge" alt="Back to the English README"></a>
+  <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/READ_IN-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in Simplified Chinese"></a>
+</p>
 
-约定：
+`bot/locales/<lang>/<cog>.yaml` contains generic default copy. Production deployments may edit these tracked files directly to customize a server. Those differences from the repository are expected deployment overrides, not drift that needs to be fixed.
 
-- 升级部署时用 `git stash && git pull && git stash pop` 保留服务器本地修改；**不要**在生产机上执行 `git checkout -- .` 或 `git reset --hard`。
-- 通用性的文案改进请提交回仓库；仅属于某个服务器的品牌化文案留在该服务器本地。
-- 不要把主机环境事实（时区、服务器名、入口邀请码等）写死进文案：用运行时参数（例如 `shop.checkin_embed_footer` 的 `{tz_label}` 由 bot 按部署主机时区自动填充），或放进各服务器自己的 gitignored 配置。
-- 新增或移动 locale 键后运行 `./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`。
+Rules:
+
+- Preserve server-local changes during upgrades with `git stash && git pull && git stash pop`. Never run `git checkout -- .` or `git reset --hard` on a production checkout.
+- Submit generally useful copy improvements upstream. Keep server-specific branding in the deployment.
+- Do not hardcode host facts such as the timezone, server name, or entry invite code. Supply them at runtime—for example, the bot fills `{tz_label}` in `shop.checkin_embed_footer` from the deployment host timezone—or keep them in server-owned ignored config.
+- After adding or moving locale keys, run `./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`.

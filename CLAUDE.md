@@ -5,8 +5,6 @@ This file is the detailed project guide for coding agents and maintainers. `AGEN
 ## Agent Workflow
 
 - Read this file first, then inspect the code relevant to the current task.
-- For manual feature testing, follow `REFACTORING_TEST_CHECKLIST.md`.
-- For refactor state and historical decisions, consult `REFACTORING_PROGRESS.md` and `REFACTORING_PLAN.md`.
 - When the user asks to continue, fix, refactor, or test, execute directly. Ask only when the requirement is genuinely ambiguous or risky.
 - Communicate with the user in Chinese. Keep command, path, and log excerpts concise, and do not expose secrets.
 - Per user preference, environment validation, imports, compile checks, tests, `uv`, and dependency checks should be run outside the sandbox with approval/escalation. If the venv is missing packages, install/sync them as part of the task.
@@ -203,7 +201,7 @@ Current P3-9 status:
 - Next default target: targeted real test-server validation for new changes / side-effect paths only when explicitly approved.
 - Add more fake interaction tests only for new bugs, payload replay work, or new features.
 
-Real Discord behavior still needs test-server validation for slash commands, permission failures, persistent views, buttons, Discord rate limits, DMs, command sync, and UI screenshots/logs where relevant. Follow `REFACTORING_TEST_CHECKLIST.md`.
+Real Discord behavior still needs test-server validation for slash commands, permission failures, persistent views, buttons, Discord rate limits, DMs, command sync, and UI screenshots/logs where relevant.
 
 ## Refactor And Safety Rules
 

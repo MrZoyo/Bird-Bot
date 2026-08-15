@@ -1,6 +1,11 @@
 # Bird Bot architecture
 
-Last reviewed: 2026-08-11
+<p align="center">
+  <a href="../README.md"><img src="https://img.shields.io/badge/README-HOME-2EA44F?style=for-the-badge" alt="Back to the English README"></a>
+  <a href="ARCHITECTURE.zh-CN.md"><img src="https://img.shields.io/badge/READ_IN-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in Simplified Chinese"></a>
+</p>
+
+Last reviewed: 2026-08-15
 
 This document explains the runtime boundaries and shared modules behind Bird Bot. The project guide in [CLAUDE.md](../CLAUDE.md) remains the canonical source for development, migration, logging, and testing rules.
 
@@ -170,6 +175,6 @@ When adding an active cog:
 4. Add user-facing and command locale keys.
 5. Route database access through a manager and `connect_database()`.
 6. Add offline tests for config metadata, database behavior, and interaction ordering.
-7. Update [FEATURES.md](FEATURES.md), the README configuration table, and the staging checklist.
+7. Update [FEATURES.md](FEATURES.md), the README configuration table, and the relevant tests.
 
 Use a staging guild only for behavior that requires Discord itself: permissions, command sync, persistent views after restart, rate limits, DM delivery, and client-side rendering.

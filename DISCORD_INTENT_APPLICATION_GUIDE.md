@@ -1,29 +1,34 @@
-# Discord 权限申请填写说明
+# Discord privileged-intent application guide
 
-本文给负责提交 Discord Developer Portal 权限申请的人使用。请按当前 `main` 分支代码和公开仓库内容填写，不要申请当前代码没有使用的权限。
+<p align="center">
+  <a href="README.md"><img src="https://img.shields.io/badge/README-HOME-2EA44F?style=for-the-badge" alt="Back to the English README"></a>
+  <a href="DISCORD_INTENT_APPLICATION_GUIDE.zh-CN.md"><img src="https://img.shields.io/badge/READ_IN-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in Simplified Chinese"></a>
+</p>
 
-## 基本链接
+This guide is for the person submitting the Discord Developer Portal application. Describe the current `main` branch and public repository. Do not request intents that the current code does not use.
 
-隐私政策链接：
+## Links
+
+Privacy policy:
 
 ```text
 https://github.com/MrZoyo/Bird-Bot/blob/main/PRIVACY.md
 ```
 
-可用于表单的截图链接：
+Screenshots for the application form:
 
 ```text
-成就面板：
+Achievement panel:
 https://github.com/MrZoyo/Bird-Bot/blob/main/pics/discord-intent-review/achievement-panel.png
 
-排行榜面板：
+Ranking panel:
 https://github.com/MrZoyo/Bird-Bot/blob/main/pics/discord-intent-review/rank-panel.png
 
-组队邀请面板：
+Team-up invitation panel:
 https://github.com/MrZoyo/Bird-Bot/blob/main/pics/discord-intent-review/teamup-panel.png
 ```
 
-如果表单要求直接图片文件链接，也可以使用 raw 链接：
+Use these raw links if the form requires direct image URLs:
 
 ```text
 https://raw.githubusercontent.com/MrZoyo/Bird-Bot/main/pics/discord-intent-review/achievement-panel.png
@@ -31,54 +36,54 @@ https://raw.githubusercontent.com/MrZoyo/Bird-Bot/main/pics/discord-intent-revie
 https://raw.githubusercontent.com/MrZoyo/Bird-Bot/main/pics/discord-intent-review/teamup-panel.png
 ```
 
-## 权限选择总览
+## Intent selection
 
-申请的 Privileged Gateway Intent：
+Request these Privileged Gateway Intents:
 
 ```text
-Server Members Intent: 申请
-Message Content Intent: 申请
-Presence Intent: 不申请
+Server Members Intent: Request
+Message Content Intent: Request
+Presence Intent: Do not request
 ```
 
-原因：当前代码只启用了 `members` 和 `message_content`，并明确关闭 `presences`。Bot 不使用在线/离线状态、活动状态、平台状态或 rich presence 数据。
+The current code enables only `members` and `message_content` and explicitly disables `presences`. Bird Bot does not use online/offline status, activities, platform status, or rich presence data.
 
-## APP 详情
+## App details
 
-问题：您的 APP 具备哪些功能？请尽可能详细描述，可附上相关图片或视频链接。
+Question: What does your app do? Describe its features in detail and include relevant image or video links.
 
-建议填写：
+Suggested answer:
 
 ```text
-Bird Bot 是一个面向 Discord 社区运营的服务器管理与互动 Bot，主要功能包括：
+Bird Bot is a server-management and community-interaction bot for Discord communities. Its main features are:
 
-1. 自动语音房系统：用户进入指定语音频道后，Bot 自动创建临时语音房并移动用户；房间无人后自动清理；房主可以通过控制面板切换公开/私人、标记满员、开关音效板等。
-2. 组队邀请系统：用户在文字频道发送符合规则的组队消息时，Bot 会识别关键词，生成可加入当前语音房的组队面板，并同步到组队展示板。
-3. 欢迎系统：新成员加入服务器时发送欢迎频道消息、欢迎图片和私信引导。
-4. 成就与排行榜系统：统计成员消息数、反应数、语音在线时长、签到记录等，用于成就进度、成就身份组领取和排行榜展示。
-5. 商店与每日签到系统：成员可以每日签到、补签、查看积分余额；管理员可以管理积分交易。
-6. 私人房间系统：成员可以购买和续费私人房间，Bot 会记录到期时间并在到期后自动删除房间。
-7. 工单系统：成员可以创建私密 thread 工单，Bot 会按工单类型自动加入对应管理员/管理身份组成员，并记录工单状态。
-8. 身份领取系统：成员可以领取星座、MBTI、性别标识、成就身份组，并设置个性签名。
-9. 抽奖、临时封禁、备份、服务器语音状态查询等辅助管理功能。
+1. Automatic voice rooms: when a user joins a configured voice channel, the bot creates a temporary room and moves the user into it. The bot deletes an empty room automatically. Room owners can use a control panel to switch between public and private access, mark the room as full, and enable or disable the soundboard.
+2. Team-up invitations: when a user sends a matching team-up message in a text channel, the bot detects configured keywords, creates a panel linked to the user's current voice room, and adds the entry to a live team-up board.
+3. Welcome flow: when a new member joins, the bot sends a welcome-channel message, creates a welcome image, and can send onboarding instructions by DM.
+4. Achievements and rankings: the bot counts member messages, reactions, voice time, and check-ins for achievement progress, achievement role pickup, and ranking displays.
+5. Shop and daily check-in: members can check in each day, use points for a makeup check-in, and view their point balance. Administrators can manage point transactions.
+6. Private rooms: members can buy and renew private rooms. The bot records expiry dates and deletes expired rooms.
+7. Tickets: members can create private thread-based tickets. The bot adds the administrators assigned to each ticket type and records ticket state.
+8. Role pickup: members can select zodiac, MBTI, gender, and achievement roles and set a personal signature.
+9. Supporting operations: giveaways, temporary bans, database backups, and server voice-status queries.
 
-Bot 仅用于服务器管理、成员互动、成就统计和功能面板恢复，不会将 Discord 数据出售、共享给第三方，或用于机器学习/AI 模型训练。
+The bot uses Discord data only for server administration, member interaction, achievement tracking, and panel recovery. It does not sell Discord data, share it with third parties, or use it to train machine-learning or AI models.
 
-截图链接：
+Screenshots:
 https://github.com/MrZoyo/Bird-Bot/blob/main/pics/discord-intent-review/teamup-panel.png
 https://github.com/MrZoyo/Bird-Bot/blob/main/pics/discord-intent-review/achievement-panel.png
 https://github.com/MrZoyo/Bird-Bot/blob/main/pics/discord-intent-review/rank-panel.png
 ```
 
-问题：您是否已发布公开的隐私政策，向用户说明其数据的使用方式？
+Question: Have you published a public privacy policy that explains how user data is used?
 
-选择：
+Select:
 
 ```text
 Yes
 ```
 
-隐私政策 URL：
+Privacy policy URL:
 
 ```text
 https://github.com/MrZoyo/Bird-Bot/blob/main/PRIVACY.md
@@ -86,173 +91,173 @@ https://github.com/MrZoyo/Bird-Bot/blob/main/PRIVACY.md
 
 ## Server Members Intent
 
-问题：您为什么需要服务器成员 Intent？
+Question: Why do you need the Server Members Intent?
 
-建议填写：
+Suggested answer:
 
 ```text
-Bot 需要 Server Members Intent 来支持服务器成员相关的核心功能：
+The bot needs the Server Members Intent for core features that depend on Discord members:
 
-1. 欢迎系统需要接收成员加入事件，生成欢迎消息、欢迎图片、成员计数，并向新成员发送入服引导私信。
-2. 工单系统需要读取指定管理员身份组下的成员，将这些成员自动加入对应的私密工单 thread，并发送通知。
-3. 成就、身份领取、私人房间和管理命令需要可靠地识别 Discord Member 对象、成员身份组和成员权限。
-4. 语音状态查询功能需要展示某个成员当前所在语音频道以及同频道成员列表。
-5. 私人房间和部分管理功能需要检查成员是否持有特定身份组，例如房间折扣/资格判断。
+1. The welcome flow receives member-join events, creates welcome messages and images, displays the member count, and sends onboarding instructions to the new member by DM.
+2. The ticket system reads the members of configured administrator roles so it can add those members to the appropriate private ticket threads and notify them.
+3. Achievements, role pickup, private rooms, and administration commands need reliable Discord Member objects, role membership, and member permissions.
+4. Voice-status tools display a member's current voice channel and the other members in that channel.
+5. Private rooms and some administration features check whether a member has a configured role, such as an eligibility or discount role.
 
-这些数据只用于服务器内功能执行、权限判断、面板恢复和管理审计，不用于广告、画像、出售或外部共享。
+The bot uses this data only to run features inside the server, check permissions, recover panels, and support administration audits. It does not use the data for advertising or profiling, sell it, or share it outside the deployment.
 ```
 
-问题：请提供能演示您使用场景的截图和 / 或视频链接。
+Question: Provide screenshots and/or video links that demonstrate these use cases.
 
-可填写：
+Suggested answer:
 
 ```text
-成就面板：
+Achievement panel:
 https://github.com/MrZoyo/Bird-Bot/blob/main/pics/discord-intent-review/achievement-panel.png
 
-排行榜面板：
+Ranking panel:
 https://github.com/MrZoyo/Bird-Bot/blob/main/pics/discord-intent-review/rank-panel.png
 ```
 
-问题：您是否会在平台外（Discord 之外）存储任何 API 数据？
+Question: Do you store any API data outside Discord?
 
-选择：
+Select:
 
 ```text
 Yes
 ```
 
-问题：您存储的 API 数据是否不超过 30 天？
+Question: Do you retain the API data for no more than 30 days?
 
-建议选择：
+Recommended selection:
 
 ```text
 No
 ```
 
-说明：Bot 会长期保存一些服务器功能所需的数据，例如成就统计、签到记录、积分余额、工单记录、私人房间到期时间、临时语音房记录、抽奖记录、临时封禁记录、面板 message ID 等。这些数据用于功能恢复、排行榜、审计和管理，不是临时缓存。
+Bird Bot retains some data required for long-running server features, including achievement statistics, check-in history, point balances, ticket records, private-room expiry dates, temporary voice-room records, giveaway records, temporary-ban records, and panel message IDs. The bot uses this state for recovery, rankings, audits, and administration; it is not a temporary cache.
 
-问题：用户如何联系您申请删除其活跃数据？
+Question: How can users contact you to request deletion of their active data?
 
-建议填写：
+Suggested answer:
 
 ```text
-用户可以联系服务器管理团队申请删除数据，主要方式是：
+Users can request data deletion from the server's administration team in either of these ways:
 
-1. 在服务器内联系管理员；
-2. 使用 Bot 的工单系统提交数据删除请求。
+1. Contact a server administrator directly.
+2. Submit a data-deletion request through the bot's ticket system.
 
-管理员确认请求后，可以删除或清理该用户相关的活跃数据，例如签名、工单记录、积分/签到记录、成就统计、私人房间记录、组队记录或其他功能状态数据。
+After confirming the request, an administrator can delete or clear the user's active data, including signatures, ticket records, points and check-in records, achievement statistics, private-room records, team-up records, and other feature state.
 ```
 
-问题：您是否按照开发者政策要求，对静态存储的数据进行加密处理？
+Question: Is stored data encrypted at rest as required by the Developer Policy?
 
-选择：
+Select:
 
 ```text
 Yes
 ```
 
-说明：当前代码支持 SQLCipher 数据库静态加密，生产环境应配置 `DCGSH_DB_KEY` 或 `DCGSH_DB_KEY_FILE`，并设置 `DCGSH_DB_REQUIRE_ENCRYPTION=1`。
+The current code supports SQLCipher encryption at rest. Production deployments should configure `DCGSH_DB_KEY` or `DCGSH_DB_KEY_FILE` and set `DCGSH_DB_REQUIRE_ENCRYPTION=1`.
 
 ## Message Content Intent
 
-问题：用户是否可选择退出消息内容数据的追踪？
+Question: Can users opt out of message-content tracking?
 
-选择：
-
-```text
-Yes
-```
-
-可补充说明：
-
-```text
-用户可以通过联系服务器管理员或提交工单申请退出/删除相关数据。管理员也可以将特定频道或用户加入组队关键词检测忽略列表，使 Bot 不再处理这些位置或用户的组队消息。
-```
-
-问题：您是否会将消息内容数据存储至平台外（Discord 之外）？
-
-选择：
+Select:
 
 ```text
 Yes
 ```
 
-说明：Bot 会为了组队展示和问题排查短期保存组队关键词消息内容，也会将关键词检测事件写入本地日志。普通功能状态和用户主动输入的数据保存在本地 SQLite 数据库中。
+Optional explanation:
 
-问题：您存储的用户消息内容数据是否不超过 30 天？
+```text
+Users can contact a server administrator or submit a ticket to request opt-out or data deletion. Administrators can also add specific channels or users to the team-up keyword detector's ignore list, so the bot no longer processes team-up messages from those locations or users.
+```
 
-建议选择：
+Question: Do you store message-content data outside Discord?
+
+Select:
+
+```text
+Yes
+```
+
+Bird Bot stores team-up keyword message content temporarily for the live team-up display and troubleshooting, and it writes keyword-detection events to local logs. Ordinary feature state and user-submitted values are stored in a local SQLite database.
+
+Question: Do you retain user message-content data for no more than 30 days?
+
+Recommended selection:
 
 ```text
 No
 ```
 
-说明：当前运行配置默认日志轮转保留 14 个日备份文件，组队展示数据默认约 5 分钟过期并清理；但由于运营方可能保留手动备份或按实际服务器政策调整日志保留，因此这里按保守口径填写 `No`。如提交人确认生产环境严格保证所有消息内容日志和备份均不超过 30 天，也可以改为 `Yes`，但需要与实际运维策略保持一致。
+The default runtime configuration keeps 14 daily rotated log backups, and team-up display entries expire after about five minutes. However, operators may retain manual backups or change log-retention policy, so `No` is the conservative answer. Select `Yes` only if the production deployment guarantees that all message-content logs and backups are removed within 30 days and its actual operations match that claim.
 
-问题：用户如何联系您申请删除其活跃数据？
+Question: How can users contact you to request deletion of their active data?
 
-建议填写：
+Suggested answer:
 
 ```text
-用户可以联系服务器管理团队，或通过 Bot 工单系统提交删除请求。管理员确认后，可以清理该用户相关的消息内容数据，例如组队展示记录、个性签名、工单相关记录或其他功能中保存的用户输入文本。
+Users can contact the server's administration team or submit a deletion request through the bot's ticket system. After confirming the request, an administrator can clear the user's message-content data, including team-up display records, personal signatures, ticket-related records, and user-submitted text stored by other features.
 ```
 
-问题：您是否按照开发者政策要求，对静态存储的数据进行加密处理？
+Question: Is stored data encrypted at rest as required by the Developer Policy?
 
-选择：
+Select:
 
 ```text
 Yes
 ```
 
-问题：您是否会将消息内容数据用于训练机器学习或 AI 模型？
+Question: Do you use message-content data to train machine-learning or AI models?
 
-选择：
+Select:
 
 ```text
 No
 ```
 
-问题：您为何需要消息内容 Intent？
+Question: Why do you need the Message Content Intent?
 
-建议填写：
+Suggested answer:
 
 ```text
-Bot 需要 Message Content Intent 来实现服务器内的组队关键词检测和消息成就统计：
+The bot needs the Message Content Intent for team-up keyword detection and message-count achievements inside the server:
 
-1. 组队邀请系统会读取普通文字频道中的消息内容，使用规则和正则表达式识别组队关键词，例如排队、缺人、队伍人数等，然后自动回复语音房组队邀请面板。
-2. 成就系统会监听成员消息事件，用于累计消息数量成就和月度消息排行榜。
-3. Bot 不会读取这些消息内容用于广告、画像、出售、外部共享或 AI/机器学习训练。
-4. 对于组队展示，Bot 只保存短期展示所需的组队文本、频道 ID、用户 ID、语音频道 ID 和过期时间；过期邀请会被清理。其他持久化文本仅限功能必要内容，例如用户主动设置的签名、工单关闭原因、抽奖描述等。
+1. The team-up invitation system reads ordinary text-channel messages and uses configured rules and regular expressions to identify team-up phrases, such as queue status, missing-player notices, and party size. It then replies with a panel linked to the user's voice room.
+2. The achievement system listens for member messages to count total messages and build monthly message rankings.
+3. The bot does not use message content for advertising or profiling, sell it, share it outside the deployment, or use it for AI or machine-learning training.
+4. For the team-up display, the bot stores only the short team-up text, channel ID, user ID, voice-channel ID, and expiry time required for the temporary display. Expired invitations are removed. Other persistent text is limited to feature data that users or administrators submit intentionally, such as personal signatures, ticket close reasons, and giveaway descriptions.
 ```
 
-问题：请提供能演示您使用场景的截图和 / 或视频链接。
+Question: Provide screenshots and/or video links that demonstrate these use cases.
 
-可填写：
+Suggested answer:
 
 ```text
-组队邀请面板：
+Team-up invitation panel:
 https://github.com/MrZoyo/Bird-Bot/blob/main/pics/discord-intent-review/teamup-panel.png
 
-成就面板：
+Achievement panel:
 https://github.com/MrZoyo/Bird-Bot/blob/main/pics/discord-intent-review/achievement-panel.png
 
-排行榜面板：
+Ranking panel:
 https://github.com/MrZoyo/Bird-Bot/blob/main/pics/discord-intent-review/rank-panel.png
 ```
 
-## 提交前检查
+## Pre-submission checklist
 
-提交前确认：
+Confirm these points before submitting:
 
 ```text
-1. 只勾选 Server Members Intent 和 Message Content Intent。
-2. 不勾选 Presence Intent。
-3. 隐私政策链接使用公开仓库的 PRIVACY.md。
-4. 删除数据联系方式写“联系管理员或提交工单”。
-5. 静态数据加密选择 Yes，并确认生产环境已启用 SQLCipher 数据库加密。
-6. 机器学习/AI 训练选择 No。
-7. 截图链接使用 main 分支下的公开 GitHub 链接。
+1. Request only Server Members Intent and Message Content Intent.
+2. Do not request Presence Intent.
+3. Use the public repository's PRIVACY.md as the privacy-policy URL.
+4. State that users can request deletion by contacting an administrator or submitting a ticket.
+5. Select Yes for encryption at rest, and confirm that the production deployment has enabled SQLCipher database encryption.
+6. Select No for machine-learning or AI training.
+7. Use public GitHub screenshot links from the main branch.
 ```
