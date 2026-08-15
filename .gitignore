@@ -1,0 +1,112 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.env
+.venv
+bot-env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.project
+.pydevproject
+.settings/
+
+# Project specific
+/bot.db
+data/*.db
+data/*.log
+backup/db_backup/*
+backup/db_backup_manual/*
+!data/.gitkeep
+!backup/db_backup/.gitkeep
+!backup/db_backup_manual/.gitkeep
+old_test/
+!archives/*
+
+# Configuration and sensitive data
+# Real configs live in bot/config/*.yaml; *.yaml.example templates remain tracked.
+# The legacy bot/config/config_*.json files were archived to old_function/config/ in
+# the config 2.0 sprint (see REFACTORING_PROGRESS.md step 9) and are gitignored via
+# the old_function/ rule below.
+bot/config/*.yaml
+*.pem
+*.key
+*.env
+
+# Migration tooling products that carry real IDs (see REFACTORING_PLAN.md P1-6 step 0)
+tools/migration_db_seed.json
+tools/migration_report.md
+
+# Archived configs under old_function/ must never return to git with real IDs
+# (`.json.example` / `.yaml.example` are NOT matched and stay tracked as templates)
+old_function/**/*.json
+old_function/**/*.yaml
+
+# Testing
+.coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Logs
+logs/
+*.log
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Keep directory structure
+!.gitkeep
+
+# Optional: Add if using Jupyter notebooks
+.ipynb_checkpoints
+*.ipynb
+/archives
+/.claude
+CLAUDE.md
+
+# P3-1: uv.lock is the canonical dependency lock and must be tracked.

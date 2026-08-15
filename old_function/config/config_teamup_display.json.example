@@ -1,0 +1,51 @@
+{
+  "messages": {
+    "display_title": "🎮 组队信息板",
+    "no_teamup_message": "📭 当前没有组队信息",
+    "general_teamup_title": "🌐 综合组队",
+    "init_success": "✅ 组队展示板创建成功！",
+    "init_error": "❌ 创建展示板失败，请检查频道权限",
+    "type_add_success": "✅ 游戏类型添加成功！",
+    "type_add_error": "❌ 添加游戏类型失败",
+    "type_delete_success": "✅ 游戏类型删除成功！",
+    "type_delete_error": "❌ 删除游戏类型失败或类型不存在",
+    "type_list_title": "🎯 游戏类型设置",
+    "type_list_empty": "暂无游戏类型设置",
+    "permission_error": "❌ 权限不足，无法操作此频道",
+    "channel_not_found": "❌ 找不到指定的频道",
+    "invalid_channel": "❌ 无效的频道ID",
+    "board_created_in": "展示板已在",
+    "channel_set_as_type": "已将频道 {channel_mention} 设置为 **{game_type}** 类型",
+    "channel_type_deleted": "已删除频道 <#{channel_id}> 的游戏类型设置",
+    "channel_not_exist": "(频道不存在)",
+    "unknown_user": "未知用户",
+    "players_suffix": "人",
+    "time_just_now": "刚刚",
+    "footer_text": "在对应游戏组队频道发送组队信息即可同步到看板，锁房可结束组队",
+    "room_count_prefix": "房间内",
+    "invitation_format": {
+      "line1": "{search_emoji} `{content}`",
+      "line2": "{players_emoji}{room_count_prefix}{player_count}{players_suffix} | {time_emoji} {time_ago}",
+      "line3": "{link_emoji}{channel_link}"
+    }
+  },
+  "display": {
+    "max_content_length": 50,
+    "embed_color": 11746508,
+    "refresh_interval_minutes": 3,
+    "invitation_expire_minutes": 5
+  },
+  "emojis": {
+    "search": "🔍",
+    "players": "🏠",
+    "link": "📍",
+    "time": "⏳",
+    "teamup_board": "🎮",
+    "no_teamup": "📭",
+    "general": "🌐",
+    "success": "✅",
+    "error": "❌",
+    "settings": "🎯",
+    "empty": "📝"
+  }
+}
