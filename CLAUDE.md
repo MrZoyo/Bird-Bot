@@ -173,7 +173,7 @@ Current pytest smoke coverage includes:
 - Log helper formatting.
 - Static logging callsite scan for obvious raw Discord `.id` / `.name` / `.display_name` usage.
 - UI metadata smoke for locale-backed Shop, PrivateRoom, Welcome DM, Achievement rank controls, and Components v2 panels.
-- Ban fake interaction flow for tempban permission, duplicate-active checks, Discord ban failure, DB record, scheduling, and notification ordering.
+- Ban fake interaction flow for tempban permission, duplicate-active checks, Discord ban failure, DB record, scheduling, notification ordering, the one-hour spam-message deletion default, and legacy `delete_message_days` compatibility.
 - Shop fake interaction flow for daily check-in and makeup check-in modal charging order.
 - Shop check-in panel refresh recovery: transient Discord HTTP / permission failures stay active for retry, only missing messages are deactivated, and daily state advances per panel only after a successful message edit.
 - Modal text inputs target discord.py 2.7.1+: wrap inputs with `discord.ui.Label` instead of using deprecated `discord.ui.TextInput(label=...)`.
@@ -199,7 +199,7 @@ Current pytest smoke coverage includes:
 Current P3-9 status:
 
 - Done: current fake interaction flow list is complete for PrivateRoom, Shop, Tickets, Ban, VoiceChannel, Giveaway, Role / Signature, Achievement / Rank, Welcome / Games, CheckStatus / Backup, and InviteGuard.
-- Current baseline: `147 passed, 1 warning`.
+- Current baseline: `155 passed, 1 warning`.
 - Next default target: targeted real test-server validation for new changes / side-effect paths only when explicitly approved.
 - Add more fake interaction tests only for new bugs, payload replay work, or new features.
 

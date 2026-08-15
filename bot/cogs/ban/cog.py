@@ -20,6 +20,7 @@ from .service import (
     is_admin_channel,
     is_valid_discord_invite_link,
     member_has_ban_permission,
+    member_is_spam_defense_admin,
     parse_duration,
 )
 from .views import RejoinServerView
@@ -31,6 +32,7 @@ class BanCog(commands.Cog):
         self.config_data = config.get_config('ban')
         self.db = BanDatabaseManager(config.get_config()['db_path'])
         self.tempban_tasks = {}
+        self._spam_defense_pending_user_ids = set()
         self._tempban_recovery_done = False
         self.cleanup_tempbans.start()
         self.check_expired_tempbans.start()
@@ -226,9 +228,212 @@ class BanCog(commands.Cog):
         """Check if user has permission to use ban commands"""
         return member_has_ban_permission(interaction.user, self.config_data)
 
+    def is_spam_defense_admin(
+        self,
+        member: discord.Member,
+        guild: discord.Guild,
+    ) -> bool:
+        """Check all configured administrator exemptions for spam defense."""
+        admin_channel_id = config.get_config('main').get('admin_channel_id')
+        admin_channel = guild.get_channel(admin_channel_id) if admin_channel_id else None
+        if admin_channel is None and admin_channel_id:
+            admin_channel = self.bot.get_channel(admin_channel_id)
+
+        return member_is_spam_defense_admin(
+            member,
+            guild.owner_id,
+            admin_channel,
+            self.config_data,
+        )
+
     def parse_duration(self, duration_str: str) -> Optional[timedelta]:
         """Parse duration string (e.g., '1d', '2h', '30m') to timedelta"""
         return parse_duration(duration_str)
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        settings = self.config_data.get('spam_defense', {})
+        if not isinstance(settings, dict) or not settings.get('enabled', False):
+            return
+
+        if (
+            message.guild is None
+            or message.author.bot
+            or getattr(message, 'webhook_id', None) is not None
+        ):
+            return
+
+        content = message.content.lower()
+        if '@everyone' not in content or not message.mention_everyone:
+            return
+
+        configured_guild_id = config.get_config('main').get('guild_id')
+        if configured_guild_id and message.guild.id != configured_guild_id:
+            return
+
+        if self.is_spam_defense_admin(message.author, message.guild):
+            logging.info(
+                "Ignored @everyone spam defense for administrator %s in %s",
+                fmt_user(message.author),
+                fmt_guild(message.guild),
+            )
+            return
+
+        if message.author.id in self._spam_defense_pending_user_ids:
+            return
+
+        self._spam_defense_pending_user_ids.add(message.author.id)
+        try:
+            await self._tempban_spam_sender(message, settings)
+        finally:
+            self._spam_defense_pending_user_ids.discard(message.author.id)
+
+    async def _tempban_spam_sender(
+        self,
+        message: discord.Message,
+        settings: dict,
+    ) -> None:
+        duration = str(settings.get('tempban_duration', '1d')).strip()
+        ban_duration = self.parse_duration(duration)
+        if ban_duration is None:
+            logging.error(
+                "Invalid BanCog spam_defense.tempban_duration value: %r",
+                duration,
+            )
+            return
+
+        delete_message_seconds = settings.get('delete_message_seconds')
+        if delete_message_seconds is None:
+            legacy_delete_message_days = settings.get('delete_message_days')
+            if legacy_delete_message_days is None:
+                delete_message_seconds = 3600
+            elif (
+                not isinstance(legacy_delete_message_days, int)
+                or isinstance(legacy_delete_message_days, bool)
+                or not 0 <= legacy_delete_message_days <= 7
+            ):
+                logging.error(
+                    "Invalid BanCog spam_defense.delete_message_days value: %r",
+                    legacy_delete_message_days,
+                )
+                return
+            else:
+                delete_message_seconds = legacy_delete_message_days * 86400
+        elif (
+            not isinstance(delete_message_seconds, int)
+            or isinstance(delete_message_seconds, bool)
+            or not 0 <= delete_message_seconds <= 604800
+        ):
+            logging.error(
+                "Invalid BanCog spam_defense.delete_message_seconds value: %r",
+                delete_message_seconds,
+            )
+            return
+
+        # The retained tempbans schema stores whole days. Sub-day windows are
+        # recorded as 0; Discord still receives the exact number of seconds.
+        delete_message_days_for_db = delete_message_seconds // 86400
+
+        user = message.author
+        guild = message.guild
+        reason = t('ban.spam_defense_reason').format(channel=message.channel.mention)
+
+        try:
+            existing_tempban = await self.db.get_user_tempban(user.id, guild.id)
+            if existing_tempban:
+                logging.warning(
+                    "Skipped @everyone spam defense for %s in %s: active tempban already exists",
+                    fmt_user(user),
+                    fmt_guild(guild),
+                )
+                return
+
+            unban_time = discord.utils.utcnow() + ban_duration
+            await self.send_tempban_dm(user, guild, reason, duration, unban_time)
+            await guild.ban(
+                user,
+                reason=f"Automatic @everyone spam defense: {reason} (Duration: {duration})",
+                delete_message_seconds=delete_message_seconds,
+            )
+        except discord.Forbidden:
+            logging.error(
+                "Bot lacks permission to apply @everyone spam defense to %s in %s",
+                fmt_user(user),
+                fmt_guild(guild),
+            )
+            return
+        except discord.HTTPException as e:
+            logging.error(
+                "Discord rejected @everyone spam defense for %s in %s: %s",
+                fmt_user(user),
+                fmt_guild(guild),
+                e,
+            )
+            return
+        except Exception as e:
+            logging.error(
+                "Unexpected @everyone spam-defense failure for %s in %s: %s",
+                fmt_user(user),
+                fmt_guild(guild),
+                e,
+                exc_info=True,
+            )
+            return
+
+        try:
+            tempban_id = await self.db.add_tempban(
+                user.id,
+                guild.id,
+                self.bot.user.id,
+                reason,
+                unban_time,
+                delete_message_days_for_db,
+            )
+        except Exception as e:
+            logging.error(
+                "Failed to persist @everyone spam-defense tempban for %s in %s: %s",
+                fmt_user(user),
+                fmt_guild(guild),
+                e,
+                exc_info=True,
+            )
+            try:
+                await guild.unban(
+                    user,
+                    reason="Rolled back automatic spam ban because persistence failed",
+                )
+                logging.warning(
+                    "Rolled back @everyone spam-defense ban for %s in %s",
+                    fmt_user(user),
+                    fmt_guild(guild),
+                )
+            except discord.HTTPException as rollback_error:
+                logging.critical(
+                    "Failed to roll back unpersisted spam-defense ban for %s in %s: %s",
+                    fmt_user(user),
+                    fmt_guild(guild),
+                    rollback_error,
+                )
+            return
+
+        try:
+            await self.schedule_unban_with_db(guild, user, unban_time, tempban_id)
+        except Exception as e:
+            logging.error(
+                "Failed to schedule spam-defense unban for %s in %s: %s",
+                fmt_user(user),
+                fmt_guild(guild),
+                e,
+                exc_info=True,
+            )
+        await self.send_ban_notification(user, reason, duration, unban_time)
+        logging.warning(
+            "%s automatically tempbanned for %s after @everyone spam in %s at %s",
+            fmt_user(user),
+            duration,
+            fmt_guild(guild),
+            fmt_channel(message.channel),
+        )
 
     async def send_ban_notification(self, user: discord.User, reason: str, duration: Optional[str] = None,
                                     unban_time: Optional[datetime] = None):

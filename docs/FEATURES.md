@@ -191,9 +191,9 @@ The cog provides modal confirmation, pending/accepted/closed states, automatic a
 Feature key: `ban`
 Config: `bot/config/ban.yaml`
 
-BanCog provides permanent bans, scheduled temporary bans, and Discord timeouts. It persists active temporary bans, restores their timers after restart, records moderator actions, and sends configurable notifications.
+BanCog provides permanent bans, scheduled temporary bans, Discord timeouts, and an optional automatic defense against unauthorized `@everyone` spam. It persists active temporary bans, restores their timers after restart, records moderator actions, and sends configurable notifications.
 
-Feature access uses the role and user lists in `ban.yaml`. The notification channel and temporary-ban return link can be updated through commands. Durations accept values such as `30m`, `12h`, `7d`, and `2w`; Discord limits timeouts to 28 days.
+Feature access uses the role and user lists in `ban.yaml`. The notification channel and temporary-ban return link can be updated through commands. Durations accept values such as `30m`, `12h`, `7d`, and `2w`; Discord limits timeouts to 28 days. Spam defense is disabled by default. Its example duration is one day, and it deletes the previous hour of message history. Older `delete_message_days` settings remain compatible. The defense exempts the guild owner, Discord administrators, configured Ban administrators, and members who can send messages in `main.admin_channel_id`. Temporary-ban DMs remind users who clicked a malicious advertisement to enable multi-factor authentication before rejoining.
 
 | Command | Purpose |
 | --- | --- |

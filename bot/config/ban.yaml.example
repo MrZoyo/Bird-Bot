@@ -1,4 +1,12 @@
 # 封禁/禁言模块配置。
+# 自动防御真实 @everyone 群体提及；默认关闭，确认测试服行为后再按部署需要启用。
+# 豁免成员：服主、Discord 管理员、下方管理员用户/身份组、以及能在 main.admin_channel_id 频道发言的成员。
+spam_defense:
+  enabled: false
+  # 自动临时封禁时长；支持 m/h/d/w，例如 10m、1h、1d。
+  tempban_duration: 1d
+  # 封禁时删除最近多少秒的消息；Discord 支持 0-604800，3600 表示 1 小时。
+  delete_message_seconds: 3600
 # 管理员名单、通知频道和临时封禁 DM 的回服邀请链接会由 /ban_admin_*、/ban_set_* 命令写回本文件。
 # 可使用 ban/tempban/mute 管理命令的 Discord Role ID 列表；成员拥有任一角色即通过权限检查。
 admin_roles:

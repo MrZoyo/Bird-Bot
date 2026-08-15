@@ -48,6 +48,25 @@ def member_has_ban_permission(member: discord.Member, ban_config: dict) -> bool:
     return member.id in admin_users
 
 
+def member_is_spam_defense_admin(
+    member: discord.Member,
+    guild_owner_id: int,
+    admin_channel: discord.abc.GuildChannel | None,
+    ban_config: dict,
+) -> bool:
+    """Return whether a member is exempt from automatic spam bans."""
+    if member.id == guild_owner_id:
+        return True
+
+    if member_has_ban_permission(member, ban_config):
+        return True
+
+    if admin_channel is None:
+        return False
+
+    return admin_channel.permissions_for(member).send_messages
+
+
 def is_admin_channel(channel_id: int | None, admin_channel_id: int | None) -> bool:
     return bool(admin_channel_id) and channel_id == admin_channel_id
 

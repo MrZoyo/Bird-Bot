@@ -8,6 +8,7 @@ from bot.cogs.shop.views import CheckinEmbedView
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_DIR = PROJECT_ROOT / "bot" / "config"
+LOCALE_DIR = PROJECT_ROOT / "bot" / "locales" / "zh_CN"
 
 
 def load_yaml(path: Path):
@@ -25,6 +26,23 @@ def test_config_examples_parse_and_stay_yaml_only():
     for path in examples:
         data = load_yaml(path)
         assert isinstance(data, dict), f"{path} should parse to a mapping"
+
+
+def test_ban_spam_defense_defaults_and_dm_security_notice():
+    ban_config = load_yaml(CONFIG_DIR / "ban.yaml.example")
+    ban_locale = load_yaml(LOCALE_DIR / "ban.yaml")
+
+    assert ban_config["spam_defense"]["tempban_duration"] == "1d"
+    assert ban_config["spam_defense"]["delete_message_seconds"] == 3600
+    assert "delete_message_days" not in ban_config["spam_defense"]
+    assert (
+        "请先确保 Discord 账户已启用多重认证，再重新加入服务器。"
+        in ban_locale["tempban_dm_description"]
+    )
+    assert (
+        ban_locale["messages"]["tempban_dm_description"]
+        == ban_locale["tempban_dm_description"]
+    )
 
 
 def test_cog_specs_match_feature_flags_and_config_templates():

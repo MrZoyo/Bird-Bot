@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="CHANGELOG.md">
-    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.2-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="Current release: Bird Bot v2.0.2">
+    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.3-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="Current release: Bird Bot v2.0.3">
   </a>
 </p>
 
@@ -35,7 +35,7 @@ All persistent data stays in the operator's local SQLite database, logs, and bac
 | Achievements and roles | Message, reaction, voice-time, and check-in achievements; rankings; role pickup panels; user signatures |
 | Economy and private rooms | Daily check-in, makeup check-in, balances, transaction history, private-room purchase, renewal, and expiry |
 | Tickets | Thread-based tickets, per-type administrators, persistent controls, status tracking, and statistics |
-| Moderation | Permanent bans, temporary bans, timeouts, notification channels, and restart-safe temporary-ban recovery |
+| Moderation | Permanent bans, temporary bans, timeouts, @everyone spam defense, notification channels, and restart-safe temporary-ban recovery |
 | Invite management | Expired-invite cleanup, invite attribution, pooled batch settlement, leaderboards, and configurable point rewards |
 | Giveaways and games | Persistent giveaways, D&D dice expressions, and an interactive SpyMode game |
 | Operations | Log inspection, voice activity reports, automatic database backups, and manual backups |

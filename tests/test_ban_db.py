@@ -37,6 +37,22 @@ def test_tempban_lifecycle_and_cleanup(tmp_path):
         assert await db.deactivate_tempban_by_user(100, 200) is True
         assert await db.get_user_tempban(100, 200) is None
 
+        reactivated_unban = discord.utils.utcnow() + timedelta(hours=2)
+        reactivated_id = await db.add_tempban(
+            user_id=100,
+            guild_id=200,
+            banned_by=301,
+            reason="repeat",
+            unban_at=reactivated_unban,
+            delete_message_days=2,
+        )
+        assert reactivated_id == tempban_id
+        reactivated_record = await db.get_user_tempban(100, 200)
+        assert reactivated_record[3] == 301
+        assert reactivated_record[4] == "repeat"
+        assert reactivated_record[7] == 2
+        assert await db.deactivate_tempban(reactivated_id) is True
+
         expired_unban = discord.utils.utcnow() - timedelta(days=31)
         old_id = await db.add_tempban(
             user_id=101,

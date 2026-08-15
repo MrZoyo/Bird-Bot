@@ -2,6 +2,14 @@
 
 This file preserves the release notes that previously lived at the bottom of `README.md`. Entries describe the code at the time of each release; current runtime behavior is documented in [FEATURES.md](docs/FEATURES.md).
 
+## 2.0.3 — 2026-08-15
+
+- Added an optional defense that automatically applies a one-day temporary ban when a non-administrator sends a real `@everyone` mention.
+- Exempted the guild owner, Discord administrators, configured Ban administrator users and roles, and members who can send messages in the configured administrator channel.
+- Deleted the previous hour of message history by default while retaining compatibility with legacy `delete_message_days` settings.
+- Reused temporary-ban DMs, persistence, notifications, scheduling, and automatic unbans; a failed database write now immediately rolls back the Discord ban.
+- Added an account-security reminder to temporary-ban DMs and expanded regression coverage for exemptions, false positives, permission failures, persistence rollback, and repeat temporary bans.
+
 ## 2.0.2 — 2026-08-02
 
 - Fixed check-in panels becoming permanently inactive after a transient Discord API failure during refresh or startup recovery.

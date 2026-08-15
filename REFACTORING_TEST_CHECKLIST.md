@@ -20,7 +20,7 @@
 - 所有保留 DB manager 的离线 smoke。
 - JSON config 临时迁移到 YAML / locale / DB seed。
 - PrivateRoom 续费日期、持久化回读、扣款顺序和失败不扣款。
-- Shop、Tickets、Ban、VoiceChannel、Giveaway、Role / Signature、Achievement / Rank、Welcome / Games、CheckStatus / Backup 的 fake interaction flow。
+- Shop、Tickets、Ban、VoiceChannel、Giveaway、Role / Signature、Achievement / Rank、Welcome / Games、CheckStatus / Backup 的 fake interaction flow；Ban 额外覆盖未授权 `@everyone` 的自动临时封禁、管理员豁免、默认删除最近 1 小时消息及旧 `delete_message_days` 配置兼容。
 - InviteGuard 邀请清理 / 排行榜逻辑：过期删除、dry-run、邀请 code 白名单、创建者白名单、`created_at` 缺失跳过、单条失败不中断、邀请链接同步、成员加入归因、重复加入不重复计数、Components v2 排行榜刷新 / 重建命令、有效邀请 Shop 积分奖励。
 - InviteGuard 池化归因 / 批结算 / 缓存锁串行化：`on_member_join` 入队 + 批窗口结算，单人单邀请行为不变，同窗口多人多邀请按各自 delta 池化记功发奖（`pooled_count`）、同窗口多人单邀请完整归因发多份奖，总量不匹配 / 含 ignored invite / 批内自邀 / 批内已锁定成员均降级为 ambiguous 且零奖励，`pooled_attribution_enabled=false` 维持旧行为，排行榜按 `invited_count+pooled_count` 排序，`/invite_check_user` 输出含 `pooled_count`，以及 `_invite_cache_lock` 序列化 `sync_invite_links` / `initialize_invite_cache` / 批结算的冒烟验证。
 - InviteGuard 邀请奖励通知 DM：单人归因 + 面板有效时邀请人收到 Components v2 通知（Container + 分割线 + 附图 MediaGallery + 总邀请数 footer + 容器外“查看排行榜”link 按钮，URL 精确指向面板消息），面板无效（channel/message id 缺失）或 `reward_notification_enabled=false` 时完全不发但归因与积分照常，池化路径各邀请人收到含人数、实得总积分与总邀请数 footer 的 body_pooled 汇总版本，DM Forbidden 不影响归因与积分，`reward_points_per_invite=0` 时无积分也无 DM，以及“DB 归因 → 积分入账 → DM 发送”的顺序断言。
@@ -32,7 +32,7 @@
 
 最后一次通过基线：
 - [x] `./.venv/Scripts/python.exe -m pytest -q`
-  - 当前：`147 passed, 1 warning`（2026-08-02）
+  - 当前：`155 passed, 1 warning`（2026-08-15）
 - [x] `./.venv/Scripts/python.exe -m ruff check bot tests tools`
 - [x] `./.venv/Scripts/python.exe -m compileall bot tests tools`
 - [x] `./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`
@@ -157,6 +157,11 @@
   - 2026-06-28：测试库当前无活跃临时封禁，`mrzoyo` 与配置内 Ban 管理用户 `zoyoooo` 执行命令均返回 `当前没有活跃的临时封禁。`；未做真实 `/tempban` 以避免封禁副作用。`mrzoyo` 在非管理频道 `测试2` 执行 `/ban_admin_list` 返回“此指令只能在管理频道中使用”，频道限制生效。
 - [x] `/mute` 路径按预期执行或提示权限不足；`/ban` 永久封禁只在测试账号上验证。
   - 2026-06-28：按用户说明跳过真实 mute / permanent ban 副作用测试；本轮仅覆盖 Ban 管理权限、管理频道限制、临时封禁列表空态和邀请链接格式校验。
+- [x] 测试服普通账号发送真实 `@everyone` 后被自动临时封禁；封禁通知频道收到沿用现有样式的通知，测试配置 1 分钟后自动解封。
+  - 2026-08-15：`zoyoooo` 在普通频道发送真实 `@everyone`；日志确认先发送临时封禁 DM，再自动封禁并向 `#封禁消息` 发送通知。约 1 分钟后自动解封并停用 DB 记录；验证完成后本地默认时长恢复为 `1d`。
+  - 2026-08-15：使用 `1d` 配置复测后，手动解封测试账号；Discord 封禁列表和 DB 活跃记录均已清空。自动防护的消息删除窗口随后改为默认 `1h`。
+- [ ] 分别确认服主、Ban 管理员用户/身份组、Discord 管理员、能在 `main.admin_channel_id` 发言的成员发送 `@everyone` 时不会触发自动封禁。
+  - 2026-08-15：已真实确认 Ban 管理员用户和能在 `main.admin_channel_id` 发言的成员会被豁免；服主、Ban 管理员身份组和 Discord 管理员仍待分别验证。
 
 ---
 

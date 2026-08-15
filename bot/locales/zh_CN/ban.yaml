@@ -45,7 +45,10 @@ notification_channel_set: 封禁通知频道已设置为 {channel}。
 notification_channel_removed: 封禁通知频道已移除。
 notification_channel_not_set: 未设置封禁通知频道。
 tempban_dm_title: ⚠️ 你已被临时封禁
-tempban_dm_description: 你在 **{guild_name}** 被临时封禁。
+tempban_dm_description: |-
+  你在 **{guild_name}** 被临时封禁。
+
+  如果你误点了垃圾广告链接，请先确保 Discord 账户已启用多重认证，再重新加入服务器。
 tempban_dm_reason_field: 📝 封禁原因
 tempban_dm_duration_field: ⏱️ 封禁时长
 tempban_dm_unban_time_field: 🔓 解封时间
@@ -66,6 +69,7 @@ user_already_tempbanned: ⚠️ 用户 {user} 已经有一个活跃的临时封�
 no_active_tempbans: ✅ 当前没有活跃的临时封禁。
 active_tempbans_title: ⏰ 活跃临时封禁列表
 tempban_list_error: ❌ 获取临时封禁列表时出错。
+spam_defense_reason: 自动 Spam 防御：在 {channel} 发送了 @everyone 消息
 messages:
   no_permission: 你没有权限使用此指令。
   invalid_delete_days: 删除消息天数必须在0-7之间。
@@ -114,7 +118,10 @@ messages:
   notification_channel_removed: 封禁通知频道已移除。
   notification_channel_not_set: 未设置封禁通知频道。
   tempban_dm_title: ⚠️ 你已被临时封禁
-  tempban_dm_description: 你在 **{guild_name}** 被临时封禁。
+  tempban_dm_description: |-
+    你在 **{guild_name}** 被临时封禁。
+
+    如果你误点了垃圾广告链接，请先确保 Discord 账户已启用多重认证，再重新加入服务器。
   tempban_dm_reason_field: 📝 封禁原因
   tempban_dm_duration_field: ⏱️ 封禁时长
   tempban_dm_unban_time_field: 🔓 解封时间

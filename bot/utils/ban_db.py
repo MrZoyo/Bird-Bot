@@ -111,18 +111,46 @@ class BanDatabaseManager(BaseDatabaseManager):
 
     async def add_tempban(self, user_id: int, guild_id: int, banned_by: int, 
                          reason: str, unban_at: datetime, delete_message_days: int = 0) -> int:
-        """Add a new tempban record."""
+        """Add a tempban or reactivate the retained user/guild record."""
         async with connect_database(self.db_path) as db:
             # Convert datetime to ISO format string for consistent storage
             unban_at_str = unban_at.isoformat()
-            
+
+            cursor = await db.execute('''
+                UPDATE tempbans
+                SET banned_by = ?, reason = ?, banned_at = CURRENT_TIMESTAMP,
+                    unban_at = ?, is_active = 1, delete_message_days = ?
+                WHERE user_id = ? AND guild_id = ?
+            ''', (
+                banned_by,
+                reason,
+                unban_at_str,
+                delete_message_days,
+                user_id,
+                guild_id,
+            ))
+            if cursor.rowcount > 0:
+                await cursor.close()
+                id_cursor = await db.execute('''
+                    SELECT id FROM tempbans WHERE user_id = ? AND guild_id = ?
+                ''', (user_id, guild_id))
+                try:
+                    tempban_id = (await id_cursor.fetchone())[0]
+                finally:
+                    await id_cursor.close()
+                await db.commit()
+                return tempban_id
+
+            await cursor.close()
             cursor = await db.execute('''
                 INSERT INTO tempbans (user_id, guild_id, banned_by, reason, unban_at, delete_message_days)
                 VALUES (?, ?, ?, ?, ?, ?)
             ''', (user_id, guild_id, banned_by, reason, unban_at_str, delete_message_days))
-            
+
+            tempban_id = cursor.lastrowid
+            await cursor.close()
             await db.commit()
-            return cursor.lastrowid
+            return tempban_id
 
     async def get_active_tempbans(self, guild_id: Optional[int] = None) -> List[Tuple]:
         """Get all active tempbans that haven't expired yet."""
