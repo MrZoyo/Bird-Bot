@@ -1,13 +1,13 @@
 # Bird Bot 功能参考
 
 <p align="center">
-  <a href="../README.zh-CN.md"><img src="https://img.shields.io/badge/README-%E4%B8%AD%E6%96%87%E9%A6%96%E9%A1%B5-2EA44F?style=for-the-badge" alt="返回中文 README"></a>
-  <a href="FEATURES.md"><img src="https://img.shields.io/badge/READ_IN-ENGLISH-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in English"></a>
+  <a href="../../README.zh-CN.md"><img src="https://img.shields.io/badge/README-%E4%B8%AD%E6%96%87%E9%A6%96%E9%A1%B5-2EA44F?style=for-the-badge" alt="返回中文 README"></a>
+  <a href="../en/FEATURES.md"><img src="https://img.shields.io/badge/READ_IN-ENGLISH-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in English"></a>
 </p>
 
 最后检查：2026-08-15
 
-本文介绍每个现役 cog 的运行行为和 slash 命令。安装与最短初始化流程见[中文 README](../README.zh-CN.md)。
+本文介绍每个现役 cog 的运行行为和 slash 命令。安装与最短初始化流程见[中文 README](../../README.zh-CN.md)。
 
 `bot/main.py::COG_SPECS` 是现役 cog 及配置依赖的权威来源。Slash 命令名称来自各 cog 的命令装饰器；Discord 显示的本地化说明和选项帮助来自 `bot/locales/zh_CN/commands.yaml`。
 
@@ -314,4 +314,4 @@ SQLCipher 数据库的备份是直接文件副本，因此仍保持加密。请�
 
 ## 已移除的运行时功能
 
-NotebookCog、RatingCog 和旧的 channel-based TicketsCog 未注册到运行时，不应出现在现役配置模板或 Discord 命令选择器中。历史实现和脱敏旧模板位于 `legacy-old-files-archive` 分支，详情见[中文旧实现归档说明](../LEGACY_ARCHIVE.zh-CN.md)。
+NotebookCog、RatingCog 和旧的 channel-based TicketsCog 未注册到运行时，不应出现在现役配置模板或 Discord 命令选择器中。历史实现和脱敏旧模板位于 `legacy-old-files-archive` 分支，详情见[中文旧实现归档说明](LEGACY_ARCHIVE.md)。

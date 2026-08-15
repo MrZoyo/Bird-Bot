@@ -1,8 +1,8 @@
 # Discord privileged-intent application guide
 
 <p align="center">
-  <a href="README.md"><img src="https://img.shields.io/badge/README-HOME-2EA44F?style=for-the-badge" alt="Back to the English README"></a>
-  <a href="DISCORD_INTENT_APPLICATION_GUIDE.zh-CN.md"><img src="https://img.shields.io/badge/READ_IN-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in Simplified Chinese"></a>
+  <a href="../../README.md"><img src="https://img.shields.io/badge/README-HOME-2EA44F?style=for-the-badge" alt="Back to the English README"></a>
+  <a href="../zh-CN/DISCORD_INTENT_APPLICATION_GUIDE.md"><img src="https://img.shields.io/badge/READ_IN-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in Simplified Chinese"></a>
 </p>
 
 This guide is for the person submitting the Discord Developer Portal application. Describe the current `main` branch and public repository. Do not request intents that the current code does not use.
@@ -12,7 +12,7 @@ This guide is for the person submitting the Discord Developer Portal application
 Privacy policy:
 
 ```text
-https://github.com/MrZoyo/Bird-Bot/blob/main/PRIVACY.md
+https://github.com/MrZoyo/Bird-Bot/blob/main/docs/en/PRIVACY.md
 ```
 
 Screenshots for the application form:
@@ -86,7 +86,7 @@ Yes
 Privacy policy URL:
 
 ```text
-https://github.com/MrZoyo/Bird-Bot/blob/main/PRIVACY.md
+https://github.com/MrZoyo/Bird-Bot/blob/main/docs/en/PRIVACY.md
 ```
 
 ## Server Members Intent
@@ -255,7 +255,7 @@ Confirm these points before submitting:
 ```text
 1. Request only Server Members Intent and Message Content Intent.
 2. Do not request Presence Intent.
-3. Use the public repository's PRIVACY.md as the privacy-policy URL.
+3. Use the public repository's docs/en/PRIVACY.md as the privacy-policy URL.
 4. State that users can request deletion by contacting an administrator or submitting a ticket.
 5. Select Yes for encryption at rest, and confirm that the production deployment has enabled SQLCipher database encryption.
 6. Select No for machine-learning or AI training.

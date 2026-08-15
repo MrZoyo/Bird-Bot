@@ -1,8 +1,8 @@
 # 隐私与数据处理
 
 <p align="center">
-  <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/README-%E4%B8%AD%E6%96%87%E9%A6%96%E9%A1%B5-2EA44F?style=for-the-badge" alt="返回中文 README"></a>
-  <a href="PRIVACY.md"><img src="https://img.shields.io/badge/READ_IN-ENGLISH-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in English"></a>
+  <a href="../../README.zh-CN.md"><img src="https://img.shields.io/badge/README-%E4%B8%AD%E6%96%87%E9%A6%96%E9%A1%B5-2EA44F?style=for-the-badge" alt="返回中文 README"></a>
+  <a href="../en/PRIVACY.md"><img src="https://img.shields.io/badge/READ_IN-ENGLISH-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in English"></a>
 </p>
 
 本文说明 Bird Bot 保存哪些数据、保存原因，以及运营者应如何保护这些数据。Bird Bot 由运营者自行托管；数据保存在运营者本地的 SQLite 数据库、日志和备份文件中，不会发送到本仓库控制的托管服务。

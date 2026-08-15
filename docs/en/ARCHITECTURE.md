@@ -1,13 +1,13 @@
 # Bird Bot architecture
 
 <p align="center">
-  <a href="../README.md"><img src="https://img.shields.io/badge/README-HOME-2EA44F?style=for-the-badge" alt="Back to the English README"></a>
-  <a href="ARCHITECTURE.zh-CN.md"><img src="https://img.shields.io/badge/READ_IN-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in Simplified Chinese"></a>
+  <a href="../../README.md"><img src="https://img.shields.io/badge/README-HOME-2EA44F?style=for-the-badge" alt="Back to the English README"></a>
+  <a href="../zh-CN/ARCHITECTURE.md"><img src="https://img.shields.io/badge/READ_IN-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in Simplified Chinese"></a>
 </p>
 
 Last reviewed: 2026-08-15
 
-This document explains the runtime boundaries and shared modules behind Bird Bot. The project guide in [CLAUDE.md](../CLAUDE.md) remains the canonical source for development, migration, logging, and testing rules.
+This document explains the runtime boundaries and shared modules behind Bird Bot. The project guide in [CLAUDE.md](../../CLAUDE.md) remains the canonical source for development, migration, logging, and testing rules.
 
 ## Runtime flow
 
@@ -97,7 +97,7 @@ Feature managers own schema creation and queries. Cross-version schema changes u
 | `voice_channel_db.py` | Entry-channel rules, temporary rooms, and control-panel state |
 | `teamup_display_manager.py` | Display boards, game-type mappings, and active team-up entries |
 
-Before a migration or direct maintenance task touches a deployment database, back it up. See [PRIVACY.md](../PRIVACY.md) for encryption and key-handling procedures.
+Before a migration or direct maintenance task touches a deployment database, back it up. See [PRIVACY.md](PRIVACY.md) for encryption and key-handling procedures.
 
 ## Discord UI and persistence
 

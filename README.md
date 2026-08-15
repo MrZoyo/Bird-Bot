@@ -4,15 +4,9 @@
   <a href="README.zh-CN.md">
     <img src="https://img.shields.io/badge/READ_IN-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in Simplified Chinese">
   </a>
-</p>
-
-<p align="center">
-  <a href="CHANGELOG.md">
+  <a href="docs/en/CHANGELOG.md">
     <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.3-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="Current release: Bird Bot v2.0.3">
   </a>
-</p>
-
-<p align="center">
   <a href="https://www.python.org/">
     <img src="https://img.shields.io/badge/PYTHON-3.12-3776AB?style=for-the-badge&amp;logo=python&amp;logoColor=white" alt="Python 3.12">
   </a>
@@ -48,7 +42,7 @@ All persistent data stays in the operator's local SQLite database, logs, and bac
 
 Persistent Discord panels recover after a restart where the corresponding feature supports them. Feature flags let each deployment load only the cogs it needs.
 
-For command-by-command behavior and feature-specific gotchas, see the [feature reference](docs/FEATURES.md). The runtime boundaries and shared helpers are described in [ARCHITECTURE.md](docs/ARCHITECTURE.md).
+For command-by-command behavior and feature-specific gotchas, see the [feature reference](docs/en/FEATURES.md). The runtime boundaries and shared helpers are described in [ARCHITECTURE.md](docs/en/ARCHITECTURE.md).
 
 ## Preview
 
@@ -77,7 +71,7 @@ In the [Discord Developer Portal](https://discord.com/developers/applications):
 3. Invite the bot with the `bot` and `applications.commands` scopes.
 4. Save the bot token, guild ID, and an administrator channel ID for configuration.
 
-See [DISCORD_INTENT_APPLICATION_GUIDE.md](DISCORD_INTENT_APPLICATION_GUIDE.md) if the application needs Discord's privileged-intent review.
+See [DISCORD_INTENT_APPLICATION_GUIDE.md](docs/en/DISCORD_INTENT_APPLICATION_GUIDE.md) if the application needs Discord's privileged-intent review.
 
 ### 2. Install the project
 
@@ -190,7 +184,7 @@ Database encryption is controlled through environment variables:
 
 `run.py` reads an ignored repository-root `.env` file for local deployments without overriding variables already supplied by the launcher. Production deployments should use host environment variables or a secret manager.
 
-Read [PRIVACY.md](PRIVACY.md) before production use. It contains the complete data inventory, retention behavior, backup notes, and the plaintext-to-SQLCipher migration procedure.
+Read [PRIVACY.md](docs/en/PRIVACY.md) before production use. It contains the complete data inventory, retention behavior, backup notes, and the plaintext-to-SQLCipher migration procedure.
 
 ## Upgrading a deployment
 
@@ -271,12 +265,12 @@ Before contributing, read [CLAUDE.md](CLAUDE.md). It defines the current archite
 
 | Document | Purpose |
 | --- | --- |
-| [FEATURES.md](docs/FEATURES.md) | Detailed active-cog behavior, commands, defaults, and gotchas |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Runtime flow, data ownership, database layer, UI, and extension points |
-| [CHANGELOG.md](CHANGELOG.md) | Release history moved out of the README |
-| [PRIVACY.md](PRIVACY.md) | Stored data, privileged intents, retention, backups, and SQLCipher |
-| [DISCORD_INTENT_APPLICATION_GUIDE.md](DISCORD_INTENT_APPLICATION_GUIDE.md) | Discord privileged-intent application guidance |
-| [LEGACY_ARCHIVE.md](LEGACY_ARCHIVE.md) | Location of archived legacy implementations and templates |
+| [FEATURES.md](docs/en/FEATURES.md) | Detailed active-cog behavior, commands, defaults, and gotchas |
+| [ARCHITECTURE.md](docs/en/ARCHITECTURE.md) | Runtime flow, data ownership, database layer, UI, and extension points |
+| [CHANGELOG.md](docs/en/CHANGELOG.md) | Release history moved out of the README |
+| [PRIVACY.md](docs/en/PRIVACY.md) | Stored data, privileged intents, retention, backups, and SQLCipher |
+| [DISCORD_INTENT_APPLICATION_GUIDE.md](docs/en/DISCORD_INTENT_APPLICATION_GUIDE.md) | Discord privileged-intent application guidance |
+| [LEGACY_ARCHIVE.md](docs/en/LEGACY_ARCHIVE.md) | Location of archived legacy implementations and templates |
 
 ## License
 

@@ -1,11 +1,11 @@
 # 更新日志
 
 <p align="center">
-  <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/README-%E4%B8%AD%E6%96%87%E9%A6%96%E9%A1%B5-2EA44F?style=for-the-badge" alt="返回中文 README"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/FULL_HISTORY-ENGLISH-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="查看英文完整更新历史"></a>
+  <a href="../../README.zh-CN.md"><img src="https://img.shields.io/badge/README-%E4%B8%AD%E6%96%87%E9%A6%96%E9%A1%B5-2EA44F?style=for-the-badge" alt="返回中文 README"></a>
+  <a href="../en/CHANGELOG.md"><img src="https://img.shields.io/badge/FULL_HISTORY-ENGLISH-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="查看英文完整更新历史"></a>
 </p>
 
-本文只提供当前版本的中文摘要。所有历史版本及其原始发布说明请查看[英文完整更新日志](CHANGELOG.md)。当前运行行为以[中文功能参考](docs/FEATURES.zh-CN.md)为准。
+本文只提供当前版本的中文摘要。所有历史版本及其原始发布说明请查看[英文完整更新日志](../en/CHANGELOG.md)。当前运行行为以[中文功能参考](FEATURES.md)为准。
 
 ## 2.0.3 — 2026-08-15
 

@@ -1,11 +1,11 @@
 # Changelog
 
 <p align="center">
-  <a href="README.md"><img src="https://img.shields.io/badge/README-HOME-2EA44F?style=for-the-badge" alt="Back to the English README"></a>
-  <a href="CHANGELOG.zh-CN.md"><img src="https://img.shields.io/badge/LATEST_IN-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read the latest release notes in Simplified Chinese"></a>
+  <a href="../../README.md"><img src="https://img.shields.io/badge/README-HOME-2EA44F?style=for-the-badge" alt="Back to the English README"></a>
+  <a href="../zh-CN/CHANGELOG.md"><img src="https://img.shields.io/badge/LATEST_IN-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read the latest release notes in Simplified Chinese"></a>
 </p>
 
-This file preserves the release notes that previously lived at the bottom of `README.md`. Entries describe the code at the time of each release; current runtime behavior is documented in [FEATURES.md](docs/FEATURES.md).
+This file preserves the release notes that previously lived at the bottom of `README.md`. Entries describe the code at the time of each release; current runtime behavior is documented in [FEATURES.md](FEATURES.md).
 
 ## 2.0.3 — 2026-08-15
 
@@ -160,4 +160,4 @@ This file preserves the release notes that previously lived at the bottom of `RE
 
 ## Historical terminology
 
-Older entries use names such as `Tickets_New_Cog`, `Rating_Cog`, and JSON config filenames. Those names describe historical releases only. See [LEGACY_ARCHIVE.md](LEGACY_ARCHIVE.md) for the archived implementation branch and [FEATURES.md](docs/FEATURES.md) for the current runtime.
+Older entries use names such as `Tickets_New_Cog`, `Rating_Cog`, and JSON config filenames. Those names describe historical releases only. See [LEGACY_ARCHIVE.md](LEGACY_ARCHIVE.md) for the archived implementation branch and [FEATURES.md](FEATURES.md) for the current runtime.

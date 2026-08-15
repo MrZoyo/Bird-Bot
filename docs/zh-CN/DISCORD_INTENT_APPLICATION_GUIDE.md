@@ -1,8 +1,8 @@
 # Discord 权限申请填写说明
 
 <p align="center">
-  <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/README-%E4%B8%AD%E6%96%87%E9%A6%96%E9%A1%B5-2EA44F?style=for-the-badge" alt="返回中文 README"></a>
-  <a href="DISCORD_INTENT_APPLICATION_GUIDE.md"><img src="https://img.shields.io/badge/READ_IN-ENGLISH-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in English"></a>
+  <a href="../../README.zh-CN.md"><img src="https://img.shields.io/badge/README-%E4%B8%AD%E6%96%87%E9%A6%96%E9%A1%B5-2EA44F?style=for-the-badge" alt="返回中文 README"></a>
+  <a href="../en/DISCORD_INTENT_APPLICATION_GUIDE.md"><img src="https://img.shields.io/badge/READ_IN-ENGLISH-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in English"></a>
 </p>
 
 本文给负责提交 Discord Developer Portal 权限申请的人使用。请按当前 `main` 分支代码和公开仓库内容填写，不要申请当前代码没有使用的权限。
@@ -12,7 +12,7 @@
 隐私政策链接：
 
 ```text
-https://github.com/MrZoyo/Bird-Bot/blob/main/PRIVACY.zh-CN.md
+https://github.com/MrZoyo/Bird-Bot/blob/main/docs/zh-CN/PRIVACY.md
 ```
 
 可用于表单的截图链接：
@@ -86,7 +86,7 @@ Yes
 隐私政策 URL：
 
 ```text
-https://github.com/MrZoyo/Bird-Bot/blob/main/PRIVACY.zh-CN.md
+https://github.com/MrZoyo/Bird-Bot/blob/main/docs/zh-CN/PRIVACY.md
 ```
 
 ## Server Members Intent
@@ -255,7 +255,7 @@ https://github.com/MrZoyo/Bird-Bot/blob/main/pics/discord-intent-review/rank-pan
 ```text
 1. 只勾选 Server Members Intent 和 Message Content Intent。
 2. 不勾选 Presence Intent。
-3. 隐私政策链接使用公开仓库的 PRIVACY.zh-CN.md。
+3. 隐私政策链接使用公开仓库的 docs/zh-CN/PRIVACY.md。
 4. 删除数据联系方式写“联系管理员或提交工单”。
 5. 静态数据加密选择 Yes，并确认生产环境已启用 SQLCipher 数据库加密。
 6. 机器学习/AI 训练选择 No。

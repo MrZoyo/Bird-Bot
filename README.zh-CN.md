@@ -4,15 +4,9 @@
   <a href="README.md">
     <img src="https://img.shields.io/badge/READ_IN-ENGLISH-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in English">
   </a>
-</p>
-
-<p align="center">
-  <a href="CHANGELOG.zh-CN.md">
+  <a href="docs/zh-CN/CHANGELOG.md">
     <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.3-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="当前版本：Bird Bot v2.0.3">
   </a>
-</p>
-
-<p align="center">
   <a href="https://www.python.org/">
     <img src="https://img.shields.io/badge/PYTHON-3.12-3776AB?style=for-the-badge&amp;logo=python&amp;logoColor=white" alt="Python 3.12">
   </a>
@@ -48,7 +42,7 @@ Bird Bot 是一款面向中文游戏社区的自托管 Discord Bot。它以模�
 
 对应功能支持持久化 Discord 面板时，Bot 会在重启后恢复面板。部署者可以通过功能开关只加载需要的 cog。
 
-按命令查看具体行为和注意事项，请阅读[功能参考](docs/FEATURES.zh-CN.md)。运行时边界和共享模块见[架构说明](docs/ARCHITECTURE.zh-CN.md)。
+按命令查看具体行为和注意事项，请阅读[功能参考](docs/zh-CN/FEATURES.md)。运行时边界和共享模块见[架构说明](docs/zh-CN/ARCHITECTURE.md)。
 
 ## 预览
 
@@ -77,7 +71,7 @@ Bird Bot 不申请 Presence Intent。最简单的初始权限配置是同时使�
 3. 使用 `bot` 和 `applications.commands` scope 邀请 Bot。
 4. 记录 Bot token、服务器 ID 和管理员频道 ID，供配置使用。
 
-如果应用需要提交 Discord 特权 Intent 审核，请阅读 [Discord 权限申请指南](DISCORD_INTENT_APPLICATION_GUIDE.zh-CN.md)。
+如果应用需要提交 Discord 特权 Intent 审核，请阅读 [Discord 权限申请指南](docs/zh-CN/DISCORD_INTENT_APPLICATION_GUIDE.md)。
 
 ### 2. 安装项目
 
@@ -190,7 +184,7 @@ Bird Bot 只保存已启用功能所需的状态，包括 Discord ID、面板位
 
 `run.py` 会读取仓库根目录下被忽略的 `.env`，但不会覆盖启动器已经提供的变量。生产部署应使用主机环境变量或 secret manager。
 
-投入生产前请阅读[隐私与数据处理说明](PRIVACY.zh-CN.md)，其中包含完整数据清单、保留规则、备份说明和从明文 SQLite 迁移到 SQLCipher 的流程。
+投入生产前请阅读[隐私与数据处理说明](docs/zh-CN/PRIVACY.md)，其中包含完整数据清单、保留规则、备份说明和从明文 SQLite 迁移到 SQLCipher 的流程。
 
 ## 升级部署
 
@@ -271,12 +265,12 @@ uv lock --check
 
 | 文档 | 用途 |
 | --- | --- |
-| [功能参考](docs/FEATURES.zh-CN.md) | 现役 cog 的详细行为、命令、默认值和注意事项 |
-| [架构说明](docs/ARCHITECTURE.zh-CN.md) | 运行流程、数据归属、数据库层、UI 和扩展点 |
-| [更新日志](CHANGELOG.zh-CN.md) | 最新版本中文摘要和英文完整历史入口 |
-| [隐私与数据处理](PRIVACY.zh-CN.md) | 存储数据、特权 Intent、保留规则、备份和 SQLCipher |
-| [Discord 权限申请指南](DISCORD_INTENT_APPLICATION_GUIDE.zh-CN.md) | Discord 特权 Intent 申请填写说明 |
-| [旧实现归档说明](LEGACY_ARCHIVE.zh-CN.md) | 旧实现和旧模板的归档位置 |
+| [功能参考](docs/zh-CN/FEATURES.md) | 现役 cog 的详细行为、命令、默认值和注意事项 |
+| [架构说明](docs/zh-CN/ARCHITECTURE.md) | 运行流程、数据归属、数据库层、UI 和扩展点 |
+| [更新日志](docs/zh-CN/CHANGELOG.md) | 最新版本中文摘要和英文完整历史入口 |
+| [隐私与数据处理](docs/zh-CN/PRIVACY.md) | 存储数据、特权 Intent、保留规则、备份和 SQLCipher |
+| [Discord 权限申请指南](docs/zh-CN/DISCORD_INTENT_APPLICATION_GUIDE.md) | Discord 特权 Intent 申请填写说明 |
+| [旧实现归档说明](docs/zh-CN/LEGACY_ARCHIVE.md) | 旧实现和旧模板的归档位置 |
 
 ## 许可证
 

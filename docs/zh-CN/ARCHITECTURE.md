@@ -1,8 +1,8 @@
 # Bird Bot 架构说明
 
 <p align="center">
-  <a href="../README.zh-CN.md"><img src="https://img.shields.io/badge/README-%E4%B8%AD%E6%96%87%E9%A6%96%E9%A1%B5-2EA44F?style=for-the-badge" alt="返回中文 README"></a>
-  <a href="ARCHITECTURE.md"><img src="https://img.shields.io/badge/READ_IN-ENGLISH-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in English"></a>
+  <a href="../../README.zh-CN.md"><img src="https://img.shields.io/badge/README-%E4%B8%AD%E6%96%87%E9%A6%96%E9%A1%B5-2EA44F?style=for-the-badge" alt="返回中文 README"></a>
+  <a href="../en/ARCHITECTURE.md"><img src="https://img.shields.io/badge/READ_IN-ENGLISH-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in English"></a>
 </p>
 
 最后检查：2026-08-15
@@ -97,7 +97,7 @@ ID、路径、颜色、时间格式、数值限制和功能元数据放在配置
 | `voice_channel_db.py` | 入口频道规则、临时房间和控制面板状态 |
 | `teamup_display_manager.py` | 展示板、游戏类型映射和现役组队条目 |
 
-迁移或直接维护部署数据库前必须备份。加密和密钥处理流程见[中文隐私说明](../PRIVACY.zh-CN.md)。
+迁移或直接维护部署数据库前必须备份。加密和密钥处理流程见[中文隐私说明](PRIVACY.md)。
 
 ## Discord UI 与持久化
 
@@ -175,6 +175,6 @@ Bird Bot 同时使用 embed 和 Discord Components v2。持久化面板会把频
 4. 添加用户文案和命令 locale 键。
 5. 通过管理器和 `connect_database()` 访问数据库。
 6. 为配置元数据、数据库行为和交互顺序添加离线测试。
-7. 更新[中文功能参考](FEATURES.zh-CN.md)、README 配置表和相关测试。
+7. 更新[中文功能参考](FEATURES.md)、README 配置表和相关测试。
 
 只有依赖 Discord 本身的行为才使用测试服务器验证：权限、命令同步、重启后的持久化视图、rate limit、私信投递和客户端渲染。
