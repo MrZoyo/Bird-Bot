@@ -7,12 +7,15 @@
 
 Sanitized legacy content is no longer stored on the `main` branch.
 
-Switch to the archive branch to inspect old implementations, the pre-package snapshot, legacy JSON examples, or old update notes:
+Browse the [`legacy-old-files-archive`](https://github.com/MrZoyo/Bird-Bot/tree/legacy-old-files-archive) branch or open its [`LEGACY_ARCHIVE_INDEX.md`](https://github.com/MrZoyo/Bird-Bot/blob/legacy-old-files-archive/LEGACY_ARCHIVE_INDEX.md) directly. To inspect it locally:
 
 ```bash
+git fetch origin
 git switch legacy-old-files-archive
 ```
 
-`LEGACY_ARCHIVE_INDEX.md` on that branch contains the complete inventory and explanation. The archive includes the files previously tracked under `old_function/` and `old_updates.md`: 32 files and 16,939 lines in total.
+The archive is a single sanitized root commit with no inherited Git history. It excludes real configuration files, logs, runtime data, and local experiments; Discord invite values in archived material use placeholders.
+
+Use the archive to inspect old implementations, pre-package snapshots, legacy JSON examples, and old update notes. The index covers 32 legacy implementation, configuration, and update-note files totaling 16,939 lines; supporting archive documentation is excluded from that count.
 
 `old_test/` is an ignored local experiment directory and is not part of the sanitized archive branch. Reusable tests belong in `tests/` on `main`.
