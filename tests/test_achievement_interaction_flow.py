@@ -1,11 +1,23 @@
 import asyncio
 from types import SimpleNamespace
 
+import discord
+
 from bot.cogs.achievement import views as achievement_views
-from bot.cogs.achievement.views import ConfirmationView, RankView
+from bot.cogs.achievement.views import (
+    AchievementRefreshView,
+    ConfirmationView,
+    RankView,
+    resolve_achievement_avatar_url,
+)
 
 
 ACHIEVEMENT_TEXT = {
+    "achievements.achievements_page_title": "Achievements: {user_name}",
+    "achievements.achievements_page_description": (
+        "{user_mention} completed {completed_achievements}/{total_achievements}"
+    ),
+    "achievements.achievements_finish_emoji": "✅",
     "achievements.rank.all_button_label": "All",
     "achievements.achievements_ranking_title": "Rankings",
     "achievements.rank.embed_title_single": "Rank: {type_name}",
@@ -188,6 +200,104 @@ def test_confirmation_button_applies_changes_logs_then_edits_original(monkeypatc
         assert interaction.original_edits[0]["content"] == "**Operation increase complete!**"
 
     asyncio.run(scenario())
+
+
+def test_achievement_page_uses_components_v2_native_separators(monkeypatch):
+    async def scenario():
+        _install_achievement_config(monkeypatch)
+
+        class PageAchievementCog:
+            def get_visible_achievements(self):
+                return [
+                    {
+                        "name": "Reaction starter",
+                        "description": "Add reactions",
+                        "threshold": 10,
+                        "type": "reaction",
+                    },
+                    {
+                        "name": "Reaction expert",
+                        "description": "Add more reactions",
+                        "threshold": 100,
+                        "type": "reaction",
+                    },
+                    {
+                        "name": "Message starter",
+                        "description": "Send messages",
+                        "threshold": 20,
+                        "type": "message",
+                    },
+                ]
+
+            def get_achievement_count_value(self, user_achievements, achievement_type):
+                return user_achievements[achievement_type]
+
+        class PageBot:
+            user = SimpleNamespace(
+                avatar=SimpleNamespace(url="https://example.com/bot-avatar.png"),
+            )
+
+            def get_cog(self, name):
+                return PageAchievementCog() if name == "AchievementCog" else None
+
+            async def fetch_user(self, user_id):
+                return SimpleNamespace(
+                    id=user_id,
+                    name="Tester",
+                    mention=f"<@{user_id}>",
+                    avatar=SimpleNamespace(url="https://example.com/user-avatar.png"),
+                    default_avatar=SimpleNamespace(
+                        url="https://example.com/user-default-avatar.png"
+                    ),
+                    display_avatar=SimpleNamespace(url="https://example.com/avatar.png"),
+                )
+
+        class PageDB:
+            async def get_user_achievements(self, user_id):
+                return {"reaction": 10, "message": 5}
+
+        view = AchievementRefreshView(PageBot(), 123, PageDB())
+        await view.format_page()
+
+        payload = view.to_components()
+        assert len(payload) == 1
+        container = payload[0]
+        assert container["type"] == 17
+        assert container["accent_color"] == discord.Color.blue().value
+
+        components = container["components"]
+        assert [component["type"] for component in components] == [9, 14, 10, 14, 10]
+        assert all(
+            component["divider"] is True
+            for component in components
+            if component["type"] == 14
+        )
+        assert "Achievements: Tester" in components[0]["components"][0]["content"]
+        assert components[0]["accessory"]["media"]["url"] == (
+            "https://example.com/user-avatar.png"
+        )
+        assert "✅ **Reaction starter**" in components[2]["content"]
+        assert "Message starter" in components[4]["content"]
+
+    asyncio.run(scenario())
+
+
+def test_achievement_avatar_fallback_order():
+    user = SimpleNamespace(
+        avatar=SimpleNamespace(url="user-avatar"),
+        default_avatar=SimpleNamespace(url="user-default-avatar"),
+    )
+    bot_user = SimpleNamespace(
+        avatar=SimpleNamespace(url="bot-avatar"),
+    )
+
+    assert resolve_achievement_avatar_url(user, bot_user) == "user-avatar"
+
+    user.avatar = None
+    assert resolve_achievement_avatar_url(user, bot_user) == "bot-avatar"
+
+    bot_user.avatar = None
+    assert resolve_achievement_avatar_url(user, bot_user) == "user-default-avatar"
 
 
 def test_confirmation_timeout_edits_message_when_present(monkeypatch):

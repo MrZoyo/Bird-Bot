@@ -5,7 +5,7 @@
   <a href="../zh-CN/FEATURES.md"><img src="https://img.shields.io/badge/READ_IN-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in Simplified Chinese"></a>
 </p>
 
-Last reviewed: 2026-08-15
+Last reviewed: 2026-08-16
 
 This document describes every active cog, its runtime behavior, and its slash commands. For installation and the shortest setup path, start with the [project README](../../README.md).
 
@@ -41,9 +41,13 @@ The cog restores recorded panels after restart and removes stale database rows f
 Feature key: `invitation`
 Config: `bot/config/invitation.yaml`
 
-CreateInvitationCog creates team-up messages with a direct link to the author's current voice room. It supports explicit `/invt` calls and automatic detection of configured team-up phrases in ordinary messages.
+CreateInvitationCog creates team-up messages with a direct link to the author's current voice room. It supports explicit `/invt` calls and automatic detection of team-up phrases in ordinary messages.
 
-The invitation can include the author's signature. If the author is outside voice, the response links to the configured room-entry channel. Ignore lists prevent automatic handling for selected users and text channels. The room control panel and invitation panel share the same full-room update path, so both produce the same final state.
+Automatic detection first requires a marker (`缺`, `等`, `=`, `＝`, or `q`) followed by a count. Only after this base match succeeds does the detector inspect the character before the marker. A standalone `1`, `１`, or `一` selects the gentler single-person prompt. For example, `1q4` and `一等全世界` qualify, while `1等`, `一q`, and the ordinary phrase `稍微一等` do not trigger detection.
+
+Messages of exactly six characters are silently ignored when they contain no equals sign, Chinese character, or whitespace. This compatibility filter does not apply when the message contains `flex`, `rank`, `aram`, or `hks`, case-insensitively.
+
+The invitation can include the author's signature. If the author is outside voice, the response links to the configured room-entry channel and uses either the normal room-creation prompt or the gentler single-person prompt. Ignore lists prevent automatic handling for selected users and text channels. The room control panel and invitation panel share the same full-room update path, so both produce the same final state.
 
 | Command | Purpose |
 | --- | --- |
@@ -89,6 +93,8 @@ Feature key: `achievements`
 Config: `bot/config/achievements.yaml`
 
 AchievementCog records reactions, messages, voice time, and check-in statistics. It exposes member progress, monthly views, category rankings, a button-driven `/rank` panel, and audited administrator adjustments.
+
+The current, non-monthly `/achievements` page uses a Components v2 container with native separators between achievement categories. Its large thumbnail uses the queried user's custom avatar first, then the bot's custom avatar, then the user's default Discord avatar. Dated monthly views remain embeds.
 
 Achievement definitions and their role IDs live in `achievements.yaml`. Categories tied to disabled features are hidden at runtime. In particular, `checkin_sum` and `checkin_combo` disappear when ShopCog is disabled. Retired giveaway achievement categories remain hidden even when GiveawayCog is enabled.
 

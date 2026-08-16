@@ -5,7 +5,7 @@
   <a href="../zh-CN/ARCHITECTURE.md"><img src="https://img.shields.io/badge/READ_IN-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in Simplified Chinese"></a>
 </p>
 
-Last reviewed: 2026-08-15
+Last reviewed: 2026-08-16
 
 This document explains the runtime boundaries and shared modules behind Bird Bot. The project guide in [CLAUDE.md](../../CLAUDE.md) remains the canonical source for development, migration, logging, and testing rules.
 
@@ -104,6 +104,8 @@ Before a migration or direct maintenance task touches a deployment database, bac
 Bird Bot uses both embeds and Discord Components v2. Persistent panels store their channel and message IDs in SQLite, then register compatible views again after startup.
 
 `bot.utils.components_v2` contains shared construction helpers. Feature-local `views.py` modules own interaction callbacks, while `modal_helpers.py` handles reusable modal patterns. Text inputs target discord.py 2.7.1 and are wrapped with `discord.ui.Label`.
+
+The default `/achievements` response is a Components v2 layout with native category separators and a large avatar thumbnail. Its avatar fallback order is the queried user's custom avatar, the bot's custom avatar, then the user's default Discord avatar.
 
 The full-room state for team-up invitations has one shared formatter: `bot.cogs.create_invitation.full_message.update_invitation_message_to_full()`. Both the invitation panel and voice-room panel call it so embeds and Components v2 messages converge on the same red, button-free final state.
 

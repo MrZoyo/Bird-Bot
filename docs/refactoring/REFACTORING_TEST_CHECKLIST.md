@@ -20,19 +20,20 @@
 - 所有保留 DB manager 的离线 smoke。
 - JSON config 临时迁移到 YAML / locale / DB seed。
 - PrivateRoom 续费日期、持久化回读、扣款顺序和失败不扣款。
-- Shop、Tickets、Ban、VoiceChannel、Giveaway、Role / Signature、Achievement / Rank、Welcome / Games、CheckStatus / Backup 的 fake interaction flow；Ban 额外覆盖未授权 `@everyone` 的自动临时封禁、管理员豁免、默认删除最近 1 小时消息及旧 `delete_message_days` 配置兼容。
+- Shop、Tickets、Ban、VoiceChannel、Giveaway、Role / Signature、Achievement / Rank、Welcome / Games、CheckStatus / Backup 的 fake interaction flow；Ban 额外覆盖未授权 `@everyone` 的自动临时封禁、管理员豁免、默认删除最近 1 小时消息及旧 `delete_message_days` 配置兼容；Achievement 额外覆盖 Components v2 成就列表、原生分类分割线和头像降级顺序。
 - InviteGuard 邀请清理 / 排行榜逻辑：过期删除、dry-run、邀请 code 白名单、创建者白名单、`created_at` 缺失跳过、单条失败不中断、邀请链接同步、成员加入归因、重复加入不重复计数、Components v2 排行榜刷新 / 重建命令、有效邀请 Shop 积分奖励。
 - InviteGuard 池化归因 / 批结算 / 缓存锁串行化：`on_member_join` 入队 + 批窗口结算，单人单邀请行为不变，同窗口多人多邀请按各自 delta 池化记功发奖（`pooled_count`）、同窗口多人单邀请完整归因发多份奖，总量不匹配 / 含 ignored invite / 批内自邀 / 批内已锁定成员均降级为 ambiguous 且零奖励，`pooled_attribution_enabled=false` 维持旧行为，排行榜按 `invited_count+pooled_count` 排序，`/invite_check_user` 输出含 `pooled_count`，以及 `_invite_cache_lock` 序列化 `sync_invite_links` / `initialize_invite_cache` / 批结算的冒烟验证。
 - InviteGuard 邀请奖励通知 DM：单人归因 + 面板有效时邀请人收到 Components v2 通知（Container + 分割线 + 附图 MediaGallery + 总邀请数 footer + 容器外“查看排行榜”link 按钮，URL 精确指向面板消息），面板无效（channel/message id 缺失）或 `reward_notification_enabled=false` 时完全不发但归因与积分照常，池化路径各邀请人收到含人数、实得总积分与总邀请数 footer 的 body_pooled 汇总版本，DM Forbidden 不影响归因与积分，`reward_points_per_invite=0` 时无积分也无 DM，以及“DB 归因 → 积分入账 → DM 发送”的顺序断言。
 - PrivateRoom 商店、Shop 签到、Tickets 主入口和组队邀请的 Components v2 panel 结构。
 - Shop 签到面板刷新恢复：临时 Discord HTTP 失败保持 active 等待重试、真实 404 才停用、消息编辑成功后才逐面板推进日期与清零当日统计。
 - 组队消息和房间面板“满员”共享样式；旧 embed 和新 Components v2 消息均有兼容覆盖。
+- CreateInvitation 关键词 flow：先命中“标记 + 人数”再判断标记前单人数，避免 `稍微一等`、`1等`、`一q` 误识别；覆盖单人柔和提示、普通创房提示和 6 字符 `hks` 大小写例外。
 - 显式 gateway intents、SQLCipher 数据库加密连接、明文库迁移工具、显式 key 文件生成和 `run.py` 本地 `.env` 加载。
 - 后台 loop 未登录离线 guard。
 
 最后一次通过基线：
 - [x] `./.venv/Scripts/python.exe -m pytest -q`
-  - 当前：`155 passed, 1 warning`（2026-08-15）
+  - 当前：`159 passed, 1 warning`（2026-08-16）
 - [x] `./.venv/Scripts/python.exe -m ruff check bot tests tools`
 - [x] `./.venv/Scripts/python.exe -m compileall bot tests tools`
 - [x] `./.venv/Scripts/python.exe -X utf8 tools/check_locales.py`
@@ -134,6 +135,7 @@
 - [x] 普通用户查看 `/achievements`、`/achievement_ranking`、`/rank`，真实排行榜数据和按钮切换可用。
   - 2026-06-28：`zoyoooo` 在 `测试2` 执行 `/achievements` 返回 `zoyoooo的成就清单`，显示完成 `2/22`；`/achievement_ranking` 返回排行榜；新 `/rank` 消息的 `添加反应`、`语音时长`、`全部排名` 按钮可正常编辑消息，无交互失败。
   - 2026-06-28：连续签到颜色已统一为 🟢；本地 `rank_locale.py`、`achievements.yaml` locale、`role.yaml(.example)` 和 `achievements.yaml.example` 均同步，复搜棕色圆点 emoji 无残留。
+  - 2026-08-16：测试服 `/achievements` 样板已切换到 Components v2 原生分割线和右上角大头像，外观确认通过；头像降级顺序为用户自定义头像、Bot 自定义头像、用户默认头像。
 - [x] 用户进出语音频道后，语音时长最终写入成就。
   - 2026-06-28：按用户说明跳过真实语音进出测试；`time_spent` 写入 / 排行显示由自动化覆盖，真实客户端侧已验证 `/rank` 的 `语音时长` 分类按钮可正常切换并显示当前测试数据。
 

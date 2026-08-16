@@ -5,7 +5,7 @@
   <a href="../en/ARCHITECTURE.md"><img src="https://img.shields.io/badge/READ_IN-ENGLISH-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in English"></a>
 </p>
 
-最后检查：2026-08-15
+最后检查：2026-08-16
 
 本文说明 Bird Bot 的运行边界和共享模块。项目开发指南 `CLAUDE.md` 是开发、迁移、日志和测试规则的权威来源。
 
@@ -104,6 +104,8 @@ ID、路径、颜色、时间格式、数值限制和功能元数据放在配置
 Bird Bot 同时使用 embed 和 Discord Components v2。持久化面板会把频道和消息 ID 写入 SQLite，并在启动后重新注册兼容视图。
 
 `bot.utils.components_v2` 提供共享构建工具。各功能的 `views.py` 负责交互回调，`modal_helpers.py` 负责可复用的 modal 模式。文本输入以 discord.py 2.7.1 为目标，并用 `discord.ui.Label` 包裹。
+
+默认 `/achievements` 响应使用 Components v2 布局，以原生分割线区分分类，并在右上角显示大头像。头像依次降级为被查询用户的自定义头像、Bot 的自定义头像、用户的 Discord 默认头像。
 
 组队邀请的满员状态只有一个共享格式化入口：`bot.cogs.create_invitation.full_message.update_invitation_message_to_full()`。邀请面板和语音房面板都调用它，使 embed 和 Components v2 消息最终呈现为相同的红色、无按钮状态。
 

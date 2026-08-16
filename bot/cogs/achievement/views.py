@@ -7,9 +7,17 @@ from bot.utils.i18n import t
 from .rank_locale import rank_button_parts, rank_type_button_labels
 
 
-class AchievementRefreshView(View):
+def resolve_achievement_avatar_url(user, bot_user) -> str:
+    if user.avatar is not None:
+        return user.avatar.url
+    if bot_user.avatar is not None:
+        return bot_user.avatar.url
+    return user.default_avatar.url
+
+
+class AchievementRefreshView(discord.ui.LayoutView):
     def __init__(self, bot, user_id, db_manager):
-        super().__init__(timeout=180.0)
+        super().__init__(timeout=None)
         self.bot = bot
         self.user_id = user_id
         self.message = None
@@ -47,7 +55,7 @@ class AchievementRefreshView(View):
         user_mention = user.mention
         user_name = user.name
 
-        # Create an embed with the user's achievements
+        # Build a Components v2 page with native separators between achievement types.
         title = t('achievements.achievements_page_title', user_name=user_name)
         description = t(
             'achievements.achievements_page_description',
@@ -56,39 +64,50 @@ class AchievementRefreshView(View):
             total_achievements=len(achievements),
         )
         achievements_finish_emoji = t('achievements.achievements_finish_emoji')
-        embed = discord.Embed(title=title, description=description, color=discord.Color.blue())
+        avatar_url = resolve_achievement_avatar_url(user, self.bot.user)
+        container_items: list[discord.ui.Item] = [
+            discord.ui.Section(
+                discord.ui.TextDisplay(f"### {title}\n{description}"),
+                accessory=discord.ui.Thumbnail(avatar_url),
+            ),
+            discord.ui.Separator(),
+        ]
 
-        # Add user avatar to embed
-        embed.set_author(name=user_name, icon_url=user.display_avatar.url)
-
-        first_group = True
-        for _, achievements_list in achievement_groups.items():
+        rendered_groups = 0
+        for achievements_list in achievement_groups.values():
             if not achievements_list:
                 continue
 
-            # Add separator between groups
-            if not first_group:
-                embed.add_field(name="", value="​", inline=False)
-            first_group = False
+            if rendered_groups > 0:
+                container_items.append(discord.ui.Separator())
 
-            # Build the field value for this category
-            category_value = ""
+            category_parts = []
             for achievement in achievements_list:
                 is_completed = achievement["count"] >= achievement["threshold"]
 
                 if is_completed:
-                    # For completed achievements, show checkmark with bold name
-                    category_value += f"{achievements_finish_emoji} **{achievement['name']}**\n"
+                    category_parts.append(
+                        f"{achievements_finish_emoji} **{achievement['name']}**"
+                    )
                 else:
-                    # For incomplete achievements, show bold name and progress bar
                     progress = min(1, achievement["count"] / achievement["threshold"])
-                    progress_bar = f"**{achievement['name']}**\n{achievement['description']} → `{int(achievement['count'])}/{int(achievement['threshold'])}`\n`{'█' * int(progress * 20)}{' ' * (20 - int(progress * 20))}` `{progress * 100:.2f}%`\n"
-                    category_value += progress_bar
+                    category_parts.append(
+                        f"**{achievement['name']}**\n"
+                        f"{achievement['description']} → "
+                        f"`{int(achievement['count'])}/{int(achievement['threshold'])}`\n"
+                        f"`{'█' * int(progress * 20)}{' ' * (20 - int(progress * 20))}` "
+                        f"`{progress * 100:.2f}%`"
+                    )
 
-            # Add the field for this category without name
-            embed.add_field(name="", value=category_value.strip(), inline=False)
+            container_items.append(discord.ui.TextDisplay("\n".join(category_parts)))
+            rendered_groups += 1
 
-        return embed
+        self.clear_items()
+        self.add_item(discord.ui.Container(
+            *container_items,
+            accent_color=discord.Color.blue(),
+        ))
+        return self
 
 
     async def format_page_monthly(self, date):

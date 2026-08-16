@@ -7,6 +7,14 @@
 
 This file preserves the release notes that previously lived at the bottom of `README.md`. Entries describe the code at the time of each release; current runtime behavior is documented in [FEATURES.md](FEATURES.md).
 
+## 2.0.4 — 2026-08-16
+
+- Refined automatic team-up detection so the existing marker-plus-count grammar must match before the bot checks for a leading single-person count. Forms such as `1q4` and `一等全世界` receive the gentler prompt without misreading `稍微一等`, `1等`, or `一q`.
+- Reworded the normal outside-voice response to a shorter room-creation prompt and added the gentler single-person response.
+- Preserved the six-character silent-ignore filter while exempting messages containing `hks`, case-insensitively, alongside the existing `flex`, `rank`, and `aram` exceptions.
+- Migrated the current `/achievements` list to Components v2 with native category separators and a large avatar thumbnail. The thumbnail falls back from the queried user's custom avatar to the bot's custom avatar, then to the user's default Discord avatar.
+- Added regression coverage for team-up detection, six-character handling, Components v2 achievement layout, and avatar fallback order.
+
 ## 2.0.3 — 2026-08-15
 
 - Added an optional defense that automatically applies a one-day temporary ban when a non-administrator sends a real `@everyone` mention.

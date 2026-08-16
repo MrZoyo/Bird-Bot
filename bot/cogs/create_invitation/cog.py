@@ -20,6 +20,39 @@ from .full_message import update_invitation_message_to_full
 from .views import DefaultRoomView, TeamInvitationView
 
 
+TEAMUP_KEYWORD_PATTERN = re.compile(
+    r"(?:(缺|等|[=＝]|[Qq]))"
+    r"(?:(\d|[一二三四五]|[nN]|全世界|world|World))"
+    r"(?!(分|分钟|min|个钟|小时))",
+    re.IGNORECASE,
+)
+SINGLE_PERSON_COUNTS = frozenset({"1", "１", "一"})
+
+
+def find_teamup_keyword_matches(content: str) -> list[re.Match[str]]:
+    """Find teamup expressions using the required marker-before-count grammar."""
+    if re.search(r'\d[A-Z]$', content, re.IGNORECASE):
+        return []
+    return list(TEAMUP_KEYWORD_PATTERN.finditer(content))
+
+
+def is_single_person_waiting(
+    content: str,
+    matches: list[re.Match[str]],
+) -> bool:
+    """Return whether a matched teamup expression has a standalone one before its marker."""
+    for match in matches:
+        count_index = match.start() - 1
+        if count_index < 0 or content[count_index] not in SINGLE_PERSON_COUNTS:
+            continue
+
+        previous_index = count_index - 1
+        if previous_index < 0 or not content[previous_index].isnumeric():
+            return True
+
+    return False
+
+
 def log_keyword_detection(message: discord.Message, valid_matches) -> None:
     keyword_logger = logging.getLogger('keyword_detection')
     keyword_logger.info(
@@ -41,6 +74,9 @@ class CreateInvitationCog(commands.Cog):
 
         self.conf = config.get_config('invitation')
         self.illegal_team_response = t('invitation.illegal_team_response')
+        self.single_person_waiting_response = t(
+            'invitation.single_person_waiting_response'
+        )
         self.default_invite_embed_title = t('invitation.default_invite_embed_title')
         self.default_create_room_channel_id = self.conf['default_create_room_channel_id']
         self.ignore_channel_message = t('invitation.ignore_channel_message')
@@ -99,10 +135,10 @@ class CreateInvitationCog(commands.Cog):
             return
 
         # 检查是否满足忽略条件：仅有6个字符且不包含等号、中文字、空格，
-        # 但如果包含 "flex" 或 "rank" 或 "aram"（无论大小写），则不忽略。
+        # 但如果包含 "flex"、"rank"、"aram" 或 "hks"（无论大小写），则不忽略。
         if (len(message.content) == 6 and
                 not re.search(r"[=＝\s]", message.content) and  # Check for any equal sign or space
-                not re.search(r"(?i)(flex|rank|aram)", message.content) and
+                not re.search(r"(?i)(flex|rank|aram|hks)", message.content) and
                 not re.search(r"[\u4e00-\u9FFF]", message.content)):  # Check for any Chinese character
             # print(f"忽略的消息: {message.content}")
             return  # 忽略这条消息
@@ -115,15 +151,9 @@ class CreateInvitationCog(commands.Cog):
         if message.author.id in self.ignore_user_ids:
             return  # Ignore the message
 
-        # 前缀：匹配"缺"、"等"、"="、"＝"、"q"、"Q"。
-        # 主体：匹配数字、"一"到"五"的汉字、"n"、"N"、"全世界"、"W/world"。
-        # 排除：不应该后跟"分"、"分钟"、"min"、"个钟"、"小时"。
-        pattern = r"(?:(缺|等|[=＝]|[Qq]))(?:(\d|[一二三四五]|[nN]|全世界|world|World))(?!(分|分钟|min|个钟|小时))"
-
-        # Find all matches in the message content
-        matches = re.findall(pattern, message.content, re.IGNORECASE)
-        # Filter out matches that end with a digit followed by a letter
-        valid_matches = [match for match in matches if not re.search(r'\d[A-Z]$', message.content, re.IGNORECASE)]
+        # 必须先命中“标记 + 人数”的基本组队语法，再判断标记前是否写了当前人数。
+        keyword_matches = find_teamup_keyword_matches(message.content)
+        valid_matches = [match.group(0) for match in keyword_matches]
 
         # Define a default value for reply_message
         reply_message = ""
@@ -180,7 +210,12 @@ class CreateInvitationCog(commands.Cog):
                     reply_message = self.failed_invite_responses + str(e)
 
             else:
-                reply_message = self.illegal_team_response.format(mention=message.author.mention)
+                response_template = (
+                    self.single_person_waiting_response
+                    if is_single_person_waiting(message.content, keyword_matches)
+                    else self.illegal_team_response
+                )
+                reply_message = response_template.format(mention=message.author.mention)
 
                 # Create the URL for the default room
                 guild_id = message.guild.id

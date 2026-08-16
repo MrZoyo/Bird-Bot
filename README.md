@@ -5,7 +5,7 @@
     <img src="https://img.shields.io/badge/READ_IN-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in Simplified Chinese">
   </a>
   <a href="docs/en/CHANGELOG.md">
-    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.3-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="Current release: Bird Bot v2.0.3">
+    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.4-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="Current release: Bird Bot v2.0.4">
   </a>
   <a href="https://www.python.org/">
     <img src="https://img.shields.io/badge/PYTHON-3.12-3776AB?style=for-the-badge&amp;logo=python&amp;logoColor=white" alt="Python 3.12">
@@ -32,9 +32,9 @@ All persistent data stays in the operator's local SQLite database, logs, and bac
 
 | Area | What Bird Bot provides |
 | --- | --- |
-| Voice rooms and team-up | Temporary voice rooms, room control panels, keyword-triggered invitations, and a live team-up board |
+| Voice rooms and team-up | Temporary voice rooms, room control panels, guarded keyword-triggered invitations, contextual room prompts, and a live team-up board |
 | Community onboarding | Welcome images, welcome-channel messages, and configurable welcome DMs |
-| Achievements and roles | Message, reaction, voice-time, and check-in achievements; rankings; role pickup panels; user signatures |
+| Achievements and roles | Message, reaction, voice-time, and check-in achievements in a Components v2 progress page; rankings; role pickup panels; user signatures |
 | Economy and private rooms | Daily check-in, makeup check-in, balances, transaction history, private-room purchase, renewal, and expiry |
 | Tickets | Thread-based tickets, per-type administrators, persistent controls, status tracking, and statistics |
 | Moderation | Permanent bans, temporary bans, timeouts, @everyone spam defense, notification channels, and restart-safe temporary-ban recovery |

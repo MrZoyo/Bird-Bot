@@ -14,6 +14,7 @@ from bot.utils.achievement_visibility import (
     is_achievement_type_visible,
     resolve_hidden_achievement_types,
 )
+from bot.utils.components_v2 import clear_legacy_message_payload
 from bot.utils.i18n import t
 
 from .views import (
@@ -177,9 +178,13 @@ class AchievementCog(commands.Cog):
 
         if date:
             embed = await view.format_page_monthly(date)
+            message = await interaction.edit_original_response(embeds=[embed])
         else:
-            embed = await view.format_page()
-        message = await interaction.edit_original_response(embeds=[embed], view=view)
+            await view.format_page()
+            message = await interaction.edit_original_response(
+                view=view,
+                **clear_legacy_message_payload(),
+            )
         view.message = message
 
     @app_commands.command(

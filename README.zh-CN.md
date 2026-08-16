@@ -5,7 +5,7 @@
     <img src="https://img.shields.io/badge/READ_IN-ENGLISH-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in English">
   </a>
   <a href="docs/zh-CN/CHANGELOG.md">
-    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.3-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="当前版本：Bird Bot v2.0.3">
+    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.4-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="当前版本：Bird Bot v2.0.4">
   </a>
   <a href="https://www.python.org/">
     <img src="https://img.shields.io/badge/PYTHON-3.12-3776AB?style=for-the-badge&amp;logo=python&amp;logoColor=white" alt="Python 3.12">
@@ -32,9 +32,9 @@ Bird Bot 是一款面向游戏社区的自托管 Discord Bot。它以模块化�
 
 | 领域 | Bird Bot 提供的功能 |
 | --- | --- |
-| 语音房与组队 | 临时语音房、房间控制面板、关键词触发的组队邀请和实时组队展示板 |
+| 语音房与组队 | 临时语音房、房间控制面板、带误识别防护的关键词组队邀请、情境化房间提示和实时组队展示板 |
 | 社区欢迎 | 欢迎图片、欢迎频道消息和可配置的欢迎私信 |
-| 成就与身份组 | 消息、反应、语音时长和签到成就；排行榜；身份组领取面板；个性签名 |
+| 成就与身份组 | Components v2 成就进度页；消息、反应、语音时长和签到成就；排行榜；身份组领取面板；个性签名 |
 | 积分与私人房 | 每日签到、补签、余额、交易记录、私人房购买、续费和到期处理 |
 | 工单 | 基于 thread 的工单、按类型分配管理员、持久化控件、状态跟踪和统计 |
 | 管理 | 永久封禁、临时封禁、禁言、`@everyone` 垃圾消息防护、通知频道和重启后恢复临时封禁 |

@@ -1,5 +1,6 @@
 default_create_room_button: 📣 点我创建房间！
-illegal_team_response: '{mention}，本频道禁止私拉，请先拉起一个语音频道！'
+illegal_team_response: '{mention}，本频道不允许私拉，先创个房间吧~'
+single_person_waiting_response: '{mention}，不如你先来发车~'
 failed_invite_responses: 创建邀请链接时出错，请检查我的权限。
 invite_button_label: 📣 点我进入房间！
 roomfull_button_label: 🚫 房间满员点我

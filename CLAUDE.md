@@ -132,6 +132,13 @@ The "room full" state for team invitation messages has one shared implementation
 
 Do not fork a second full-message formatting path in another cog.
 
+## Team Invitation Keyword Detection
+
+- Keep the existing marker-plus-count grammar as the mandatory first gate for automatic team-up detection.
+- Only after a valid marker-plus-count match may the detector inspect the character before the marker for a standalone `1`, `１`, or `一` current-party count.
+- `1q4` and `一等全世界` are single-person examples. `稍微一等`, `1等`, and `一q` must not trigger because they lack the required marker-plus-count match.
+- The six-character silent-ignore compatibility filter remains active. `flex`, `rank`, `aram`, and `hks` bypass it case-insensitively.
+
 ## Discord Interaction Tests
 
 Prefer local fake / fixture tests for Discord interaction handlers before adding more manual test-server steps:
@@ -181,7 +188,8 @@ Current pytest smoke coverage includes:
 - VoiceChannel fake interaction flow for Lock / Unlock / Soundboard / Full control-panel buttons.
 - Giveaway fake interaction flow for draft publish, optional image payloads, personal join / leave feedback, cancel, and early end ordering.
 - Role / Signature fake interaction flow for achievement role pickup and signature modal writes.
-- Achievement / Rank fake interaction flow for manual operation confirmation and rank type buttons.
+- Achievement / Rank fake interaction flow for manual operation confirmation, rank type buttons, the Components v2 achievement list, native category separators, and avatar fallback order.
+- CreateInvitation keyword-flow coverage for marker-plus-count gating, single-person prompts, false-positive avoidance, and six-character `hks` handling.
 - Welcome / Games fake interaction flow for Welcome DM, SpyMode, and DnD roll response.
 - CheckStatus / Backup fake interaction flow for Where Is, voice status, log tail, and manual backup.
 - InviteGuard cleanup and leaderboard logic for expired invite deletion, dry-run, invite-code whitelist, creator whitelist, missing `created_at`, per-invite failure isolation, invite-link sync, member-join attribution, rejoin lockout, Components v2 leaderboard refresh/create commands, and Shop point rewards for valid invites.
@@ -197,7 +205,7 @@ Current pytest smoke coverage includes:
 Current P3-9 status:
 
 - Done: current fake interaction flow list is complete for PrivateRoom, Shop, Tickets, Ban, VoiceChannel, Giveaway, Role / Signature, Achievement / Rank, Welcome / Games, CheckStatus / Backup, and InviteGuard.
-- Current baseline: `155 passed, 1 warning`.
+- Current baseline: `159 passed, 1 warning`.
 - Next default target: targeted real test-server validation for new changes / side-effect paths only when explicitly approved.
 - Add more fake interaction tests only for new bugs, payload replay work, or new features.
 
