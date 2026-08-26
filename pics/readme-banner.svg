@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 480" role="img" aria-labelledby="title desc">
+  <title id="title">Bird Bot banner</title>
+  <desc id="desc">A dark indigo and cyan banner with a stylised bird mark and modular Discord feature cards.</desc>
+
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1020"/>
+      <stop offset="0.52" stop-color="#20255a"/>
+      <stop offset="1" stop-color="#0d6c86"/>
+    </linearGradient>
+    <linearGradient id="halo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8ea2ff" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#41e2d2" stop-opacity="0.82"/>
+    </linearGradient>
+    <linearGradient id="wing" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#b9c5ff"/>
+    </linearGradient>
+    <pattern id="grid" width="42" height="42" patternUnits="userSpaceOnUse">
+      <path d="M42 0H0V42" fill="none" stroke="#ffffff" stroke-opacity="0.08"/>
+    </pattern>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#050817" flood-opacity="0.42"/>
+    </filter>
+    <filter id="soft-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="22"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="480" rx="34" fill="url(#background)"/>
+  <rect x="18" y="18" width="1564" height="444" rx="24" fill="url(#grid)"/>
+
+  <circle cx="1410" cy="72" r="180" fill="#52d9db" opacity="0.18" filter="url(#soft-glow)"/>
+  <circle cx="1390" cy="286" r="230" fill="#6f75ff" opacity="0.18" filter="url(#soft-glow)"/>
+  <path d="M0 390C260 300 420 430 650 350s390-8 520 56 278 32 430-42v116H0Z" fill="#050817" opacity="0.24"/>
+
+  <g transform="translate(108 102)">
+    <text x="0" y="42" fill="#8fe9e3" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="22" font-weight="700" letter-spacing="5">SELF-HOSTED  •  MODULAR  •  DISCORD</text>
+    <text x="-3" y="142" fill="#ffffff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="92" font-weight="800" letter-spacing="-3">Bird Bot</text>
+    <text x="2" y="196" fill="#d7ddff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="30" font-weight="500">Modular tools for gaming communities</text>
+    <g transform="translate(2 246)">
+      <rect width="474" height="48" rx="24" fill="#ffffff" fill-opacity="0.12" stroke="#ffffff" stroke-opacity="0.2"/>
+      <circle cx="25" cy="24" r="7" fill="#41e2d2"/>
+      <text x="46" y="31" fill="#f3f5ff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="650" letter-spacing="1.2">VOICE  ·  TEAM-UP  ·  ACHIEVEMENTS  ·  OPS</text>
+    </g>
+  </g>
+
+  <g transform="translate(1160 70)" filter="url(#shadow)">
+    <circle cx="190" cy="170" r="156" fill="url(#halo)" opacity="0.95"/>
+    <circle cx="190" cy="170" r="132" fill="#12193c" opacity="0.55"/>
+    <path d="M118 198c29-61 87-99 151-99 27 0 53 6 77 18-24 7-46 21-62 41 39 2 69 17 91 43-42-15-80-16-117-2-33 13-66 37-92 73-20-20-36-45-48-74Z" fill="url(#wing)"/>
+    <path d="M258 119c24-20 55-27 86-20l-30 25 31 19c-30 6-58-1-87-24Z" fill="#ffffff"/>
+    <circle cx="303" cy="132" r="7" fill="#20255a"/>
+    <path d="M145 207c25 6 45 18 62 37-30 3-54-9-71-31l9-6Z" fill="#8ea2ff" opacity="0.72"/>
+    <path d="M201 256c-10 31-30 50-60 57 12-25 13-48 4-70 18 3 36 7 56 13Z" fill="#41e2d2" opacity="0.9"/>
+  </g>
+
+  <g transform="translate(1040 370)">
+    <g transform="translate(0 0)">
+      <rect width="132" height="58" rx="16" fill="#111735" fill-opacity="0.9" stroke="#ffffff" stroke-opacity="0.18"/>
+      <circle cx="25" cy="29" r="10" fill="#8ea2ff"/>
+      <text x="46" y="35" fill="#ffffff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" font-weight="700">VOICE</text>
+    </g>
+    <g transform="translate(146 0)">
+      <rect width="154" height="58" rx="16" fill="#111735" fill-opacity="0.9" stroke="#ffffff" stroke-opacity="0.18"/>
+      <circle cx="25" cy="29" r="10" fill="#41e2d2"/>
+      <text x="46" y="35" fill="#ffffff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" font-weight="700">TEAM-UP</text>
+    </g>
+    <g transform="translate(314 0)">
+      <rect width="190" height="58" rx="16" fill="#111735" fill-opacity="0.9" stroke="#ffffff" stroke-opacity="0.18"/>
+      <circle cx="25" cy="29" r="10" fill="#ffd166"/>
+      <text x="46" y="35" fill="#ffffff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" font-weight="700">ACHIEVEMENTS</text>
+    </g>
+  </g>
+
+  <g fill="#ffffff">
+    <circle cx="930" cy="96" r="3" opacity="0.7"/>
+    <circle cx="1000" cy="146" r="5" opacity="0.35"/>
+    <circle cx="1512" cy="180" r="4" opacity="0.5"/>
+    <circle cx="1080" cy="54" r="2" opacity="0.8"/>
+  </g>
+</svg>

@@ -1,9 +1,24 @@
-# Bird Bot
+<p align="center">
+  <img src="pics/readme-banner.svg" alt="Bird Bot 横幅" width="100%">
+</p>
+
+<h1 align="center">Bird Bot</h1>
 
 <p align="center">
-  <a href="README.md">
-    <img src="https://img.shields.io/badge/READ_IN-ENGLISH-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in English">
-  </a>
+  <strong>面向游戏社区的模块化、自托管 Discord Bot</strong>
+</p>
+
+<p align="center">
+  <a href="README.md">English</a>
+  ·
+  <a href="#功能">功能</a>
+  ·
+  <a href="docs/zh-CN/FEATURES.md">功能参考</a>
+  ·
+  <a href="docs/zh-CN/ARCHITECTURE.md">架构说明</a>
+</p>
+
+<p align="center">
   <a href="docs/zh-CN/CHANGELOG.md">
     <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.4-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="当前版本：Bird Bot v2.0.4">
   </a>
@@ -18,11 +33,16 @@
   </a>
 </p>
 
-Bird Bot 是一款面向游戏社区的自托管 Discord Bot。它以模块化服务整合临时语音房、组队工具、成就、积分经济、工单、管理和服务器运维功能，并通过 i18n 将用户可见文案拆分为 locale 包，让每个部署选择适合自己社区的语言。
+<p align="center">
+  Bird Bot 将临时语音房、组队工具、成就、积分经济、工单、管理与服务器运维整合在一个模块化服务中。<br>
+  用户文案由 locale 包管理，持久化数据保存在运营者本地的 SQLite 数据库、日志和备份中，并可启用 SQLCipher 静态加密。
+</p>
 
-所有持久化数据均保存在运营者本地的 SQLite 数据库、日志和备份中。需要静态加密的部署可以启用 SQLCipher。
-
-[![Bird Gaming Discord](https://discord.com/api/guilds/1146359014968537089/widget.png?style=banner2)](https://discord.gg/birdgaming)
+<p align="center">
+  <a href="https://discord.gg/birdgaming">
+    <img src="https://discord.com/api/guilds/1146359014968537089/widget.png?style=banner2" alt="加入 Bird Gaming Discord" width="550">
+  </a>
+</p>
 
 > 上方链接的 Bird Gaming Discord 是项目的公开样例部署，服务于中文社区；这不代表 Bird Bot 只适用于中文社区。
 >

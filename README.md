@@ -1,9 +1,24 @@
-# Bird Bot
+<p align="center">
+  <img src="pics/readme-banner.svg" alt="Bird Bot banner" width="100%">
+</p>
+
+<h1 align="center">Bird Bot</h1>
 
 <p align="center">
-  <a href="README.zh-CN.md">
-    <img src="https://img.shields.io/badge/READ_IN-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-5865F2?style=for-the-badge&amp;logo=googletranslate&amp;logoColor=white" alt="Read in Simplified Chinese">
-  </a>
+  <strong>A modular, self-hosted Discord bot for gaming communities</strong>
+</p>
+
+<p align="center">
+  <a href="README.zh-CN.md">简体中文</a>
+  ·
+  <a href="#features">Features</a>
+  ·
+  <a href="docs/en/FEATURES.md">Feature reference</a>
+  ·
+  <a href="docs/en/ARCHITECTURE.md">Architecture</a>
+</p>
+
+<p align="center">
   <a href="docs/en/CHANGELOG.md">
     <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.4-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="Current release: Bird Bot v2.0.4">
   </a>
@@ -18,11 +33,18 @@
   </a>
 </p>
 
-Bird Bot is a self-hosted Discord bot for gaming communities. It combines temporary voice rooms, team-up tools, achievements, an economy, tickets, moderation, and server operations in one modular service. Its i18n layer keeps user-facing text in locale packs so each deployment can use the language that fits its community.
+<p align="center">
+  Bird Bot brings temporary voice rooms, team-up tools, achievements, an economy, tickets,
+  moderation, and server operations together in one modular service.<br>
+  User-facing text lives in locale packs, while persistent data remains in the operator's
+  local SQLite database, logs, and backups; SQLCipher encryption is available at rest.
+</p>
 
-All persistent data stays in the operator's local SQLite database, logs, and backups. SQLCipher encryption is available for deployments that need encrypted storage at rest.
-
-[![Bird Gaming Discord](https://discord.com/api/guilds/1146359014968537089/widget.png?style=banner2)](https://discord.gg/birdgaming)
+<p align="center">
+  <a href="https://discord.gg/birdgaming">
+    <img src="https://discord.com/api/guilds/1146359014968537089/widget.png?style=banner2" alt="Join the Bird Gaming Discord" width="550">
+  </a>
+</p>
 
 > The public Bird Gaming Discord linked above is the project's sample deployment and serves a Chinese-speaking community. This sample does not limit Bird Bot to Chinese communities.
 >
