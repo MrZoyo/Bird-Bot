@@ -1,12 +1,20 @@
 """Monthly invite settlement and winner notifications."""
 import hashlib
 import logging
+from dataclasses import replace
 
 import discord
 
 from bot.utils import fmt_guild, fmt_user
 from bot.utils.i18n import t
 from bot.utils.invite_months import month_key
+
+
+MONTHLY_REWARD_IMAGES = {
+    1: 'invitation_no1.png',
+    2: 'invitation_no2.png',
+    3: 'invitation_no3.png',
+}
 
 
 def build_reward_view(cog, reward, settings, *, guild_name: str, with_image: bool, preview: bool = False):
@@ -35,15 +43,16 @@ async def send_reward_notification(cog, reward, settings, *, preview: bool = Fal
     guild = cog.bot.get_guild(settings.guild_id)
     if guild is None:
         guild = await cog.bot.fetch_guild(settings.guild_id)
-    file = cog._build_reward_notification_file(settings)
+    image_name = MONTHLY_REWARD_IMAGES.get(reward['rank'], 'invitation_no4-10.png')
+    file = cog._build_reward_notification_file(replace(settings, reward_notification_image=image_name))
     try:
         view = build_reward_view(cog, reward, settings, guild_name=guild.name,
                                  with_image=file is not None, preview=preview)
         identity = f"invite-monthly:{reward['guild_id']}:{reward['month']}:{reward['user_id']}"
-        if preview:
-            identity += ':preview'
         nonce = int.from_bytes(hashlib.sha256(identity.encode()).digest()[:8], 'big')
-        kwargs = dict(view=view, nonce=nonce, allowed_mentions=discord.AllowedMentions.none())
+        kwargs = dict(view=view, allowed_mentions=discord.AllowedMentions.none())
+        if not preview:
+            kwargs['nonce'] = nonce
         if file is not None:
             kwargs['file'] = file
         message = await user.send(**kwargs)

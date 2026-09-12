@@ -235,13 +235,13 @@ Joins settle in a short batch window. When the total invite-use delta matches th
 
 Successful attribution can credit Shop points even while ShopCog is disabled; the data remains available when ShopCog is enabled again. With a valid leaderboard panel, the cog can DM each rewarded inviter a summary, image, and direct panel link. DM or image failures never roll back attribution or points.
 
-The same panel shows the current month's top ten above the lifetime leaderboard, separated by a divider. The update line also names the previous month's settled champion. Both rankings exclude bots and break equal invite totals by ascending user ID.
+The same panel shows the lifetime leaderboard above the current month's top ten, separated by a divider. The update line also names the previous month's settled champion. Both rankings exclude bots and break equal invite totals by ascending user ID.
 
 Monthly accounting uses the IANA zone in `monthly_timezone`, defaulting to `Europe/Berlin`. First activation imports existing lifetime totals into the activation month once. Subsequent single and pooled attribution records monthly credits in the same transaction as lifetime counts, using attribution time to determine the calendar month. The opening month and import state survive restarts; changing the zone later requires a separate migration.
 
 At local midnight on the first day of each month, the previous month's champion receives 200 points, second place 150, third place 100, and places four through ten 60 each, in addition to per-invite rewards. Winners are frozen before payment; unique transaction keys prevent duplicate credits after retries or restarts. Startup catches up missed month boundaries. Empty months have no champion or rewards. Transient account lookup failures defer settlement instead of changing the winners.
 
-Monthly DMs reuse the reward notification switch, image, and leaderboard link. Delivery failures preserve awarded points. Notification outcomes are stored as `sent` or `failed`; a process interruption during sending leaves a `sending` record for operator review instead of automatically sending a duplicate.
+Monthly DMs reuse the reward notification switch and leaderboard link, and identify monthly points as an additional reward. First, second, third, and fourth through tenth place use `invitation_no1.png`, `invitation_no2.png`, `invitation_no3.png`, and `invitation_no4-10.png` from `resources/images/`. Delivery failures preserve awarded points. Notification outcomes are stored as `sent` or `failed`; a process interruption during sending leaves a `sending` record for operator review instead of automatically sending a duplicate.
 
 | Command | Purpose |
 | --- | --- |

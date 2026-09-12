@@ -44,17 +44,15 @@ monthly:
   total_title: "### 🏆 总邀请排行"
   champion: "👑{month}月邀请冠军：{user}"
   no_champion: "暂无"
-  footer: |-
-    -# 月榜奖励：🥇200 · 🥈150 · 🥉100 · 第4–10名各60积分
-    -# 每月1日00:00（{timezone}）结算上月，机器人不参与排名。
+  footer: "-# 每月1日00:00（{timezone}）结算上月邀请奖励"
   notification_title: "🏆 {month}月邀请排行奖励"
   notification_body: |-
-    恭喜你获得 **{guild} · {month}月邀请{placement}**！
-    本月有效邀请 **{count}** 人，**{points} 积分**奖励已到账。
+    恭喜你获得 **{guild} · {month}月邀请 {placement}**！
+    本月有效邀请 **{count}** 人，额外 **{points} 积分**奖励已到账。
 
     感谢你为服务器带来新的伙伴！
-  notification_footer: "结算月份：{year}年{month}月 · 期待你下个月的表现"
-  rank_1: "冠军"
+  notification_footer: "结算月份：{year}年{month}月 · 小鸟助手 邀请激励系统"
+  rank_1: "👑冠军"
   rank_2: "亚军"
   rank_3: "季军"
   rank_other: "排行第{rank}名"

@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -1517,13 +1518,13 @@ def test_combined_monthly_top_ten_and_total_panel_with_previous_champion(tmp_pat
             assert [item['type'] for item in items] == [10, 14, 9, 14, 10, 14, 10]
             assert '更新于 <t:' in items[0]['content']
             assert '｜　👑8月邀请冠军：<@100>' in items[0]['content']
-            monthly = items[2]['components'][0]['content']
+            monthly = items[4]['content']
             assert monthly.startswith('### 📅 9月邀请排行 · TOP 10')
             assert monthly.count('<@') == 10
             assert '<@99>' not in monthly and '<@110>' not in monthly
-            assert items[4]['content'].count('<@') == 12
-            assert '总邀请排行' in items[4]['content']
-            assert '200' in items[6]['content'] and 'Europe/Berlin' in items[6]['content']
+            assert items[2]['components'][0]['content'].count('<@') == 12
+            assert '总邀请排行' in items[2]['components'][0]['content']
+            assert items[6]['content'] == '-# 每月1日00:00（Europe/Berlin）结算上月邀请奖励'
         finally:
             await cog.shop_db.close()
 
@@ -1551,9 +1552,14 @@ def test_monthly_settlement_pays_only_ten_humans_and_sends_dm_once(tmp_path):
                 components = payload['view'].to_components()
                 text = components[0]['components'][0]['content']
                 assert '9月邀请排行奖励' in text and str(row['points']) in text
+                assert f"额外 **{row['points']} 积分**奖励已到账" in text
+                assert components[0]['components'][-1]['content'] == '-# 结算月份：2026年9月 · 小鸟助手 邀请激励系统'
+                expected_image = f"invitation_no{row['rank']}.png" if row['rank'] <= 3 else 'invitation_no4-10.png'
+                assert Path(payload['file'].fp.name).name == expected_image
+                assert payload['file'].fp.closed
                 assert components[1]['components'][0]['url'] == 'https://discord.com/channels/123/555/777'
                 assert payload['allowed_mentions'].everyone is False
-            assert '冠军' in cog.bot.users[100].sent[0]['kwargs']['view'].to_components()[0]['components'][0]['content']
+            assert '9月邀请 👑冠军**！' in cog.bot.users[100].sent[0]['kwargs']['view'].to_components()[0]['components'][0]['content']
             await settle_months(cog, cog.leaderboard_settings, now)
             assert len(cog.bot.users[100].sent) == 1
         finally:

@@ -1342,17 +1342,18 @@ class InviteGuardCog(commands.Cog):
             ) or t('invite_guard.leaderboard.empty')
 
         monthly_body = t('invite_guard.monthly.title', month=int(key[-2:])) + '\n' + body(monthly_rows)
+        total_body = t('invite_guard.monthly.total_title') + '\n' + body(total_rows)
         avatar = _get_bot_avatar_url(self.bot)
-        monthly_item = discord.ui.Section(monthly_body, accessory=discord.ui.Thumbnail(avatar)) if avatar else (
-            discord.ui.TextDisplay(monthly_body)
+        total_item = discord.ui.Section(total_body, accessory=discord.ui.Thumbnail(avatar)) if avatar else (
+            discord.ui.TextDisplay(total_body)
         )
         view = discord.ui.LayoutView(timeout=None)
         view.add_item(discord.ui.Container(
             discord.ui.TextDisplay(f"### {t('invite_guard.leaderboard.title')}\n{subtitle}"),
             discord.ui.Separator(),
-            monthly_item,
+            total_item,
             discord.ui.Separator(),
-            discord.ui.TextDisplay(t('invite_guard.monthly.total_title') + '\n' + body(total_rows)),
+            discord.ui.TextDisplay(monthly_body),
             discord.ui.Separator(),
             discord.ui.TextDisplay(t('invite_guard.monthly.footer', timezone=settings.monthly_timezone)),
             accent_color=LEADERBOARD_PANEL_COLOR,
