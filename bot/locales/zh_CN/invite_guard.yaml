@@ -39,5 +39,25 @@ leaderboard:
   empty: "暂无有效邀请计数。"
   entry: "{badge} {user}  **{count}** 人"
   footer: "每个新成员只会被第一次有效普通邀请计入一次，退出后重新加入不会重复计数。"
+monthly:
+  title: "### 📅 {month}月邀请排行 · TOP 10"
+  total_title: "### 🏆 总邀请排行"
+  champion: "👑{month}月邀请冠军：{user}"
+  no_champion: "暂无"
+  footer: |-
+    -# 月榜奖励：🥇200 · 🥈150 · 🥉100 · 第4–10名各60积分
+    -# 每月1日00:00（{timezone}）结算上月，机器人不参与排名。
+  notification_title: "🏆 {month}月邀请排行奖励"
+  notification_body: |-
+    恭喜你获得 **{guild} · {month}月邀请{placement}**！
+    本月有效邀请 **{count}** 人，**{points} 积分**奖励已到账。
+
+    感谢你为服务器带来新的伙伴！
+  notification_footer: "结算月份：{year}年{month}月 · 期待你下个月的表现"
+  rank_1: "冠军"
+  rank_2: "亚军"
+  rank_3: "季军"
+  rank_other: "排行第{rank}名"
+  preview: "🧪 测试预览 · 不影响真实积分"
 labels:
   none: "无"

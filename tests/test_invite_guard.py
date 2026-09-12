@@ -14,6 +14,9 @@ from bot.cogs.invite_guard.cog import (
 )
 from bot.utils.invite_guard_db import InviteGuardDatabaseManager
 from bot.utils.shop_db import ShopDatabaseManager
+from bot.utils.invite_monthly_db import InviteMonthlyDatabaseManager
+from bot.utils.db_connect import connect_database
+from bot.cogs.invite_guard.monthly import settle_months
 
 
 NOW = datetime(2026, 7, 4, 12, 0, tzinfo=timezone.utc)
@@ -242,6 +245,7 @@ def _leaderboard_settings(**overrides):
         "attribution_batch_window_seconds": 0,
         "reward_notification_enabled": True,
         "reward_notification_image": "invite_reward.png",
+        "monthly_enabled": False,
     }
     data.update(overrides)
     return InviteLeaderboardSettings(**data)
@@ -1469,5 +1473,191 @@ def test_leaderboard_without_human_candidates_shows_empty_state(tmp_path, bot_co
         view = await cog._build_leaderboard_view(cog.leaderboard_settings)
         body = view.to_components()[0]["components"][2]["components"][0]["content"]
         assert body == invite_guard_cog.t('invite_guard.leaderboard.empty')
+
+    asyncio.run(scenario())
+
+
+async def _build_monthly_cog(tmp_path, *, human_count=12):
+    guild = FakeGuild([])
+    cog = await _build_leaderboard_cog(
+        tmp_path, guild, _leaderboard_settings(monthly_enabled=True, channel_id=555, message_id=777),
+    )
+    cog.monthly_db = InviteMonthlyDatabaseManager(cog.db.db_path)
+    cog._monthly_settlement_lock = asyncio.Lock()
+    cog.shop_db = ShopDatabaseManager(cog.db.db_path)
+    await cog.shop_db.initialize_database()
+    for user_id in range(99, 100 + human_count):
+        await cog.db.record_member_join(123, user_id + 1000, NOW.isoformat())
+        await cog.db.attribute_member(123, user_id + 1000, user_id, 'a', NOW.isoformat())
+        user = FakeUser(user_id, bot=user_id == 99)
+        original_send = user.send
+
+        async def send(*args, _send=original_send, **kwargs):
+            await _send(*args, **kwargs)
+            return SimpleNamespace(id=9000)
+
+        user.send = send
+        cog.bot.users[user_id] = user
+    await cog.monthly_db.ensure_tracking(123, datetime(2026, 9, 12, tzinfo=timezone.utc), 'Europe/Berlin')
+    return cog
+
+
+def test_combined_monthly_top_ten_and_total_panel_with_previous_champion(tmp_path, monkeypatch):
+    async def scenario():
+        cog = await _build_monthly_cog(tmp_path)
+        try:
+            async with connect_database(cog.db.db_path) as db:
+                await db.execute('''INSERT INTO invite_monthly_rewards
+                    (guild_id, month, user_id, rank, total_count, points, paid_at, dm_status)
+                    VALUES (123, '2026-08', 100, 1, 20, 200, '2026-09-01', 'sent')''')
+                await db.commit()
+            monkeypatch.setattr(discord.utils, 'utcnow', lambda: datetime(2026, 9, 12, 12, tzinfo=timezone.utc))
+            view = await cog._build_leaderboard_view(cog.leaderboard_settings)
+            items = view.to_components()[0]['components']
+            assert [item['type'] for item in items] == [10, 14, 9, 14, 10, 14, 10]
+            assert '更新于 <t:' in items[0]['content']
+            assert '｜　👑8月邀请冠军：<@100>' in items[0]['content']
+            monthly = items[2]['components'][0]['content']
+            assert monthly.startswith('### 📅 9月邀请排行 · TOP 10')
+            assert monthly.count('<@') == 10
+            assert '<@99>' not in monthly and '<@110>' not in monthly
+            assert items[4]['content'].count('<@') == 12
+            assert '总邀请排行' in items[4]['content']
+            assert '200' in items[6]['content'] and 'Europe/Berlin' in items[6]['content']
+        finally:
+            await cog.shop_db.close()
+
+    asyncio.run(scenario())
+
+
+def test_monthly_settlement_pays_only_ten_humans_and_sends_dm_once(tmp_path):
+    async def scenario():
+        cog = await _build_monthly_cog(tmp_path)
+        now = datetime(2026, 9, 30, 22, tzinfo=timezone.utc)
+        try:
+            await asyncio.gather(*(settle_months(cog, cog.leaderboard_settings, now) for _ in range(2)))
+            rewards = await cog.monthly_db.get_rewards(123)
+            assert [row['user_id'] for row in rewards] == list(range(100, 110))
+            assert [row['points'] for row in rewards] == [200, 150, 100] + [60]*7
+            assert all(row['paid_at'] and row['dm_status'] == 'sent' for row in rewards)
+            assert await cog.shop_db.get_user_balance(99) == 0
+            assert await cog.shop_db.get_user_balance(110) == 0
+            for row in rewards:
+                user = cog.bot.users[row['user_id']]
+                assert await cog.shop_db.get_user_balance(user.id) == row['points']
+                assert await cog.shop_db.get_transaction_count(user.id) == 1
+                assert len(user.sent) == 1
+                payload = user.sent[0]['kwargs']
+                components = payload['view'].to_components()
+                text = components[0]['components'][0]['content']
+                assert '9月邀请排行奖励' in text and str(row['points']) in text
+                assert components[1]['components'][0]['url'] == 'https://discord.com/channels/123/555/777'
+                assert payload['allowed_mentions'].everyone is False
+            assert '冠军' in cog.bot.users[100].sent[0]['kwargs']['view'].to_components()[0]['components'][0]['content']
+            await settle_months(cog, cog.leaderboard_settings, now)
+            assert len(cog.bot.users[100].sent) == 1
+        finally:
+            await cog.shop_db.close()
+
+    asyncio.run(scenario())
+
+
+def test_monthly_payment_recovers_after_credit_before_mark_paid_failure(tmp_path):
+    async def scenario():
+        cog = await _build_monthly_cog(tmp_path, human_count=1)
+        now = datetime(2026, 9, 30, 22, tzinfo=timezone.utc)
+        original = cog.monthly_db.mark_paid
+
+        async def crash(*args):
+            raise RuntimeError('simulated interruption after credit')
+
+        cog.monthly_db.mark_paid = crash
+        try:
+            await settle_months(cog, cog.leaderboard_settings, now)
+            assert await cog.shop_db.get_user_balance(100) == 200
+            assert cog.bot.users[100].sent == []
+            cog.monthly_db.mark_paid = original
+            await settle_months(cog, cog.leaderboard_settings, now)
+            assert await cog.shop_db.get_user_balance(100) == 200
+            assert await cog.shop_db.get_transaction_count(100) == 1
+            assert len(cog.bot.users[100].sent) == 1
+        finally:
+            await cog.shop_db.close()
+
+    asyncio.run(scenario())
+
+
+def test_monthly_lookup_failure_defers_settlement_instead_of_changing_winners(tmp_path):
+    async def scenario():
+        cog = await _build_monthly_cog(tmp_path, human_count=2)
+        now = datetime(2026, 9, 30, 22, tzinfo=timezone.utc)
+        user = cog.bot.users.pop(100)
+
+        async def unavailable(user_id):
+            raise discord.HTTPException(SimpleNamespace(status=503, reason='unavailable'), 'unavailable')
+
+        cog.bot.fetch_user = unavailable
+        try:
+            with pytest.raises(discord.HTTPException):
+                await settle_months(cog, cog.leaderboard_settings, now)
+            assert await cog.monthly_db.get_rewards(123) == []
+            assert await cog.monthly_db.next_unsettled_month(123) == '2026-09'
+            cog.bot.users[100] = user
+            await settle_months(cog, cog.leaderboard_settings, now)
+            assert (await cog.monthly_db.get_champion(123, '2026-09'))['user_id'] == 100
+        finally:
+            await cog.shop_db.close()
+
+    asyncio.run(scenario())
+
+
+def test_monthly_dm_forbidden_preserves_payment_and_other_winners(tmp_path):
+    async def scenario():
+        cog = await _build_monthly_cog(tmp_path, human_count=2)
+        cog.bot.users[100].send_exception = discord.Forbidden(SimpleNamespace(status=403, reason='forbidden'), 'disabled')
+        try:
+            await settle_months(cog, cog.leaderboard_settings, datetime(2026, 9, 30, 22, tzinfo=timezone.utc))
+            rewards = await cog.monthly_db.get_rewards(123)
+            assert rewards[0]['dm_status'] == 'failed' and rewards[0]['paid_at']
+            assert rewards[1]['dm_status'] == 'sent'
+            assert await cog.shop_db.get_user_balance(100) == 200
+            assert await cog.shop_db.get_user_balance(101) == 150
+        finally:
+            await cog.shop_db.close()
+
+    asyncio.run(scenario())
+
+
+def test_monthly_offline_catchup_processes_empty_months_without_stale_champion(tmp_path):
+    async def scenario():
+        cog = await _build_monthly_cog(tmp_path, human_count=1)
+        try:
+            await settle_months(cog, cog.leaderboard_settings, datetime(2027, 1, 1, tzinfo=timezone.utc))
+            assert await cog.monthly_db.next_unsettled_month(123) == '2027-01'
+            assert await cog.monthly_db.get_champion(123, '2026-12') is None
+            assert await cog.shop_db.get_user_balance(100) == 200
+            assert await cog.shop_db.get_transaction_count(100) == 1
+        finally:
+            await cog.shop_db.close()
+
+    asyncio.run(scenario())
+
+
+def test_monthly_background_schedule_uses_berlin_midnight(tmp_path, monkeypatch):
+    async def scenario():
+        from discord.ext import tasks
+        from zoneinfo import ZoneInfo
+        cog = await _build_monthly_cog(tmp_path, human_count=0)
+        cog.settings = _settings(enabled=False)
+        started = []
+        monkeypatch.setattr(tasks.Loop, 'start', lambda loop: started.append(loop.coro.__name__))
+        try:
+            await cog.cog_load()
+            assert 'invite_monthly_task' in started
+            scheduled = cog.invite_monthly_task.time[0]
+            assert scheduled.hour == 0 and scheduled.minute == 0
+            assert scheduled.tzinfo == ZoneInfo('Europe/Berlin')
+        finally:
+            await cog.shop_db.close()
 
     asyncio.run(scenario())

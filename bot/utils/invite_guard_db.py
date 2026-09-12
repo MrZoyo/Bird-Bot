@@ -7,6 +7,7 @@ import aiosqlite
 
 from .db_connect import connect_database
 from .db_lifecycle import BaseDatabaseManager
+from .invite_monthly_db import create_monthly_tables, record_monthly_credit
 from .schema_migrations import SchemaMigration, add_column_if_missing, apply_schema_migrations
 
 
@@ -67,6 +68,11 @@ class InviteGuardDatabaseManager(BaseDatabaseManager):
                         version=1,
                         description='add pooled_count to invite_users for pooled attribution',
                         migrate=self._migrate_add_pooled_count,
+                    ),
+                    SchemaMigration(
+                        version=2,
+                        description='add monthly invite credit ledger and settlement records',
+                        migrate=create_monthly_tables,
                     ),
                 ],
             )
@@ -367,6 +373,7 @@ class InviteGuardDatabaseManager(BaseDatabaseManager):
                 ''',
                 (now, guild_id, inviter_id),
             )
+            await record_monthly_credit(db, guild_id, inviter_id, 1, now, 'attributed')
             await db.commit()
             return True
 
@@ -429,6 +436,7 @@ class InviteGuardDatabaseManager(BaseDatabaseManager):
                     ''',
                     (delta, now, guild_id, inviter_id),
                 )
+                await record_monthly_credit(db, guild_id, inviter_id, delta, now, 'pooled')
 
             await db.commit()
             return True

@@ -30,6 +30,15 @@ leaderboard_message_id:
 leaderboard_interval_minutes: 5
 # 排行榜显示前 N 名。
 leaderboard_top_n: 15
+# 同一面板展示当月前10名及上月已结算冠军。月榜按有效邀请归因入账时间累计。
+# 首次启用时，现有总邀请数一次性作为启用月份的初始计数；重启不会重复导入。
+monthly_enabled: true
+# 每月1日当地00:00结算上月，IANA时区自动处理夏令时，不依赖主机系统时区。
+# 启用后修改时区需要明确的数据迁移，以免改变历史结算边界。
+monthly_timezone: Europe/Berlin
+# 月榜固定奖励：冠军200、亚军150、季军100、第4–10名各60积分；奖励额外计入Shop余额。
+# 每个结算月与获奖用户只入账一次；离线错过月初会在启动时补结算。
+# 私信沿用 reward_notification_enabled 和排行榜跳转链接；私信失败不影响积分。
 # 不计入排行榜的邀请 code，例如 vanity/官方入口 birdgaming。这里会与 invite_code_whitelist 合并。
 ignored_codes:
 - birdgaming

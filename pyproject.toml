@@ -15,6 +15,7 @@ dependencies = [
     "ruamel.yaml",
     "sqlcipher3==0.6.2",
     "tqdm",
+    "tzdata",
 ]
 
 [project.optional-dependencies]

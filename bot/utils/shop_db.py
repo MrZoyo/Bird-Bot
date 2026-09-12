@@ -8,6 +8,7 @@ import aiosqlite
 
 from .db_connect import connect_database
 from .db_lifecycle import BaseDatabaseManager
+from .schema_migrations import SchemaMigration, add_column_if_missing, apply_schema_migrations
 
 
 class ShopDatabaseManager(BaseDatabaseManager):
@@ -112,6 +113,10 @@ class ShopDatabaseManager(BaseDatabaseManager):
                     )
                 ''')
 
+                await apply_schema_migrations(
+                    db, 'shop', [SchemaMigration(1, 'add idempotent reward transactions', self._migrate_reward_keys)],
+                )
+
                 # Daily check-in records table
                 await self._execute_on_connection(db, '''
                     CREATE TABLE IF NOT EXISTS shop_checkin_records (
@@ -153,6 +158,12 @@ class ShopDatabaseManager(BaseDatabaseManager):
             except Exception:
                 await db.rollback()
                 raise
+
+    async def _migrate_reward_keys(self, db: aiosqlite.Connection) -> None:
+        await add_column_if_missing(db, 'shop_transactions', 'idempotency_key', 'TEXT')
+        await db.execute(
+            'CREATE UNIQUE INDEX IF NOT EXISTS idx_shop_transaction_key ON shop_transactions(idempotency_key)',
+        )
 
     async def get_user_balance(self, user_id: int) -> int:
         """Get a user's current balance."""
@@ -327,11 +338,25 @@ class ShopDatabaseManager(BaseDatabaseManager):
         operation_type: str,
         operator_id: int,
         note: str = None,
+        *,
+        idempotency_key: str | None = None,
     ):
-        """Update user balance and record the transaction."""
+        """Update balance and history atomically, optionally once per reward key."""
         async with self._get_persistent_connection_lock():
             db = await self._get_persistent_connection()
             try:
+                await db.execute('BEGIN IMMEDIATE')
+                if idempotency_key is not None:
+                    previous = await self._fetchone_on_connection(
+                        db,
+                        'SELECT user_id, amount, operation_type, new_balance FROM shop_transactions WHERE idempotency_key=?',
+                        (idempotency_key,),
+                    )
+                    if previous:
+                        if previous[:3] != (user_id, amount, operation_type):
+                            raise ValueError('Reward key reused for a different transaction')
+                        await db.rollback()
+                        return previous[3]
                 await self._execute_on_connection(
                     db,
                     'INSERT OR IGNORE INTO shop_user_balance (user_id, balance) '
@@ -358,9 +383,9 @@ class ShopDatabaseManager(BaseDatabaseManager):
                     INSERT INTO shop_transactions
                     (
                         user_id, timestamp, operation_type, amount,
-                        new_balance, operator_id, note
+                        new_balance, operator_id, note, idempotency_key
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     ''',
                     (
                         user_id,
@@ -370,6 +395,7 @@ class ShopDatabaseManager(BaseDatabaseManager):
                         new_balance,
                         operator_id,
                         note,
+                        idempotency_key,
                     ),
                 )
                 await db.commit()

@@ -4,9 +4,10 @@ import asyncio
 import logging
 import os
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import discord
 from discord import app_commands
@@ -24,9 +25,12 @@ from bot.utils import (
 )
 from bot.utils.components_v2 import clear_legacy_message_payload
 from bot.utils.invite_guard_db import InviteLinkRecord, InviteLinkSyncSummary
+from bot.utils.invite_monthly_db import InviteMonthlyDatabaseManager
+from bot.utils.invite_months import month_key, shift_month
 from bot.utils.i18n import t
 from bot.utils.paths import project_path
 from bot.utils.task_helpers import wait_until_ready_or_stop
+from .monthly import settle_months
 
 
 DEFAULT_MAX_AGE_DAYS = 3
@@ -72,6 +76,8 @@ class InviteLeaderboardSettings:
     attribution_batch_window_seconds: float = DEFAULT_ATTRIBUTION_BATCH_WINDOW_SECONDS
     reward_notification_enabled: bool = True
     reward_notification_image: str = DEFAULT_REWARD_NOTIFICATION_IMAGE
+    monthly_enabled: bool = True
+    monthly_timezone: str = 'Europe/Berlin'
 
 
 @dataclass(frozen=True)
@@ -109,6 +115,8 @@ class InviteGuardCog(commands.Cog):
         self.leaderboard_settings = self._load_leaderboard_settings()
         self.db_path = config.get_config('main')['db_path']
         self.db = InviteGuardDatabaseManager(self.db_path)
+        self.monthly_db = InviteMonthlyDatabaseManager(self.db_path)
+        self._monthly_settlement_lock = asyncio.Lock()
         shop_config = config.get_config('shop', silent=True)
         self.shop_db = ShopDatabaseManager(self.db_path, shop_config if isinstance(shop_config, dict) else {})
         self.invite_cache: dict[str, InviteSnapshot] = {}
@@ -121,8 +129,16 @@ class InviteGuardCog(commands.Cog):
 
     async def cog_load(self):
         await self.db.initialize_database()
-        if self.leaderboard_settings.reward_points_per_invite > 0:
+        if self.leaderboard_settings.reward_points_per_invite > 0 or self.leaderboard_settings.monthly_enabled:
             await self.shop_db.initialize_database()
+        if self.leaderboard_settings.enabled and self.leaderboard_settings.monthly_enabled:
+            await self.monthly_db.ensure_tracking(
+                self.leaderboard_settings.guild_id, discord.utils.utcnow(), self.leaderboard_settings.monthly_timezone,
+            )
+            self.invite_monthly_task.change_interval(
+                time=time(0, tzinfo=ZoneInfo(self.leaderboard_settings.monthly_timezone)),
+            )
+            self.invite_monthly_task.start()
 
         self._apply_loop_interval(self.settings)
         if self.settings.enabled and not self.invite_cleanup_task.is_running():
@@ -147,6 +163,8 @@ class InviteGuardCog(commands.Cog):
             logging.info("[InviteLeaderboard] Scheduled leaderboard sync is disabled by config.")
 
     def cog_unload(self):
+        if self.invite_monthly_task.is_running():
+            self.invite_monthly_task.cancel()
         if self.invite_cleanup_task.is_running():
             self.invite_cleanup_task.cancel()
         if self.invite_leaderboard_task.is_running():
@@ -322,7 +340,28 @@ class InviteGuardCog(commands.Cog):
             return
 
         await self.sync_invite_links(settings=settings, source="scheduled")
+        await self._settle_monthly_safely(settings)
         await self.update_leaderboard_message(settings=settings)
+
+    async def _settle_monthly_safely(self, settings):
+        try:
+            await settle_months(self, settings)
+        except Exception:
+            logging.exception('[InviteMonthly] Settlement interrupted; frozen payments will be retried.')
+
+    @tasks.loop(hours=24)
+    async def invite_monthly_task(self):
+        settings = self._load_leaderboard_settings()
+        await self._settle_monthly_safely(settings)
+        if settings.enabled and settings.monthly_enabled:
+            await self.update_leaderboard_message(settings=settings)
+
+    @invite_monthly_task.before_loop
+    async def before_invite_monthly_task(self):
+        if not await wait_until_ready_or_stop(self.bot, self.invite_monthly_task, 'InviteGuardCog.invite_monthly_task'):
+            return
+        # Catch up missed month boundaries when the bot was offline.
+        await self._settle_monthly_safely(self._load_leaderboard_settings())
 
     @invite_leaderboard_task.before_loop
     async def before_invite_leaderboard_task(self):
@@ -557,7 +596,7 @@ class InviteGuardCog(commands.Cog):
         if message_id:
             try:
                 message = await channel.fetch_message(message_id)
-                await message.edit(view=view, **clear_legacy_message_payload())
+                await message.edit(view=view, allowed_mentions=discord.AllowedMentions.none(), **clear_legacy_message_payload())
                 self._runtime_leaderboard_channel_id = channel.id
                 self._runtime_leaderboard_message_id = message.id
                 return message.id
@@ -584,7 +623,7 @@ class InviteGuardCog(commands.Cog):
                 return None
 
         try:
-            message = await channel.send(view=view)
+            message = await channel.send(view=view, allowed_mentions=discord.AllowedMentions.none())
             self._runtime_leaderboard_channel_id = channel.id
             self._runtime_leaderboard_message_id = message.id
             logging.warning(
@@ -631,7 +670,6 @@ class InviteGuardCog(commands.Cog):
             return
 
         settings = self._load_leaderboard_settings()
-        now = _now_iso()
         guild = batch[0].guild
 
         # Rewards collected while the lock is held, paid out after release so Shop
@@ -641,6 +679,7 @@ class InviteGuardCog(commands.Cog):
         pooled_rewards: list[tuple[int, str, int]] = []
 
         async with self._invite_cache_lock:
+            now = _now_iso()
             previous_cache = dict(self.invite_cache)
             invites = await self._fetch_guild_invites(guild)
             if invites is None:
@@ -1122,10 +1161,11 @@ class InviteGuardCog(commands.Cog):
         channel_id: int,
         message_id: int,
         with_image: bool,
+        title: str | None = None,
     ) -> discord.ui.LayoutView:
         container_items: list[discord.ui.Item] = [
             discord.ui.TextDisplay(
-                f"### {t('invite_guard.notification.title')}\n{body}"
+                f"### {title or t('invite_guard.notification.title')}\n{body}"
             ),
         ]
         if with_image:
@@ -1204,10 +1244,13 @@ class InviteGuardCog(commands.Cog):
         return deltas
 
     async def _get_human_leaderboard_rows(self, settings: InviteLeaderboardSettings) -> list[dict[str, Any]]:
-        guild = self.bot.get_guild(settings.guild_id)
         # Read one snapshot before awaiting Discord. Paginating by offset while
         # invite counts change could skip or repeat inviters between pages.
         candidates = await self.db.get_leaderboard(settings.guild_id, limit=None)
+        return await self._filter_human_leaderboard_rows(candidates, settings.top_n, guild_id=settings.guild_id)
+
+    async def _filter_human_leaderboard_rows(self, candidates, limit, *, strict=False, guild_id=None):
+        guild = self.bot.get_guild(guild_id or self.leaderboard_settings.guild_id)
         rows = []
         for row in candidates:
             user_id = row['user_id']
@@ -1216,22 +1259,28 @@ class InviteGuardCog(commands.Cog):
                 try:
                     # A departed member may still be a valid human inviter.
                     user = await self.bot.fetch_user(user_id)
+                except discord.NotFound:
+                    continue
                 except discord.HTTPException as e:
                     logging.warning(
                         "[InviteLeaderboard] Skipping unresolved account %s for this refresh: %s",
                         fmt_user(user_id),
                         e,
                     )
+                    if strict:
+                        raise
                     continue
             if user.bot:
                 continue
             rows.append(row)
-            if len(rows) == settings.top_n:
+            if len(rows) == limit:
                 break
         return rows
 
     async def _build_leaderboard_view(self, settings: InviteLeaderboardSettings) -> discord.ui.LayoutView:
         rows = await self._get_human_leaderboard_rows(settings)
+        if settings.monthly_enabled:
+            return await self._build_combined_leaderboard_view(settings, rows)
         updated_at = discord.utils.format_dt(discord.utils.utcnow(), style='R')
         if not rows:
             leaderboard_body = t('invite_guard.leaderboard.empty')
@@ -1270,6 +1319,44 @@ class InviteGuardCog(commands.Cog):
                 accent_color=LEADERBOARD_PANEL_COLOR,
             )
         )
+        return view
+
+    async def _build_combined_leaderboard_view(self, settings, total_rows):
+        now = discord.utils.utcnow()
+        key = month_key(now, settings.monthly_timezone)
+        candidates = await self.monthly_db.get_leaderboard(settings.guild_id, key, settings.monthly_timezone)
+        monthly_rows = await self._filter_human_leaderboard_rows(candidates, 10, guild_id=settings.guild_id)
+        previous_key = shift_month(key, -1)
+        champion = await self.monthly_db.get_champion(settings.guild_id, previous_key)
+        champion_user = f"<@{champion['user_id']}>" if champion else t('invite_guard.monthly.no_champion')
+        subtitle = (
+            t('invite_guard.leaderboard.updated_at', time=discord.utils.format_dt(now, style='R'))
+            + '　｜　' + t('invite_guard.monthly.champion', month=int(previous_key[-2:]), user=champion_user)
+        )
+
+        def body(rows):
+            return '\n'.join(
+                t('invite_guard.leaderboard.entry', badge=_leaderboard_badge(rank),
+                  user=f"<@{row['user_id']}>", count=row['total_count'])
+                for rank, row in enumerate(rows, 1)
+            ) or t('invite_guard.leaderboard.empty')
+
+        monthly_body = t('invite_guard.monthly.title', month=int(key[-2:])) + '\n' + body(monthly_rows)
+        avatar = _get_bot_avatar_url(self.bot)
+        monthly_item = discord.ui.Section(monthly_body, accessory=discord.ui.Thumbnail(avatar)) if avatar else (
+            discord.ui.TextDisplay(monthly_body)
+        )
+        view = discord.ui.LayoutView(timeout=None)
+        view.add_item(discord.ui.Container(
+            discord.ui.TextDisplay(f"### {t('invite_guard.leaderboard.title')}\n{subtitle}"),
+            discord.ui.Separator(),
+            monthly_item,
+            discord.ui.Separator(),
+            discord.ui.TextDisplay(t('invite_guard.monthly.total_title') + '\n' + body(total_rows)),
+            discord.ui.Separator(),
+            discord.ui.TextDisplay(t('invite_guard.monthly.footer', timezone=settings.monthly_timezone)),
+            accent_color=LEADERBOARD_PANEL_COLOR,
+        ))
         return view
 
     async def _get_message_channel(self, channel_id: int):
@@ -1644,6 +1731,8 @@ class InviteGuardCog(commands.Cog):
             ),
             interval_minutes=interval_minutes,
             top_n=top_n,
+            monthly_enabled=_coerce_bool(raw.get('monthly_enabled', True), default=True),
+            monthly_timezone=str(raw.get('monthly_timezone') or 'Europe/Berlin'),
             ignored_codes=frozenset(ignored_codes),
             ignored_inviter_ids=ignored_inviter_ids,
             unknown_allow_reattribution=_coerce_bool(
