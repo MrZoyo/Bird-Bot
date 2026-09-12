@@ -11,8 +11,12 @@ This file preserves the release notes that previously lived at the bottom of `RE
 
 - Excluded bot accounts from invite leaderboards, including bots with historical invite counts. Human inviters fill the remaining places in the existing count and user-ID order.
 - Resolve uncached accounts through Discord so departed human inviters remain eligible. Accounts that cannot be resolved are skipped for that refresh and retried on the next one.
-- Preserved stored invite attribution, counts, and rewards; no database migration is required.
-- Added regression coverage for historical bots, filling human places, concurrent count changes, pooled counts, account lookup failures, empty leaderboards, and panel refreshes.
+- Added a shared panel with lifetime rankings above the current month's Top 10, a divider, and the previous month's settled champion beside the update time.
+- Added monthly settlement at 00:00 on the first day in `Europe/Berlin`, with daylight-saving transitions and startup catch-up. Additional rewards are 200, 150, and 100 points for the top three, and 60 points for places four through ten.
+- First activation imports existing lifetime invite totals into that month's opening balance once. Later months contain only new attribution credits; existing lifetime counts and Shop balances are preserved.
+- Added additive migrations for monthly credit, settlement, and notification records, plus unique Shop reward transaction keys to prevent duplicate payments. The `tzdata` dependency supplies portable IANA timezone data.
+- Added placement-specific reward images and DMs that show the settled rank and additional points. Failed or interrupted notifications preserve payment records.
+- Expanded tests for historical bots, monthly boundaries, pooled credits, concurrent count changes, opening-balance import, account lookup failures, payment recovery, reward images, and the combined panel.
 
 ## 2.0.4 — 2026-08-16
 

@@ -90,6 +90,7 @@ Feature managers own schema creation and queries. Cross-version schema changes u
 | `check_status_db.py` | Aggregate voice-activity samples |
 | `giveaway_db.py` | Giveaways, participants, requirements, and winners |
 | `invite_guard_db.py` | Invite links, attribution locks, join/leave totals, and leaderboard counts |
+| `invite_monthly_db.py` | Monthly credit ledger, one-time opening balances, frozen winners, and notification state |
 | `privateroom_db.py` | Room ownership, expiry, saved settings, bans, and shop panels |
 | `role_db.py` | Persistent pickup views, signature state, change slots, and permission flags |
 | `shop_db.py` | Balances, transactions, check-ins, makeup quotas, and panel records |
@@ -142,7 +143,7 @@ Current recurring work includes:
 - giveaway completion and persistent-view recovery;
 - private-room expiry processing;
 - temporary-ban recovery and scheduled unban;
-- InviteGuard cleanup, invite-link sync, batch attribution, and leaderboard refresh;
+- InviteGuard cleanup, invite-link sync, batch attribution, leaderboard refresh, and timezone-aware monthly reward settlement;
 - check-in panel refresh and daily rollover.
 
 When a task mutates state and then edits Discord, define the ordering explicitly and cover it with a fake interaction or task test. For example, check-in daily state advances only after its panel edit succeeds, and private-room renewal reads back the persisted expiry before charging the user.

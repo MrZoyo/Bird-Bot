@@ -45,6 +45,7 @@ panels, track progress, and continue scheduled tasks after restart.
 - Ban features: user IDs, guild IDs, moderator IDs, ban reasons, unban timestamps, active/inactive state, and Discord delete-message-day setting.
 - Giveaways: giveaway IDs, channel/message IDs, creator IDs, prize/description text, participant IDs, winner IDs, requirements, and end state.
 - Invite guard and leaderboard: guild/user IDs, inviter user IDs, invite codes, invite channel IDs, invite use counts, attribution status, join/leave counters, leaderboard message/channel IDs, and ignored/active invite-link state. Invite rewards are recorded in the Shop balance and transaction tables.
+- Monthly invite rankings additionally retain the activation month and timezone, timestamped credit amounts and sources, monthly settlement times, winners' ranks/counts/points, payment timestamps, and DM delivery status/message IDs. Unique Shop transaction keys identify monthly rewards and prevent duplicate credits after retries.
 - Check-status samples: timestamped aggregate voice counts and active channel counts.
 - Config tables: feature setup state such as ticket types, voice-channel rules, game-type mapping, and panel message locations.
 

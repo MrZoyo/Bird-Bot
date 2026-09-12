@@ -228,6 +228,10 @@ uv sync --frozen --python 3.12.3
 
 需要时，数据库 schema 迁移会在启动阶段执行。生产 checkout 包含服务器专用 locale 或图片修改时，切勿使用 `git reset --hard` 或其他强制覆盖式更新。
 
+2.0.5 包含月度邀请排行和InviteGuard/Shop增量迁移。切换前应安装锁定的 `tzdata` 依赖，并在私有数据库备份上验证新版。`monthly_enabled: true` 为默认值，首次启动会将现有累计邀请数一次性计入启用月份，以后各月只统计新增。确认 `monthly_timezone: Europe/Berlin` 并保留已有排行榜频道和消息ID。结算和私信规则见[InviteGuard功能说明](docs/zh-CN/FEATURES.md#inviteguardcog)。
+
+为缩短停机，先在旧进程运行期间获取代码、准备依赖、验证备份并完成隔离测试；仅在切换代码和执行启动迁移时停止旧进程，然后立即通过该部署现有的服务或启动器恢复。确认Discord登录、模块加载、月榜初始计数和面板刷新后，再更新下一台服务器。启动失败时保留生产定制内容并回退代码；数据库接受新活动后，不要用旧备份覆盖。
+
 ## 从 2.0 之前的 JSON 配置迁移
 
 Config 2.0 使用 YAML、locale 文件和数据库中的可变初始化数据。请使用旧配置和数据库的副本测试迁移：
