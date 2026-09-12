@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="pics/readme-banner.svg" alt="Bird Bot banner" width="100%">
+  <img src="pics/readme-banner.svg" alt="Bird Bot — a blue bird wearing gaming headphones, with voice and team-up icons" width="100%">
 </p>
 
 <h1 align="center">Bird Bot</h1>

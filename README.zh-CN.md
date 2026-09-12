@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="pics/readme-banner.svg" alt="Bird Bot 横幅" width="100%">
+  <img src="pics/readme-banner.svg" alt="Bird Bot 横幅：戴着游戏耳机的蓝色小鸟，搭配语音与组队图标" width="100%">
 </p>
 
 <h1 align="center">Bird Bot</h1>

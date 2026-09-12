@@ -1,82 +1,132 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 480" role="img" aria-labelledby="title desc">
-  <title id="title">Bird Bot banner</title>
-  <desc id="desc">A dark indigo and cyan banner with a stylised bird mark and modular Discord feature cards.</desc>
-
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="560" viewBox="0 0 1600 560" role="img" aria-labelledby="title desc">
+  <title id="title">Bird Bot — your Discord companion</title>
+  <desc id="desc">A blue bird wearing headphones sits in a lavender orbit beside the Bird Bot title. Chat, voice, and team-up symbols celebrate gaming communities.</desc>
   <defs>
-    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0b1020"/>
-      <stop offset="0.52" stop-color="#20255a"/>
-      <stop offset="1" stop-color="#0d6c86"/>
+    <linearGradient id="background" x2="1" y2="1">
+      <stop stop-color="#11192c"/>
+      <stop offset="1" stop-color="#1e2545"/>
     </linearGradient>
-    <linearGradient id="halo" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#8ea2ff" stop-opacity="0.95"/>
-      <stop offset="1" stop-color="#41e2d2" stop-opacity="0.82"/>
+    <linearGradient id="orbit" x2="0.8" y2="1">
+      <stop stop-color="#b8b8ff"/>
+      <stop offset="1" stop-color="#8585e8"/>
     </linearGradient>
-    <linearGradient id="wing" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#b9c5ff"/>
+    <linearGradient id="feathers" x1="0" y1="0" x2="0.9" y2="1">
+      <stop stop-color="#83c9ff"/>
+      <stop offset="0.55" stop-color="#5b9ef4"/>
+      <stop offset="1" stop-color="#4778db"/>
     </linearGradient>
-    <pattern id="grid" width="42" height="42" patternUnits="userSpaceOnUse">
-      <path d="M42 0H0V42" fill="none" stroke="#ffffff" stroke-opacity="0.08"/>
-    </pattern>
-    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
-      <feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#050817" flood-opacity="0.42"/>
-    </filter>
-    <filter id="soft-glow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="22"/>
-    </filter>
+    <linearGradient id="face" x2="0.3" y2="1">
+      <stop stop-color="#fffdf6"/>
+      <stop offset="1" stop-color="#e5efff"/>
+    </linearGradient>
+    <linearGradient id="earcup" x2="1" y2="1">
+      <stop stop-color="#46557d"/>
+      <stop offset="1" stop-color="#283654"/>
+    </linearGradient>
+    <clipPath id="canvas"><rect width="1600" height="560" rx="28"/></clipPath>
   </defs>
 
-  <rect width="1600" height="480" rx="34" fill="url(#background)"/>
-  <rect x="18" y="18" width="1564" height="444" rx="24" fill="url(#grid)"/>
+  <!-- Self-contained vector artwork: no raster images, scripts, or external assets. -->
+  <g clip-path="url(#canvas)">
+    <rect width="1600" height="560" fill="url(#background)"/>
+    <path d="M908 560C847 429 893 233 1027 102S1368-55 1600 18V560Z" fill="#242d50" opacity="0.46"/>
+    <path d="M1022 560C938 410 1005 174 1190 85S1499 74 1600 114" fill="none" stroke="#3e496c" stroke-width="1.5" opacity="0.55"/>
+    <circle cx="1191" cy="283" r="227" fill="none" stroke="#54618b" stroke-width="1.5" stroke-dasharray="3 13"/>
+    <circle cx="1191" cy="283" r="199" fill="url(#orbit)"/>
+    <path d="M1026 395A199 199 0 0 0 1382 339C1287 401 1150 428 1026 395Z" fill="#7679d6" opacity="0.5"/>
+    <ellipse cx="1194" cy="452" rx="118" ry="16" fill="#505ba9" opacity="0.4"/>
 
-  <circle cx="1410" cy="72" r="180" fill="#52d9db" opacity="0.18" filter="url(#soft-glow)"/>
-  <circle cx="1390" cy="286" r="230" fill="#6f75ff" opacity="0.18" filter="url(#soft-glow)"/>
-  <path d="M0 390C260 300 420 430 650 350s390-8 520 56 278 32 430-42v116H0Z" fill="#050817" opacity="0.24"/>
-
-  <g transform="translate(108 102)">
-    <text x="0" y="42" fill="#8fe9e3" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="22" font-weight="700" letter-spacing="5">SELF-HOSTED  •  MODULAR  •  DISCORD</text>
-    <text x="-3" y="142" fill="#ffffff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="92" font-weight="800" letter-spacing="-3">Bird Bot</text>
-    <text x="2" y="196" fill="#d7ddff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="30" font-weight="500">Modular tools for gaming communities</text>
-    <g transform="translate(2 246)">
-      <rect width="474" height="48" rx="24" fill="#ffffff" fill-opacity="0.12" stroke="#ffffff" stroke-opacity="0.2"/>
-      <circle cx="25" cy="24" r="7" fill="#41e2d2"/>
-      <text x="46" y="31" fill="#f3f5ff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="650" letter-spacing="1.2">VOICE  ·  TEAM-UP  ·  ACHIEVEMENTS  ·  OPS</text>
+    <!-- Typography stays editable and uses local system fonts. -->
+    <g font-family="Verdana, 'DejaVu Sans', sans-serif">
+      <g transform="translate(94 119)">
+        <rect y="-15" width="29" height="29" rx="9" fill="#a9a7ff"/>
+        <path d="M7-1L12 4 22-6" fill="none" stroke="#1a2340" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="47" y="6" fill="#b5baff" font-size="17" font-weight="700" letter-spacing="3">YOUR DISCORD COMPANION</text>
+      </g>
+      <text x="87" y="285" fill="#fffaf0" font-family="Arial, 'DejaVu Sans', sans-serif" font-size="132" font-weight="800" letter-spacing="-6">Bird Bot<tspan fill="#a8a4ff">.</tspan></text>
+      <text x="94" y="345" fill="#bec8e0" font-size="25">Modular tools for gaming communities.</text>
+      <path d="M94 388H754" stroke="#3b4664"/>
+      <g transform="translate(96 432)" fill="#dce4f6" font-size="17">
+        <g fill="none" stroke="#9cc8ff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="1" y="-16" width="10" height="19" rx="5"/>
+          <path d="M-3-4V-1A9 9 0 0 0 15-1V-4M6 8V13M1 13H11"/>
+        </g>
+        <text x="32" y="6">Voice rooms</text>
+        <circle cx="186" cy="0" r="2.5" fill="#657393"/>
+        <g transform="translate(216)" fill="none" stroke="#b6adff" stroke-width="2.6" stroke-linecap="round">
+          <circle cx="5" cy="-9" r="5"/>
+          <path d="M-4 11V7A9 9 0 0 1 14 7V11M18-12A5 5 0 0 1 18-2M21 2Q26 4 26 10"/>
+        </g>
+        <text x="258" y="6">Team up</text>
+        <circle cx="383" cy="0" r="2.5" fill="#657393"/>
+        <g transform="translate(414)" fill="none" stroke="#ffc581" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M0-14H17V-4A8.5 8.5 0 0 1 0-4ZM0-10H-5V-6Q-5 1 2 1M17-10H22V-6Q22 1 15 1M8.5 5V12M2 12H15"/>
+        </g>
+        <text x="454" y="6">Achievements</text>
+      </g>
     </g>
-  </g>
 
-  <g transform="translate(1160 70)" filter="url(#shadow)">
-    <circle cx="190" cy="170" r="156" fill="url(#halo)" opacity="0.95"/>
-    <circle cx="190" cy="170" r="132" fill="#12193c" opacity="0.55"/>
-    <path d="M118 198c29-61 87-99 151-99 27 0 53 6 77 18-24 7-46 21-62 41 39 2 69 17 91 43-42-15-80-16-117-2-33 13-66 37-92 73-20-20-36-45-48-74Z" fill="url(#wing)"/>
-    <path d="M258 119c24-20 55-27 86-20l-30 25 31 19c-30 6-58-1-87-24Z" fill="#ffffff"/>
-    <circle cx="303" cy="132" r="7" fill="#20255a"/>
-    <path d="M145 207c25 6 45 18 62 37-30 3-54-9-71-31l9-6Z" fill="#8ea2ff" opacity="0.72"/>
-    <path d="M201 256c-10 31-30 50-60 57 12-25 13-48 4-70 18 3 36 7 56 13Z" fill="#41e2d2" opacity="0.9"/>
-  </g>
+    <!-- A compact, friendly bird silhouette with a feather crest and headset. -->
+    <g transform="translate(1188 290)">
+      <!-- Tail, feet, and the back of the headband. -->
+      <path d="M102 66Q160 27 182 43Q180 67 149 83Q177 75 185 90Q165 118 120 113Z" fill="#4680df" stroke="#3457a0" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M-67 126V145M-43 126V145" stroke="#e79748" stroke-width="13" stroke-linecap="round"/>
+      <path d="M-81 150Q-59 138-35 150M37 150Q59 138 81 150" fill="none" stroke="#ffc477" stroke-width="14" stroke-linecap="round"/>
+      <path d="M48 127V144M69 127V144" stroke="#ffc477" stroke-width="12" stroke-linecap="round"/>
+      <path d="M-144-38C-147-204 145-204 145-38" fill="none" stroke="#202c49" stroke-width="27" stroke-linecap="round"/>
+      <path d="M-143-60C-133-201 131-201 143-60" fill="none" stroke="#617197" stroke-width="7" stroke-linecap="round"/>
+      <!-- Body and three crown feathers. -->
+      <path d="M-128-33C-128-88-106-123-63-139Q-76-157-62-174Q-29-172-8-145Q-5-181 13-186Q32-169 34-146Q52-165 70-161Q76-146 63-133C109-114 132-76 132-26L132 42C132 108 81 143 7 143C-75 143-129 108-129 42Z" fill="url(#feathers)" stroke="#355ba9" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M-60-156Q-37-147-27-133M12-165L18-142" fill="none" stroke="#a6daff" stroke-width="6" stroke-linecap="round"/>
+      <!-- Pale face with a central notch; the belly shares the same silhouette. -->
+      <path d="M0-77C-41-125-103-93-102-36C-101-2-75 17-68 34C-93 77-57 122 6 122C72 122 107 78 81 34C87 16 108-8 105-40C101-92 43-117 0-77Z" fill="url(#face)"/>
+      <!-- Folded wings. -->
+      <path d="M-109 20Q-145 48-115 92Q-96 113-72 111Q-68 65-97 31" fill="#4b85df" stroke="#3868bb" stroke-width="3" stroke-linecap="round"/>
+      <path d="M112 19Q143 50 117 88Q101 109 78 111Q72 70 100 32" fill="#588fe6" stroke="#3868bb" stroke-width="3" stroke-linecap="round"/>
+      <path d="M-114 60Q-105 82-89 89M114 60Q106 80 92 88" fill="none" stroke="#8cbbff" stroke-width="4" stroke-linecap="round" opacity="0.8"/>
+      <!-- Eyes and warm cheek accents. -->
+      <ellipse cx="-46" cy="-34" rx="17" ry="23" fill="#23334f"/>
+      <ellipse cx="47" cy="-34" rx="17" ry="23" fill="#23334f"/>
+      <ellipse cx="-41" cy="-41" rx="6" ry="8" fill="#ffffff"/>
+      <ellipse cx="52" cy="-41" rx="6" ry="8" fill="#ffffff"/>
+      <circle cx="-50" cy="-23" r="3" fill="#80aeed"/>
+      <circle cx="43" cy="-23" r="3" fill="#80aeed"/>
+      <ellipse cx="-69" cy="1" rx="14" ry="7" fill="#ffc7ba" opacity="0.8"/>
+      <ellipse cx="72" cy="1" rx="14" ry="7" fill="#ffc7ba" opacity="0.8"/>
+      <!-- Two-part beak gives the bird an open, smiling expression. -->
+      <path d="M-23 7Q0-15 24 7Q14 29 1 32Q-12 28-23 7Z" fill="#df8543"/>
+      <path d="M-25 6Q0-21 26 6Q5 21-25 6Z" fill="#ffc46d"/>
+      <path d="M-12 5Q0-3 12 5" fill="none" stroke="#ffe0a1" stroke-width="3" stroke-linecap="round"/>
+      <path d="M-20 81Q0 92 21 81" fill="none" stroke="#c6dbf5" stroke-width="4" stroke-linecap="round"/>
+      <!-- Cushions, outer earcups, and microphone boom. -->
+      <rect x="-151" y="-53" width="32" height="87" rx="16" fill="#202c49"/>
+      <rect x="121" y="-53" width="32" height="87" rx="16" fill="#202c49"/>
+      <rect x="-163" y="-48" width="32" height="77" rx="14" fill="url(#earcup)" stroke="#7584aa" stroke-width="3"/>
+      <rect x="133" y="-48" width="32" height="77" rx="14" fill="url(#earcup)" stroke="#7584aa" stroke-width="3"/>
+      <path d="M-152-30V9M153-30V9" stroke="#b5b7ff" stroke-width="5" stroke-linecap="round"/>
+      <path d="M147 30Q147 61 99 61H73" fill="none" stroke="#263653" stroke-width="8" stroke-linecap="round"/>
+      <rect x="52" y="51" width="32" height="19" rx="9.5" fill="#344969"/>
+      <path d="M60 57V64" stroke="#a4b6dc" stroke-width="3" stroke-linecap="round"/>
+    </g>
 
-  <g transform="translate(1040 370)">
-    <g transform="translate(0 0)">
-      <rect width="132" height="58" rx="16" fill="#111735" fill-opacity="0.9" stroke="#ffffff" stroke-opacity="0.18"/>
-      <circle cx="25" cy="29" r="10" fill="#8ea2ff"/>
-      <text x="46" y="35" fill="#ffffff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" font-weight="700">VOICE</text>
+    <!-- Small community symbols balance the illustration without crowding it. -->
+    <g transform="translate(927 164) rotate(-9)">
+      <path d="M0 0Q0-14 14-14H61Q75-14 75 0V34Q75 48 61 48H29L12 63V48Q0 48 0 34Z" fill="#c5beff"/>
+      <g fill="#5e5d9c"><circle cx="20" cy="17" r="4"/><circle cx="37" cy="17" r="4"/><circle cx="54" cy="17" r="4"/></g>
     </g>
-    <g transform="translate(146 0)">
-      <rect width="154" height="58" rx="16" fill="#111735" fill-opacity="0.9" stroke="#ffffff" stroke-opacity="0.18"/>
-      <circle cx="25" cy="29" r="10" fill="#41e2d2"/>
-      <text x="46" y="35" fill="#ffffff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" font-weight="700">TEAM-UP</text>
+    <g transform="translate(1436 251) rotate(9)" fill="none" stroke="#a5c9ff" stroke-width="7" stroke-linecap="round">
+      <path d="M0-8V8M15-22V22M30-33V33M45-17V17M60-6V6"/>
     </g>
-    <g transform="translate(314 0)">
-      <rect width="190" height="58" rx="16" fill="#111735" fill-opacity="0.9" stroke="#ffffff" stroke-opacity="0.18"/>
-      <circle cx="25" cy="29" r="10" fill="#ffd166"/>
-      <text x="46" y="35" fill="#ffffff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" font-weight="700">ACHIEVEMENTS</text>
+    <g transform="translate(1412 398) rotate(-10)" fill="#b4aaff">
+      <circle cx="0" cy="-13" r="10"/><circle cx="-27" cy="-7" r="8"/><circle cx="27" cy="-7" r="8"/>
+      <path d="M-17 24V14A17 17 0 0 1 17 14V24ZM-37 22V14A11 11 0 0 1-19 5Q-23 12-23 22ZM23 22Q23 12 19 5A11 11 0 0 1 37 14V22Z"/>
     </g>
-  </g>
-
-  <g fill="#ffffff">
-    <circle cx="930" cy="96" r="3" opacity="0.7"/>
-    <circle cx="1000" cy="146" r="5" opacity="0.35"/>
-    <circle cx="1512" cy="180" r="4" opacity="0.5"/>
-    <circle cx="1080" cy="54" r="2" opacity="0.8"/>
+    <g fill="#f8cf8c">
+      <path d="M1433 102L1437 112 1447 116 1437 120 1433 130 1429 120 1419 116 1429 112Z"/>
+      <path d="M968 365L971 373 979 376 971 379 968 387 965 379 957 376 965 373Z"/>
+      <circle cx="1366" cy="72" r="3"/>
+    </g>
+    <g fill="#9cacf0"><circle cx="1044" cy="83" r="4"/><circle cx="1491" cy="346" r="3"/><circle cx="1002" cy="458" r="4"/></g>
+    <rect x="1" y="1" width="1598" height="558" rx="27" fill="none" stroke="#b5c5ff" stroke-opacity="0.12" stroke-width="2"/>
   </g>
 </svg>
