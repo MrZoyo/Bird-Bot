@@ -1203,8 +1203,35 @@ class InviteGuardCog(commands.Cog):
                 deltas.append((record, delta))
         return deltas
 
+    async def _get_human_leaderboard_rows(self, settings: InviteLeaderboardSettings) -> list[dict[str, Any]]:
+        guild = self.bot.get_guild(settings.guild_id)
+        # Read one snapshot before awaiting Discord. Paginating by offset while
+        # invite counts change could skip or repeat inviters between pages.
+        candidates = await self.db.get_leaderboard(settings.guild_id, limit=None)
+        rows = []
+        for row in candidates:
+            user_id = row['user_id']
+            user = (guild.get_member(user_id) if guild else None) or self.bot.get_user(user_id)
+            if user is None:
+                try:
+                    # A departed member may still be a valid human inviter.
+                    user = await self.bot.fetch_user(user_id)
+                except discord.HTTPException as e:
+                    logging.warning(
+                        "[InviteLeaderboard] Skipping unresolved account %s for this refresh: %s",
+                        fmt_user(user_id),
+                        e,
+                    )
+                    continue
+            if user.bot:
+                continue
+            rows.append(row)
+            if len(rows) == settings.top_n:
+                break
+        return rows
+
     async def _build_leaderboard_view(self, settings: InviteLeaderboardSettings) -> discord.ui.LayoutView:
-        rows = await self.db.get_leaderboard(settings.guild_id, settings.top_n)
+        rows = await self._get_human_leaderboard_rows(settings)
         updated_at = discord.utils.format_dt(discord.utils.utcnow(), style='R')
         if not rows:
             leaderboard_body = t('invite_guard.leaderboard.empty')

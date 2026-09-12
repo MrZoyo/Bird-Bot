@@ -7,6 +7,13 @@
 
 This file preserves the release notes that previously lived at the bottom of `README.md`. Entries describe the code at the time of each release; current runtime behavior is documented in [FEATURES.md](FEATURES.md).
 
+## 2.0.5 — 2026-09-12
+
+- Excluded bot accounts from invite leaderboards, including bots with historical invite counts. Human inviters fill the remaining places in the existing count and user-ID order.
+- Resolve uncached accounts through Discord so departed human inviters remain eligible. Accounts that cannot be resolved are skipped for that refresh and retried on the next one.
+- Preserved stored invite attribution, counts, and rewards; no database migration is required.
+- Added regression coverage for historical bots, filling human places, concurrent count changes, pooled counts, account lookup failures, empty leaderboards, and panel refreshes.
+
 ## 2.0.4 — 2026-08-16
 
 - Refined automatic team-up detection so the existing marker-plus-count grammar must match before the bot checks for a leading single-person count. Forms such as `1q4` and `一等全世界` receive the gentler prompt without misreading `稍微一等`, `1等`, or `一q`.

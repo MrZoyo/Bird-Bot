@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import discord
+import pytest
 
 from bot.cogs.invite_guard import cog as invite_guard_cog
 from bot.cogs.invite_guard.cog import (
@@ -57,8 +58,9 @@ class FakeBot:
 
 
 class FakeUser:
-    def __init__(self, user_id, name="user"):
+    def __init__(self, user_id, name="user", *, bot=False):
         self.id = user_id
+        self.bot = bot
         self.display_name = name
         self.name = name
         self.mention = f"<@{user_id}>"
@@ -1307,8 +1309,12 @@ def test_invite_sync_refreshes_configured_message(monkeypatch, tmp_path):
             _leaderboard_settings(channel_id=555, message_id=777),
         )
         cog.bot.channels[555] = channel
+        cog.bot.users[100] = FakeUser(100)
+        cog.bot.users[99] = FakeUser(99, bot=True)
         await cog.db.record_member_join(123, 200, NOW.isoformat())
         await cog.db.attribute_member(123, 200, 100, "abc", NOW.isoformat())
+        await cog.db.record_member_join(123, 201, NOW.isoformat())
+        await cog.db.attribute_member(123, 201, 99, "promotion", NOW.isoformat())
 
         events = []
         interaction = FakeInteraction(events)
@@ -1354,6 +1360,7 @@ def test_invite_create_embed_creates_new_runtime_panel(monkeypatch, tmp_path):
 
         cog = await _build_leaderboard_cog(tmp_path, guild, _leaderboard_settings(channel_id=444, message_id=777))
         cog.bot.channels[555] = channel
+        cog.bot.users[100] = FakeUser(100)
         await cog.db.record_member_join(123, 200, NOW.isoformat())
         await cog.db.attribute_member(123, 200, 100, "abc", NOW.isoformat())
 
@@ -1369,5 +1376,98 @@ def test_invite_create_embed_creates_new_runtime_panel(monkeypatch, tmp_path):
         assert channel.sent_messages[0]["view"].has_components_v2() is True
         assert cog._runtime_leaderboard_channel_id == 555
         assert cog._runtime_leaderboard_message_id == 999
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("counts_change_during_lookup", [False, True])
+def test_leaderboard_excludes_bots_and_fills_human_places(tmp_path, counts_change_during_lookup):
+    async def scenario():
+        guild = FakeGuild([])
+        cog = await _build_leaderboard_cog(tmp_path, guild, _leaderboard_settings(top_n=2))
+        # The original top N contains only bots. Equal totals retain the user-id tie
+        # break, including when some of the credit came from pooled attribution.
+        for user_id in range(100, 106):
+            member_ids = [user_id + 1000, user_id + 2000]
+            for member_id in member_ids:
+                await cog.db.record_member_join(123, member_id, NOW.isoformat())
+            if user_id == 104:
+                await cog.db.pool_attribute_members(
+                    123, member_ids, [(user_id, "pool", 2)], NOW.isoformat(),
+                )
+            else:
+                for member_id in member_ids:
+                    await cog.db.attribute_member(123, member_id, user_id, "abc", NOW.isoformat())
+
+        guild.members[100] = FakeUser(100, bot=True)
+        cog.bot.users[101] = FakeUser(101, bot=True)
+        guild.members[102] = FakeUser(102)
+        fetched_users = {103: FakeUser(103, bot=True), 104: FakeUser(104), 105: FakeUser(105)}
+        fetch_calls = []
+
+        async def fetch_user(user_id):
+            fetch_calls.append(user_id)
+            if counts_change_during_lookup and user_id == 103:
+                await cog.db.record_member_join(123, 3000, NOW.isoformat())
+                await cog.db.attribute_member(123, 3000, 104, "abc", NOW.isoformat())
+            return fetched_users[user_id]
+
+        cog.bot.fetch_user = fetch_user
+        before = await cog.db.get_leaderboard(123, 10)
+        view = await cog._build_leaderboard_view(cog.leaderboard_settings)
+        body = view.to_components()[0]["components"][2]["components"][0]["content"]
+
+        assert body == "🥇 <@102>  **2** 人\n🥈 <@104>  **2** 人"
+        assert fetch_calls == [103, 104]
+        if counts_change_during_lookup:
+            updated = await cog.db.get_leaderboard(123, 10)
+            assert updated[0]['user_id'] == 104
+            assert updated[0]['total_count'] == 3
+        else:
+            assert await cog.db.get_leaderboard(123, 10) == before
+        assert cog.shop_db.transactions == []
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("status", [403, 404, 500])
+def test_leaderboard_skips_unresolved_accounts_and_retries_next_refresh(tmp_path, status):
+    async def scenario():
+        guild = FakeGuild([])
+        cog = await _build_leaderboard_cog(tmp_path, guild, _leaderboard_settings(top_n=1))
+        for user_id in [100, 101]:
+            await cog.db.record_member_join(123, user_id + 1000, NOW.isoformat())
+            await cog.db.attribute_member(123, user_id + 1000, user_id, "abc", NOW.isoformat())
+        cog.bot.users[101] = FakeUser(101)
+
+        async def unavailable_user(user_id):
+            raise discord.HTTPException(SimpleNamespace(status=status, reason="unavailable"), "unavailable")
+
+        cog.bot.fetch_user = unavailable_user
+        view = await cog._build_leaderboard_view(cog.leaderboard_settings)
+        body = view.to_components()[0]["components"][2]["components"][0]["content"]
+        assert body == "🥇 <@101>  **1** 人"
+
+        cog.bot.users[100] = FakeUser(100)
+        view = await cog._build_leaderboard_view(cog.leaderboard_settings)
+        body = view.to_components()[0]["components"][2]["components"][0]["content"]
+        assert body == "🥇 <@100>  **1** 人"
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("bot_count", [0, 3])
+def test_leaderboard_without_human_candidates_shows_empty_state(tmp_path, bot_count):
+    async def scenario():
+        guild = FakeGuild([])
+        cog = await _build_leaderboard_cog(tmp_path, guild, _leaderboard_settings(top_n=2))
+        for user_id in range(100, 100 + bot_count):
+            cog.bot.users[user_id] = FakeUser(user_id, bot=True)
+            await cog.db.record_member_join(123, user_id + 1000, NOW.isoformat())
+            await cog.db.attribute_member(123, user_id + 1000, user_id, "abc", NOW.isoformat())
+
+        view = await cog._build_leaderboard_view(cog.leaderboard_settings)
+        body = view.to_components()[0]["components"][2]["components"][0]["content"]
+        assert body == invite_guard_cog.t('invite_guard.leaderboard.empty')
 
     asyncio.run(scenario())

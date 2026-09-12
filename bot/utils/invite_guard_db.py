@@ -482,7 +482,8 @@ class InviteGuardDatabaseManager(BaseDatabaseManager):
         async with connect_database(self.db_path) as db:
             return await self._fetch_link_row(db, guild_id, code)
 
-    async def get_leaderboard(self, guild_id: int, limit: int) -> list[dict[str, Any]]:
+    async def get_leaderboard(self, guild_id: int, limit: int | None) -> list[dict[str, Any]]:
+        """Read one ordered snapshot; ``None`` includes all ranked inviters."""
         async with connect_database(self.db_path) as db:
             cursor = await db.execute(
                 '''
@@ -505,7 +506,7 @@ class InviteGuardDatabaseManager(BaseDatabaseManager):
                 ORDER BY total_count DESC, u.user_id ASC
                 LIMIT ?
                 ''',
-                (guild_id, guild_id, limit),
+                (guild_id, guild_id, -1 if limit is None else limit),
             )
             rows = await cursor.fetchall()
             await cursor.close()

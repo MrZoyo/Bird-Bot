@@ -213,6 +213,8 @@ def test_get_leaderboard_orders_by_invited_plus_pooled_count(tmp_path):
         assert rows[0]["pooled_count"] == 2
         assert rows[0]["invited_count"] == 0
         assert rows[1]["total_count"] == 1
+        assert await db.get_leaderboard(1, 1) == rows[:1]
+        assert await db.get_leaderboard(1, None) == rows
 
     asyncio.run(scenario())
 
