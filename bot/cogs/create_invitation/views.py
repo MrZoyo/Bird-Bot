@@ -1,4 +1,3 @@
-import logging
 import re
 
 import discord
@@ -7,11 +6,57 @@ from discord.utils import format_dt
 from bot.utils import config
 from bot.utils.components_v2 import build_panel_container
 from bot.utils.i18n import t
+from .interactions import acknowledge
+
+
+def invitation_custom_id(invitation_id):
+    return f'teamup:full:v1:{invitation_id}'
+
+
+class InvitationFullButton(discord.ui.DynamicItem[discord.ui.Button],
+                           template=r'teamup:full:v1:(?P<invitation_id>[0-9]+)'):
+    def __init__(self, invitation_id):
+        self.invitation_id = invitation_id
+        super().__init__(discord.ui.Button(
+            style=discord.ButtonStyle.danger, label=t('invitation.roomfull_button_label'),
+            custom_id=invitation_custom_id(invitation_id),
+        ))
+
+    @classmethod
+    async def from_custom_id(cls, interaction, item, match):
+        return cls(int(match['invitation_id']))
+
+    async def callback(self, interaction):
+        await dispatch_full(interaction, invitation_id=self.invitation_id)
+
+
+class LegacyInvitationFullButton(discord.ui.DynamicItem[discord.ui.Button], template=r'room_full_button'):
+    def __init__(self):
+        super().__init__(discord.ui.Button(
+            style=discord.ButtonStyle.danger, label=t('invitation.roomfull_button_label'),
+            custom_id='room_full_button',
+        ))
+
+    @classmethod
+    async def from_custom_id(cls, interaction, item, match):
+        return cls()
+
+    async def callback(self, interaction):
+        await dispatch_full(interaction)
+
+
+async def dispatch_full(interaction, *, invitation_id=None):
+    cog = interaction.client.get_cog('CreateInvitationCog')
+    if cog:
+        await cog.lifecycle.finish(interaction, invitation_id=invitation_id)
+    elif await acknowledge(interaction):
+        await interaction.followup.send(t('invitation.finish_failed'), ephemeral=True)
 
 
 class TeamInvitationView(discord.ui.LayoutView):
-    def __init__(self, bot, channel, user, role_db):
-        super().__init__(timeout=600)
+    def __init__(self, bot, channel, user, role_db, *, invitation_id=None):
+        super().__init__(timeout=None)
+        self.invitation_id = invitation_id
         self.bot = bot
         self.user = user
         self.channel = channel
@@ -32,12 +77,8 @@ class TeamInvitationView(discord.ui.LayoutView):
             label=self.invite_button_label,
             url=self.url,
         )
-        self.room_full_button = discord.ui.Button(
-            style=discord.ButtonStyle.danger,
-            label=self.roomfull_button_label,
-            custom_id="room_full_button"
-        )
-        self.room_full_button.callback = self.room_full_button_callback
+        self.room_full_button = (InvitationFullButton(invitation_id)
+                                 if invitation_id is not None else LegacyInvitationFullButton())
 
     async def populate_panel(self, obj, *, title: str | None = None) -> None:
         # Get the current time
@@ -99,39 +140,9 @@ class TeamInvitationView(discord.ui.LayoutView):
         ))
 
     async def room_full_button_callback(self, interaction: discord.Interaction):
-        """房间满员按钮回调 - 使用抽象出来的满员逻辑"""
-        # Defer the response
-        await interaction.response.defer(ephemeral=True)
-
-        # 检查是否是按钮的拥有者
-        if interaction.user != self.user:
-            await interaction.followup.send(self.interaction_target_error_message, ephemeral=True)
-            return
-
-        original_channel_id = self.channel.id
-
-        # 检查用户是否在语音频道
-        if not self.user.voice or self.user.voice.channel.id != original_channel_id:
-            await interaction.followup.send(self.not_in_vc_message, ephemeral=True)
-            return
-
-        # 获取CreateInvitationCog实例来调用抽象的方法
-        invitation_cog = self.bot.get_cog('CreateInvitationCog')
-        if invitation_cog:
-            # 调用抽象出来的满员方法
-            await invitation_cog.update_message_to_full(interaction.message)
-        else:
-            # 如果cog不存在，直接处理（不应该发生）
-            logging.error("CreateInvitationCog not found")
-            await interaction.followup.send("❌ 内部错误，请联系管理员", ephemeral=True)
-            return
-
-        # 从展示板移除组队信息
-        teamup_cog = self.bot.get_cog('TeamupDisplayCog')
-        if teamup_cog:
-            await teamup_cog.remove_teamup_from_display(self.user.id, original_channel_id)
-
-        await interaction.followup.send(self.roomfull_set_message, ephemeral=True)
+        await self.bot.get_cog('CreateInvitationCog').lifecycle.finish(
+            interaction, invitation_id=self.invitation_id,
+        )
 
 
 class DefaultRoomView(discord.ui.View):

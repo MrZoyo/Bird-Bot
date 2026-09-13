@@ -15,3 +15,8 @@ not_in_vc_message: 你已经离开了房间，无法再使用这个按钮。
 extract_channel_id_error: 提取房间链接失败，请联系管理员。
 default_invite_embed_title: 快来和我一起玩！
 ignore_channel_message: 别在这找我，我在这里不干活~~
+no_active_invitation: 当前房间没有正在招募的组队邀请。
+already_ended: 这条组队邀请已经结束。
+legacy_unavailable: 这条旧邀请已无法识别，请重新发送组队消息。
+finish_failed: 结束组队失败，请稍后再试。
+ended_sync_pending: 组队已结束，但消息更新暂未完成；若持续未更新，请联系管理员。

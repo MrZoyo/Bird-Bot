@@ -20,7 +20,7 @@ messages:
   unknown_user: 未知用户
   players_suffix: 人
   time_just_now: 刚刚
-  footer_text: 在对应游戏组队频道发送组队信息即可同步到看板，锁房可结束组队
+  footer_text: 在对应游戏组队频道发送组队信息即可同步到看板，点击满员可结束组队
   room_count_prefix: 房间内
   invitation_format:
     line1: '{search_emoji} `{content}`'

@@ -7,6 +7,16 @@
 
 This file preserves the release notes that previously lived at the bottom of `README.md`. Entries describe the code at the time of each release; current runtime behavior is documented in [FEATURES.md](FEATURES.md).
 
+## 2.0.6 — 2026-09-13
+
+- Made room invitation buttons persistent across restarts and removed their ten-minute callback expiry. Full ends one invitation; the room remains available for another round.
+- Added explicit pending, active, and ended invitation states. Each room has at most one active invitation, and display boards retain it until full, replacement, or room deletion.
+- Unified both full-button paths around an exact invitation ID. Room members can end the current invitation without being its original poster; stale clicks cannot end a newer invitation.
+- Publish the new message before atomically replacing the previous invitation. Persist message synchronization and bound retries so partial failures can recover without repeating an uncertain send.
+- Added migration of identifiable legacy invitations and compatibility feedback for old messages whose records no longer exist. Back up encrypted databases and rehearse the migration before switching; do not run the old expiry cleaner against the new lifecycle data.
+- Added acknowledgement diagnostics and safe aborts for expired interactions. The cause of intermittent Discord `10062` errors remains unconfirmed; this release does not claim to eliminate network or gateway delays.
+- Validated 199 offline tests, encrypted database migration, real Discord message readbacks, and user clicks after a restart and about 16 minutes, including ordinary-message replacement and the room control panel.
+
 ## 2.0.5 — 2026-09-12
 
 - Excluded bot accounts from invite leaderboards, including bots with historical invite counts. Human inviters fill the remaining places in the existing count and user-ID order.

@@ -1,6 +1,7 @@
 import logging
+import asyncio
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict
 
 import discord
@@ -33,17 +34,14 @@ class TeamupDisplayCog(commands.Cog):
         self.refresh_interval = self.display_config['refresh_interval_minutes']
         self.emojis = conf['emojis']
 
+    async def cog_load(self):
+        await self.db_manager.init_tables()
+        self._refresh_lock = asyncio.Lock()
         self.refresh_displays.start()
     
     def cog_unload(self):
         """Stop scheduled tasks when unloading"""
         self.refresh_displays.cancel()
-    
-    @commands.Cog.listener()
-    async def on_ready(self):
-        """Initialize database when bot is ready"""
-        await self.db_manager.init_tables()
-        logging.info("TeamupDisplayCog is ready")
     
     @tasks.loop(minutes=2)
     async def refresh_displays(self):
@@ -54,13 +52,10 @@ class TeamupDisplayCog(commands.Cog):
             if cleaned_count > 0:
                 # Log to room activity log
                 room_logger = logging.getLogger('room_activity')
-                room_logger.info(f"Cleaned up {cleaned_count} expired teamup invitations")
+                room_logger.info(f"Cleaned up {cleaned_count} completed invitation history")
             
-            # Get all display boards and refresh them
-            display_boards = await self.db_manager.get_all_display_boards()
-            for channel_id, message_id in display_boards:
-                await self.update_display_board(channel_id, message_id)
-                
+            await self.refresh_all_boards()
+
         except Exception as e:
             logging.error(f"Failed to refresh display boards: {e}")
     
@@ -77,7 +72,7 @@ class TeamupDisplayCog(commands.Cog):
         """Format time using Discord's relative time display"""
         try:
             # Parse time string from database and convert to datetime object
-            created_time = datetime.strptime(created_at, '%Y-%m-%d %H:%M:%S')
+            created_time = datetime.strptime(created_at, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
             # Use Discord's relative time formatting
             return discord.utils.format_dt(created_time, style='R')
         except Exception:
@@ -179,10 +174,9 @@ class TeamupDisplayCog(commands.Cog):
         # Get voice channel
         voice_channel = self.bot.get_channel(invitation['voice_channel_id'])
         if not voice_channel:
-            # Clean up invalid invitation from database
-            await self.db_manager.remove_invalid_invitation(invitation['voice_channel_id'])
+            # The lifecycle verifies deletion through Discord before ending it.
             return ""
-        
+
         # Get user
         user = self.bot.get_user(invitation['user_id'])
         username = user.display_name if user else t('teamup_display.messages.unknown_user')
@@ -202,7 +196,7 @@ class TeamupDisplayCog(commands.Cog):
         line2 = t('teamup_display.messages.invitation_format.line2').format(
             players_emoji=self.emojis['players'],
             room_count_prefix=t('teamup_display.messages.room_count_prefix'),
-            player_count=invitation['player_count'],
+            player_count=len(voice_channel.members),
             players_suffix=t('teamup_display.messages.players_suffix'),
             time_emoji=self.emojis['time'],
             time_ago=time_ago
@@ -220,62 +214,34 @@ class TeamupDisplayCog(commands.Cog):
             channel = self.bot.get_channel(channel_id)
             if not channel:
                 logging.warning("Display board channel not found: %s", fmt_channel(channel_id))
-                return
+                return False
             
             try:
                 message = await channel.fetch_message(message_id)
                 embed = await self.create_display_embed()
                 await message.edit(embed=embed)
+                return True
             except discord.NotFound:
                 logging.warning("Display board message %s not found in %s", message_id, fmt_channel(channel))
                 # Clean up invalid records in database
                 await self.db_manager.remove_display_board(channel_id)
+                return True
             except discord.Forbidden:
                 logging.warning("No permission to edit display board message %s in %s", message_id, fmt_channel(channel))
             
         except Exception as e:
             logging.error(f"Failed to update display board: {e}")
+        return False
     
-    async def add_teamup_to_display(self, user_id: int, channel_id: int, voice_channel_id: int, 
-                                   message_content: str):
-        """Add teamup information to display board"""
-        try:
-            # Get game type
-            game_type = await self.db_manager.get_game_type_by_channel(channel_id)
-            
-            # Get actual player count from voice channel
-            voice_channel = self.bot.get_channel(voice_channel_id)
-            player_count = len(voice_channel.members) if voice_channel else 1
-            
-            # Add to database
-            success = await self.db_manager.add_teamup_invitation(
-                user_id, channel_id, voice_channel_id, message_content, player_count, game_type
-            )
-            
-            if success:
-                # Refresh all display boards
-                display_boards = await self.db_manager.get_all_display_boards()
-                for board_channel_id, message_id in display_boards:
-                    await self.update_display_board(board_channel_id, message_id)
-            
-        except Exception as e:
-            logging.error(f"Failed to add teamup information to display board: {e}")
-    
-    async def remove_teamup_from_display(self, user_id: int, voice_channel_id: int):
-        """Remove teamup information from display board"""
-        try:
-            success = await self.db_manager.remove_teamup_invitation(user_id, voice_channel_id)
-            
-            if success:
-                # Refresh all display boards
-                display_boards = await self.db_manager.get_all_display_boards()
-                for board_channel_id, message_id in display_boards:
-                    await self.update_display_board(board_channel_id, message_id)
-            
-        except Exception as e:
-            logging.error(f"Failed to remove teamup information from display board: {e}")
-    
-    
+    async def refresh_all_boards(self):
+        # Serialize renders, so a slower old render cannot overwrite a newer one.
+        async with self._refresh_lock:
+            success = True
+            for channel_id, message_id in await self.db_manager.get_all_display_boards():
+                if not await self.update_display_board(channel_id, message_id):
+                    success = False
+            return success
+
     @app_commands.command(
         name="teamup_init",
         description=locale_str(

@@ -1,12 +1,11 @@
 # bot/utils/teamup_display_manager.py
 import aiosqlite
-import discord
-from datetime import datetime, timezone
 import logging
 from typing import Optional, List, Dict, Tuple
 
 from .db_connect import connect_database
 from .db_lifecycle import BaseDatabaseManager
+from .invitation_db import InvitationDatabaseManager, initialize_invitation_schema
 from .log_helpers import fmt_channel, fmt_user
 
 
@@ -19,6 +18,7 @@ class TeamupDisplayManager(BaseDatabaseManager):
     async def init_tables(self):
         """Initialize database tables"""
         async with connect_database(self.db_path) as db:
+            await db.execute('BEGIN IMMEDIATE')
             # Display board management table
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS teamup_displays (
@@ -41,22 +41,7 @@ class TeamupDisplayManager(BaseDatabaseManager):
                 )
             ''')
 
-            # Teamup invitation table (for display board)
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS teamup_invitations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    channel_id INTEGER NOT NULL,
-                    voice_channel_id INTEGER NOT NULL,
-                    message_content TEXT NOT NULL,
-                    player_count INTEGER DEFAULT 1,
-                    game_type TEXT,
-                    created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
-                    expires_at TIMESTAMP NOT NULL,
-                    invitation_message_id INTEGER,
-                    invitation_channel_id INTEGER
-                )
-            ''')
+            await initialize_invitation_schema(db)
 
             # User teamup statistics table
             await db.execute('''
@@ -151,126 +136,14 @@ class TeamupDisplayManager(BaseDatabaseManager):
             result = await cursor.fetchone()
             return result[0] if result else None
     
-    async def add_teamup_invitation(self, user_id: int, channel_id: int, voice_channel_id: int, 
-                                   message_content: str, player_count: int = 1, 
-                                   game_type: str = None) -> bool:
-        """Add or update teamup invitation"""
-        async with connect_database(self.db_path) as db:
-            try:
-                # Calculate expiration time (5 minutes later)
-                expires_at = datetime.now(timezone.utc).replace(microsecond=0)
-                expires_at = expires_at.replace(tzinfo=None)  # Remove timezone info to match database format
-                
-                # Expire old records for the same voice channel (any user) but keep them for cleanup/lookup
-                await db.execute('''
-                    UPDATE teamup_invitations
-                    SET expires_at = datetime('now', 'localtime')
-                    WHERE voice_channel_id = ?
-                ''', (voice_channel_id,))
-                
-                # Insert new record
-                await db.execute('''
-                    INSERT INTO teamup_invitations 
-                    (user_id, channel_id, voice_channel_id, message_content, player_count, game_type, expires_at)
-                    VALUES (?, ?, ?, ?, ?, ?, datetime(?, '+5 minutes'))
-                ''', (user_id, channel_id, voice_channel_id, message_content, player_count, game_type, 
-                      datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
-                
-                await db.commit()
-                
-                # Update user statistics
-                await self.update_user_stats(user_id)
-                
-                return True
-            except Exception as e:
-                logging.error(f"Failed to add teamup invitation: {e}")
-                return False
-    
-    async def remove_teamup_invitation(self, user_id: int, voice_channel_id: int) -> bool:
-        """Remove teamup invitation if user is the latest poster for this voice channel"""
-        async with connect_database(self.db_path) as db:
-            try:
-                # Check if this user is the latest poster for this voice channel
-                cursor = await db.execute('''
-                    SELECT user_id FROM teamup_invitations 
-                    WHERE voice_channel_id = ? 
-                    ORDER BY created_at DESC LIMIT 1
-                ''', (voice_channel_id,))
-                result = await cursor.fetchone()
-                
-                # Only allow removal if this user is the latest poster
-                if result and result[0] == user_id:
-                    await db.execute('''
-                        DELETE FROM teamup_invitations 
-                        WHERE voice_channel_id = ?
-                    ''', (voice_channel_id,))
-                    await db.commit()
-                    return True
-                else:
-                    return False
-            except Exception as e:
-                logging.error(f"Failed to remove teamup invitation: {e}")
-                return False
-    
     async def cleanup_expired_invitations(self) -> int:
-        """Clean up expired teamup invitations and return count of cleaned items"""
-        async with connect_database(self.db_path) as db:
-            try:
-                cursor = await db.execute('''
-                    DELETE FROM teamup_invitations 
-                    WHERE expires_at <= datetime('now', 'localtime')
-                ''')
-                await db.commit()
-                return cursor.rowcount
-            except Exception as e:
-                logging.error(f"Failed to cleanup expired invitations: {e}")
-                return 0
-    
-    async def remove_invalid_invitation(self, voice_channel_id: int) -> bool:
-        """Remove invitation for non-existent voice channel"""
-        async with connect_database(self.db_path) as db:
-            try:
-                await db.execute('''
-                    DELETE FROM teamup_invitations 
-                    WHERE voice_channel_id = ?
-                ''', (voice_channel_id,))
-                await db.commit()
-                return True
-            except Exception as e:
-                logging.error(
-                    "Failed to remove invalid invitation for %s: %s",
-                    fmt_channel(voice_channel_id),
-                    e,
-                )
-                return False
-    
+        """Compatibility name: only completed history expires, never active invites."""
+        return await InvitationDatabaseManager(self.db_path).cleanup_history()
+
     async def get_active_invitations(self) -> List[Dict]:
         """Get all active teamup invitations"""
-        async with connect_database(self.db_path) as db:
-            cursor = await db.execute('''
-                SELECT user_id, channel_id, voice_channel_id, message_content, 
-                       player_count, game_type, created_at, expires_at
-                FROM teamup_invitations 
-                WHERE expires_at > datetime('now', 'localtime')
-                ORDER BY created_at DESC
-            ''')
-            results = await cursor.fetchall()
-            
-            invitations = []
-            for row in results:
-                invitations.append({
-                    'user_id': row[0],
-                    'channel_id': row[1],
-                    'voice_channel_id': row[2],
-                    'message_content': row[3],
-                    'player_count': row[4],
-                    'game_type': row[5],
-                    'created_at': row[6],
-                    'expires_at': row[7]
-                })
-            
-            return invitations
-    
+        return await InvitationDatabaseManager(self.db_path).active()
+
     async def update_user_stats(self, user_id: int) -> bool:
         """Update user teamup statistics"""
         async with connect_database(self.db_path) as db:
@@ -305,65 +178,3 @@ class TeamupDisplayManager(BaseDatabaseManager):
             cursor = await db.execute('SELECT channel_id, message_id FROM teamup_displays')
             results = await cursor.fetchall()
             return results
-
-    async def save_invitation_message(self, voice_channel_id: int, message_id: int, channel_id: int) -> bool:
-        """Save invitation message ID for a voice channel"""
-        try:
-            async with connect_database(self.db_path) as db:
-                # Use subquery to get the latest invitation ID (SQLite UPDATE doesn't support ORDER BY directly)
-                await db.execute('''
-                    UPDATE teamup_invitations
-                    SET invitation_message_id = ?, invitation_channel_id = ?
-                    WHERE id = (
-                        SELECT id FROM teamup_invitations
-                        WHERE voice_channel_id = ?
-                        AND expires_at > datetime('now', 'localtime')
-                        ORDER BY created_at DESC
-                        LIMIT 1
-                    )
-                ''', (message_id, channel_id, voice_channel_id))
-                await db.commit()
-
-                # Verify update was successful
-                if db.total_changes == 0:
-                    logging.warning(
-                        "No invitation found for %s to update message ID",
-                        fmt_channel(voice_channel_id),
-                    )
-                    return False
-                return True
-
-        except aiosqlite.Error as e:
-            logging.error(f"Database error saving invitation message: {e}", exc_info=True)
-            return False
-        except Exception as e:
-            logging.error(f"Unexpected error saving invitation message: {e}", exc_info=True)
-            return False
-
-    async def get_last_invitation_by_voice_channel(self, voice_channel_id: int) -> Optional[Dict]:
-        """Get the last invitation for a specific voice channel"""
-        try:
-            async with connect_database(self.db_path) as db:
-                cursor = await db.execute('''
-                    SELECT invitation_message_id, invitation_channel_id, user_id
-                    FROM teamup_invitations
-                    WHERE voice_channel_id = ?
-                    AND invitation_message_id IS NOT NULL
-                    ORDER BY created_at DESC
-                    LIMIT 1
-                ''', (voice_channel_id,))
-                result = await cursor.fetchone()
-
-                if not result:
-                    return None
-
-                return {
-                    'invitation_message_id': result[0],
-                    'invitation_channel_id': result[1],
-                    'user_id': result[2],
-                    'voice_channel_id': voice_channel_id
-                }
-
-        except Exception as e:
-            logging.error(f"Error getting last invitation: {e}", exc_info=True)
-            return None

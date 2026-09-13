@@ -9,7 +9,7 @@ display:
 # 配置字段；当前后台 refresh_displays loop 在代码里固定为每 2 分钟运行，初始化会读取该值但未用于 loop 参数。
   refresh_interval_minutes: 3
 # 遗留配置字段；运行时代码不读取该值，也不再计划接入。
-# 组队应直接使用房间链接，不再生成需要过期时间的邀请。
+# 活跃邀请持续展示，直到满员、新邀请替换或房间删除；此值不控制邀请生命周期。
   invitation_expire_minutes: 5
 # 展示板格式化用 emoji 映射；消息模板在 bot/locales/zh_CN/teamup_display.yaml。
 emojis:

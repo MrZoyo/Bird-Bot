@@ -194,7 +194,7 @@ Recommended selection:
 No
 ```
 
-The default runtime configuration keeps 14 daily rotated log backups, and team-up display entries expire after about five minutes. However, operators may retain manual backups or change log-retention policy, so `No` is the conservative answer. Select `Yes` only if the production deployment guarantees that all message-content logs and backups are removed within 30 days and its actual operations match that claim.
+The default runtime configuration keeps 14 daily rotated log backups, and active team-up invitations remain until ended, and completed, successfully synchronized history is retained for 14 days; unresolved synchronization records are retained for recovery. However, operators may retain manual backups or change log-retention policy, so `No` is the conservative answer. Select `Yes` only if the production deployment guarantees that all message-content logs and backups are removed within 30 days and its actual operations match that claim.
 
 Question: How can users contact you to request deletion of their active data?
 
@@ -230,7 +230,7 @@ The bot needs the Message Content Intent for team-up keyword detection and messa
 1. The team-up invitation system reads ordinary text-channel messages and uses configured rules and regular expressions to identify team-up phrases, such as queue status, missing-player notices, and party size. It then replies with a panel linked to the user's voice room.
 2. The achievement system listens for member messages to count total messages and build monthly message rankings.
 3. The bot does not use message content for advertising or profiling, sell it, share it outside the deployment, or use it for AI or machine-learning training.
-4. For the team-up display, the bot stores only the short team-up text, channel ID, user ID, voice-channel ID, and expiry time required for the temporary display. Expired invitations are removed. Other persistent text is limited to feature data that users or administrators submit intentionally, such as personal signatures, ticket close reasons, and giveaway descriptions.
+4. For the team-up display, the bot stores the team-up text, channel ID, user ID, voice-channel ID, invitation state, and message association. Active invitations remain until ended; completed, successfully synchronized history is removed after 14 days. Other persistent text is limited to feature data that users or administrators submit intentionally, such as personal signatures, ticket close reasons, and giveaway descriptions.
 ```
 
 Question: Provide screenshots and/or video links that demonstrate these use cases.

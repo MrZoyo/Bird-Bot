@@ -20,7 +20,7 @@
 
 <p align="center">
   <a href="docs/zh-CN/CHANGELOG.md">
-    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.5-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="当前版本：Bird Bot v2.0.5">
+    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.6-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="当前版本：Bird Bot v2.0.6">
   </a>
   <a href="https://www.python.org/">
     <img src="https://img.shields.io/badge/PYTHON-3.12-3776AB?style=for-the-badge&amp;logo=python&amp;logoColor=white" alt="Python 3.12">
@@ -228,9 +228,11 @@ uv sync --frozen --python 3.12.3
 
 需要时，数据库 schema 迁移会在启动阶段执行。生产 checkout 包含服务器专用 locale 或图片修改时，切勿使用 `git reset --hard` 或其他强制覆盖式更新。
 
-2.0.5 包含月度邀请排行和InviteGuard/Shop增量迁移。切换前应安装锁定的 `tzdata` 依赖，并在私有数据库备份上验证新版。`monthly_enabled: true` 为默认值，首次启动会将现有累计邀请数一次性计入启用月份，以后各月只统计新增。确认 `monthly_timezone: Europe/Berlin` 并保留已有排行榜频道和消息ID。结算和私信规则见[InviteGuard功能说明](docs/zh-CN/FEATURES.md#inviteguardcog)。
+2.0.6 增加持久化房间邀请生命周期和启动迁移。活跃邀请持续显示到满员、新邀请替换或房间删除；两个满员入口共用邀请状态，邀请按钮支持重启后继续使用。切换前在加密备份上演练迁移，保留服务器专用文案，并在旧进程停止后迁移。旧版到期清理器与新状态不兼容；迁移完成后若启动失败，应保留当前数据库并按[邀请升级说明](docs/refactoring/ROOM_INVITATION_LIFECYCLE.md)修复前进。偶发 Discord `10062` 已增加应答诊断，其具体延迟原因仍待确认。
 
-为缩短停机，先在旧进程运行期间获取代码、准备依赖、验证备份并完成隔离测试；仅在切换代码和执行启动迁移时停止旧进程，然后立即通过该部署现有的服务或启动器恢复。确认Discord登录、模块加载、月榜初始计数和面板刷新后，再更新下一台服务器。启动失败时保留生产定制内容并回退代码；数据库接受新活动后，不要用旧备份覆盖。
+从 2.0.5 之前版本升级时，还需留意：2.0.5 包含月度邀请排行和InviteGuard/Shop增量迁移。切换前应安装锁定的 `tzdata` 依赖，并在私有数据库备份上验证新版。`monthly_enabled: true` 为默认值，首次启动会将现有累计邀请数一次性计入启用月份，以后各月只统计新增。确认 `monthly_timezone: Europe/Berlin` 并保留已有排行榜频道和消息ID。结算和私信规则见[InviteGuard功能说明](docs/zh-CN/FEATURES.md#inviteguardcog)。
+
+为缩短停机，先在旧进程运行期间获取代码、准备依赖、验证备份并完成隔离测试；仅在切换代码和执行启动迁移时停止旧进程，然后立即通过该部署现有的服务或启动器恢复。确认Discord登录、模块加载、数据库完整性、邀请迁移、定制文案和面板恢复后，再更新下一台服务器。仅在邀请迁移尚未提交时可以直接回退代码；迁移后应保留当前数据库并按邀请恢复说明处理。数据库接受新活动后，不要用旧备份覆盖。
 
 ## 从 2.0 之前的 JSON 配置迁移
 

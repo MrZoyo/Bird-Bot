@@ -9,19 +9,19 @@ from bot.utils.components_v2 import build_panel_container, clear_legacy_message_
 from bot.utils.i18n import t
 
 
-async def update_invitation_message_to_full(bot: Any, message: discord.Message) -> None:
+async def update_invitation_message_to_full(bot: Any, message: discord.Message) -> str:
     """Update a team invitation message to the shared "room full" style."""
     try:
         if message.embeds:
             await _update_legacy_embed_message(bot, message)
-            return
+            return 'updated'
 
         panel_data = _extract_panel_data(message)
         if not panel_data:
-            return
+            return 'invalid'
 
         title, description, thumbnail_url = panel_data
-        full_title = f"{t('invitation.roomfull_title')} ~~{title}~~" if title else t('invitation.roomfull_title')
+        full_title = _full_title(title)
         full_description = _build_full_description(bot, description)
         view = _build_full_panel_view(
             title=full_title,
@@ -33,6 +33,7 @@ async def update_invitation_message_to_full(bot: Any, message: discord.Message) 
             **clear_legacy_message_payload(),
             view=view,
         )
+        return 'updated'
 
     except discord.Forbidden:
         logging.error(
@@ -40,14 +41,24 @@ async def update_invitation_message_to_full(bot: Any, message: discord.Message) 
             getattr(message, 'id', 'unknown'),
             fmt_channel(getattr(message, 'channel', None)),
         )
+        return 'forbidden'
     except discord.NotFound:
         logging.warning(
             "Invitation message %s not found when updating to full in channel %s",
             getattr(message, 'id', 'unknown'),
             fmt_channel(getattr(message, 'channel', None)),
         )
+        return 'missing'
     except Exception as e:
         logging.error("Error updating invitation message to full: %s", e, exc_info=True)
+        return 'retry'
+
+
+def _full_title(title):
+    label = t('invitation.roomfull_title')
+    if title and title.startswith(label):
+        return title
+    return f"{label} ~~{title}~~" if title else label
 
 
 async def _update_legacy_embed_message(bot: Any, message: discord.Message) -> None:
@@ -55,7 +66,7 @@ async def _update_legacy_embed_message(bot: Any, message: discord.Message) -> No
     new_description = _build_full_description(bot, embed.description or "")
 
     new_embed = discord.Embed(
-        title=f"{t('invitation.roomfull_title')} ~~{embed.title}~~",
+        title=_full_title(embed.title),
         description=new_description,
         color=discord.Color.red(),
     )

@@ -1,11 +1,10 @@
-import asyncio
 import logging
 import re
 
 import discord
 from discord import app_commands
 from discord.app_commands import locale_str
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from bot.utils import (
     RoleDatabaseManager,
@@ -17,7 +16,11 @@ from bot.utils import (
 from bot.utils.i18n import t
 
 from .full_message import update_invitation_message_to_full
-from .views import DefaultRoomView, TeamInvitationView
+from bot.utils.invitation_db import InvitationDatabaseManager
+from bot.utils.task_helpers import wait_until_ready_or_stop
+
+from .lifecycle import InvitationLifecycle
+from .views import DefaultRoomView, InvitationFullButton, LegacyInvitationFullButton
 
 
 TEAMUP_KEYWORD_PATTERN = re.compile(
@@ -71,6 +74,8 @@ class CreateInvitationCog(commands.Cog):
         # user_signatures 表归 role 领域, 这里跨域只读, 复用 RoleDatabaseManager。
         self.main_config = config.get_config('main')
         self.role_db = RoleDatabaseManager(self.main_config['db_path'])
+        self.invitation_db = InvitationDatabaseManager(self.main_config['db_path'])
+        self.lifecycle = InvitationLifecycle(bot, self.invitation_db, self.role_db)
 
         self.conf = config.get_config('invitation')
         self.illegal_team_response = t('invitation.illegal_team_response')
@@ -88,41 +93,31 @@ class CreateInvitationCog(commands.Cog):
         """将组队消息更新为满员状态（可复用方法）"""
         await update_invitation_message_to_full(self.bot, message)
 
-    async def mark_old_invitation_full(self, old_invitation):
-        """异步将旧的组队消息设置为满员"""
+    async def cog_load(self):
+        await self.role_db.initialize_database()
+        await self.invitation_db.initialize()
+        self.bot.add_dynamic_items(InvitationFullButton, LegacyInvitationFullButton)
+        self.reconcile_invitations.start()
+
+    def cog_unload(self):
+        self.reconcile_invitations.cancel()
+        self.bot.remove_dynamic_items(InvitationFullButton, LegacyInvitationFullButton)
+
+    @tasks.loop(minutes=1)
+    async def reconcile_invitations(self):
         try:
-            # 1. 获取消息
-            text_channel = self.bot.get_channel(old_invitation['invitation_channel_id'])
-            if not text_channel:
-                logging.warning(
-                    "Old invitation channel %s not found",
-                    fmt_channel(old_invitation['invitation_channel_id']),
-                )
-                return
+            await self.lifecycle.reconcile()
+        except Exception:
+            logging.exception('Invitation reconciliation failed; retrying next cycle')
 
-            try:
-                old_message = await text_channel.fetch_message(old_invitation['invitation_message_id'])
-            except discord.NotFound:
-                logging.warning(
-                    "Old invitation message %s in %s not found, already deleted",
-                    old_invitation['invitation_message_id'],
-                    fmt_channel(text_channel),
-                )
-                return
-            except discord.Forbidden:
-                logging.error(
-                    "No permission to fetch old invitation message %s in %s",
-                    old_invitation['invitation_message_id'],
-                    fmt_channel(text_channel),
-                )
-                return
+    @reconcile_invitations.before_loop
+    async def before_reconcile_invitations(self):
+        await wait_until_ready_or_stop(self.bot, self.reconcile_invitations, 'CreateInvitationCog.reconcile')
 
-            # 2. 更新为满员状态
-            await self.update_message_to_full(old_message)
-
-        except Exception as e:
-            logging.error(f"Error marking old invitation as full: {e}", exc_info=True)
-            # 不向用户抛出错误，静默处理
+    @commands.Cog.listener()
+    async def on_guild_channel_delete(self, channel):
+        if isinstance(channel, discord.VoiceChannel):
+            await self.lifecycle.room_deleted(channel.id)
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -172,39 +167,7 @@ class CreateInvitationCog(commands.Cog):
                 try:
                     channel = message.author.voice.channel
 
-                    # ===== 步骤1: 获取旧的组队消息ID（如果存在）=====
-                    old_invitation = None
-                    teamup_cog = self.bot.get_cog('TeamupDisplayCog')
-
-                    if teamup_cog:
-                        old_invitation = await teamup_cog.db_manager.get_last_invitation_by_voice_channel(channel.id)
-
-                    # ===== 步骤2: 立即创建并发送新的组队消息 =====
-                    view = TeamInvitationView(self.bot, channel, message.author, self.role_db)
-                    await view.populate_panel(message)
-                    new_message = await message.reply(view=view)
-
-                    # ===== 步骤3: 添加到展示板并保存新消息ID =====
-                    if teamup_cog:
-                        # 添加到展示板（这会替换旧的记录）
-                        await teamup_cog.add_teamup_to_display(
-                            message.author.id,
-                            message.channel.id,
-                            channel.id,
-                            message.content
-                        )
-
-                        # 保存新消息ID
-                        await teamup_cog.db_manager.save_invitation_message(
-                            channel.id,
-                            new_message.id,
-                            message.channel.id
-                        )
-
-                    # ===== 步骤4: 异步处理旧消息（设置为满员）=====
-                    if old_invitation:
-                        # 使用 asyncio.create_task 异步执行，不阻塞
-                        asyncio.create_task(self.mark_old_invitation_full(old_invitation))
+                    await self.lifecycle.publish(message, channel)
 
                 except Exception as e:
                     reply_message = self.failed_invite_responses + str(e)
@@ -251,43 +214,9 @@ class CreateInvitationCog(commands.Cog):
             try:
                 channel = interaction.user.voice.channel
 
-                # ===== 步骤1: 获取旧的组队消息ID（如果存在）=====
-                old_invitation = None
-                teamup_cog = self.bot.get_cog('TeamupDisplayCog')
-
-                if teamup_cog:
-                    old_invitation = await teamup_cog.db_manager.get_last_invitation_by_voice_channel(channel.id)
-
-                # ===== 步骤2: 立即创建并发送新的组队消息 =====
-                view = TeamInvitationView(self.bot, channel, interaction.user, self.role_db)
-                await view.populate_panel(
-                    interaction,
-                    title=title or self.default_invite_embed_title,
+                await self.lifecycle.publish(
+                    interaction, channel, title=title or self.default_invite_embed_title,
                 )
-                new_message = await interaction.followup.send(view=view)
-
-                # ===== 步骤3: 添加到展示板并保存新消息ID =====
-                if teamup_cog:
-                    content = title or self.default_invite_embed_title
-                    # 添加到展示板（这会替换旧的记录）
-                    await teamup_cog.add_teamup_to_display(
-                        interaction.user.id,
-                        interaction.channel.id,
-                        channel.id,
-                        content
-                    )
-
-                    # 保存新消息ID
-                    await teamup_cog.db_manager.save_invitation_message(
-                        channel.id,
-                        new_message.id,
-                        interaction.channel.id
-                    )
-
-                # ===== 步骤4: 异步处理旧消息（设置为满员）=====
-                if old_invitation:
-                    # 使用 asyncio.create_task 异步执行，不阻塞
-                    asyncio.create_task(self.mark_old_invitation_full(old_invitation))
 
             except Exception as e:
                 await interaction.followup.send(f"Failed to create an invitation: {str(e)}")

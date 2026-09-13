@@ -267,34 +267,14 @@ def test_team_invitation_view_uses_components_v2_with_separator(monkeypatch):
     asyncio.run(scenario())
 
 
-def test_team_invitation_full_button_uses_view_channel_without_embed(monkeypatch):
+def test_team_invitation_buttons_are_persistent_and_encode_invitation_identity(monkeypatch):
     async def scenario():
         _install_view_translations(monkeypatch)
-        events = []
-        guild = SimpleNamespace(id=123)
-        channel = SimpleNamespace(id=456, guild=guild)
-        user = SimpleNamespace(
-            id=789,
-            mention="<@789>",
-            guild=guild,
-            avatar=None,
-            voice=SimpleNamespace(channel=channel),
-        )
-        invitation_cog = FakeInvitationCog(events)
-        teamup_cog = FakeTeamupCog(events)
-        bot = FakeViewBot(events, invitation_cog, teamup_cog)
-        view = TeamInvitationView(bot, channel, user, FakeRoleDB())
-        message = SimpleNamespace(id=1000, embeds=[], components=[])
-        interaction = FakeInteraction(user=user, message=message, events=events)
-
-        await view.room_full_button_callback(interaction)
-
-        assert events == [
-            ("defer", True, {}),
-            ("update_full", 1000),
-            ("remove_display", user.id, channel.id),
-            ("followup", "marked full", True),
-        ]
+        channel = SimpleNamespace(id=456, guild=SimpleNamespace(id=123))
+        user = SimpleNamespace(id=789)
+        view = TeamInvitationView(FakeViewBot(), channel, user, FakeRoleDB(), invitation_id=42)
+        assert view.timeout is None
+        assert view.room_full_button.custom_id == "teamup:full:v1:42"
 
     asyncio.run(scenario())
 

@@ -63,7 +63,7 @@ CreateInvitationCog 创建带有作者当前语音房直达链接的组队消息
 
 TeamupDisplayCog 为现役组队邀请维护一个或多个实时展示板。展示板按照 SQLite 中保存的游戏类型分组，使用房间直达链接，并每两分钟刷新一次。
 
-Cog 也会清理过期或无效的邀请记录。`display.refresh_interval_minutes` 是兼容字段，当前任务间隔在代码中固定为两分钟。由于组队条目已改用房间直达链接，不再创建 Discord invite，`display.invitation_expire_minutes` 已不再使用。
+每个房间最多有一条活跃邀请，持续展示到满员、新邀请替换或房间删除。两个满员入口共用邀请生命周期处理，邀请回复按钮支持重启后继续操作；结束后的回复移除按钮。已结束且消息同步完成的历史记录保留 14 天。`display.refresh_interval_minutes` 是兼容字段，后台刷新间隔固定为两分钟；`display.invitation_expire_minutes` 不再控制邀请状态。
 
 | 命令 | 用途 |
 | --- | --- |

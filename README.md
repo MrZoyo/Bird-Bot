@@ -20,7 +20,7 @@
 
 <p align="center">
   <a href="docs/en/CHANGELOG.md">
-    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.5-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="Current release: Bird Bot v2.0.5">
+    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.6-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="Current release: Bird Bot v2.0.6">
   </a>
   <a href="https://www.python.org/">
     <img src="https://img.shields.io/badge/PYTHON-3.12-3776AB?style=for-the-badge&amp;logo=python&amp;logoColor=white" alt="Python 3.12">
@@ -230,9 +230,11 @@ Before upgrading:
 
 Database schema migrations run during startup where required. Never use `git reset --hard` or another force-overwriting update on a production checkout with server-specific locale or image changes.
 
-Version 2.0.5 includes the monthly invite leaderboard and additive InviteGuard/Shop migrations. Install the locked `tzdata` dependency and validate the new code against a private database backup before switching. With `monthly_enabled: true` (the default), first startup imports existing invite totals into the activation month once; later months count only new credits. Confirm `monthly_timezone: Europe/Berlin` and preserve all existing panel IDs. See the [InviteGuard reference](docs/en/FEATURES.md#inviteguardcog) for settlement and notification behavior.
+Version 2.0.6 adds a persistent room-invitation lifecycle and startup migration. Active invitations remain on the board until ended, replaced, or their room is deleted. Both full buttons target the same invitation state, and invitation buttons survive restarts. Rehearse the migration on an encrypted backup, preserve server locale overrides, and keep the old process stopped during the migration. The old expiry cleaner is incompatible with the new lifecycle data; preserve the current database and use a reviewed forward repair if startup fails after migration. See the [invitation upgrade notes](docs/refactoring/ROOM_INVITATION_LIFECYCLE.md). Intermittent Discord `10062` errors now have acknowledgement diagnostics but remain an unresolved latency issue.
 
-For a short outage, fetch and validate the release, prepare dependencies, and verify backups while the current bot is running. Stop the existing process only for the code switch and startup migration, then immediately restart through that deployment's usual service or launcher. Verify Discord login, cog loading, the monthly opening balance, and the refreshed panel before updating another server. If startup fails, restore the previous code while preserving production customizations; do not replace a live database with an older backup after it has accepted new activity.
+For deployments upgrading from before 2.0.5, that version includes the monthly invite leaderboard and additive InviteGuard/Shop migrations. Install the locked `tzdata` dependency and validate the new code against a private database backup before switching. With `monthly_enabled: true` (the default), first startup imports existing invite totals into the activation month once; later months count only new credits. Confirm `monthly_timezone: Europe/Berlin` and preserve all existing panel IDs. See the [InviteGuard reference](docs/en/FEATURES.md#inviteguardcog) for settlement and notification behavior.
+
+For a short outage, fetch and validate the release, prepare dependencies, and verify backups while the current bot is running. Stop the existing process only for the code switch and startup migration, then immediately restart through that deployment's usual service or launcher. Verify Discord login, cog loading, database integrity, invitation migration, preserved overrides, and panel recovery before updating another server. A code rollback is safe only before the lifecycle migration has committed. After migration, preserve the current database and follow the invitation recovery notes; never replace a live database with an older backup after it has accepted new activity.
 
 ## Migrating from pre-2.0 JSON configuration
 

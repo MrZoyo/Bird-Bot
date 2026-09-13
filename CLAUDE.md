@@ -132,6 +132,15 @@ The "room full" state for team invitation messages has one shared implementation
 
 Do not fork a second full-message formatting path in another cog.
 
+Room invitations are owned by `CreateInvitationCog.lifecycle` and `InvitationDatabaseManager`:
+
+- Each voice room has at most one active invitation; the database enforces this with a partial unique index.
+- Full means ending one invitation, not locking the voice room. Invitation buttons target an exact invitation id; room-panel buttons resolve the room's current invitation. Keep each entry's existing permission check.
+- New invitations replace the previous generation atomically after sending the new message. A stale click must never end a newer generation.
+- The display board reads active invitations. The legacy five-minute expiry field no longer controls active invitations; completed, successfully synchronized history is retained for 14 days.
+- Dynamic invitation buttons are registered in `cog_load`; defer before database/network work. Ended-message updates are durable, idempotent, and retried at most three times. Report partial synchronization instead of unconditional success.
+- Follow `docs/refactoring/ROOM_INVITATION_LIFECYCLE.md` for migration and regression coverage.
+
 ## Team Invitation Keyword Detection
 
 - Keep the existing marker-plus-count grammar as the mandatory first gate for automatic team-up detection.
@@ -206,7 +215,7 @@ Current pytest smoke coverage includes:
 Current P3-9 status:
 
 - Done: current fake interaction flow list is complete for PrivateRoom, Shop, Tickets, Ban, VoiceChannel, Giveaway, Role / Signature, Achievement / Rank, Welcome / Games, CheckStatus / Backup, and InviteGuard.
-- Current baseline: `183 passed, 1 warning`.
+- Current baseline: `199 passed, 1 warning`.
 - Next default target: targeted real test-server validation for new changes / side-effect paths only when explicitly approved.
 - Add more fake interaction tests only for new bugs, payload replay work, or new features.
 

@@ -216,65 +216,15 @@ class RoomControlPanelView(discord.ui.View):
             await interaction.followup.send(t('voicechannel.control_panel.messages.unknown_error'), ephemeral=True)
 
     async def full_callback(self, interaction: discord.Interaction):
-        """满员按钮 - 标记房间满员并从展示板移除"""
-        await interaction.response.defer(ephemeral=True)
+        """End the room's current invitation through the shared lifecycle."""
+        from bot.cogs.create_invitation.interactions import acknowledge
 
-        try:
-            # 检查用户是否在语音频道内
-            if not interaction.user.voice or interaction.user.voice.channel.id != self.voice_channel_id:
-                await interaction.followup.send(t('voicechannel.control_panel.messages.not_in_voice'), ephemeral=True)
-                return
-
-            # 获取TeamupDisplayCog
-            teamup_cog = self.bot.get_cog('TeamupDisplayCog')
-            if not teamup_cog:
-                await interaction.followup.send(t('voicechannel.control_panel.messages.full_error'), ephemeral=True)
-                return
-
-            # 查询该房间最后一条组队信息
-            last_invitation = await teamup_cog.db_manager.get_last_invitation_by_voice_channel(self.voice_channel_id)
-
-            if not last_invitation:
-                await interaction.followup.send(t('voicechannel.control_panel.messages.full_no_invitation'), ephemeral=True)
-                return
-
-            # 获取消息
-            try:
-                text_channel = self.bot.get_channel(last_invitation['invitation_channel_id'])
-                if not text_channel:
-                    logging.warning(
-                        "Invitation text channel %s not found",
-                        fmt_channel(last_invitation['invitation_channel_id']),
-                    )
-                    await interaction.followup.send(t('voicechannel.control_panel.messages.full_channel_not_found'), ephemeral=True)
-                    return
-
-                message = await text_channel.fetch_message(last_invitation['invitation_message_id'])
-            except discord.NotFound:
-                logging.warning(f"Invitation message {last_invitation['invitation_message_id']} not found")
-                # 清理数据库中的无效记录
-                await teamup_cog.db_manager.remove_invalid_invitation(self.voice_channel_id)
-                await interaction.followup.send(t('voicechannel.control_panel.messages.full_message_deleted'), ephemeral=True)
-                return
-            except discord.Forbidden:
-                logging.error(
-                    "No permission to fetch invitation message %s in %s",
-                    last_invitation['invitation_message_id'],
-                    fmt_channel(text_channel),
-                )
-                await interaction.followup.send(t('voicechannel.control_panel.messages.full_no_permission'), ephemeral=True)
-                return
-
-            # 更新消息为满员状态
-            await self.update_message_to_full(message)
-
-            # 从展示板移除
-            await teamup_cog.remove_teamup_from_display(interaction.user.id, self.voice_channel_id)
-
-            await interaction.followup.send(t('voicechannel.control_panel.messages.full_success'), ephemeral=True)
-
-        except Exception as e:
-            logging.error(f"Error in full_callback: {e}", exc_info=True)
+        cog = self.bot.get_cog('CreateInvitationCog')
+        if cog:
+            await cog.lifecycle.finish(
+                interaction, voice_channel_id=self.voice_channel_id, source='room',
+            )
+        elif await acknowledge(interaction):
             await interaction.followup.send(t('voicechannel.control_panel.messages.full_error'), ephemeral=True)
 
     async def soundboard_callback(self, interaction: discord.Interaction):

@@ -63,7 +63,7 @@ Config: `bot/config/teamup_display.yaml`
 
 TeamupDisplayCog maintains one or more live boards for active team-up invitations. Boards group entries by the game types stored in SQLite, use direct room links, and refresh every two minutes.
 
-The cog also removes expired or invalid invitation records. `display.refresh_interval_minutes` remains a compatibility field: the current task interval is fixed at two minutes in code. `display.invitation_expire_minutes` is no longer used because team-up entries link directly to rooms instead of generated Discord invites.
+Each room has at most one active invitation, displayed until it is ended, replaced, or its room is deleted. Both full buttons use the same invitation lifecycle. Dynamic invitation buttons survive bot restarts; ended messages have their buttons removed. Completed, successfully synchronized history is retained for 14 days. The background refresh interval remains fixed at two minutes; `display.refresh_interval_minutes` and `display.invitation_expire_minutes` are compatibility fields.
 
 | Command | Purpose |
 | --- | --- |
