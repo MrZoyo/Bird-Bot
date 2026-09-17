@@ -196,6 +196,7 @@ Current pytest smoke coverage includes:
 - PrivateRoom fake interaction renewal flow, including persisted `end_date` readback before charging and failure without charge when DB readback is still expired.
 - VoiceChannel fake interaction flow for Lock / Unlock / Soundboard / Full control-panel buttons.
 - Giveaway fake interaction flow for draft publish, optional image payloads, personal join / leave feedback, cancel, and early end ordering.
+- Giveaway editing uses `/ga_change` and the draft controls. Only confirmed settings are saved; total duration remains relative to the original start time. Existing participants stay eligible when requirements change; leaving and rejoining uses the new requirements. Tests cover stale drafts, expired activities, images, failed message edits, and concurrent ending. Keep settings writes separate from participant/winner columns and serialize message refreshes, edits, and endings with the giveaway lock.
 - Role / Signature fake interaction flow for achievement role pickup and signature modal writes.
 - Achievement / Rank fake interaction flow for manual operation confirmation, rank type buttons, the Components v2 achievement list, native category separators, and avatar fallback order.
 - CreateInvitation keyword-flow coverage for marker-plus-count gating, single-person prompts, false-positive avoidance, and six-character `hks` handling.
@@ -215,7 +216,7 @@ Current pytest smoke coverage includes:
 Current P3-9 status:
 
 - Done: current fake interaction flow list is complete for PrivateRoom, Shop, Tickets, Ban, VoiceChannel, Giveaway, Role / Signature, Achievement / Rank, Welcome / Games, CheckStatus / Backup, and InviteGuard.
-- Current baseline: `199 passed, 1 warning`.
+- Current baseline: `215 passed, 1 warning`.
 - Next default target: targeted real test-server validation for new changes / side-effect paths only when explicitly approved.
 - Add more fake interaction tests only for new bugs, payload replay work, or new features.
 

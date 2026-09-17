@@ -205,7 +205,10 @@ class FakeDraftCog:
 
 
 class FakeGiveawayCog:
+    giveaway_lock = GiveawayCog.giveaway_lock
+
     def __init__(self, events, *, joined=False, eligible=True, participant_count=0):
+        self._giveaway_locks = {}
         self.events = events
         self.joined = joined
         self.eligible = eligible
@@ -511,6 +514,7 @@ def test_giveaway_exit_removes_user_before_response_and_embed_refresh(monkeypatc
 
 def _build_command_cog(events, giveaway_details):
     cog = object.__new__(GiveawayCog)
+    cog._giveaway_locks = {}
     cog.giveaway_channel_id = 10
     cog.giveaway_embed_cancel_label = "[CANCEL] "
     cog.giveaway_embed_earlyend_label = "[END] "
@@ -564,16 +568,17 @@ def test_cancel_giveaway_marks_ended_before_disabling_message(monkeypatch):
 
         event_names = [event[0] for event in events]
         assert event_names == [
+            "defer",
             "fetch_giveaway",
             "mark_ended",
             "fetch_message",
             "message_edit",
-            "response",
+            "followup",
         ]
         assert message.edits[0]["embed"].title == "[CANCEL] Giveaway"
         assert all(child.disabled for child in message.edits[0]["view"].children)
-        assert interaction.response.messages[0]["content"] == "Giveaway ga-1 has been cancelled."
-        assert interaction.response.messages[0]["ephemeral"] is False
+        assert interaction.followup.messages[0]["content"] == "Giveaway ga-1 has been cancelled."
+        assert interaction.followup.messages[0]["ephemeral"] is False
 
     asyncio.run(scenario())
 
@@ -599,19 +604,20 @@ def test_end_giveaway_draws_notifies_updates_db_then_disables_message(monkeypatc
 
         event_names = [event[0] for event in events]
         assert event_names == [
+            "defer",
             "fetch_giveaway",
             "draw_winners",
             "notify_winners",
             "update_giveaway",
             "fetch_message",
             "message_edit",
-            "response",
+            "followup",
         ]
-        assert events[3] == ("update_giveaway", "ga-1", [101])
+        assert events[4] == ("update_giveaway", "ga-1", [101])
         assert message.edits[0]["embed"].title == "[END] Giveaway"
         assert message.edits[0]["embed"].fields[-1].name == "Winners"
         assert message.edits[0]["embed"].fields[-1].value == "<@101>"
         assert all(child.disabled for child in message.edits[0]["view"].children)
-        assert interaction.response.messages[0]["content"] == "Giveaway ga-1 has been ended early."
+        assert interaction.followup.messages[0]["content"] == "Giveaway ga-1 has been ended early."
 
     asyncio.run(scenario())

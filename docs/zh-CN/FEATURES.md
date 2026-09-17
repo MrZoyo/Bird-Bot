@@ -270,8 +270,14 @@ GiveawayCog 使用基于 modal 的草稿流程填写奖品、时长、提供者�
 | `/ga_end <giveaway_id>` | 结束抽奖并选择中奖者 |
 | `/ga_time_extend <giveaway_id> <time>` | 延长结束时间 |
 | `/ga_participant <giveaway_id>` | 列出参与者 |
-| `/ga_description <giveaway_id> <description>` | 替换公开说明 |
+| `/ga_change <giveaway_id>` | 打开编辑面板，预览并保存活动修改 |
 | `/ga_sendtowinner <giveaway_id> <message>` | 向中奖者发送消息 |
+
+`/ga_change` 替代 `/ga_description`，在管理频道打开仅操作者可见的编辑面板。可修改奖品、说明、提供者、中奖人数、总时长、参与门槛和图片，点击“确认保存修改”后更新原活动消息；关闭或放弃草稿不会修改活动。图片表单留空提交可移除图片。
+
+总时长从原发布时间起计算，面板同时显示预计结束时间；已结束或到期的活动不能编辑，修改后的结束时间也必须晚于当前时间。另一位管理员先修改活动后，旧草稿需要重新载入。
+
+门槛修改只适用于之后的报名，已报名者保留参与和中奖资格，不会被重新筛除。主动退出后再次报名则按新门槛检查。保存不改变活动 ID、原发布时间、原发布者或已有报名记录。
 
 ### DnDCog
 

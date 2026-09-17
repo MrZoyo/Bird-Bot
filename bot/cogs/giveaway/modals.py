@@ -32,6 +32,8 @@ class GiveawayDraftState:
     image_file: discord.File | None = None
     image_filename: str | None = None
     published: bool = False
+    image_changed: bool = False
+    timespent_seconds_override: int | None = None
 
     @property
     def provider_or_default(self) -> str:
@@ -39,6 +41,8 @@ class GiveawayDraftState:
 
     @property
     def timespent_limit_seconds(self) -> int:
+        if self.timespent_seconds_override is not None:
+            return self.timespent_seconds_override
         return self.timespent_limit_minutes * 60
 
 
@@ -59,7 +63,11 @@ class GiveawayModal(ui.Modal):
 
 class GiveawayCreateModal(GiveawayModal):
     def __init__(self, bot, db, state: GiveawayDraftState, draft_view=None):
-        super().__init__(title=t('giveaway.giveaway_create_modal_title'))
+        editing = getattr(draft_view, 'editing', False)
+        super().__init__(title=t(
+            'giveaway.giveaway_edit_modal_title' if editing
+            else 'giveaway.giveaway_create_modal_title'
+        ))
         self.bot = bot
         self.db = db
         self.state = state
@@ -67,7 +75,7 @@ class GiveawayCreateModal(GiveawayModal):
 
         self.duration = add_labeled_text_input(
             self,
-            t('giveaway.giveaway_duration_label'),
+            t('giveaway.giveaway_edit_duration_label' if editing else 'giveaway.giveaway_duration_label'),
             placeholder=t('giveaway.giveaway_duration_placeholder'),
             required=True,
             min_length=2,
@@ -95,7 +103,7 @@ class GiveawayCreateModal(GiveawayModal):
             t('giveaway.giveaway_description_label'),
             placeholder=t('giveaway.giveaway_description_placeholder'),
             required=False,
-            default=state.description or t('giveaway.giveaway_description_default'),
+            default=state.description if editing else (state.description or t('giveaway.giveaway_description_default')),
             max_length=500,
         )
         self.providers = add_labeled_text_input(
@@ -104,9 +112,12 @@ class GiveawayCreateModal(GiveawayModal):
             placeholder=t('giveaway.giveaway_provider_placeholder'),
             required=False,
             default=state.provider or None,
+            max_length=100,
         )
 
     async def on_submit(self, interaction: discord.Interaction):
+        if self.draft_view and not await self.draft_view.interaction_check(interaction):
+            return
         duration_minutes = parse_duration_to_minutes(self.duration.value)
         if duration_minutes <= 0:
             await interaction.response.send_message(
@@ -168,6 +179,8 @@ class GiveawayLimitsModal(GiveawayModal):
         )
 
     async def on_submit(self, interaction: discord.Interaction):
+        if not await self.draft_view.interaction_check(interaction):
+            return
         values = [
             self.reaction_limit.value,
             self.message_limit.value,
@@ -182,6 +195,7 @@ class GiveawayLimitsModal(GiveawayModal):
         self.state.reaction_limit = int(self.reaction_limit.value)
         self.state.message_limit = int(self.message_limit.value)
         self.state.timespent_limit_minutes = int(self.timespent_limit.value)
+        self.state.timespent_seconds_override = None
 
         await refresh_draft_message(interaction, self.draft_view)
 
@@ -200,10 +214,13 @@ class GiveawayImageModal(GiveawayModal):
         )
 
     async def on_submit(self, interaction: discord.Interaction):
+        if not await self.draft_view.interaction_check(interaction):
+            return
         if not self.image.values:
             self._close_existing_image()
             self.state.image_file = None
             self.state.image_filename = None
+            self.state.image_changed = True
             await refresh_draft_message(interaction, self.draft_view)
             return
 
@@ -214,6 +231,7 @@ class GiveawayImageModal(GiveawayModal):
             )
             return
 
+        await interaction.response.defer()
         filename = sanitize_image_filename(attachment.filename)
         image_file = await attachment.to_file(
             filename=filename,
@@ -222,6 +240,7 @@ class GiveawayImageModal(GiveawayModal):
         self._close_existing_image()
         self.state.image_file = image_file
         self.state.image_filename = filename
+        self.state.image_changed = True
 
         await refresh_draft_message(interaction, self.draft_view)
 
@@ -522,7 +541,11 @@ async def refresh_draft_message(
 ) -> None:
     draft_view.populate_panel()
     try:
-        await interaction.response.edit_message(
+        edit = (
+            interaction.edit_original_response if interaction.response.is_done()
+            else interaction.response.edit_message
+        )
+        await edit(
             content=None,
             embed=draft_view.format_embed(),
             view=draft_view,

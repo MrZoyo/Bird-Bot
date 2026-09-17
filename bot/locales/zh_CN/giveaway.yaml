@@ -71,3 +71,21 @@ giveaway_published_message: 抽奖已发布，ID：{giveaway_id}
 giveaway_modal_error_message: 抽奖表单处理失败，错误已写入日志。
 giveaway_modal_open_failed_message: 无法打开抽奖表单，请稍后重试。
 giveaway_draft_refresh_failed_message: 抽奖草稿刷新失败，请重新使用 /ga_create 创建。
+giveaway_edit_modal_title: 编辑抽奖
+giveaway_edit_duration_label: 总时长（从原发布时间起）
+giveaway_edit_save_button: 确认保存修改
+giveaway_edit_image_button: 更换或移除图片
+giveaway_edit_cancel_button: 放弃修改
+giveaway_edit_title: '编辑抽奖 {giveaway_id}'
+giveaway_edit_rules: "确认保存后才会更新原活动。总时长从原发布时间计算，不会重新计时。新门槛只约束之后的报名；已报名者保留资格，主动退出后重新报名须满足新门槛。图片表单留空提交可移除图片。"
+giveaway_edit_owner_only_message: 只有打开这个编辑面板的人可以操作它。
+giveaway_edit_inactive_message: 这个编辑面板正在保存或已关闭，请使用 /ga_change 重新打开。
+giveaway_edit_closed_message: 抽奖不存在、已结束或已到结束时间，无法编辑。
+giveaway_edit_stale_message: 活动已被其他操作修改，请使用 /ga_change 重新载入后再编辑。
+giveaway_edit_deadline_message: 修改后的结束时间必须晚于当前时间。如需立即开奖，请使用 /ga_end。
+giveaway_edit_fetch_failed_message: 无法读取原活动消息，未保存修改。请检查消息是否存在及 Bot 的频道权限。
+giveaway_edit_legacy_message: 此活动使用旧版消息面板，暂不支持原位编辑，请联系维护者处理。
+giveaway_edit_save_failed_message: 活动消息更新失败，已尝试恢复原设置。请重新打开 /ga_change 核对当前状态后重试。
+giveaway_edit_saved_message: '抽奖 {giveaway_id} 已更新，原有报名资格已保留。'
+giveaway_edit_cancelled_message: 已放弃本次修改，原活动保持不变。
+giveaway_edit_error_message: 编辑操作出错，详情已写入日志。请重新打开 /ga_change 核对当前活动设置。

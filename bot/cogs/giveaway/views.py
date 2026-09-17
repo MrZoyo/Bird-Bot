@@ -150,6 +150,11 @@ class GiveawayParticipationView(ui.View):
             await self.update_giveaway_embed()
 
     async def update_giveaway_embed(self):
+        giveaway_cog = self.bot.get_cog('GiveawayCog')
+        async with giveaway_cog.giveaway_lock(self.giveaway_id):
+            await self._update_giveaway_embed_locked()
+
+    async def _update_giveaway_embed_locked(self):
         # Fetch the giveaway message
         channel = self.bot.get_channel(self.giveaway_channel_id)
         if channel is None:
@@ -343,13 +348,12 @@ class GiveawayPanelView(ui.View):
         return discord.Color.blue()
 
     def _resolve_media_url(self, record):
-        image_url = record.get('image_url')
-        if image_url:
-            return image_url
+        # Reusing a CDN URL when editing exposes the same upload as a standalone
+        # attachment too. Keep uploaded images bound to the embed by filename.
         image_filename = record.get('image_filename')
         if image_filename:
             return f"attachment://{image_filename}"
-        return None
+        return record.get('image_url') or None
 
     def _format_end_time(self, record):
         starttime = record.get('starttime')
@@ -419,6 +423,11 @@ class GiveawayPanelView(ui.View):
             await self.update_giveaway_embed()
 
     async def update_giveaway_embed(self):
+        giveaway_cog = self.bot.get_cog('GiveawayCog')
+        async with giveaway_cog.giveaway_lock(self.giveaway_id):
+            await self._update_giveaway_embed_locked()
+
+    async def _update_giveaway_embed_locked(self):
         channel = self.bot.get_channel(self.giveaway_channel_id)
         if channel is None:
             logging.error("Giveaway channel %s not found", fmt_channel(self.giveaway_channel_id))
@@ -427,7 +436,7 @@ class GiveawayPanelView(ui.View):
 
         giveaway_cog = self.bot.get_cog('GiveawayCog')
         record = await giveaway_cog.fetch_giveaway(self.giveaway_id)
-        if record is None:
+        if record is None or record['is_end']:
             return
 
         participant_count = await giveaway_cog.get_participant_count(self.giveaway_id)

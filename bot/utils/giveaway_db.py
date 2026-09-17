@@ -32,6 +32,12 @@ GIVEAWAY_COLUMNS = (
     'ui_version',
 )
 
+GIVEAWAY_EDITABLE_COLUMNS = (
+    'duration', 'winner_number', 'prizes', 'description', 'provider',
+    'reaction_req', 'message_req', 'timespent_req', 'image_url', 'image_filename',
+    'ui_version',
+)
+
 
 class GiveawayDatabaseManager(BaseDatabaseManager):
     """Database operations for the giveaway system.
@@ -226,6 +232,32 @@ class GiveawayDatabaseManager(BaseDatabaseManager):
                 (new_description, giveaway_id),
             )
             await db.commit()
+
+    async def update_giveaway_settings(self, expected, changes) -> bool:
+        """Compare and save settings without overwriting participants or winners.
+
+        A draft is stale when another admin changes settings, the message moves,
+        or the giveaway ends. Joining/leaving never makes a draft stale.
+        """
+        if not changes or set(changes) - set(GIVEAWAY_EDITABLE_COLUMNS):
+            raise ValueError('Only giveaway settings may be edited')
+        compared = (*GIVEAWAY_EDITABLE_COLUMNS, 'starttime', 'message_id')
+        assignments = ', '.join(f'{column} = ?' for column in changes)
+        condition = ' AND '.join(f'{column} IS ?' for column in compared)
+        async with connect_database(self.db_path) as db:
+            cursor = await db.execute(
+                f'UPDATE giveaway SET {assignments} '
+                f'WHERE giveaway_id = ? AND is_end = 0 AND {condition}',
+                (*changes.values(), expected['giveaway_id'],
+                 *(expected.get(column) for column in compared)),
+            )
+            updated = cursor.rowcount == 1
+            await cursor.close()
+            if updated:
+                await db.commit()
+            else:
+                await db.rollback()
+        return updated
 
     async def update_giveaway_duration(self, giveaway_id, new_duration) -> None:
         async with connect_database(self.db_path) as db:

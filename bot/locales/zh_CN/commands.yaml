@@ -174,11 +174,10 @@ giveaway:
     description: "查看某个抽奖的全部参与者"
     params:
       giveaway_id: "要查看参与者的抽奖 ID"
-  ga_description:
-    description: "修改尚未结束抽奖的描述"
+  ga_change:
+    description: "打开编辑面板，修改进行中的抽奖并确认保存"
     params:
       giveaway_id: "要修改的抽奖 ID"
-      description: "新的抽奖描述"
   ga_sendtowinner:
     description: "向抽奖中奖者发送消息"
     params:

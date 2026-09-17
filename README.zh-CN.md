@@ -20,7 +20,7 @@
 
 <p align="center">
   <a href="docs/zh-CN/CHANGELOG.md">
-    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.6-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="当前版本：Bird Bot v2.0.6">
+    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.7-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="当前版本：Bird Bot v2.0.7">
   </a>
   <a href="https://www.python.org/">
     <img src="https://img.shields.io/badge/PYTHON-3.12-3776AB?style=for-the-badge&amp;logo=python&amp;logoColor=white" alt="Python 3.12">
@@ -227,6 +227,8 @@ uv sync --frozen --python 3.12.3
 4. 重启 Bot，检查启动日志中是否有跳过的 cog 或迁移错误。
 
 需要时，数据库 schema 迁移会在启动阶段执行。生产 checkout 包含服务器专用 locale 或图片修改时，切勿使用 `git reset --hard` 或其他强制覆盖式更新。
+
+2.0.7 用 `/ga_change` 确认面板替代 `/ga_description`，可修改进行中的抽奖并保留已有报名；新门槛只约束之后的报名。同时修复编辑消息后上传图片重复显示的问题。从 2.0.6 升级无需增加依赖或迁移数据库。代码与新增 locale 键须一起部署，启动后确认命令同步已注册 `/ga_change` 并移除 `/ga_description`。详见[抽奖功能说明](docs/zh-CN/FEATURES.md#giveawaycog)。
 
 2.0.6 增加持久化房间邀请生命周期和启动迁移。活跃邀请持续显示到满员、新邀请替换或房间删除；两个满员入口共用邀请状态，邀请按钮支持重启后继续使用。切换前在加密备份上演练迁移，保留服务器专用文案，并在旧进程停止后迁移。旧版到期清理器与新状态不兼容；迁移完成后若启动失败，应保留当前数据库并按[邀请升级说明](docs/refactoring/ROOM_INVITATION_LIFECYCLE.md)修复前进。偶发 Discord `10062` 已增加应答诊断，其具体延迟原因仍待确认。
 

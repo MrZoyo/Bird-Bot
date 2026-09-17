@@ -270,8 +270,14 @@ Giveaway state, participants, and winners live in SQLite. The cog restores activ
 | `/ga_end <giveaway_id>` | End a giveaway and choose winners |
 | `/ga_time_extend <giveaway_id> <time>` | Extend the end time |
 | `/ga_participant <giveaway_id>` | List participants |
-| `/ga_description <giveaway_id> <description>` | Replace the public description |
+| `/ga_change <giveaway_id>` | Preview and save changes through an edit panel |
 | `/ga_sendtowinner <giveaway_id> <message>` | Send a message to the winners |
+
+`/ga_change` replaces `/ga_description` and opens a private edit panel in the admin channel. Edit the prize, description, provider, winner count, total duration, entry requirements, or image, then confirm to update the original message. Cancelling or closing the draft leaves the activity unchanged. Submitting the image form without a file removes the image.
+
+Total duration is measured from the original publication time; the panel also shows the resulting deadline. Ended or expired giveaways cannot be edited, and the new deadline must remain in the future. If another administrator changes the activity first, reopen the draft before saving.
+
+New requirements apply to subsequent entries. Existing participants keep their entry and eligibility to win. A participant who leaves and rejoins must meet the new requirements. Saving preserves the activity ID, original publication time, creator, and existing entries.
 
 ### DnDCog
 

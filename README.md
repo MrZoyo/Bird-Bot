@@ -20,7 +20,7 @@
 
 <p align="center">
   <a href="docs/en/CHANGELOG.md">
-    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.6-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="Current release: Bird Bot v2.0.6">
+    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.7-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="Current release: Bird Bot v2.0.7">
   </a>
   <a href="https://www.python.org/">
     <img src="https://img.shields.io/badge/PYTHON-3.12-3776AB?style=for-the-badge&amp;logo=python&amp;logoColor=white" alt="Python 3.12">
@@ -229,6 +229,8 @@ Before upgrading:
 4. Restart the bot and inspect startup logs for skipped cogs or migration errors.
 
 Database schema migrations run during startup where required. Never use `git reset --hard` or another force-overwriting update on a production checkout with server-specific locale or image changes.
+
+Version 2.0.7 replaces `/ga_description` with the `/ga_change` confirmation panel. Administrators can edit an active giveaway while preserving existing entries; new requirements apply only to subsequent entries. It also prevents uploaded images from appearing twice after message edits. Upgrading from 2.0.6 requires no dependency or schema changes. Deploy the code and new locale keys together, then confirm that startup command sync exposes `/ga_change` and removes `/ga_description`. See the [Giveaway reference](docs/en/FEATURES.md#giveawaycog).
 
 Version 2.0.6 adds a persistent room-invitation lifecycle and startup migration. Active invitations remain on the board until ended, replaced, or their room is deleted. Both full buttons target the same invitation state, and invitation buttons survive restarts. Rehearse the migration on an encrypted backup, preserve server locale overrides, and keep the old process stopped during the migration. The old expiry cleaner is incompatible with the new lifecycle data; preserve the current database and use a reviewed forward repair if startup fails after migration. See the [invitation upgrade notes](docs/refactoring/ROOM_INVITATION_LIFECYCLE.md). Intermittent Discord `10062` errors now have acknowledgement diagnostics but remain an unresolved latency issue.
 

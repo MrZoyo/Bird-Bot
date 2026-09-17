@@ -7,6 +7,14 @@
 
 This file preserves the release notes that previously lived at the bottom of `README.md`. Entries describe the code at the time of each release; current runtime behavior is documented in [FEATURES.md](FEATURES.md).
 
+## 2.0.7 — 2026-09-17
+
+- Replaced `/ga_description` with `/ga_change <giveaway_id>`. Its private confirmation panel edits the prize, description, provider, winner count, total duration, entry requirements, and image on the original activity.
+- Keep existing participants eligible when requirements change. New entries, including people who leave and rejoin, use the updated requirements. Duration remains relative to the original publication time.
+- Reject expired activities and stale drafts. Serialize edits, endings, extensions, and panel refreshes; restore settings after a failed message edit without overwriting participant records.
+- Reference uploaded giveaway images by attachment filename so editing, refreshing, or ending an activity does not display the image twice. Image uploads acknowledge the interaction before downloading the file.
+- Added 16 regression cases; all 215 offline tests pass. No dependency or schema changes are required when upgrading from 2.0.6. Preserve server locale overrides, back up the database and key, and validate the candidate before the brief process switch.
+
 ## 2.0.6 — 2026-09-13
 
 - Made room invitation buttons persistent across restarts and removed their ten-minute callback expiry. Full ends one invitation; the room remains available for another round.

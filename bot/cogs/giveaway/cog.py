@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import logging
 import random
@@ -13,6 +14,7 @@ from bot.utils import GiveawayDatabaseManager, check_channel_validity, config, f
 from bot.utils.i18n import t
 from bot.utils.task_helpers import wait_until_ready_or_stop
 
+from .editing import GiveawayEditView, giveaway_is_closed
 from .modals import GiveawayCreateModal, GiveawayDraftState
 from .views import GiveawayCheckParticipantView, GiveawayPanelView, GiveawayParticipationView
 
@@ -21,6 +23,7 @@ class GiveawayCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.giveaways = {}
+        self._giveaway_locks = {}
 
         self.main_config = config.get_config('main')
         self.db_path = self.main_config['db_path']
@@ -48,6 +51,9 @@ class GiveawayCog(commands.Cog):
         await self.db.initialize_database()
         self.check_giveaways.start()
 
+    def giveaway_lock(self, giveaway_id):
+        return self._giveaway_locks.setdefault(str(giveaway_id), asyncio.Lock())
+
     async def draw_winners(self, giveaway_id, winner_number):
         # Fetch the participant_ids from the database
         participant_ids = await self.fetch_participant_ids(giveaway_id)
@@ -70,108 +76,90 @@ class GiveawayCog(commands.Cog):
                 giveaways = await self.fetch_all_giveaways(is_end=False)
 
                 for giveaway in giveaways:
-                    # print(giveaway)
-                    (giveaway_id, message_id, starttime, duration,
-                     winner_number, prizes, description, creator_id,
-                     reaction_req, message_req, timespent_req,
-                     participant_ids, winner_ids, is_end, provider,
-                     image_url, image_filename, ui_version) = giveaway
-                    giveaway_record = {
-                        'giveaway_id': giveaway_id,
-                        'message_id': message_id,
-                        'starttime': starttime,
-                        'duration': duration,
-                        'winner_number': winner_number,
-                        'prizes': prizes,
-                        'description': description,
-                        'creator_id': creator_id,
-                        'reaction_req': reaction_req,
-                        'message_req': message_req,
-                        'timespent_req': timespent_req,
-                        'participant_ids': participant_ids,
-                        'winner_ids': winner_ids,
-                        'is_end': is_end,
-                        'provider': provider,
-                        'image_url': image_url,
-                        'image_filename': image_filename,
-                        'ui_version': ui_version,
-                    }
-
-                    message_id = int(message_id)
-                    # Check if the giveaway has ended
-                    end_time = datetime.datetime.fromisoformat(starttime) + datetime.timedelta(minutes=duration)
-                    if datetime.datetime.now() >= end_time and not is_end:
-                        # print(end_time)
-                        # The giveaway has ended
-                        # Fetch the giveaway message
-                        channel = self.bot.get_channel(self.giveaway_channel_id)
-                        if channel is None:
-                            logging.error("Couldn't find giveaway channel %s", fmt_channel(self.giveaway_channel_id))
-                        else:
-                            try:
-                                # Try to fetch the giveaway message
-                                message = await channel.fetch_message(message_id)
-                            except discord.NotFound:
-                                logging.error(f"Couldn't find a message with the ID {message_id}")
-                                # The message has been deleted
-                                if datetime.datetime.now() >= end_time:
-                                    # The giveaway has ended
-                                    # Create a new end embed
-                                    embed = discord.Embed(
-                                        title=self.giveaway_embed_title_closed_deleted.format(giveaway_id),
-                                        description=self.giveaway_embed_description_closed_deleted,
-                                        color=discord.Color.red()
-                                    )
-
-                                    # Send the end embed
-                                    await channel.send(embed=embed)
-
-                                    # Mark the giveaway as ended in the database
-                                    await self.mark_giveaway_as_ended(giveaway_id)
+                    async with self.giveaway_lock(giveaway[0]):
+                        current = await self.fetch_giveaway(giveaway[0])
+                        if current is None or current['is_end']:
+                            continue
+                        giveaway_record = current
+                        giveaway_id = current['giveaway_id']
+                        message_id = int(current['message_id'])
+                        winner_number = current['winner_number']
+                        prizes = current['prizes']
+                        end_time = datetime.datetime.fromisoformat(current['starttime']) + datetime.timedelta(
+                            minutes=current['duration'],
+                        )
+                        if datetime.datetime.now() >= end_time:
+                            # print(end_time)
+                            # The giveaway has ended
+                            # Fetch the giveaway message
+                            channel = self.bot.get_channel(self.giveaway_channel_id)
+                            if channel is None:
+                                logging.error("Couldn't find giveaway channel %s", fmt_channel(self.giveaway_channel_id))
                             else:
-                                # Draw the winners
-                                winners = await self.draw_winners(giveaway_id, winner_number)
+                                try:
+                                    # Try to fetch the giveaway message
+                                    message = await channel.fetch_message(message_id)
+                                except discord.NotFound:
+                                    logging.error(f"Couldn't find a message with the ID {message_id}")
+                                    # The message has been deleted
+                                    if datetime.datetime.now() >= end_time:
+                                        # The giveaway has ended
+                                        # Create a new end embed
+                                        embed = discord.Embed(
+                                            title=self.giveaway_embed_title_closed_deleted.format(giveaway_id),
+                                            description=self.giveaway_embed_description_closed_deleted,
+                                            color=discord.Color.red()
+                                        )
 
-                                # Notify the winners
-                                await self.notify_winners(winners, prizes, giveaway_id)
+                                        # Send the end embed
+                                        await channel.send(embed=embed)
 
-                                winner_mentions = self._format_winner_mentions(winners)
-                                if self._uses_components_v2(giveaway_record):
-                                    participant_count = len(await self.fetch_participant_ids(giveaway_id))
-                                    giveaway_record['is_end'] = 1
-                                    giveaway_view = GiveawayPanelView(
-                                        self.bot,
-                                        giveaway_id,
-                                        self.giveaway_channel_id,
-                                        record=giveaway_record,
-                                        participant_count=participant_count,
-                                        status="ended",
-                                        winners=winner_mentions,
-                                        disabled=True,
-                                    )
-                                    giveaway_view.message_id = message_id
-                                    self.giveaways[giveaway_id] = giveaway_view
-                                    await self.edit_giveaway_panel_message(message, giveaway_view)
+                                        # Mark the giveaway as ended in the database
+                                        await self.mark_giveaway_as_ended(giveaway_id)
                                 else:
-                                    if giveaway_id not in self.giveaways:
-                                        giveaway_view = GiveawayParticipationView(self.bot, giveaway_id,
-                                                                                  self.giveaway_channel_id)
+                                    # Draw the winners
+                                    winners = await self.draw_winners(giveaway_id, winner_number)
+
+                                    # Notify the winners
+                                    await self.notify_winners(winners, prizes, giveaway_id)
+
+                                    winner_mentions = self._format_winner_mentions(winners)
+                                    if self._uses_components_v2(giveaway_record):
+                                        participant_count = len(await self.fetch_participant_ids(giveaway_id))
+                                        giveaway_record['is_end'] = 1
+                                        giveaway_view = GiveawayPanelView(
+                                            self.bot,
+                                            giveaway_id,
+                                            self.giveaway_channel_id,
+                                            record=giveaway_record,
+                                            participant_count=participant_count,
+                                            status="ended",
+                                            winners=winner_mentions,
+                                            disabled=True,
+                                        )
                                         giveaway_view.message_id = message_id
                                         self.giveaways[giveaway_id] = giveaway_view
+                                        await self.edit_giveaway_panel_message(message, giveaway_view)
+                                    else:
+                                        if giveaway_id not in self.giveaways:
+                                            giveaway_view = GiveawayParticipationView(self.bot, giveaway_id,
+                                                                                      self.giveaway_channel_id)
+                                            giveaway_view.message_id = message_id
+                                            self.giveaways[giveaway_id] = giveaway_view
 
-                                    giveaway_view = self.giveaways[giveaway_id]
-                                    embed = message.embeds[0]
-                                    embed.title = self.giveaway_embed_end_label + embed.title
-                                    embed.color = discord.Color.red()
-                                    giveaway_view.disable_all_buttons()
-                                    embed.add_field(name=self.giveaway_embed_winner_title,
-                                                    value=", ".join(winner_mentions)
-                                                    if winner_mentions else self.giveaway_embed_no_winner,
-                                                    inline=False)
-                                    await message.edit(embed=embed, view=giveaway_view)
+                                        giveaway_view = self.giveaways[giveaway_id]
+                                        embed = message.embeds[0]
+                                        embed.title = self.giveaway_embed_end_label + embed.title
+                                        embed.color = discord.Color.red()
+                                        giveaway_view.disable_all_buttons()
+                                        embed.add_field(name=self.giveaway_embed_winner_title,
+                                                        value=", ".join(winner_mentions)
+                                                        if winner_mentions else self.giveaway_embed_no_winner,
+                                                        inline=False)
+                                        await message.edit(embed=embed, view=giveaway_view)
 
-                                # Update the results to the database after the public panel is repainted.
-                                await self.update_giveaway(giveaway_id, winners)
+                                    # Update the results to the database after the public panel is repainted.
+                                    await self.update_giveaway(giveaway_id, winners)
 
             except Exception as e:
                 # print(f"An error occurred in check_giveaways: {e}")
@@ -376,16 +364,20 @@ class GiveawayCog(commands.Cog):
     async def cancel_giveaway(self, interaction: discord.Interaction, giveaway_id: str):
         if not await check_channel_validity(interaction, ephemeral=False):
             return
+        await interaction.response.defer()
+        async with self.giveaway_lock(giveaway_id):
+            await self._cancel_giveaway_locked(interaction, giveaway_id)
 
+    async def _cancel_giveaway_locked(self, interaction, giveaway_id):
         # Fetch the giveaway details from the database
         giveaway_details = await self.fetch_giveaway(giveaway_id)
 
         if giveaway_details is None:
             # The giveaway does not exist
-            await interaction.response.send_message(f"Giveaway {giveaway_id} does not exist.")
+            await interaction.followup.send(f"Giveaway {giveaway_id} does not exist.")
         elif giveaway_details['is_end']:
             # The giveaway has already ended
-            await interaction.response.send_message(f"Giveaway {giveaway_id} has already ended.")
+            await interaction.followup.send(f"Giveaway {giveaway_id} has already ended.")
         else:
             # The giveaway is not ended, so cancel it
             # Mark the giveaway as ended in the database
@@ -417,7 +409,7 @@ class GiveawayCog(commands.Cog):
                 # Edit the message with the disabled view
                 await message.edit(embed=embed, view=view)
 
-            await interaction.response.send_message(f"Giveaway {giveaway_id} has been cancelled.")
+            await interaction.followup.send(f"Giveaway {giveaway_id} has been cancelled.")
 
     @app_commands.command(
         name="ga_end",
@@ -435,15 +427,20 @@ class GiveawayCog(commands.Cog):
     async def end_giveaway(self, interaction: discord.Interaction, giveaway_id: str):
         if not await check_channel_validity(interaction, ephemeral=False):
             return
+        await interaction.response.defer()
+        async with self.giveaway_lock(giveaway_id):
+            await self._end_giveaway_locked(interaction, giveaway_id)
+
+    async def _end_giveaway_locked(self, interaction, giveaway_id):
         # Fetch the giveaway details from the database
         giveaway_details = await self.fetch_giveaway(giveaway_id)
 
         if giveaway_details is None:
             # The giveaway does not exist
-            await interaction.response.send_message(f"Giveaway {giveaway_id} does not exist.")
+            await interaction.followup.send(f"Giveaway {giveaway_id} does not exist.")
         elif giveaway_details['is_end']:
             # The giveaway has already ended
-            await interaction.response.send_message(f"Giveaway {giveaway_id} has already ended.")
+            await interaction.followup.send(f"Giveaway {giveaway_id} has already ended.")
         else:
             # The giveaway is not ended, so end it early
             # Draw the winners from the existing participants
@@ -487,7 +484,7 @@ class GiveawayCog(commands.Cog):
                 # Edit the message with the disabled view
                 await message.edit(embed=embed, view=view)
 
-            await interaction.response.send_message(f"Giveaway {giveaway_id} has been ended early.")
+            await interaction.followup.send(f"Giveaway {giveaway_id} has been ended early.")
 
     @app_commands.command(
         name="ga_time_extend",
@@ -509,15 +506,20 @@ class GiveawayCog(commands.Cog):
     async def extend_giveaway(self, interaction: discord.Interaction, giveaway_id: str, time: int):
         if not await check_channel_validity(interaction, ephemeral=False):
             return
+        await interaction.response.defer()
+        async with self.giveaway_lock(giveaway_id):
+            await self._extend_giveaway_locked(interaction, giveaway_id, time)
+
+    async def _extend_giveaway_locked(self, interaction, giveaway_id, time):
         # Fetch the giveaway details from the database
         giveaway_details = await self.fetch_giveaway(giveaway_id)
 
         if giveaway_details is None:
             # The giveaway does not exist
-            await interaction.response.send_message(f"Giveaway {giveaway_id} does not exist.")
+            await interaction.followup.send(f"Giveaway {giveaway_id} does not exist.")
         elif giveaway_details['is_end']:
             # The giveaway has already ended
-            await interaction.response.send_message(f"Giveaway {giveaway_id} has already ended.")
+            await interaction.followup.send(f"Giveaway {giveaway_id} has already ended.")
         else:
             # The giveaway is not ended, so extend its time
             # Extend the duration of the giveaway by the specified time
@@ -546,7 +548,7 @@ class GiveawayCog(commands.Cog):
                 # Update the message
                 await message.edit(embed=embed)
 
-            await interaction.response.send_message(f"Giveaway {giveaway_id} time has been extended by {time} minutes.",
+            await interaction.followup.send(f"Giveaway {giveaway_id} time has been extended by {time} minutes.",
                                                     )
 
     @app_commands.command(
@@ -594,65 +596,28 @@ class GiveawayCog(commands.Cog):
             participant_view.message = message
 
     @app_commands.command(
-        name="ga_description",
+        name="ga_change",
         description=locale_str(
-            "Modify the description of a giveaway that is not yet finished",
-            key="giveaway.ga_description.description",
+            "Edit an active giveaway with a confirmation panel",
+            key="giveaway.ga_change.description",
         ),
     )
     @app_commands.describe(
         giveaway_id=locale_str(
             "Enter the giveaway ID to modify",
-            key="giveaway.ga_description.params.giveaway_id",
-        ),
-        description=locale_str(
-            "Enter the new description for the giveaway",
-            key="giveaway.ga_description.params.description",
+            key="giveaway.ga_change.params.giveaway_id",
         ),
     )
-    async def ga_description(self, interaction: discord.Interaction, giveaway_id: str, description: str):
-        if not await check_channel_validity(interaction, ephemeral=False):
+    async def ga_change(self, interaction: discord.Interaction, giveaway_id: str):
+        if not await check_channel_validity(interaction, ephemeral=True):
             return
-
-        # Fetch the giveaway details from the database
-        giveaway_details = await self.fetch_giveaway(giveaway_id)
-
-        if giveaway_details is None:
-            # The giveaway does not exist
-            await interaction.response.send_message(f"Giveaway {giveaway_id} does not exist.")
-        elif giveaway_details['is_end']:
-            # The giveaway has already ended
-            await interaction.response.send_message(f"Giveaway {giveaway_id} has already ended.")
-        else:
-            # The giveaway is not ended, so update its description
-            await self.update_giveaway_description(giveaway_id, description)
-
-            # Fetch the giveaway message
-            channel = self.bot.get_channel(self.giveaway_channel_id)
-            message = await channel.fetch_message(giveaway_details['message_id'])
-
-            if self._uses_components_v2(giveaway_details):
-                giveaway_details['description'] = description
-                view = await self._build_giveaway_panel_view(giveaway_details)
-                view.message_id = message.id
-                await self.edit_giveaway_panel_message(message, view)
-            else:
-                # Update the embed to reflect the new description
-                embed = message.embeds[0]
-                # Find the index of the "Description" field
-                index = next((i for i, field in enumerate(message.embeds[0].fields) if
-                              field.name == self.giveaway_embed_description_title), None)
-
-                # Update the "Description" field if it exists
-                if index is not None:
-                    embed.set_field_at(index, name=self.giveaway_embed_description_title, value=description,
-                                       inline=False)
-
-                # Edit the message with the updated embed
-                await message.edit(embed=embed)
-
-            await interaction.response.send_message(f"Giveaway {giveaway_id} description has been updated.",
-                                                    )
+        await interaction.response.defer(ephemeral=True)
+        record = await self.fetch_giveaway(giveaway_id)
+        if giveaway_is_closed(record):
+            await interaction.followup.send(t('giveaway.giveaway_edit_closed_message'), ephemeral=True)
+            return
+        view = GiveawayEditView(self, record, interaction.user.id)
+        await interaction.followup.send(embed=view.format_embed(), view=view, ephemeral=True)
 
     @app_commands.command(
         name="ga_sendtowinner",
