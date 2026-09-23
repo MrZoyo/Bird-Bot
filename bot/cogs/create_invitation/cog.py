@@ -117,7 +117,7 @@ class CreateInvitationCog(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel):
         if isinstance(channel, discord.VoiceChannel):
-            await self.lifecycle.room_deleted(channel.id)
+            await self.lifecycle.room_deleted(channel.id, voice_channel=channel)
 
     @commands.Cog.listener()
     async def on_message(self, message):

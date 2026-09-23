@@ -124,7 +124,7 @@ class InvitationLifecycle:
         outcome = await self.sync_one(await self.db.get(row['id']), message=message)
         return 'roomfull_set_message' if outcome in ('updated', 'missing') else 'ended_sync_pending'
 
-    async def sync_one(self, row, *, message=None):
+    async def sync_one(self, row, *, message=None, voice_channel=None):
         if not row['invitation_message_id']:
             await self.db.record_sync(row['id'], 'missing')
             return 'missing'
@@ -134,7 +134,7 @@ class InvitationLifecycle:
                 if channel is None:
                     channel = await self.bot.fetch_channel(row['invitation_channel_id'])
                 message = await channel.fetch_message(row['invitation_message_id'])
-            outcome = await update_invitation_message_to_full(self.bot, message)
+            outcome = await update_invitation_message_to_full(self.bot, message, voice_channel=voice_channel)
         except discord.NotFound:
             outcome = 'missing'
         except discord.Forbidden:
@@ -147,17 +147,17 @@ class InvitationLifecycle:
                             row['id'], outcome, fmt_channel(row['invitation_channel_id']))
         return outcome
 
-    async def sync_room(self, channel_id):
+    async def sync_room(self, channel_id, *, voice_channel=None):
         # Caller holds the room lock. UI work is outside database transactions.
         for row in await self.db.pending_sync(channel_id):
-            await self.sync_one(row)
+            await self.sync_one(row, voice_channel=voice_channel)
 
-    async def room_deleted(self, channel_id):
+    async def room_deleted(self, channel_id, *, voice_channel=None):
         async with self.room_lock(channel_id):
             row = await self.db.current(channel_id)
             if row:
                 await self.db.end(row['id'], 'room_deleted')
-                await self.sync_room(channel_id)
+                await self.sync_room(channel_id, voice_channel=voice_channel)
         await self.refresh_boards()
 
     async def reconcile(self):

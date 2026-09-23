@@ -7,6 +7,14 @@
 
 This file preserves the release notes that previously lived at the bottom of `README.md`. Entries describe the code at the time of each release; current runtime behavior is documented in [FEATURES.md](FEATURES.md).
 
+## 2.0.8 — 2026-09-23
+
+- Preserve voice-room names when invitations end: fetch uncached channels, use the channel object supplied by deletion events, and save readable names in new invitation messages.
+- Show channel IDs when legacy names cannot be recovered, mark confirmed deleted channels, and retain retries for transient lookup failures.
+- Increase the default private-room booster bonus to 30 voice hours in both shop text and purchase/renewal discounts. Explicit settings still take precedence; zero disables the bonus.
+- Retain the existing user-mention style for invite leaderboards. Previously ended messages are not rewritten.
+- No dependency or schema changes are required from 2.0.7. Set `booster_discount_hours: 30` in the deployment's `privateroom.yaml` and deploy the new invitation locale keys while preserving server-specific wording.
+
 ## 2.0.7 — 2026-09-17
 
 - Replaced `/ga_description` with `/ga_change <giveaway_id>`. Its private confirmation panel edits the prize, description, provider, winner count, total duration, entry requirements, and image on the original activity.

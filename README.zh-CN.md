@@ -20,7 +20,7 @@
 
 <p align="center">
   <a href="docs/zh-CN/CHANGELOG.md">
-    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.7-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="当前版本：Bird Bot v2.0.7">
+    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.8-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="当前版本：Bird Bot v2.0.8">
   </a>
   <a href="https://www.python.org/">
     <img src="https://img.shields.io/badge/PYTHON-3.12-3776AB?style=for-the-badge&amp;logo=python&amp;logoColor=white" alt="Python 3.12">
@@ -227,6 +227,8 @@ uv sync --frozen --python 3.12.3
 4. 重启 Bot，检查启动日志中是否有跳过的 cog 或迁移错误。
 
 需要时，数据库 schema 迁移会在启动阶段执行。生产 checkout 包含服务器专用 locale 或图片修改时，切勿使用 `git reset --hard` 或其他强制覆盖式更新。
+
+2.0.8 修复房间删除或缓存缺失后，结束邀请丢失房间名称的问题；私人房间助力用户默认增加 30 小时语音时长。已有部署需将运行配置的 `privateroom.booster_discount_hours` 改为 `30`，并随代码部署新增邀请 locale 键，保留服务器定制文案。从 2.0.7 升级无需增加依赖或迁移数据库；邀请排行榜继续使用原来的提及样式。
 
 2.0.7 用 `/ga_change` 确认面板替代 `/ga_description`，可修改进行中的抽奖并保留已有报名；新门槛只约束之后的报名。同时修复编辑消息后上传图片重复显示的问题。从 2.0.6 升级无需增加依赖或迁移数据库。代码与新增 locale 键须一起部署，启动后确认命令同步已注册 `/ga_change` 并移除 `/ga_description`。详见[抽奖功能说明](docs/zh-CN/FEATURES.md#giveawaycog)。
 

@@ -20,7 +20,7 @@
 
 <p align="center">
   <a href="docs/en/CHANGELOG.md">
-    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.7-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="Current release: Bird Bot v2.0.7">
+    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.8-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="Current release: Bird Bot v2.0.8">
   </a>
   <a href="https://www.python.org/">
     <img src="https://img.shields.io/badge/PYTHON-3.12-3776AB?style=for-the-badge&amp;logo=python&amp;logoColor=white" alt="Python 3.12">
@@ -229,6 +229,8 @@ Before upgrading:
 4. Restart the bot and inspect startup logs for skipped cogs or migration errors.
 
 Database schema migrations run during startup where required. Never use `git reset --hard` or another force-overwriting update on a production checkout with server-specific locale or image changes.
+
+Version 2.0.8 preserves voice-room names when invitations end after room deletion or a cache miss, and raises the default private-room booster bonus to 30 voice hours. Existing deployments should set `privateroom.booster_discount_hours: 30` in their runtime YAML. Deploy the new invitation locale keys with the code while preserving server-specific wording. No dependency or schema changes are required from 2.0.7; invite leaderboards retain their existing mention style.
 
 Version 2.0.7 replaces `/ga_description` with the `/ga_change` confirmation panel. Administrators can edit an active giveaway while preserving existing entries; new requirements apply only to subsequent entries. It also prevents uploaded images from appearing twice after message edits. Upgrading from 2.0.6 requires no dependency or schema changes. Deploy the code and new locale keys together, then confirm that startup command sync exposes `/ga_change` and removes `/ga_description`. See the [Giveaway reference](docs/en/FEATURES.md#giveawaycog).
 

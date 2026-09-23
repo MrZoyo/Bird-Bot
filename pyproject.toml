@@ -1,6 +1,6 @@
 [project]
 name = "dcgameserverhelper"
-version = "2.0.7"
+version = "2.0.8"
 description = "Discord game server helper bot"
 requires-python = ">=3.12"
 dependencies = [

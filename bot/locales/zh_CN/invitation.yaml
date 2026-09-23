@@ -11,6 +11,8 @@ roomfull_title: '[🚫房间已满🚫]'
 invite_embed_content_edited: "- 📢 语音频道: `{name}`        [偷看一眼]({url})\n- 👤 发起用户: {mention}\n\
   - ⏰ 创建时间: {time}"
 roomfull_set_message: 房间已被设置为满员
+channel_unavailable: '频道（ID: {channel_id}）'
+channel_deleted: '已删除频道（ID: {channel_id}）'
 not_in_vc_message: 你已经离开了房间，无法再使用这个按钮。
 extract_channel_id_error: 提取房间链接失败，请联系管理员。
 default_invite_embed_title: 快来和我一起玩！

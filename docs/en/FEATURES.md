@@ -155,6 +155,8 @@ Config: `bot/config/privateroom.yaml`, `bot/config/role.yaml`
 
 PrivateRoomCog sells time-limited private voice rooms through Shop balances. It creates the configured Discord channel structure, stores ownership and expiry in SQLite, applies voice-activity and booster discounts, and removes expired rooms.
 
+Boosters receive 30 extra voice hours by default when calculating purchase and renewal discounts. Override this with `privateroom.booster_discount_hours`, or set it to zero to disable the bonus. Eligibility uses the role configured in `role.signature.helper_role_id`.
+
 The example config grants 31 days for a purchase, allows renewal during the final seven days, and extends a renewal by 31 days. A normal renewal extends from the stored `end_date`; a stale active room whose date has already passed extends from the current time, so the user is not charged for elapsed days.
 
 Users can restore saved room settings when the recorded room is missing. Administrators can initialize the shop, inspect rooms, repair expiry state, reset setup, and block a user from the feature.

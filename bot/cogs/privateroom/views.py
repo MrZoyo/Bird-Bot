@@ -133,7 +133,7 @@ class PrivateRoomShopView(discord.ui.LayoutView):
                 points_cost=self.cog.conf['points_cost'],
                 duration=self.cog.conf['room_duration_days'],
                 hours_threshold=self.cog.conf['voice_hours_threshold'],
-                booster_hours=self.cog.conf.get('booster_discount_hours', 0),
+                booster_hours=self.cog.conf.get('booster_discount_hours', 30),
                 available_rooms=shown_available_rooms,
                 max_rooms=max_rooms,
             ),

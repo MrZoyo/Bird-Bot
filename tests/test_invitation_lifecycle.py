@@ -217,10 +217,16 @@ def test_edit_failure_retains_end_and_restart_retries_once(tmp_path, monkeypatch
 def test_room_deletion_ends_active_invitation(tmp_path, monkeypatch):
     async def scenario():
         env = await setup(tmp_path, monkeypatch)
-        await env.lifecycle.room_deleted(10)
+        # Discord removes the channel from cache before dispatching deletion.
+        env.bot.get_channel = lambda cid: env.message.channel if cid == 20 else None
+        env.bot.fetch_channel = AsyncMock(side_effect=AssertionError('deleted channel should not be fetched'))
+        await env.lifecycle.room_deleted(10, voice_channel=env.room)
         assert await env.db.active() == []
         assert (await env.db.get(env.row['id']))['end_reason'] == 'room_deleted'
         assert env.message.edits[-1]['view'] is None
+        assert '`Room`' in env.message.edits[-1]['embed'].description
+        assert (await env.db.get(env.row['id']))['message_sync'] == 'done'
+        env.bot.fetch_channel.assert_not_awaited()
     asyncio.run(scenario())
 
 

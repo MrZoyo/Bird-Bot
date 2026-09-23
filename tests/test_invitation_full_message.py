@@ -1,8 +1,10 @@
 import asyncio
 import logging
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import discord
+import pytest
 
 from bot.cogs.create_invitation import full_message
 from bot.cogs.create_invitation import views as invitation_views
@@ -235,11 +237,74 @@ def test_update_invitation_message_to_full_repaints_components_v2_panel(monkeypa
     assert "voice=Alpha Room" in text
 
 
+@pytest.mark.parametrize('panel', [False, True], ids=['embed', 'components_v2'])
+@pytest.mark.parametrize('resolution', ['fetch', 'saved', 'saved_forbidden', 'saved_retry', 'forbidden', 'missing', 'retry'])
+def test_full_message_recovers_channel_names_without_cache(panel, resolution):
+    async def scenario():
+        url = 'https://discord.com/channels/123/456'
+        description = f'join {url} from <@789> posted <t:1700000000:R>'
+        if resolution.startswith('saved'):
+            description = description.replace(url, rf'[Alpha \[Room\]]({url})')
+        bot = SimpleNamespace(get_channel=lambda _: None, fetch_channel=AsyncMock())
+        if resolution == 'fetch':
+            bot.fetch_channel.return_value = SimpleNamespace(id=456, name='Fetched Room')
+        else:
+            error_type, status = {
+                'saved': (discord.NotFound, 404), 'missing': (discord.NotFound, 404),
+                'saved_forbidden': (discord.Forbidden, 403), 'saved_retry': (discord.HTTPException, 500),
+                'forbidden': (discord.Forbidden, 403), 'retry': (discord.HTTPException, 500),
+            }[resolution]
+            bot.fetch_channel.side_effect = error_type(SimpleNamespace(status=status, reason='unavailable'), 'unavailable')
+        if panel:
+            view = discord.ui.LayoutView()
+            view.add_item(full_message.build_panel_container(title='Need one', description=description, buttons=[]))
+            message = FakeV2Message(view.to_components())
+        else:
+            message = FakeMessage(discord.Embed(title='Need one', description=description))
+
+        outcome = await full_message.update_invitation_message_to_full(bot, message)
+        bot.fetch_channel.assert_awaited_once_with(456)
+        if resolution == 'retry':
+            assert outcome == 'retry'
+            if panel:
+                assert not message.edits
+            else:
+                assert message.edited_embed is None
+            return
+        assert outcome == 'updated'
+        if panel:
+            payload = message.edits[-1]['view'].to_components()
+            text = _first_text_content(payload)
+            assert not any(c['type'] == 2 for c in _walk_components(payload))
+            repeated = FakeV2Message(payload)
+        else:
+            text = message.edited_embed.description
+            assert message.edited_view is None
+            repeated = FakeMessage(message.edited_embed)
+        expected = {
+            'fetch': 'Fetched Room', 'saved': 'Alpha [Room]',
+            'saved_forbidden': 'Alpha [Room]', 'saved_retry': 'Alpha [Room]',
+            'forbidden': '频道（ID: 456）', 'missing': '已删除频道（ID: 456）',
+        }[resolution]
+        assert f'`{expected}`' in text
+        assert url in text and '<@789>' in text and '<t:1700000000:R>' in text
+        assert '未知频道' not in text
+        if resolution.startswith('saved'):
+            # A retry of the already-full payload must retain the saved name.
+            assert await full_message.update_invitation_message_to_full(bot, repeated) == 'updated'
+            text = _first_text_content(repeated.edits[-1]['view'].to_components()) if panel else (
+                repeated.edited_embed.description
+            )
+            assert '`Alpha [Room]`' in text
+
+    asyncio.run(scenario())
+
+
 def test_team_invitation_view_uses_components_v2_with_separator(monkeypatch):
     async def scenario():
         _install_view_translations(monkeypatch)
         guild = SimpleNamespace(id=123)
-        channel = SimpleNamespace(id=456, guild=guild)
+        channel = SimpleNamespace(id=456, name="Alpha [Room]", guild=guild)
         user = SimpleNamespace(
             id=789,
             mention="<@789>",
@@ -260,6 +325,7 @@ def test_team_invitation_view_uses_components_v2_with_separator(monkeypatch):
         assert container["type"] == 17
         assert _first_text_content(container["components"]).startswith("### 缺1")
         assert "<@999>" not in _first_text_content(container["components"])
+        assert r"[Alpha \[Room\]](https://discord.com/channels/123/456)" in _first_text_content(container["components"])
         assert not any(component["type"] == 14 for component in container["components"])
         action_row = container["components"][-1]
         assert [button["label"] for button in action_row["components"]] == ["Join", "Full"]

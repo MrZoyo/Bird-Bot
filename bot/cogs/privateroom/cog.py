@@ -615,7 +615,7 @@ class PrivateRoomCog(commands.Cog):
         Returns:
             float: 优惠小时数
         """
-        return float(self.conf.get('booster_discount_hours', 0))
+        return float(self.conf.get('booster_discount_hours', 30))
 
     async def calculate_discount(self, user_id: int) -> tuple:
         """计算用户的折扣率和需要支付的积分
