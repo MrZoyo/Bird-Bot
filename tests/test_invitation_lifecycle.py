@@ -63,6 +63,32 @@ def test_concurrent_publish_and_end_never_delete_another_generation(tmp_path):
     asyncio.run(scenario())
 
 
+def test_room_name_migration_preserves_existing_invitation_state(tmp_path):
+    async def scenario():
+        db = InvitationDatabaseManager(str(tmp_path / 'v1.db'))
+        await db.initialize()
+        older = await prepare(db)
+        await db.activate(older['id'], 101)
+        active = await prepare(db)
+        await db.activate(active['id'], 102)
+        # Recreate the pre-2.0.9 schema with already-active/ended generations.
+        async with connect_database(db.db_path) as conn:
+            await conn.execute('ALTER TABLE teamup_invitations DROP COLUMN voice_channel_name')
+            await conn.execute("UPDATE schema_version SET version=1 WHERE namespace='room_invitations'")
+            await conn.commit()
+        before = [await db.get(older['id']), await db.get(active['id'])]
+        await db.initialize()
+        await db.initialize()
+        after = [await db.get(older['id']), await db.get(active['id'])]
+        assert all(row['voice_channel_name'] is None for row in after)
+        assert [{k: v for k, v in row.items() if k != 'voice_channel_name'} for row in after] == before
+        assert (await db.current(10))['id'] == active['id']
+        async with connect_database(db.db_path) as conn:
+            async with conn.execute("SELECT version FROM schema_version WHERE namespace='room_invitations'") as cur:
+                assert await cur.fetchone() == (2,)
+    asyncio.run(scenario())
+
+
 def test_legacy_migration_keeps_only_identifiable_latest_live_invite(tmp_path):
     async def scenario():
         path = str(tmp_path / 'legacy.db')
@@ -230,6 +256,48 @@ def test_room_deletion_ends_active_invitation(tmp_path, monkeypatch):
     asyncio.run(scenario())
 
 
+def test_raw_link_invitation_keeps_database_name_after_restart_and_offline_deletion(tmp_path, monkeypatch):
+    async def scenario():
+        env = await setup(tmp_path, monkeypatch)
+        await env.db.remember_channel_name(10, 'Saved Room')
+        assert 'Saved Room' not in env.message.embeds[0].description
+        env.bot.get_channel = lambda cid: env.message.channel if cid == 20 else None
+        env.bot.fetch_channel = AsyncMock(side_effect=discord.NotFound(
+            SimpleNamespace(status=404, reason='missing'), 'missing'))
+        restarted_db = InvitationDatabaseManager(env.db.db_path)
+        await restarted_db.initialize()
+        restarted = InvitationLifecycle(env.bot, restarted_db, None)
+        await restarted.reconcile()
+        row = await restarted_db.get(env.row['id'])
+        assert (row['status'], row['end_reason'], row['message_sync']) == ('ended', 'room_deleted', 'done')
+        assert '`Saved Room`' in env.message.edits[-1]['embed'].description
+        assert env.message.edits[-1]['view'] is None
+    asyncio.run(scenario())
+
+
+def test_deletion_name_is_durable_when_message_edit_needs_retry(tmp_path, monkeypatch):
+    async def scenario():
+        env = await setup(tmp_path, monkeypatch)
+        await env.db.remember_channel_name(10, 'Old Room')
+        env.room.name = 'Renamed Room'
+        env.bot.get_channel = lambda cid: env.message.channel if cid == 20 else None
+        env.bot.fetch_channel = AsyncMock(side_effect=discord.NotFound(
+            SimpleNamespace(status=404, reason='missing'), 'missing'))
+        original_edit = env.message.edit
+        env.message.edit = AsyncMock(side_effect=discord.HTTPException(
+            SimpleNamespace(status=500, reason='temporary'), 'temporary'))
+        await env.lifecycle.room_deleted(10, voice_channel=env.room)
+        row = await env.db.get(env.row['id'])
+        assert row['message_sync'] == 'pending'
+        assert row['voice_channel_name'] == 'Renamed Room'
+        env.message.edit = original_edit
+        restarted = InvitationLifecycle(env.bot, InvitationDatabaseManager(env.db.db_path), None)
+        assert await restarted.sync_one(row) == 'updated'
+        assert '`Renamed Room`' in env.message.edits[-1]['embed'].description
+        assert (await env.db.get(row['id']))['message_sync'] == 'done'
+    asyncio.run(scenario())
+
+
 def test_room_full_without_active_invitation_returns_clear_feedback(tmp_path, monkeypatch):
     async def scenario():
         env = await setup(tmp_path, monkeypatch)
@@ -332,6 +400,7 @@ def test_new_publish_saves_exact_message_and_marks_previous_full(tmp_path, monke
         current = await env.db.current(10)
         assert current['invitation_message_id'] == 102
         assert current['user_id'] == env.other.id
+        assert current['voice_channel_name'] == env.room.name
         assert env.message.edits[-1]['view'] is None
         assert obj.reply.await_args.kwargs['view'].invitation_id == current['id']
     asyncio.run(scenario())

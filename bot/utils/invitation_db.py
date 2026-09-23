@@ -23,6 +23,7 @@ async def initialize_invitation_schema(db):
     ''')
     await apply_schema_migrations(db, 'room_invitations', [
         SchemaMigration(1, 'Explicit invitation lifecycle and durable message synchronization', _migrate_lifecycle),
+        SchemaMigration(2, 'Persist room names independently of invitation presentation', _migrate_room_name),
     ])
 
 
@@ -65,6 +66,10 @@ async def _migrate_lifecycle(db):
     ''')
 
 
+async def _migrate_room_name(db):
+    await add_column_if_missing(db, 'teamup_invitations', 'voice_channel_name', 'TEXT')
+
+
 async def _rows(db, sql, params=()):
     async with db.execute(sql, params) as cursor:
         names = [column[0] for column in cursor.description]
@@ -82,18 +87,27 @@ class InvitationDatabaseManager(BaseDatabaseManager):
             await db.commit()
 
     async def prepare(self, *, user_id, channel_id, voice_channel_id, content,
-                      player_count=1, game_type=None) -> dict[str, Any]:
+                      player_count=1, game_type=None, voice_channel_name=None) -> dict[str, Any]:
         async with connect_database(self.db_path) as db:
             async with db.execute('''
                 INSERT INTO teamup_invitations
                     (user_id, channel_id, voice_channel_id, message_content,
                      player_count, game_type, created_at, expires_at,
-                     invitation_channel_id, status)
-                VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?, 'pending')
-            ''', (user_id, channel_id, voice_channel_id, content, player_count, game_type, channel_id)) as cursor:
+                     invitation_channel_id, status, voice_channel_name)
+                VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?, 'pending', ?)
+            ''', (user_id, channel_id, voice_channel_id, content, player_count, game_type,
+                  channel_id, voice_channel_name)) as cursor:
                 invitation_id = cursor.lastrowid
             await db.commit()
         return await self.get(invitation_id)
+
+    async def remember_channel_name(self, voice_channel_id, name):
+        """Keep the last known name for active invitations and pending edits."""
+        async with connect_database(self.db_path) as db:
+            await db.execute('''UPDATE teamup_invitations SET voice_channel_name=?
+                WHERE voice_channel_id=? AND (status IN ('pending', 'active') OR message_sync='pending')
+                AND voice_channel_name IS NOT ?''', (name, voice_channel_id, name))
+            await db.commit()
 
     async def get(self, invitation_id):
         async with connect_database(self.db_path) as db:

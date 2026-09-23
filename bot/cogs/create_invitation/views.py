@@ -100,10 +100,6 @@ class TeamInvitationView(discord.ui.LayoutView):
         sig = await self.role_db.get_user_signature(author.id)
         signature = sig['signature'] if sig and not sig['is_disabled'] else None
 
-        channel_name = re.sub(r'([\\`*_~|\[\]()])', r'\\\1', self.channel.name)
-        channel_name = discord.utils.escape_mentions(channel_name)
-        vc_link = f"[{channel_name}]({self.url})"
-
         panel_title = title or content
         # Remove mentions from content
         panel_title = re.sub(r'<@\d+>', '', panel_title)
@@ -115,7 +111,7 @@ class TeamInvitationView(discord.ui.LayoutView):
 
         description_parts = [
             self.invite_embed_content.format(
-                vc_url=vc_link,
+                vc_url=self.url,
                 mention=author.mention,
                 time=elapsed_time,
             ),

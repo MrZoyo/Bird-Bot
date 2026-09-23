@@ -45,6 +45,7 @@ class InvitationLifecycle:
             row = await self.db.prepare(
                 user_id=author.id, channel_id=obj.channel.id, voice_channel_id=channel.id,
                 content=content, player_count=len(channel.members), game_type=game_type,
+                voice_channel_name=channel.name,
             )
             view = TeamInvitationView(self.bot, channel, author, self.role_db, invitation_id=row['id'])
             try:
@@ -134,7 +135,10 @@ class InvitationLifecycle:
                 if channel is None:
                     channel = await self.bot.fetch_channel(row['invitation_channel_id'])
                 message = await channel.fetch_message(row['invitation_message_id'])
-            outcome = await update_invitation_message_to_full(self.bot, message, voice_channel=voice_channel)
+            outcome = await update_invitation_message_to_full(
+                self.bot, message, voice_channel=voice_channel,
+                voice_channel_name=row.get('voice_channel_name'),
+            )
         except discord.NotFound:
             outcome = 'missing'
         except discord.Forbidden:
@@ -154,6 +158,8 @@ class InvitationLifecycle:
 
     async def room_deleted(self, channel_id, *, voice_channel=None):
         async with self.room_lock(channel_id):
+            if voice_channel is not None:
+                await self.db.remember_channel_name(channel_id, voice_channel.name)
             row = await self.db.current(channel_id)
             if row:
                 await self.db.end(row['id'], 'room_deleted')

@@ -325,7 +325,9 @@ def test_team_invitation_view_uses_components_v2_with_separator(monkeypatch):
         assert container["type"] == 17
         assert _first_text_content(container["components"]).startswith("### 缺1")
         assert "<@999>" not in _first_text_content(container["components"])
-        assert r"[Alpha \[Room\]](https://discord.com/channels/123/456)" in _first_text_content(container["components"])
+        text = _first_text_content(container["components"])
+        assert "voice=https://discord.com/channels/123/456;" in text
+        assert "Alpha" not in text
         assert not any(component["type"] == 14 for component in container["components"])
         action_row = container["components"][-1]
         assert [button["label"] for button in action_row["components"]] == ["Join", "Full"]

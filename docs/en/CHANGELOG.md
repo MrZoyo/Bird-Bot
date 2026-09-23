@@ -7,6 +7,12 @@
 
 This file preserves the release notes that previously lived at the bottom of `README.md`. Entries describe the code at the time of each release; current runtime behavior is documented in [FEATURES.md](FEATURES.md).
 
+## 2.0.9 — 2026-09-23
+
+- Restore the original raw Discord channel link in active invitations. Version 2.0.8 unintentionally changed it to a named Markdown link while saving the room name.
+- Store the name in the invitation record instead. Preserve the latest deletion-event name before editing the message so retries and restarts can recover it.
+- Add an idempotent migration for nullable `voice_channel_name`; existing invitation state and counts are preserved. Back up the database before upgrading. Dependencies, invite leaderboard style, and the 30-hour booster benefit are unchanged.
+
 ## 2.0.8 — 2026-09-23
 
 - Preserve voice-room names when invitations end: fetch uncached channels, use the channel object supplied by deletion events, and save readable names in new invitation messages.

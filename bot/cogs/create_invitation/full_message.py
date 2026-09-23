@@ -10,12 +10,14 @@ from bot.utils.i18n import t
 
 
 async def update_invitation_message_to_full(
-    bot: Any, message: discord.Message, *, voice_channel: Any = None,
+    bot: Any, message: discord.Message, *, voice_channel: Any = None, voice_channel_name: str | None = None,
 ) -> str:
     """Update a team invitation message to the shared "room full" style."""
     try:
         if message.embeds:
-            await _update_legacy_embed_message(bot, message, voice_channel=voice_channel)
+            await _update_legacy_embed_message(
+                bot, message, voice_channel=voice_channel, voice_channel_name=voice_channel_name,
+            )
             return 'updated'
 
         panel_data = _extract_panel_data(message)
@@ -24,7 +26,9 @@ async def update_invitation_message_to_full(
 
         title, description, thumbnail_url = panel_data
         full_title = _full_title(title)
-        full_description = await _build_full_description(bot, description, voice_channel=voice_channel)
+        full_description = await _build_full_description(
+            bot, description, voice_channel=voice_channel, voice_channel_name=voice_channel_name,
+        )
         view = _build_full_panel_view(
             title=full_title,
             description=full_description,
@@ -63,9 +67,13 @@ def _full_title(title):
     return f"{label} ~~{title}~~" if title else label
 
 
-async def _update_legacy_embed_message(bot: Any, message: discord.Message, *, voice_channel: Any = None) -> None:
+async def _update_legacy_embed_message(
+    bot: Any, message: discord.Message, *, voice_channel: Any = None, voice_channel_name: str | None = None,
+) -> None:
     embed = message.embeds[0]
-    new_description = await _build_full_description(bot, embed.description or "", voice_channel=voice_channel)
+    new_description = await _build_full_description(
+        bot, embed.description or "", voice_channel=voice_channel, voice_channel_name=voice_channel_name,
+    )
 
     new_embed = discord.Embed(
         title=_full_title(embed.title),
@@ -198,8 +206,7 @@ def _extract_thumbnail_url(components: list[dict[str, Any]]) -> str | None:
 
 
 def _saved_channel_name(description: str, url: str) -> str | None:
-    # Full messages keep the name in code; active messages keep it in the link
-    # label so a deleted room remains identifiable after a restart.
+    # Compatibility for full messages and the named links emitted by 2.0.8.
     full_name = re.search(r'`([^`\n]+)`[ \t]+\[[^\]\n]*\]\(' + re.escape(url) + r'\)', description)
     if full_name:
         return full_name.group(1) if full_name.group(1) != '未知频道' else None
@@ -209,7 +216,9 @@ def _saved_channel_name(description: str, url: str) -> str | None:
     return None
 
 
-async def _build_full_description(bot: Any, description: str, *, voice_channel: Any = None) -> str:
+async def _build_full_description(
+    bot: Any, description: str, *, voice_channel: Any = None, voice_channel_name: str | None = None,
+) -> str:
     voice_channel_match = re.search(
         r'https://discord\.com/channels/\d+/(\d+)',
         description,
@@ -234,7 +243,7 @@ async def _build_full_description(bot: Any, description: str, *, voice_channel: 
     channel_id = int(voice_channel_id)
     if getattr(voice_channel, 'id', None) != channel_id:
         voice_channel = bot.get_channel(channel_id)
-    saved_name = _saved_channel_name(description, url)
+    saved_name = voice_channel_name or _saved_channel_name(description, url)
     fallback_key = 'invitation.channel_unavailable'
     if voice_channel is None:
         try:
