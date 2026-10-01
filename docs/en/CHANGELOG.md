@@ -9,6 +9,7 @@ This file preserves the release notes that previously lived at the bottom of `RE
 
 ## 2.0.9 — 2026-09-23
 
+- 2026-10-01 fix: restore the five-minute display window for team-up boards, renewed by same-room republication. Preserve invitation records, full buttons, and restart recovery. Bound board text while keeping complete entries and reporting omissions. Version remains 2.0.9; no schema or dependency changes.
 - Restore the original raw Discord channel link in active invitations. Version 2.0.8 unintentionally changed it to a named Markdown link while saving the room name.
 - Store the name in the invitation record instead. Preserve the latest deletion-event name before editing the message so retries and restarts can recover it.
 - Add an idempotent migration for nullable `voice_channel_name`; existing invitation state and counts are preserved. Back up the database before upgrading. Dependencies, invite leaderboard style, and the 30-hour booster benefit are unchanged.

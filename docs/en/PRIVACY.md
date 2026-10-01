@@ -125,7 +125,7 @@ key is lost, existing encrypted database and backup files cannot be decrypted.
 
 ## Retention and Deletion
 
-- Team-up invitations expire after the configured runtime window; the current runtime default is 5 minutes.
+- Team-up entries leave display boards five minutes after publication by default. Hiding an entry does not delete its invitation record. Completed invitations are cleaned up after 14 days once message synchronization succeeds.
 - Temporary voice room rows are removed when the managed channel no longer exists.
 - Inactive temporary ban records can be cleaned by the ban database cleanup path; active records are kept until unban handling completes.
 - Logs rotate according to `log_backup_count`.

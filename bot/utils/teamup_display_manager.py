@@ -140,9 +140,16 @@ class TeamupDisplayManager(BaseDatabaseManager):
         """Compatibility name: only completed history expires, never active invites."""
         return await InvitationDatabaseManager(self.db_path).cleanup_history()
 
-    async def get_active_invitations(self) -> List[Dict]:
-        """Get all active teamup invitations"""
-        return await InvitationDatabaseManager(self.db_path).active()
+    async def get_active_invitations(self, max_age_minutes: int = 5) -> List[Dict]:
+        """Read recent invitations for display without ending their lifecycle."""
+        async with connect_database(self.db_path) as db:
+            async with db.execute('''
+                SELECT * FROM teamup_invitations
+                WHERE status='active' AND created_at > datetime('now', ?)
+                ORDER BY id DESC
+            ''', (f'-{max(1, int(max_age_minutes))} minutes',)) as cursor:
+                names = [column[0] for column in cursor.description]
+                return [dict(zip(names, row)) for row in await cursor.fetchall()]
 
     async def update_user_stats(self, user_id: int) -> bool:
         """Update user teamup statistics"""

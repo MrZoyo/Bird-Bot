@@ -1,6 +1,7 @@
 messages:
   display_title: 🎮 组队信息板
   no_teamup_message: 📭 当前没有组队信息
+  overflow: '另有 {count} 条组队信息暂未展示，请到对应组队频道查看。'
   general_teamup_title: 🌐 综合游戏组队
   init_success: ✅ 组队展示板创建成功！
   init_error: ❌ 创建展示板失败，请检查频道权限

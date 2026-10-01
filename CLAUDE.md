@@ -64,7 +64,7 @@ Runtime config is YAML:
 - Relative paths such as `./data/bot.db` resolve from the repository root, not the process CWD.
 - Keep both `.yaml.example` templates and local real YAML commented. Comments should explain units, Discord ID targets, DB/locale ownership, and whether a key is currently read by runtime code.
 - Unless a feature has its own explicit permission table, "owner / admin" project wording means users who can use the default admin channel (`main.admin_channel_id`) through Discord channel permissions. Commands should reuse `check_channel_validity` for that default boundary.
-- Signature change cooldown uses 3 fixed change slots and reads `role.signature.cooldown_days` for the slot reuse window; default is 7 days. `role.signature.max_changes_per_week` is a historical compatibility field and is not read by runtime code. Teamup invitation expiry is no longer a config follow-up because teamup should use direct room links instead of generated invites.
+- Signature change cooldown uses 3 fixed change slots and reads `role.signature.cooldown_days` for the slot reuse window; default is 7 days. `role.signature.max_changes_per_week` is a historical compatibility field and is not read by runtime code. Teamup display visibility uses `display.invitation_expire_minutes` (default 5); this is separate from the room link and invitation lifecycle.
 
 Legacy JSON:
 
@@ -137,7 +137,7 @@ Room invitations are owned by `CreateInvitationCog.lifecycle` and `InvitationDat
 - Each voice room has at most one active invitation; the database enforces this with a partial unique index.
 - Full means ending one invitation, not locking the voice room. Invitation buttons target an exact invitation id; room-panel buttons resolve the room's current invitation. Keep each entry's existing permission check.
 - New invitations replace the previous generation atomically after sending the new message. A stale click must never end a newer generation.
-- The display board reads active invitations. The legacy five-minute expiry field no longer controls active invitations; completed, successfully synchronized history is retained for 14 days.
+- The display board reads active invitations published within `display.invitation_expire_minutes` (default 5). Same-room republication restarts this window; the next two-minute refresh hides expired entries without ending invitations or disabling buttons. Rendering preserves complete entries within Discord's text limits and reports omitted entries. Completed, successfully synchronized history is retained for 14 days.
 - Dynamic invitation buttons are registered in `cog_load`; defer before database/network work. Ended-message updates are durable, idempotent, and retried at most three times. Report partial synchronization instead of unconditional success.
 - Follow `docs/refactoring/ROOM_INVITATION_LIFECYCLE.md` for migration and regression coverage.
 

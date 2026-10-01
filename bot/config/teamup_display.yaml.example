@@ -8,8 +8,8 @@ display:
   embed_color: 10039500
 # 配置字段；当前后台 refresh_displays loop 在代码里固定为每 2 分钟运行，初始化会读取该值但未用于 loop 参数。
   refresh_interval_minutes: 3
-# 遗留配置字段；运行时代码不读取该值，也不再计划接入。
-# 活跃邀请持续展示，直到满员、新邀请替换或房间删除；此值不控制邀请生命周期。
+# 组队信息在展示板的保留分钟数；同房间重新发布会重新计时，到期后在下一次刷新移除。
+# 只控制展示，不结束邀请或禁用满员按钮；邀请记录仍按生命周期保留。
   invitation_expire_minutes: 5
 # 展示板格式化用 emoji 映射；消息模板在 bot/locales/zh_CN/teamup_display.yaml。
 emojis:

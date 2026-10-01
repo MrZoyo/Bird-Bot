@@ -14,6 +14,7 @@ from bot.utils.channel_validator import check_channel_validity
 from bot.utils.i18n import t
 from bot.utils.task_helpers import wait_until_ready_or_stop
 from bot.utils.teamup_display_manager import TeamupDisplayManager
+from .rendering import fit_sections, text_length
 
 
 class TeamupDisplayCog(commands.Cog):
@@ -32,6 +33,7 @@ class TeamupDisplayCog(commands.Cog):
         self.max_content_length = self.display_config['max_content_length']
         self.embed_color = self.display_config['embed_color']
         self.refresh_interval = self.display_config['refresh_interval_minutes']
+        self.invitation_expire_minutes = max(1, int(self.display_config.get('invitation_expire_minutes', 5)))
         self.emojis = conf['emojis']
 
     async def cog_load(self):
@@ -85,8 +87,8 @@ class TeamupDisplayCog(commands.Cog):
             color=self.embed_color
         )
         
-        # Get active teamup invitations
-        invitations = await self.db_manager.get_active_invitations()
+        # Display expiry never deletes records or disables their full buttons.
+        invitations = await self.db_manager.get_active_invitations(self.invitation_expire_minutes)
         
         if not invitations:
             embed.description = t('teamup_display.messages.no_teamup_message')
@@ -108,7 +110,7 @@ class TeamupDisplayCog(commands.Cog):
                     general_invitations.append(invitation)
             
             # Build embed content
-            embed_content = []
+            sections = []
             
             # Display game types in configured order
             for channel_id, game_type in game_types.items():
@@ -122,12 +124,7 @@ class TeamupDisplayCog(commands.Cog):
                     
                     # Only add section title if there are valid lines
                     if valid_lines:
-                        embed_content.append(f"\n**{game_type}**")
-                        for i, line in enumerate(valid_lines):
-                            embed_content.append(line)
-                            # Add space between invitations of the same type (but not after the last one)
-                            if i < len(valid_lines) - 1:
-                                embed_content.append("")
+                        sections.append((game_type, valid_lines))
             
             # Add general teamup section
             if general_invitations:
@@ -140,15 +137,12 @@ class TeamupDisplayCog(commands.Cog):
                 
                 # Only add section title if there are valid lines
                 if valid_general_lines:
-                    embed_content.append(f"\n**{t('teamup_display.messages.general_teamup_title')}**")
-                    for i, line in enumerate(valid_general_lines):
-                        embed_content.append(line)
-                        # Add space between invitations of the same type (but not after the last one)
-                        if i < len(valid_general_lines) - 1:
-                            embed_content.append("")
+                    sections.append((t('teamup_display.messages.general_teamup_title'), valid_general_lines))
             
-            if embed_content:
-                embed.description = "\n".join(embed_content)
+            if sections:
+                budget = min(4096, 6000 - text_length(embed.title or '')
+                             - text_length(t('teamup_display.messages.footer_text')))
+                embed.description = fit_sections(sections, budget)
             else:
                 embed.description = t('teamup_display.messages.no_teamup_message')
         

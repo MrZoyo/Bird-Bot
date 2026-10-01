@@ -35,7 +35,8 @@ def test_lifecycle_survives_expiry_restart_and_stale_end(tmp_path):
         board = TeamupDisplayManager(path)
         await board.init_tables()
         await board.cleanup_expired_invitations()
-        assert [row['id'] for row in await board.get_active_invitations()] == [a['id']]
+        assert await board.get_active_invitations() == []
+        assert (await restarted.current(10))['id'] == a['id']
         b = await prepare(restarted, user_id=2)
         assert await restarted.activate(b['id'], 102)
         assert not await restarted.end(a['id'])
@@ -165,9 +166,15 @@ async def setup(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize('source', ['invitation', 'room', 'legacy'])
-def test_both_buttons_end_same_invitation_and_remove_components(tmp_path, monkeypatch, source):
+@pytest.mark.parametrize('expired_from_board', [False, True])
+def test_both_buttons_end_same_invitation_and_remove_components(tmp_path, monkeypatch, source, expired_from_board):
     async def scenario():
         env = await setup(tmp_path, monkeypatch)
+        if expired_from_board:
+            async with connect_database(env.db.db_path) as conn:
+                await conn.execute("UPDATE teamup_invitations SET created_at=datetime('now','-1 hour')")
+                await conn.commit()
+            assert await TeamupDisplayManager(env.db.db_path).get_active_invitations() == []
         interaction = env.interaction(env.other if source == 'room' else env.author)
         if source == 'room':
             # Exercise the actual room-panel entry, with a member who is not the poster.

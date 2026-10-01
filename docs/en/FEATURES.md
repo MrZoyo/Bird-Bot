@@ -63,7 +63,7 @@ Config: `bot/config/teamup_display.yaml`
 
 TeamupDisplayCog maintains one or more live boards for active team-up invitations. Boards group entries by the game types stored in SQLite, use direct room links, and refresh every two minutes.
 
-Each room has at most one active invitation, displayed until it is ended, replaced, or its room is deleted. Both full buttons use the same invitation lifecycle. Dynamic invitation buttons survive bot restarts; ended messages have their buttons removed. Completed, successfully synchronized history is retained for 14 days. The background refresh interval remains fixed at two minutes; `display.refresh_interval_minutes` and `display.invitation_expire_minutes` are compatibility fields.
+Each room has at most one active invitation. Boards show invitations published within the last five minutes, controlled by `display.invitation_expire_minutes`. Republishing in the same room restarts that window; expired entries disappear on the next refresh without ending the invitation or disabling its full buttons. Both full buttons use the same persistent lifecycle. Full, replacement, or room deletion ends the invitation and removes its buttons. Completed, successfully synchronized history is retained for 14 days. The background refresh interval remains fixed at two minutes; `display.refresh_interval_minutes` is a compatibility field. Busy boards retain complete entries within the message limit and report how many entries were omitted.
 
 | Command | Purpose |
 | --- | --- |
