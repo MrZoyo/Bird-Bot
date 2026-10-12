@@ -28,7 +28,7 @@ class FakeMessage:
         self.edited_embed = None
         self.edited_view = "not-updated"
 
-    async def edit(self, *, embed, view):
+    async def edit(self, *, embed, view, **kwargs):
         self.edited_embed = embed
         self.edited_view = view
 

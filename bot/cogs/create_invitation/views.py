@@ -1,11 +1,10 @@
-import re
-
 import discord
 from discord.utils import format_dt
 
 from bot.utils import config
 from bot.utils.components_v2 import build_panel_container
 from bot.utils.i18n import t
+from bot.utils.mentions import strip_discord_mentions
 from .interactions import acknowledge
 
 
@@ -98,12 +97,9 @@ class TeamInvitationView(discord.ui.LayoutView):
 
         # Get user's signature if exists (owned by role_db)
         sig = await self.role_db.get_user_signature(author.id)
-        signature = sig['signature'] if sig and not sig['is_disabled'] else None
+        signature = strip_discord_mentions(sig['signature'] or '') if sig and not sig['is_disabled'] else None
 
-        panel_title = title or content
-        # Remove mentions from content
-        panel_title = re.sub(r'<@\d+>', '', panel_title)
-        panel_title = re.sub(r'<@&\d+>', '', panel_title)
+        panel_title = strip_discord_mentions(title or content or '') or t('invitation.default_invite_embed_title')
 
         # Truncate the content
         if len(panel_title) > 256:

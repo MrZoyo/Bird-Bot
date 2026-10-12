@@ -20,7 +20,7 @@
 
 <p align="center">
   <a href="docs/zh-CN/CHANGELOG.md">
-    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.9-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="当前版本：Bird Bot v2.0.9">
+    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.10-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="当前版本：Bird Bot v2.0.10">
   </a>
   <a href="https://www.python.org/">
     <img src="https://img.shields.io/badge/PYTHON-3.12-3776AB?style=for-the-badge&amp;logo=python&amp;logoColor=white" alt="Python 3.12">
@@ -227,6 +227,8 @@ uv sync --frozen --python 3.12.3
 4. 重启 Bot，检查启动日志中是否有跳过的 cog 或迁移错误。
 
 需要时，数据库 schema 迁移会在启动阶段执行。生产 checkout 包含服务器专用 locale 或图片修改时，切勿使用 `git reset --hard` 或其他强制覆盖式更新。
+
+2.0.10 修复组队回复借机器人转发全体或身份组提及的问题。邀请文本和展示的签名会移除 `@everyone`、`@here`、`<@ID>`、`<@&ID>`，保留 `<@!ID>` 显示。新邀请只允许通知发起人；满员更新和组队看板禁用全部提及通知。历史内容在渲染时清理。从 2.0.9 升级无需数据库迁移、依赖、配置或 locale 变更，详见[组队邀请说明](docs/zh-CN/FEATURES.md#createinvitationcog)。
 
 2.0.9 恢复满员前原来的 Discord 频道链接外观，将名称单独保存在可空的 `voice_channel_name` 列，保留删除房间和重启后的名称恢复。启动时自动进行新增列迁移，升级前备份数据库；依赖及 30 小时助力福利保持不变。
 

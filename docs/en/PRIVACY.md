@@ -49,6 +49,12 @@ panels, track progress, and continue scheduled tasks after restart.
 - Check-status samples: timestamped aggregate voice counts and active channel counts.
 - Config tables: feature setup state such as ticket types, voice-channel rules, game-type mapping, and panel message locations.
 
+Since 2.0.10, new invitation text is stored after removing `@everyone`, `@here`,
+`<@ID>`, and `<@&ID>`; `<@!ID>` remains in the stored text. The same filter is
+applied when displaying signatures and historical invitation content. Saved
+signatures and existing invitation rows are not rewritten, and users' original
+Discord messages are unchanged. Existing retention rules still apply.
+
 The bot does not intentionally store Discord access tokens in the database.
 Bot tokens and runtime configuration live in ignored local YAML files under
 `bot/config/*.yaml`.

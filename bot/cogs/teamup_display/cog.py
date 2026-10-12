@@ -1,6 +1,5 @@
 import logging
 import asyncio
-import re
 from datetime import datetime, timezone
 from typing import Dict
 
@@ -12,6 +11,7 @@ from discord.ext import commands, tasks
 from bot.utils import config, fmt_channel
 from bot.utils.channel_validator import check_channel_validity
 from bot.utils.i18n import t
+from bot.utils.mentions import strip_discord_mentions
 from bot.utils.task_helpers import wait_until_ready_or_stop
 from bot.utils.teamup_display_manager import TeamupDisplayManager
 from .rendering import fit_sections, text_length
@@ -156,10 +156,8 @@ class TeamupDisplayCog(commands.Cog):
     
     async def format_invitation_line(self, invitation: Dict) -> str:
         """Format single invitation information line"""
-        # Remove mentions from content
-        content = invitation['message_content']
-        content = re.sub(r'<@\d+>', '', content)
-        content = re.sub(r'<@&\d+>', '', content)
+        # Also sanitize historical rows written before publication was filtered.
+        content = strip_discord_mentions(invitation['message_content'])
         
         # Truncate message content
         if len(content) > self.max_content_length:
@@ -213,7 +211,7 @@ class TeamupDisplayCog(commands.Cog):
             try:
                 message = await channel.fetch_message(message_id)
                 embed = await self.create_display_embed()
-                await message.edit(embed=embed)
+                await message.edit(embed=embed, allowed_mentions=discord.AllowedMentions.none())
                 return True
             except discord.NotFound:
                 logging.warning("Display board message %s not found in %s", message_id, fmt_channel(channel))
@@ -266,7 +264,7 @@ class TeamupDisplayCog(commands.Cog):
             embed = await self.create_display_embed()
             
             # Send message
-            message = await channel.send(embed=embed)
+            message = await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
             
             # Save to database
             success = await self.db_manager.save_display_board(channel.id, message.id)

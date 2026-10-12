@@ -14,6 +14,14 @@
 
 发布、替换、结束和恢复操作在同一进程内按房间串行处理。数据库条件更新仍保证迟到的旧请求不能结束新邀请，重复结束只成功一次。数据库事务中不等待 Discord 网络请求。
 
+## 提及过滤与通知
+
+自 2.0.10 起，普通组队消息和 `/invt` 在预留邀请记录前统一移除 `@everyone`、`@here`、`<@ID>` 和 `<@&ID>`。过滤为空时使用默认标题。过滤以空格替换匹配，避免删除中间片段后拼出新的提及。保留 `<@!ID>` 显示，也保留频道链接及不含上述过滤片段的普通 `@名字`。
+
+邀请面板渲染标题和签名时再次过滤，签名数据库原文不变。发送请求显式设置 `AllowedMentions(everyone=False, roles=False, users=[author], replied_user=False)`：只允许通知发起人，保留的其他用户提及只作显示。
+
+满员消息编辑、看板创建与刷新都使用 `AllowedMentions.none()`。满员标题和看板条目在渲染时过滤历史内容；已有邀请记录不做批量重写。此次过滤不修改用户原消息，也不改变关键词识别、邀请状态、房间链接和满员权限。
+
 ## 展示与恢复
 
 组队展示板只查询最近 `display.invitation_expire_minutes` 分钟内发布的活跃邀请，默认五分钟。同房间重新发布会重新计时，到期后在下一次两分钟后台刷新时下榜。下榜只影响展示，不结束邀请、不删除记录，也不禁用原消息或房间面板的满员按钮。创建、结束时立即刷新。人数读取当前语音房成员数，记录时间统一使用 UTC。
@@ -32,6 +40,8 @@
 
 迁移前备份数据库，并停用旧代码的写入者。使用 `schema_migrations` 的 `room_invitations` 命名空间执行迁移。
 
+从 2.0.9 升级到 2.0.10 无需新增数据库迁移、依赖、配置或 locale 键。
+
 2.0.9 使用该命名空间的第 2 版迁移，仅新增可空的 `voice_channel_name` 列，不修改已有邀请状态或计数。升级前在加密副本验证迁移，启动时自动应用。迁移可重复执行；回退到 2.0.8 时可以保留新增列，不要用旧库覆盖新数据。
 
 旧表中仅保留每个房间最新、尚未到期且有消息 ID 的记录为 active；其余旧记录设为 ended。有消息关联的结束记录会同步为满员。已被旧清理逻辑删除的记录无法直接恢复，也不会把所有仍显示按钮的历史消息重新激活。迁移可重复初始化而不复活已结束邀请。
@@ -43,9 +53,13 @@
 针对性测试：
 
 ```bash
-./.venv/Scripts/python.exe -m pytest -q tests/test_invitation_lifecycle.py tests/test_invitation_full_message.py tests/test_voice_channel_interaction_flow.py tests/test_create_invitation_keyword_flow.py
+uv run --no-sync python -m pytest -q tests/test_invitation_lifecycle.py tests/test_invitation_full_message.py tests/test_invitation_mentions.py tests/test_voice_channel_interaction_flow.py tests/test_create_invitation_keyword_flow.py
 ```
 
 覆盖两个满员入口、非发布者房间成员、精确消息关联、新旧邀请替换、并发结束、旧请求隔离、旧记录迁移、长时有效、无原始 View 的动态路由恢复、首次应答失效、发送失败、发送结果恢复、消息重试及房间删除。
+
+提及回归还覆盖危险文本过滤、`<@!ID>` 保留、签名清理、全空标题回退、普通消息与 `/invt` 的发起人通知白名单，以及 Components v2 / 旧 Embed 满员更新和看板创建、刷新时的禁通知参数。
+
+真实测试服的提及验证应读回邀请、满员消息和看板，确认组件与 Embed 中的过滤结果、`mention_everyone` 和角色提及状态，并检查房间链接与按钮。API 读回与发送参数只能证明服务端消息和请求行为；客户端是否收到通知须单独观察，不能从离线夹具或 `mentions` 列表推断。
 
 真实测试服还需分别记录：消息创建和编辑的 API 读回、真人按钮应答、等待超过十分钟、机器人重启后的按钮点击。测试夹具调用回调并不等同于真人 Discord 交互；只有客户端实际点击才能确认真实首次应答与客户端提示。

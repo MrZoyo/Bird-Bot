@@ -7,6 +7,7 @@ import discord
 from bot.utils import fmt_channel
 from bot.utils.components_v2 import build_panel_container, clear_legacy_message_payload
 from bot.utils.i18n import t
+from bot.utils.mentions import strip_discord_mentions
 
 
 async def update_invitation_message_to_full(
@@ -38,6 +39,7 @@ async def update_invitation_message_to_full(
         await message.edit(
             **clear_legacy_message_payload(),
             view=view,
+            allowed_mentions=discord.AllowedMentions.none(),
         )
         return 'updated'
 
@@ -61,6 +63,7 @@ async def update_invitation_message_to_full(
 
 
 def _full_title(title):
+    title = strip_discord_mentions(title or '')
     label = t('invitation.roomfull_title')
     if title and title.startswith(label):
         return title
@@ -89,7 +92,7 @@ async def _update_legacy_embed_message(
 
     # Link buttons cannot be disabled. Removing the view keeps both
     # invitation-message paths visually identical after the room is full.
-    await message.edit(embed=new_embed, view=None)
+    await message.edit(embed=new_embed, view=None, allowed_mentions=discord.AllowedMentions.none())
 
 
 def _build_full_panel_view(
@@ -224,7 +227,7 @@ async def _build_full_description(
         description,
     )
     if not voice_channel_match:
-        return description
+        return strip_discord_mentions(description)
 
     voice_channel_id = voice_channel_match.group(1)
     guild_id_match = re.search(

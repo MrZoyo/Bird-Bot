@@ -7,6 +7,13 @@
 
 This file preserves the release notes that previously lived at the bottom of `README.md`. Entries describe the code at the time of each release; current runtime behavior is documented in [FEATURES.md](FEATURES.md).
 
+## 2.0.10 — 2026-10-12
+
+- Prevent team-up invitations from relaying `@everyone`, `@here`, user mentions in `<@ID>` form, and role mentions in `<@&ID>` form. Apply the same filtering to automatic replies, `/invt` titles, displayed signatures, full-state titles, and team-up board entries.
+- Retain `<@!ID>` for display. New invitation messages allow notifications only to the invitation author; full-state edits and board creation or refresh disable all mention notifications.
+- Store filtered text for new invitations and filter historical content when rendered. Keep saved signatures and existing invitation rows intact; users' original Discord messages are unchanged.
+- Add regression coverage for filtering, retained nickname mentions, publication payloads, signatures, historical content, and full-state and board updates. Upgrading from 2.0.9 requires no schema, dependency, config, or locale changes.
+
 ## 2.0.9 — 2026-09-23
 
 - 2026-10-01 fix: restore the five-minute display window for team-up boards, renewed by same-room republication. Preserve invitation records, full buttons, and restart recovery. Bound board text while keeping complete entries and reporting omissions. Version remains 2.0.9; no schema or dependency changes.

@@ -7,6 +7,7 @@ import discord
 
 from bot.utils import fmt_channel, fmt_user
 from bot.utils.i18n import t
+from bot.utils.mentions import strip_discord_mentions
 
 from .full_message import update_invitation_message_to_full
 from .interactions import acknowledge
@@ -39,6 +40,12 @@ class InvitationLifecycle:
 
         author = getattr(obj, 'author', None) or obj.user
         content = title or getattr(obj, 'content', None) or t('invitation.default_invite_embed_title')
+        content = strip_discord_mentions(content) or t('invitation.default_invite_embed_title')
+        # Only the invitation author may be notified. User text, including
+        # signatures and retained nickname mentions, cannot ping anyone else.
+        allowed_mentions = discord.AllowedMentions(
+            everyone=False, roles=False, users=[author], replied_user=False,
+        )
         async with self.room_lock(channel.id):
             board = self.bot.get_cog('TeamupDisplayCog')
             game_type = await board.db_manager.get_game_type_by_channel(obj.channel.id) if board else None
@@ -55,9 +62,9 @@ class InvitationLifecycle:
                 raise
             try:
                 if hasattr(obj, 'author'):
-                    message = await obj.reply(view=view)
+                    message = await obj.reply(view=view, allowed_mentions=allowed_mentions)
                 else:
-                    message = await obj.followup.send(view=view, wait=True)
+                    message = await obj.followup.send(view=view, wait=True, allowed_mentions=allowed_mentions)
             except discord.HTTPException as exc:
                 if exc.status < 500:
                     await self.db.abandon(row['id'])

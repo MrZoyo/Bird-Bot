@@ -49,6 +49,8 @@ Messages of exactly six characters are silently ignored when they contain no equ
 
 The invitation can include the author's signature. If the author is outside voice, the response links to the configured room-entry channel and uses either the normal room-creation prompt or the gentler single-person prompt. Ignore lists prevent automatic handling for selected users and text channels. The room control panel and invitation panel share the same full-room update path, so both produce the same final state.
 
+Invitation text and displayed signatures remove `@everyone`, `@here`, `<@ID>`, and `<@&ID>`. The `<@!ID>` form remains visible, as do channel links and ordinary `@names` without these filtered sequences. New invitations allow mention notifications only to their author: if A's invitation includes `<@!B>`, B remains visible but the bot cannot notify B. Full-state edits disable all mention notifications. This applies to automatic invitations and `/invt`; the user's source message and saved signature remain unchanged.
+
 | Command | Purpose |
 | --- | --- |
 | `/invt [title]` | Create a team-up invitation for the current voice room |
@@ -64,6 +66,8 @@ Config: `bot/config/teamup_display.yaml`
 TeamupDisplayCog maintains one or more live boards for active team-up invitations. Boards group entries by the game types stored in SQLite, use direct room links, and refresh every two minutes.
 
 Each room has at most one active invitation. Boards show invitations published within the last five minutes, controlled by `display.invitation_expire_minutes`. Republishing in the same room restarts that window; expired entries disappear on the next refresh without ending the invitation or disabling its full buttons. Both full buttons use the same persistent lifecycle. Full, replacement, or room deletion ends the invitation and removes its buttons. Completed, successfully synchronized history is retained for 14 days. The background refresh interval remains fixed at two minutes; `display.refresh_interval_minutes` is a compatibility field. Busy boards retain complete entries within the message limit and report how many entries were omitted.
+
+Boards apply the invitation text filter when rendering each entry, including historical records. Creating or refreshing a board disables all mention notifications, including retained `<@!ID>` mentions.
 
 | Command | Purpose |
 | --- | --- |

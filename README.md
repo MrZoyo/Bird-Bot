@@ -20,7 +20,7 @@
 
 <p align="center">
   <a href="docs/en/CHANGELOG.md">
-    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.9-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="Current release: Bird Bot v2.0.9">
+    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.10-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="Current release: Bird Bot v2.0.10">
   </a>
   <a href="https://www.python.org/">
     <img src="https://img.shields.io/badge/PYTHON-3.12-3776AB?style=for-the-badge&amp;logo=python&amp;logoColor=white" alt="Python 3.12">
@@ -229,6 +229,8 @@ Before upgrading:
 4. Restart the bot and inspect startup logs for skipped cogs or migration errors.
 
 Database schema migrations run during startup where required. Never use `git reset --hard` or another force-overwriting update on a production checkout with server-specific locale or image changes.
+
+Version 2.0.10 prevents team-up replies from relaying mass or role mentions. It removes `@everyone`, `@here`, `<@ID>`, and `<@&ID>` from invitation text and displayed signatures, while retaining `<@!ID>` for display. New invitations allow notifications only to their author; full-state updates and team-up boards suppress all mentions. Historical content is filtered when rendered. Upgrading from 2.0.9 requires no schema, dependency, config, or locale changes. See the [invitation reference](docs/en/FEATURES.md#createinvitationcog).
 
 Version 2.0.9 restores the original Discord channel-link appearance before invitations are marked full. Room names are stored separately in a nullable `voice_channel_name` column, preserving deletion and restart recovery without changing the active message. Back up the database before the automatic additive migration; dependencies and the 30-hour booster benefit are unchanged.
 
