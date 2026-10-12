@@ -187,6 +187,8 @@ The cog provides modal confirmation, pending/accepted/closed states, automatic a
 
 Startup recovery selects only tickets marked open in the database. Closed records do not enter its count, message-update queue, or batch delays. Within one cog instance, repeated or concurrent ready events preserve completed recovery work and retry failed operations. Logs distinguish registered views from successful message updates.
 
+If an open ticket is missing from the startup cache, recovery queries Discord for that thread. Archived threads are skipped without changing their database status; failed lookups remain eligible for retry. Closed tickets never enter this fallback lookup.
+
 Administrators can still use `/tickets_refresh_buttons` to repair open and closed ticket controls. This covers an interrupted closure where the database is already closed but the Discord button update failed. The command skips archived or unavailable threads and disables every button on closed tickets; it does not reopen them. Startup recovery does not reopen or remove closed history.
 
 | Command | Purpose |

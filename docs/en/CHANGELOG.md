@@ -11,6 +11,7 @@ This file preserves the release notes that previously lived at the bottom of `RE
 
 - Restore only tickets marked open in the database at startup. Exclude closed history before counting or batching recovery, so closed tickets no longer cause button requests or batch delays.
 - Prevent duplicate recovery across repeated or concurrent ready events. Preserve successful recovery work and allow failed operations to retry; report completed button updates separately from registered views.
+- Resolve uncached open threads through Discord, skipping automatically archived threads without treating a cache miss as failed recovery or closing their database records.
 - Preserve `/tickets_refresh_buttons` as an explicit administrator repair operation for open and closed tickets, keeping closed-ticket controls disabled.
 - Add regression coverage for active-ticket selection, repeated and concurrent recovery, retry behavior, and manual refresh. Upgrading from 2.0.10 requires no schema, dependency, config, or locale changes.
 

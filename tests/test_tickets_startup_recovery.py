@@ -108,6 +108,7 @@ def recovery(monkeypatch):
             bot.views.append((view, kwargs))
 
         bot.get_channel = get_channel
+        bot.fetch_channel = AsyncMock(side_effect=RuntimeError("uncached channel unavailable"))
         bot.add_view = add_view
         monkeypatch.setattr(tickets_cog, "Config", lambda: SimpleNamespace(get_config=lambda name: {"db_path": "unused"}))
         monkeypatch.setattr(tickets_cog, "TicketsDatabaseManager", lambda path: db)
@@ -142,6 +143,7 @@ def test_startup_filters_closed_database_rows_before_batching(recovery, tmp_path
         await h.cog.on_ready()
 
         assert h.sleeps == []
+        h.bot.fetch_channel.assert_not_awaited()
         for row in rows:
             channel = h.channels[row["thread_id"]]
             if row["is_closed"]:
@@ -164,6 +166,7 @@ def test_all_closed_history_does_not_fetch_tickets_or_sleep(recovery):
         await h.cog.on_ready()
 
         assert h.sleeps == []
+        h.bot.fetch_channel.assert_not_awaited()
         assert all(not h.channels[row["thread_id"]].fetches for row in rows)
         assert len(h.channels[10].message.edits) == 1
         assert h.db.active_calls == 1
@@ -290,6 +293,71 @@ def test_archived_open_ticket_does_not_prevent_recovery_completion(recovery):
         assert h.db.active_calls == 1
         assert h.channels[100].fetches == [1100]
         assert h.channels[101].fetches == []
+
+    asyncio.run(scenario())
+
+
+def test_uncached_archived_ticket_rest_lookup_completes_without_message_edit(recovery):
+    async def scenario():
+        h = recovery([ticket(100), ticket(101)])
+        archived_channel = h.channels.pop(101)
+        archived_channel.archived = True
+        h.bot.fetch_channel = AsyncMock(return_value=archived_channel)
+        await h.cog.on_ready()
+        await h.cog.on_ready()
+
+        h.bot.fetch_channel.assert_awaited_once_with(101)
+        assert h.db.active_calls == 1
+        assert h.channels[100].fetches == [1100]
+        assert archived_channel.fetches == []
+        assert archived_channel.message.edits == []
+        assert all(getattr(view, "thread_id", None) != 101 for view, _ in h.bot.views)
+
+    asyncio.run(scenario())
+
+
+def test_uncached_active_ticket_rest_lookup_restores_buttons(recovery):
+    async def scenario():
+        h = recovery([ticket(100), ticket(101, accepted=True)])
+        active_channel = h.channels.pop(101)
+        h.bot.fetch_channel = AsyncMock(return_value=active_channel)
+        await h.cog.on_ready()
+        await h.cog.on_ready()
+
+        h.bot.fetch_channel.assert_awaited_once_with(101)
+        assert h.db.active_calls == 1
+        assert h.channels[100].fetches == [1100]
+        assert active_channel.fetches == [1101]
+        view = active_channel.message.edits[0]["view"]
+        assert view.children[0].disabled is True
+        assert all(not child.disabled for child in view.children[1:])
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("status", [403, 404, 503])
+def test_uncached_ticket_rest_error_stays_retryable(recovery, status, caplog):
+    caplog.set_level(logging.INFO)
+
+    async def scenario():
+        h = recovery([ticket(100), ticket(101)])
+        active_channel = h.channels.pop(101)
+        exception_type = {403: discord.Forbidden, 404: discord.NotFound, 503: discord.HTTPException}[status]
+        error = exception_type(SimpleNamespace(status=status, reason="lookup failed"), "lookup failed")
+        h.bot.fetch_channel = AsyncMock(side_effect=[error, active_channel])
+        await h.cog.on_ready()
+
+        assert active_channel.fetches == []
+        summaries = [record.getMessage() for record in caplog.records if "Ticket view recovery:" in record.getMessage()]
+        assert "failed=1, complete=False" in summaries[-1]
+        await h.cog.on_ready()
+        await h.cog.on_ready()
+
+        assert h.bot.fetch_channel.await_count == 2
+        assert h.db.active_calls == 2
+        assert h.channels[100].fetches == [1100]
+        assert active_channel.fetches == [1101]
+        assert h.channels[10].fetches == [30]
 
     asyncio.run(scenario())
 

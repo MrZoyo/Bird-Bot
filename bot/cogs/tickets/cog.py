@@ -138,6 +138,11 @@ class TicketsCog(commands.Cog):
 
                     try:
                         thread = self.bot.get_channel(thread_id)
+                        if thread is None:
+                            # READY caches omit archived threads. Check only
+                            # open tickets through REST before deciding whether
+                            # recovery must wait for a later READY.
+                            thread = await self.bot.fetch_channel(thread_id)
                         if thread and not thread.archived:  # Only process non-archived threads
                             # Create persistent view for ticket control buttons with correct state
                             ticket_view = TicketThreadView(self, thread_id, type_name, is_accepted)
