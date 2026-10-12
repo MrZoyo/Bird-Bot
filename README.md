@@ -20,7 +20,7 @@
 
 <p align="center">
   <a href="docs/en/CHANGELOG.md">
-    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.10-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="Current release: Bird Bot v2.0.10">
+    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.11-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="Current release: Bird Bot v2.0.11">
   </a>
   <a href="https://www.python.org/">
     <img src="https://img.shields.io/badge/PYTHON-3.12-3776AB?style=for-the-badge&amp;logo=python&amp;logoColor=white" alt="Python 3.12">
@@ -229,6 +229,8 @@ Before upgrading:
 4. Restart the bot and inspect startup logs for skipped cogs or migration errors.
 
 Database schema migrations run during startup where required. Never use `git reset --hard` or another force-overwriting update on a production checkout with server-specific locale or image changes.
+
+Version 2.0.11 restores only open ticket controls at startup. Closed history no longer enters the recovery queue or adds batch delays. Repeated or concurrent ready events preserve completed recovery work, while failed operations can retry. `/tickets_refresh_buttons` still repairs controls for open and closed tickets. Upgrading from 2.0.10 requires no schema, dependency, config, or locale changes. See the [ticket reference](docs/en/FEATURES.md#ticketscog).
 
 Version 2.0.10 prevents team-up replies from relaying mass or role mentions. It removes `@everyone`, `@here`, `<@ID>`, and `<@&ID>` from invitation text and displayed signatures, while retaining `<@!ID>` for display. New invitations allow notifications only to their author; full-state updates and team-up boards suppress all mentions. Historical content is filtered when rendered. Upgrading from 2.0.9 requires no schema, dependency, config, or locale changes. See the [invitation reference](docs/en/FEATURES.md#createinvitationcog).
 

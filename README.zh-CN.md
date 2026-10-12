@@ -20,7 +20,7 @@
 
 <p align="center">
   <a href="docs/zh-CN/CHANGELOG.md">
-    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.10-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="当前版本：Bird Bot v2.0.10">
+    <img src="https://img.shields.io/badge/CURRENT_RELEASE-v2.0.11-5865F2?style=for-the-badge&amp;logo=discord&amp;logoColor=white" alt="当前版本：Bird Bot v2.0.11">
   </a>
   <a href="https://www.python.org/">
     <img src="https://img.shields.io/badge/PYTHON-3.12-3776AB?style=for-the-badge&amp;logo=python&amp;logoColor=white" alt="Python 3.12">
@@ -227,6 +227,8 @@ uv sync --frozen --python 3.12.3
 4. 重启 Bot，检查启动日志中是否有跳过的 cog 或迁移错误。
 
 需要时，数据库 schema 迁移会在启动阶段执行。生产 checkout 包含服务器专用 locale 或图片修改时，切勿使用 `git reset --hard` 或其他强制覆盖式更新。
+
+2.0.11 启动时只恢复未关闭工单的控件，已关闭历史不再进入恢复队列或增加分批等待。重复或并发触发 ready 事件时保留已成功的恢复结果，失败操作仍可重试。`/tickets_refresh_buttons` 继续支持修复未关闭和已关闭工单的控件。从 2.0.10 升级无需数据库迁移、依赖、配置或 locale 变更，详见[工单说明](docs/zh-CN/FEATURES.md#ticketscog)。
 
 2.0.10 修复组队回复借机器人转发全体或身份组提及的问题。邀请文本和展示的签名会移除 `@everyone`、`@here`、`<@ID>`、`<@&ID>`，保留 `<@!ID>` 显示。新邀请只允许通知发起人；满员更新和组队看板禁用全部提及通知。历史内容在渲染时清理。从 2.0.9 升级无需数据库迁移、依赖、配置或 locale 变更，详见[组队邀请说明](docs/zh-CN/FEATURES.md#createinvitationcog)。
 

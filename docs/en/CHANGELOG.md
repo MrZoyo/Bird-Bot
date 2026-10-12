@@ -7,6 +7,13 @@
 
 This file preserves the release notes that previously lived at the bottom of `README.md`. Entries describe the code at the time of each release; current runtime behavior is documented in [FEATURES.md](FEATURES.md).
 
+## 2.0.11 — 2026-10-12
+
+- Restore only tickets marked open in the database at startup. Exclude closed history before counting or batching recovery, so closed tickets no longer cause button requests or batch delays.
+- Prevent duplicate recovery across repeated or concurrent ready events. Preserve successful recovery work and allow failed operations to retry; report completed button updates separately from registered views.
+- Preserve `/tickets_refresh_buttons` as an explicit administrator repair operation for open and closed tickets, keeping closed-ticket controls disabled.
+- Add regression coverage for active-ticket selection, repeated and concurrent recovery, retry behavior, and manual refresh. Upgrading from 2.0.10 requires no schema, dependency, config, or locale changes.
+
 ## 2.0.10 — 2026-10-12
 
 - Prevent team-up invitations from relaying `@everyone`, `@here`, user mentions in `<@ID>` form, and role mentions in `<@&ID>` form. Apply the same filtering to automatic replies, `/invt` titles, displayed signatures, full-state titles, and team-up board entries.

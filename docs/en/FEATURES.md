@@ -185,6 +185,10 @@ TicketsCog uses private Discord threads. Ticket types, panel locations, thread r
 
 The cog provides modal confirmation, pending/accepted/closed states, automatic administrator membership, DM notifications with jump links, persistent controls, statistics, and startup cleanup for missing Discord threads. DM failures do not stop ticket creation or closure.
 
+Startup recovery selects only tickets marked open in the database. Closed records do not enter its count, message-update queue, or batch delays. Within one cog instance, repeated or concurrent ready events preserve completed recovery work and retry failed operations. Logs distinguish registered views from successful message updates.
+
+Administrators can still use `/tickets_refresh_buttons` to repair open and closed ticket controls. This covers an interrupted closure where the database is already closed but the Discord button update failed. The command skips archived or unavailable threads and disables every button on closed tickets; it does not reopen them. Startup recovery does not reopen or remove closed history.
+
 | Command | Purpose |
 | --- | --- |
 | `/tickets_init [ticket_channel] [info_channel]` | Initialize the system, creating channels when omitted |
@@ -197,7 +201,7 @@ The cog provides modal confirmation, pending/accepted/closed states, automatic a
 | `/tickets_admin_remove_user <user>` | Remove a global administrator user |
 | `/tickets_accept` | Accept the current ticket |
 | `/tickets_close [reason]` | Close the current ticket |
-| `/tickets_refresh_buttons` | Refresh controls for existing tickets |
+| `/tickets_refresh_buttons` | Repair controls for existing open and closed tickets |
 | `/tickets_refresh_main` | Refresh the main ticket panel |
 | `/tickets_add_type` | Add a ticket type through a modal |
 | `/tickets_edit_type` | Edit ticket metadata, guide, color, or administrators |

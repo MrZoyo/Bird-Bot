@@ -1,5 +1,7 @@
 import asyncio
 
+import pytest
+
 from bot.utils.tickets_db import TicketsDatabaseManager
 
 
@@ -99,6 +101,7 @@ def test_ticket_lifecycle_members_stats_and_history(tmp_path):
         assert stats["by_type"] == [("support", 1)]
 
         assert await db.close_ticket(1001, closed_by=9004, reason="done") is True
+        assert await db.get_active_tickets() == []
         assert await db.add_ticket_member(1001, 3003, added_by=9001) is False
         assert await db.check_ticket_status(1001) == (True, True)
 
@@ -114,3 +117,31 @@ def test_ticket_lifecycle_members_stats_and_history(tmp_path):
         assert await db.get_ticket_number() == 2
 
     run(scenario())
+
+
+def test_ticket_recovery_query_excludes_closed_but_manual_query_retains_history(tmp_path):
+    async def scenario():
+        db = TicketsDatabaseManager(str(tmp_path / "tickets.db"))
+        await db.initialize_database()
+        for thread_id in (1001, 1002, 1003):
+            assert await db.create_ticket(
+                thread_id, thread_id + 1000, 3001, "support", 4001, thread_id - 1000
+            )
+        assert await db.accept_ticket(1002, accepted_by=9002)
+        assert await db.close_ticket(1003, closed_by=9003, reason="done")
+
+        active = await db.get_active_tickets()
+        assert {row["thread_id"] for row in active} == {1001, 1002}
+        assert all(row["is_closed"] == 0 for row in active)
+        history = await db.get_all_tickets()
+        assert {row["thread_id"] for row in history} == {1001, 1002, 1003}
+        assert next(row for row in history if row["thread_id"] == 1003)["is_closed"] == 1
+
+    run(scenario())
+
+
+@pytest.mark.parametrize("query", ["get_active_tickets", "get_all_tickets"])
+def test_ticket_recovery_query_failure_is_not_reported_as_empty(tmp_path, query):
+    db = TicketsDatabaseManager(str(tmp_path / "uninitialized.db"))
+    with pytest.raises(Exception, match="no such table"):
+        run(getattr(db, query)())

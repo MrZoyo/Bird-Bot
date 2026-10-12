@@ -408,14 +408,22 @@ class TicketsDatabaseManager(BaseDatabaseManager):
 
     async def get_active_tickets(self) -> List[dict]:
         """Get all active (not closed) tickets."""
+        return await self._get_tickets(include_closed=False)
+
+    async def get_all_tickets(self) -> List[dict]:
+        """Include closed tickets for explicit administrator button repairs."""
+        return await self._get_tickets(include_closed=True)
+
+    async def _get_tickets(self, *, include_closed: bool) -> List[dict]:
         async with connect_database(self.db_path) as db:
             try:
                 cursor = await db.execute('''
                     SELECT thread_id, message_id, creator_id, type_name, 
                            accepted_by, closed_at, is_accepted, is_closed
-                    FROM tickets_new 
+                    FROM tickets_new
+                    WHERE (? OR is_closed = 0)
                     ORDER BY created_at DESC
-                ''')
+                ''', (include_closed,))
                 rows = await cursor.fetchall()
                 
                 tickets = []
@@ -433,8 +441,9 @@ class TicketsDatabaseManager(BaseDatabaseManager):
                 
                 return tickets
             except Exception as e:
-                logging.error(f"Error getting active tickets: {e}")
-                return []
+                logging.error(f"Error getting tickets: {e}")
+                # A failed read must not mark startup recovery as complete.
+                raise
 
     async def clean_invalid_tickets(self, valid_thread_ids: List[int]) -> None:
         """Clean up tickets for threads that no longer exist."""

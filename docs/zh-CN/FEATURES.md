@@ -185,6 +185,10 @@ TicketsCog 使用私密 Discord thread。工单类型、面板位置、thread �
 
 Cog 提供 modal 确认、待处理/已接单/已关闭状态、自动添加管理员成员、包含跳转链接的私信通知、持久化控件、统计，以及启动时清理 Discord 中已不存在的 thread。私信失败不会中断工单创建或关闭。
 
+启动恢复只查询数据库中标记为未关闭的工单，已关闭记录不进入恢复计数、消息更新队列或分批等待。同一个 cog 实例内，重复或并发 ready 事件保留已完成的恢复结果，并允许失败操作重试。日志区分已注册的控件和实际成功的消息更新。
+
+管理员仍可使用 `/tickets_refresh_buttons` 修复未关闭和已关闭工单的控件，例如数据库已经关闭、Discord 按钮更新却失败的中断情况。命令会跳过已归档或不可用的 thread，把已关闭工单的所有按钮设为禁用，不会重新打开工单。启动恢复不会重新打开或移除已关闭历史。
+
 | 命令 | 用途 |
 | --- | --- |
 | `/tickets_init [ticket_channel] [info_channel]` | 初始化系统；未指定时创建频道 |
@@ -197,7 +201,7 @@ Cog 提供 modal 确认、待处理/已接单/已关闭状态、自动添加管�
 | `/tickets_admin_remove_user <user>` | 移除全局管理员用户 |
 | `/tickets_accept` | 接受当前工单 |
 | `/tickets_close [reason]` | 关闭当前工单 |
-| `/tickets_refresh_buttons` | 刷新现有工单控件 |
+| `/tickets_refresh_buttons` | 修复现有未关闭和已关闭工单的控件 |
 | `/tickets_refresh_main` | 刷新主工单面板 |
 | `/tickets_add_type` | 通过 modal 添加工单类型 |
 | `/tickets_edit_type` | 编辑工单元数据、说明、颜色或管理员 |

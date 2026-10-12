@@ -37,6 +37,10 @@ class TicketsCog(commands.Cog):
         # DB-backed cache refreshed on cog_load / after every CRUD.
         self.ticket_types: dict = {}
         self._missing_ticket_cleanup_done = False
+        self._view_restore_lock = asyncio.Lock()
+        self._views_restored = False
+        self._restored_main_message = None
+        self._restored_ticket_messages = set()
 
     async def cog_load(self):
         """Initialize the cog"""
@@ -59,6 +63,14 @@ class TicketsCog(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         """Initialize views on bot ready"""
+        # discord.py keeps persistent views across READY events. Serialize
+        # overlapping events and retain successful work if part of a run fails.
+        async with self._view_restore_lock:
+            if self._views_restored:
+                return
+            self._views_restored = await self._restore_ticket_views()
+
+    async def _restore_ticket_views(self) -> bool:
         try:
             if not self._missing_ticket_cleanup_done:
                 await self.check_and_close_missing_tickets()
@@ -68,59 +80,61 @@ class TicketsCog(commands.Cog):
             config_data = await self.db_manager.get_config()
             if not config_data:
                 logging.warning("TicketsCog: No config data found in database")
-                return
+                return False
 
             ticket_channel_id = config_data.get('ticket_channel_id')
             main_message_id = config_data.get('main_message_id')
 
             if not ticket_channel_id or not main_message_id:
                 logging.warning("TicketsCog: Missing channel or message ID in config")
-                return
+                return False
 
             # Get the ticket channel and message
             ticket_channel = self.bot.get_channel(ticket_channel_id)
             if not ticket_channel:
                 logging.error("TicketsCog: Could not find ticket channel %s", fmt_channel(ticket_channel_id))
-                return
+                return False
 
-            try:
-                main_message = await ticket_channel.fetch_message(main_message_id)
-
-                # Create and register persistent view for main message
-                ticket_types = self.ticket_types
-                if ticket_types:
-                    main_view = TicketCreateView(self, ticket_types)
-                    self.bot.add_view(main_view)
-
-                    # Update the main message with current ticket types
-                    await self.update_main_message(ticket_channel, main_message, ticket_types)
-
-                    logging.info(f"TicketsCog: Restored main ticket message with {len(ticket_types)} ticket types")
-
-            except discord.NotFound:
-                logging.warning(f"TicketsCog: Main message {main_message_id} not found")
-            except Exception as e:
-                logging.error(f"TicketsCog: Error updating main message: {e}")
+            main_key = (ticket_channel_id, main_message_id)
+            main_restored = not self.ticket_types or self._restored_main_message == main_key
+            if not main_restored:
+                try:
+                    main_message = await ticket_channel.fetch_message(main_message_id)
+                    main_view = TicketCreateView(self, self.ticket_types)
+                    self.bot.add_view(main_view, message_id=main_message_id)
+                    main_restored = await self.update_main_message(ticket_channel, main_message, self.ticket_types)
+                    if main_restored:
+                        self._restored_main_message = main_key
+                        logging.info(f"TicketsCog: Restored main ticket message with {len(self.ticket_types)} ticket types")
+                except discord.NotFound:
+                    logging.warning(f"TicketsCog: Main message {main_message_id} not found")
+                except Exception as e:
+                    logging.error(f"TicketsCog: Error updating main message: {e}")
 
             # Restore active ticket thread views and update button states
             active_tickets = await self.db_manager.get_active_tickets()
+            pending_tickets = [
+                ticket for ticket in active_tickets
+                if (ticket['thread_id'], ticket.get('message_id')) not in self._restored_ticket_messages
+            ]
             restored_count = 0
             updated_count = 0
+            skipped_count = 0
+            failed_count = 0
 
             # Process tickets in batches to avoid rate limits
             batch_size = 3  # Smaller batch size for startup
             delay_between_batches = 1.5  # seconds
 
-            logging.info(f"TicketsCog: Starting to restore {len(active_tickets)} ticket views with button updates...")
+            logging.info("TicketsCog: Starting to restore %s open ticket views with button updates...", len(pending_tickets))
 
-            for i in range(0, len(active_tickets), batch_size):
-                batch = active_tickets[i:i + batch_size]
+            for i in range(0, len(pending_tickets), batch_size):
+                batch = pending_tickets[i:i + batch_size]
 
                 for ticket_data in batch:
                     thread_id = ticket_data['thread_id']
                     type_name = ticket_data['type_name']
                     is_accepted = ticket_data.get('accepted_by') is not None
-                    is_closed = ticket_data.get('is_closed', False)
 
                     try:
                         thread = self.bot.get_channel(thread_id)
@@ -128,26 +142,33 @@ class TicketsCog(commands.Cog):
                             # Create persistent view for ticket control buttons with correct state
                             ticket_view = TicketThreadView(self, thread_id, type_name, is_accepted)
 
-                            if is_closed:
-                                # Disable all buttons for closed tickets
-                                for child in ticket_view.children:
-                                    child.disabled = True
-
-                            self.bot.add_view(ticket_view)
+                            self.bot.add_view(ticket_view, message_id=ticket_data.get('message_id') or None)
                             restored_count += 1
 
                             # Update the ticket message with correct button states
                             try:
-                                await self.update_ticket_message_buttons(thread, ticket_data, ticket_view)
-                                updated_count += 1
+                                if await self.update_ticket_message_buttons(thread, ticket_data, ticket_view):
+                                    updated_count += 1
+                                    self._restored_ticket_messages.add((thread_id, ticket_data['message_id']))
+                                else:
+                                    failed_count += 1
                             except Exception as e:
+                                failed_count += 1
                                 logging.warning(
                                     "TicketsCog: Could not update buttons for ticket thread %s: %s",
                                     fmt_channel(thread or thread_id),
                                     e,
                                 )
+                        elif thread:
+                            skipped_count += 1  # Archived threads need no message edit.
+                        else:
+                            # A cache miss is not proof of deletion. Leave the
+                            # ticket pending so a later READY can retry it.
+                            skipped_count += 1
+                            failed_count += 1
 
                     except Exception as e:
+                        failed_count += 1
                         logging.error(
                             "TicketsCog: Error restoring ticket thread %s: %s",
                             fmt_channel(thread_id),
@@ -155,17 +176,23 @@ class TicketsCog(commands.Cog):
                         )
 
                 # Add delay between batches to avoid rate limits
-                if i + batch_size < len(active_tickets):
+                if i + batch_size < len(pending_tickets):
                     await asyncio.sleep(delay_between_batches)
 
-            if restored_count > 0:
-                logging.info(f"TicketsCog: Restored {restored_count} active ticket thread views")
-                logging.info(f"TicketsCog: Updated {updated_count} ticket message buttons")
-                if updated_count < restored_count:
-                    logging.info("TicketsCog: Some button updates failed - use /tickets_refresh_buttons if needed")
+            complete = bool(main_restored and failed_count == 0)
+            logging.info(
+                "TicketsCog: Ticket view recovery: open=%s, pending=%s, registered=%s, updated=%s, "
+                "skipped=%s, failed=%s, complete=%s",
+                len(active_tickets), len(pending_tickets), restored_count, updated_count,
+                skipped_count, failed_count, complete,
+            )
+            if not complete:
+                logging.warning("TicketsCog: Recovery incomplete; retry on next READY or use /tickets_refresh_buttons")
+            return complete
 
         except Exception as e:
             logging.error(f"TicketsCog on_ready error: {e}")
+            return False
 
     async def update_main_message(self, channel, message, ticket_types):
         """Update the main ticket message with current types"""
@@ -176,20 +203,23 @@ class TicketsCog(commands.Cog):
                 **clear_legacy_message_payload(),
                 view=view,
             )
+            return True
 
         except Exception as e:
             logging.error(f"Error updating main message: {e}")
+            return False
 
     async def update_ticket_message_buttons(self, thread: discord.Thread, ticket_data: dict, view: discord.ui.View):
         """Update ticket message buttons based on current status"""
         try:
             message_id = ticket_data.get('message_id')
             if not message_id:
-                return
+                return False
 
             try:
                 message = await thread.fetch_message(message_id)
                 await message.edit(view=view)
+                return True
             except discord.NotFound:
                 logging.warning("Ticket message %s not found in thread %s", message_id, fmt_channel(thread))
             except discord.HTTPException as e:
@@ -202,6 +232,7 @@ class TicketsCog(commands.Cog):
 
         except Exception as e:
             logging.error(f"Error updating ticket message buttons: {e}")
+        return False
 
     async def is_admin_for_type(self, user: discord.Member, ticket_type: str = None) -> bool:
         """Check if user is admin for specific ticket type or globally"""
@@ -1233,7 +1264,7 @@ class TicketsCog(commands.Cog):
         await interaction.response.defer(ephemeral=True)
 
         try:
-            all_tickets = await self.db_manager.get_active_tickets()  # This gets ALL tickets now, not just active
+            all_tickets = await self.db_manager.get_all_tickets()
             updated_count = 0
             error_count = 0
             skipped_count = 0
@@ -1284,8 +1315,10 @@ class TicketsCog(commands.Cog):
                             self.bot.add_view(ticket_view)
 
                             # Update the ticket message
-                            await self.update_ticket_message_buttons(thread, ticket_data, ticket_view)
-                            updated_count += 1
+                            if await self.update_ticket_message_buttons(thread, ticket_data, ticket_view):
+                                updated_count += 1
+                            else:
+                                error_count += 1
                         else:
                             # Thread not found, count as skipped
                             skipped_count += 1
